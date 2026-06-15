@@ -376,13 +376,9 @@ class AppState extends ChangeNotifier {
     final qId = _quizService.currentQuestion!.id!;
     _currentQuestionStats = await _quizService.getQuestionStats(qId);
 
-    // 加载或生成AI解析
-    // 做错的题自动加载解析，做对的不展示
-    if (_lastAnswerRecord!.isCorrect) {
-      _currentAnalysis = null; // 做对默认不展示
-    } else {
-      await _loadAnalysis(); // 做错自动展示
-    }
+    // 不再自动加载解析，由用户手动触发
+    _currentAnalysis = null;
+    _analysisLoading = false;
 
     notifyListeners();
   }
@@ -399,8 +395,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 手动查看解析（做对时点击按钮）
+  /// 手动查看解析
   Future<void> showAnalysis() async {
+    await _loadAnalysis();
+  }
+
+  /// 重新生成解析（清除缓存）
+  Future<void> regenerateAnalysis() async {
+    if (_aiService == null || currentQuestion == null) return;
+    // 清除缓存，强制 AI 重新生成
+    if (currentQuestion!.id != null) {
+      await _db.cacheAnalysis(currentQuestion!.id!, '');
+    }
+    _currentAnalysis = null;
     await _loadAnalysis();
   }
 

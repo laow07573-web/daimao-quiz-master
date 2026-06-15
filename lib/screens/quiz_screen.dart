@@ -20,6 +20,8 @@ class _QuizScreenState extends State<QuizScreen> {
   String? _followUpResponse;
   bool _followUpLoading = false;
   bool _inErrorBook = false;
+  int? _lastQuestionId;
+  bool _showAnalysis = false;
   final Set<String> _selectedOptions = {};
 
   @override
@@ -53,6 +55,12 @@ class _QuizScreenState extends State<QuizScreen> {
 
         final lastRecord = appState.lastAnswerRecord;
         final isAnswered = lastRecord != null;
+
+        // Reset analysis display on question change
+        if (appState.currentQuestion?.id != _lastQuestionId) {
+          _showAnalysis = false;
+          _lastQuestionId = appState.currentQuestion?.id;
+        }
 
         return Scaffold(
           backgroundColor: const Color(0xFFF5F7FA),
@@ -95,9 +103,18 @@ class _QuizScreenState extends State<QuizScreen> {
                       if (!isAnswered)
                         ...[_buildOptionsArea(appState, question)]
                       else ...[
-                        _buildResultArea(appState, question),
-                        const SizedBox(height: 16),
-                        _buildAnalysisArea(appState, question),
+                        _buildAnsweredOptions(appState, question),
+                        const SizedBox(height: 12),
+                        _buildResultFeedback(appState, question),
+                        const SizedBox(height: 8),
+                        if (_showAnalysis || appState.currentAnalysis != null)
+                          _buildAnalysisArea(appState, question)
+                        else
+                          _buildShowAnalysisButton(appState),
+                        if (appState.currentAnalysis != null) ...[
+                          const SizedBox(height: 4),
+                          _buildRegenerateButton(appState),
+                        ],
                       ],
                     ],
                   ),
@@ -349,52 +366,127 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildResultArea(AppState appState, Question question) {
-    final lastRecord = appState.lastAnswerRecord!;
-    final isCorrect = lastRecord.isCorrect;
+  /// 答题后选项：显示三态（普通/用户错/正确）
+  Widget _buildAnsweredOptions(AppState appState, Question question) {
+    final lastRecord = appState.lastAnswerRecord;
+    final userAnswer = lastRecord?.userAnswer ?? '';
+    final correctAnswer = question.correctAnswer.toUpperCase().trim();
+    final isMulti = question.questionType == 'multi_choice';
+    final userAnswers = isMulti ? userAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {userAnswer.toUpperCase().trim()};
+    final correctAnswers = isMulti ? correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {correctAnswer};
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isCorrect
-            ? const Color(0xFF5CB85C).withOpacity(0.08)
-            : const Color(0xFFD9534F).withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: isCorrect
-                ? const Color(0xFF5CB85C).withOpacity(0.3)
-                : const Color(0xFFD9534F).withOpacity(0.3)),
+    final options = question.options;
+    if (options.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: options.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final label = String.fromCharCode(65 + idx);
+        final isCorrect = correctAnswers.contains(label);
+        final isUserWrong = !isCorrect && userAnswers.contains(label);
+
+        Color bgColor = Colors.white;
+        Color textColor = const Color(0xFF333333);
+        Color borderColor = const Color(0xFFE0E0E0);
+        if (isCorrect) {
+          bgColor = const Color(0xFFE8F5E9);
+          textColor = const Color(0xFF2E7D32);
+          borderColor = const Color(0xFF4CAF50);
+        } else if (isUserWrong) {
+          bgColor = const Color(0xFFFFEBEE);
+          textColor = const Color(0xFFC62828);
+          borderColor = const Color(0xFFEF5350);
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 26, height: 26,
+                  decoration: BoxDecoration(
+                    color: isCorrect ? const Color(0xFF4CAF50) : isUserWrong ? const Color(0xFFEF5350) : const Color(0xFFE0E0E0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : isUserWrong ? const Icon(Icons.close, size: 14, color: Colors.white)
+                        : Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF999999))),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(entry.value,
+                    style: TextStyle(fontSize: 14, color: textColor, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// 结果反馈：两行加粗正确/用户答案
+  Widget _buildResultFeedback(AppState appState, Question question) {
+    final lastRecord = appState.lastAnswerRecord;
+    if (lastRecord == null) return const SizedBox.shrink();
+    final correct = question.correctAnswer;
+    final user = lastRecord.userAnswer;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('正确答案: ',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+        const SizedBox(height: 4),
+        Text('你的答案: ',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFC62828))),
+      ],
+    );
+  }
+
+  /// 查看解析按钮
+  Widget _buildShowAnalysisButton(AppState appState) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.psychology, size: 18),
+        label: const Text('查看 AI 解析'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF4A90D9),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        onPressed: () {
+          setState(() => _showAnalysis = true);
+          appState.showAnalysis();
+        },
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isCorrect ? Icons.check_circle : Icons.cancel,
-                color: isCorrect
-                    ? const Color(0xFF5CB85C)
-                    : const Color(0xFFD9534F),
-                size: 22,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isCorrect ? '回答正确！' : '回答错误',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isCorrect
-                        ? const Color(0xFF5CB85C)
-                        : const Color(0xFFD9534F)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '你的答案: ${lastRecord.userAnswer}    正确答案: ${question.correctAnswer}',
-            style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
-          ),
-        ],
+    );
+  }
+
+  /// 重新生成解析按钮
+  Widget _buildRegenerateButton(AppState appState) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.refresh, size: 16),
+        label: const Text('重新生成解析', style: TextStyle(fontSize: 13)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF999999),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        onPressed: () => appState.regenerateAnalysis(),
       ),
     );
   }
@@ -616,6 +708,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () {
+                      _showAnalysis = false;
                       _showManualAnalysis = false;
                       _followUpController.clear();
                       appState.nextQuestion();
