@@ -14,13 +14,11 @@ class BankManageScreen extends StatefulWidget {
 class _BankManageScreenState extends State<BankManageScreen> {
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('题库管理'),
-        elevation: 0,
-        backgroundColor: const Color(0xFF4A90D9),
-        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -39,18 +37,14 @@ class _BankManageScreenState extends State<BankManageScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.library_books_outlined,
-                      size: 64, color: Colors.grey[300]),
+                      size: 64, color: cs.outlineVariant),
                   const SizedBox(height: 16),
-                  const Text('还没有题库',
-                      style: TextStyle(fontSize: 16, color: Color(0xFF999999))),
+                  Text('还没有题库',
+                      style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.upload_file),
                     label: const Text('导入题库'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90D9),
-                      foregroundColor: Colors.white,
-                    ),
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -64,11 +58,8 @@ class _BankManageScreenState extends State<BankManageScreen> {
 
           return Column(
             children: [
-              // 刷题设置区域
-              _buildQuizSettings(appState),
+              _buildQuizSettings(appState, cs),
               const Divider(height: 1),
-
-              // 题库列表
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -80,6 +71,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
                     return _BankCard(
                       bank: bank,
                       isSelected: isSelected,
+                      cs: cs,
                       onTap: () => appState.toggleBankSelection(bank.id!),
                       onDelete: () => _confirmDelete(context, appState, bank),
                     );
@@ -93,42 +85,41 @@ class _BankManageScreenState extends State<BankManageScreen> {
     );
   }
 
-  Widget _buildQuizSettings(AppState appState) {
+  Widget _buildQuizSettings(AppState appState, ColorScheme cs) {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: cs.surfaceContainerHighest,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.tune, size: 18, color: Color(0xFF4A90D9)),
+              Icon(Icons.tune, size: 18, color: cs.primary),
               const SizedBox(width: 6),
-              const Text('刷题设置',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text('刷题设置',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: cs.onSurface)),
               const Spacer(),
               Text(
                 appState.selectedBankIds.isEmpty
                     ? '点击题目前方选择框'
                     : '已选 ${appState.selectedBankIds.length} 个题库',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
           ),
           const SizedBox(height: 12),
-
-          // 刷题模式
           Row(
             children: [
-              const Text('刷题模式: ',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+              Text('刷题模式: ',
+                  style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: appState.selectedBankIds.length > 1
-                      ? const Color(0xFFF0AD4E).withOpacity(0.1)
-                      : const Color(0xFF4A90D9).withOpacity(0.1),
+                  color: (appState.selectedBankIds.length > 1
+                          ? cs.secondary
+                          : cs.primary)
+                      .withOpacity(0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -136,8 +127,8 @@ class _BankManageScreenState extends State<BankManageScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     color: appState.selectedBankIds.length > 1
-                        ? const Color(0xFFF0AD4E)
-                        : const Color(0xFF4A90D9),
+                        ? cs.secondary
+                        : cs.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -145,10 +136,8 @@ class _BankManageScreenState extends State<BankManageScreen> {
             ],
           ),
           const SizedBox(height: 12),
-
-          // 题量选择（50题一档）
-          const Text('每轮题量: ',
-              style: TextStyle(fontSize: 14, color: Color(0xFF666666))),
+          Text('每轮题量: ',
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -162,19 +151,17 @@ class _BankManageScreenState extends State<BankManageScreen> {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color:
-                        isSelected ? const Color(0xFF4A90D9) : Colors.grey[100],
+                        isSelected ? cs.primary : cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF4A90D9)
-                          : Colors.grey[300]!,
+                      color: isSelected ? cs.primary : cs.outlineVariant,
                     ),
                   ),
                   child: Text(
                     '$count 题',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isSelected ? Colors.white : const Color(0xFF666666),
+                      color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
@@ -190,6 +177,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
 
   void _confirmDelete(
       BuildContext context, AppState appState, QuestionBank bank) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -204,7 +192,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
               appState.deleteBank(bank.id!);
               Navigator.pop(ctx);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: cs.error),
             child: const Text('删除'),
           ),
         ],
@@ -216,12 +204,14 @@ class _BankManageScreenState extends State<BankManageScreen> {
 class _BankCard extends StatelessWidget {
   final QuestionBank bank;
   final bool isSelected;
+  final ColorScheme cs;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _BankCard({
     required this.bank,
     required this.isSelected,
+    required this.cs,
     required this.onTap,
     required this.onDelete,
   });
@@ -234,43 +224,30 @@ class _BankCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFF4A90D9)
-                : const Color(0xFFE8E8E8),
+            color: isSelected ? cs.primary : cs.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 1)),
-          ],
         ),
         child: Row(
           children: [
-            // 选择框
             GestureDetector(
               onTap: onTap,
               child: Container(
                 width: 22,
                 height: 22,
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFF4A90D9)
-                      : Colors.transparent,
+                  color: isSelected ? cs.primary : Colors.transparent,
                   border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF4A90D9)
-                        : Colors.grey[400]!,
+                    color: isSelected ? cs.primary : cs.outlineVariant,
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    ? Icon(Icons.check, size: 16, color: cs.onPrimary)
                     : null,
               ),
             ),
@@ -280,18 +257,18 @@ class _BankCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(bank.name,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurface)),
                   const SizedBox(height: 4),
                   Text('${bank.questionCount} 道题目',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF999999))),
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),
             IconButton(
               icon: Icon(Icons.delete_outline,
-                  color: Colors.grey[400], size: 20),
+                  color: cs.onSurfaceVariant, size: 20),
               onPressed: onDelete,
             ),
           ],

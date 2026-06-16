@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/app_settings.dart';
 import 'database_service.dart';
+import 'debug_log_service.dart';
 
 class AIService {
   final AppSettings _settings;
@@ -68,7 +69,7 @@ $chunk
       "title": "题目题干（去除题号）",
       "options": ["选项A内容", "选项B内容", ...],
       "correct_answer": "A/B/C/D/对/错/填空答案",
-      "question_type": "single_choice/multi_choice/true_false/fill_blank",
+      "question_type": "single_choice/multi_choice/true_false/fill_blank/ming_jie/jian_da/jie_da",
       "analysis": "如果原文有解析则提取，否则留空"
     }
   ]
@@ -78,7 +79,10 @@ $chunk
 1. 单选题：question_type="single_choice"，options 至少2个，correct_answer 如 "A"
 2. 多选题：question_type="multi_choice"，correct_answer 用逗号分隔如 "A,C"
 3. 判断题：question_type="true_false"，options 为空 []，correct_answer 为 "对" 或 "错"
-4. 填空题：question_type="fill_blank"，options 为空 []，correct_answer 为正确答案文本。题干的空白处通常有下划线____或括号（）
+4. 填空题：question_type="fill_blank"，options 为空 []，correct_answer 为正确答案文本（多空用中文分号；分隔）
+5. 名词解释：question_type="ming_jie"，options 为空 []，correct_answer 为完整释义段落
+6. 简答题：question_type="jian_da"，options 为空 []，correct_answer 为参考答案段落
+7. 问答题：question_type="jie_da"，options 为空 []，correct_answer 为参考答案段落
 5. 原文中的解析内容请保留到 analysis 字段
 6. 只返回 JSON，不要任何其他文字
 
@@ -107,9 +111,15 @@ $chunk
       ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final logger = DebugLogService.instance;
+        final rawBytes = response.bodyBytes;
+        logger.logRawResponse(_settings.apiEndpoint, response.statusCode, rawBytes.length);
+        final decoded = utf8.decode(rawBytes);
+        logger.logUtf8Decode(rawBytes.length, decoded.length, decoded);
+        final data = jsonDecode(decoded);
         final content = data['choices']?[0]?['message']?['content'] as String?;
         if (content == null) return [];
+        logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
 
         // 解析 JSON 响应
         final parsed = jsonDecode(content);
@@ -146,11 +156,16 @@ $chunk
   }
 
   String _detectType(Map q) {
+    // 优先使用 AI 返回的 question_type
+    final aiType = q['question_type']?.toString() ?? '';
+    if (aiType == 'ming_jie' || aiType == 'jian_da' || aiType == 'jie_da') {
+      return aiType;
+    }
     final answer = (q['correct_answer'] ?? '').toString();
     if (answer.contains(',') && answer.length > 1) return 'multi_choice';
     if (answer == '对' || answer == '错') return 'true_false';
     final opts = q['options'];
-    return (opts is List && opts.isNotEmpty) ? 'single_choice' : 'true_false';
+    return (opts is List && opts.isNotEmpty) ? 'single_choice' : 'fill_blank';
   }
 
   /// 获取题目解析（优先使用缓存）
@@ -318,8 +333,14 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final logger = DebugLogService.instance;
+        final rawBytes = response.bodyBytes;
+        logger.logRawResponse(_settings.apiEndpoint, response.statusCode, rawBytes.length);
+        final decoded = utf8.decode(rawBytes);
+        logger.logUtf8Decode(rawBytes.length, decoded.length, decoded);
+        final data = jsonDecode(decoded);
         final content = data['choices']?[0]?['message']?['content'] as String?;
+        logger.log('PIPE:DECODE', 'contentLen=${content?.length ?? 0}  hasChoices=${data['choices'] != null}');
         return content ?? 'AI解析生成失败，请稍后重试。';
       } else {
         return 'AI服务返回错误 (${response.statusCode})，请检查API配置。';

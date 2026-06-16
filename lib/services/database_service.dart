@@ -6,6 +6,7 @@ import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
+import 'fsrs_service.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -44,7 +45,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -104,6 +105,19 @@ class DatabaseService {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           question_id INTEGER NOT NULL UNIQUE,
           added_at TEXT NOT NULL,
+          FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE fsrs_cards (
+          question_id INTEGER PRIMARY KEY,
+          stability REAL DEFAULT 0.5,
+          difficulty REAL DEFAULT 5.0,
+          review_count INTEGER DEFAULT 0,
+          last_review_at TEXT,
+          next_review_at TEXT,
           FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
         )
       ''');
@@ -195,6 +209,18 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         question_id INTEGER NOT NULL UNIQUE,
         added_at TEXT NOT NULL,
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE fsrs_cards (
+        question_id INTEGER PRIMARY KEY,
+        stability REAL DEFAULT 0.5,
+        difficulty REAL DEFAULT 5.0,
+        review_count INTEGER DEFAULT 0,
+        last_review_at TEXT,
+        next_review_at TEXT,
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
     ''');
@@ -462,5 +488,66 @@ class DatabaseService {
       )
     ''');
     return result.first['cnt'] as int;
+  }
+
+  // ======================== FSRS 间隔重复 ========================
+
+  /// 读取一道题的 FSRS 状态，不存在返回 null
+  Future<FSRSCardState?> getFSRSCard(int questionId) async {
+    final db = await database;
+    final maps = await db.query('fsrs_cards',
+        where: 'question_id = ?', whereArgs: [questionId]);
+    if (maps.isEmpty) return null;
+    return FSRSCardState.fromMap(maps.first);
+  }
+
+  /// 写入或更新 FSRS 状态
+  Future<void> upsertFSRSCard(FSRSCardState card) async {
+    final db = await database;
+    await db.insert('fsrs_cards', card.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// 获取到期的 FSRS 错题（按题库分组）
+  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT DISTINCT q.* FROM questions q
+      WHERE q.id IN (
+        SELECT question_id FROM fsrs_cards
+        WHERE next_review_at <= datetime('now')
+        UNION
+        SELECT question_id FROM error_book
+      )
+      ORDER BY q.bank_id, RANDOM()
+    ''');
+    final questions = results.map((m) => Question.fromMap(m)).toList();
+    final map = <int, List<Question>>{};
+    for (final q in questions) {
+      map.putIfAbsent(q.bankId, () => []).add(q);
+    }
+    return map;
+  }
+
+  /// 按题库获取错题统计（到期题数 + 收藏题数）
+  Future<List<Map<String, dynamic>>> getErrorStatsByBank() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT
+        qb.id as bank_id,
+        qb.name as bank_name,
+        COUNT(DISTINCT CASE
+          WHEN fc.next_review_at IS NOT NULL AND fc.next_review_at <= datetime('now')
+          THEN q.id END
+        ) as due_count,
+        COUNT(DISTINCT CASE WHEN eb.question_id IS NOT NULL THEN q.id END) as bookmark_count
+      FROM question_banks qb
+      LEFT JOIN questions q ON q.bank_id = qb.id
+      LEFT JOIN fsrs_cards fc ON fc.question_id = q.id
+      LEFT JOIN error_book eb ON eb.question_id = q.id
+      GROUP BY qb.id
+      HAVING due_count > 0 OR bookmark_count > 0
+      ORDER BY qb.name
+    ''');
   }
 }

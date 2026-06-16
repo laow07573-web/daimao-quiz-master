@@ -4,6 +4,7 @@ import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
 import 'database_service.dart';
+import 'debug_log_service.dart';
 
 class QuizService {
   final DatabaseService _db = DatabaseService.instance;
@@ -12,6 +13,7 @@ class QuizService {
   QuizSession? _currentSession;
   List<Question> _questions = [];
   int _currentIndex = 0;
+  DateTime? _answerStartTime;  // 当前题目开始计时
 
   QuizSession? get currentSession => _currentSession;
   List<Question> get questions => _questions;
@@ -23,6 +25,13 @@ class QuizService {
           : null;
   bool get isLastQuestion => _currentIndex >= _questions.length - 1;
   bool get hasNext => _currentIndex < _questions.length - 1;
+  bool get hasPrevious => _currentIndex > 0;
+  DateTime? get answerStartTime => _answerStartTime;
+  int get answerReactionMs =>
+      _answerStartTime != null
+          ? DateTime.now().difference(_answerStartTime!).inMilliseconds
+          : 0;
+  void markAnswerStart() => _answerStartTime = DateTime.now();
 
   /// 开始新的刷题会话
   Future<void> startQuiz({
@@ -62,6 +71,7 @@ class QuizService {
     );
 
     _currentIndex = 0;
+    _answerStartTime = DateTime.now();
   }
 
   /// 提交答案
@@ -71,9 +81,45 @@ class QuizService {
       throw StateError('没有活跃的刷题会话');
     }
 
-    final correctAnswer = question.correctAnswer.toUpperCase().trim();
-    final normalizedUser = userAnswer.toUpperCase().trim();
-    final isCorrect = normalizedUser == correctAnswer;
+    final correctAnswer = question.correctAnswer.trim();
+    final normalizedUser = userAnswer.trim();
+    final bool isCorrect;
+
+    if (question.questionType == 'fill_blank') {
+      // 填空：按分号拆分，逐空比对
+      final correctParts = correctAnswer
+          .split(RegExp(r'[；;]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final userParts = normalizedUser
+          .split(RegExp(r'[；;]'))
+          .map((s) => s.trim())
+          .toList();
+      isCorrect = correctParts.isNotEmpty &&
+          correctParts.length == userParts.length &&
+          List.generate(correctParts.length,
+                  (i) => correctParts[i] == (i < userParts.length ? userParts[i] : ''))
+              .every((v) => v);
+    } else if (question.questionType == 'ming_jie' ||
+        question.questionType == 'jian_da' ||
+        question.questionType == 'jie_da') {
+      // 名解/简答/问答：用户答案在参考答案中能找到关键匹配即可
+      final userLower = normalizedUser.replaceAll(RegExp(r'\s+'), '');
+      final correctLower = correctAnswer.replaceAll(RegExp(r'\s+'), '');
+      isCorrect = userLower.length > 3 &&
+          (correctLower.contains(userLower) || userLower.contains(correctLower));
+    } else {
+      isCorrect = normalizedUser.toUpperCase() == correctAnswer.toUpperCase();
+    }
+
+    DebugLogService.instance.logAnswerSubmit(
+      userAnswer: userAnswer,
+      correctAnswer: correctAnswer,
+      isCorrect: isCorrect,
+      questionType: question.questionType,
+      questionTitle: question.title,
+    );
 
     final record = AnswerRecord(
       questionId: question.id!,
@@ -127,6 +173,17 @@ class QuizService {
   bool nextQuestion() {
     if (hasNext) {
       _currentIndex++;
+      _answerStartTime = DateTime.now();
+      return true;
+    }
+    return false;
+  }
+
+  /// 返回上一题
+  bool previousQuestion() {
+    if (hasPrevious) {
+      _currentIndex--;
+      _answerStartTime = DateTime.now();
       return true;
     }
     return false;
@@ -161,6 +218,17 @@ class QuizService {
   /// 获取单题统计
   Future<Map<String, int>> getQuestionStats(int questionId) async {
     return await _db.getQuestionStats(questionId);
+  }
+
+  /// 从外部加载题目和会话（用于错题重刷等不通过 startQuiz 的场景）
+  void loadQuiz({
+    required List<Question> questions,
+    required QuizSession session,
+  }) {
+    _questions = questions;
+    _currentSession = session;
+    _currentIndex = 0;
+    _answerStartTime = DateTime.now();
   }
 
   /// 重置会话

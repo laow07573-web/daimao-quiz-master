@@ -280,7 +280,13 @@ class DocParserService {
     if (correctAnswer != null && correctAnswer!.contains(',')) {
       questionType = 'multi_choice';
     } else if (options.isEmpty) {
-      questionType = 'true_false';
+      // 无选项：看答案判断是填空还是判断
+      final ans = correctAnswer?.trim().toUpperCase() ?? '';
+      if (RegExp(r'^(对|错|正确|错误|√|×|A|B)$').hasMatch(ans)) {
+        questionType = 'true_false';
+      } else {
+        questionType = 'fill_blank';
+      }
     }
 
     return Question(
@@ -315,7 +321,7 @@ class DocParserService {
         .hasMatch(line);
   }
 
-  static String _extractAnswer(String line) {
+  static String? _extractAnswer(String line) {
     // 匹配 A、B、C、D 或 对/错 或 √/×
     final match = RegExp(r'[答案参考正确][答案案确]?[：:\s]*([A-Da-d]+)',
             caseSensitive: false)
@@ -335,7 +341,17 @@ class DocParserService {
     if (line.contains('错') || line.contains('×') || line.contains('错误')) {
       return '错';
     }
-    return '';
+    // 填空题：提取 "答案：" 后的全部文本
+    final textMatch = RegExp(r'[答案参考正确][答案案确]?[：:\s]+(.+)',
+            caseSensitive: false)
+        .firstMatch(line);
+    if (textMatch != null) {
+      final text = textMatch.group(1)!.trim();
+      if (text.isNotEmpty && !RegExp(r'^[A-Da-d]+$').hasMatch(text)) {
+        return text;
+      }
+    }
+    return null;
   }
 
   static bool _isAnalysisLine(String line) {
@@ -359,6 +375,14 @@ class DocParserService {
       if (match != null) {
         return match.group(1)?.toUpperCase();
       }
+    }
+    // 填空题：提取 "答案：" 后的全部文本
+    final textMatch = RegExp(r'[答案参考正确][答案案确]?[：:\s]+(.+?)(?:\n|$|解析|【)',
+            caseSensitive: false)
+        .firstMatch(text);
+    if (textMatch != null) {
+      final t = textMatch.group(1)!.trim();
+      if (t.isNotEmpty && !RegExp(r'^[A-Da-d]+$').hasMatch(t)) return t;
     }
     return null;
   }

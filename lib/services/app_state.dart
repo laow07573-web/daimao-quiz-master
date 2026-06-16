@@ -10,6 +10,7 @@ import 'doc_parser_service.dart';
 import 'ai_service.dart';
 import 'quiz_service.dart';
 import 'stats_service.dart';
+import 'fsrs_service.dart';
 
 class AppState extends ChangeNotifier {
   final DatabaseService _db = DatabaseService.instance;
@@ -51,6 +52,10 @@ class AppState extends ChangeNotifier {
   // 上次答题结果
   AnswerRecord? _lastAnswerRecord;
   AnswerRecord? get lastAnswerRecord => _lastAnswerRecord;
+
+  // 答题历史（按题目索引存储，支持前后翻题）
+  final List<AnswerRecord?> _answerHistory = [];
+  bool get hasPrevious => _currentQuestionIndex > 0;
 
   // 单题统计
   Map<String, int> _currentQuestionStats = {};
@@ -188,6 +193,8 @@ class AppState extends ChangeNotifier {
   void clearPreview() {
     _previewQuestions = [];
     _previewBankName = '';
+    _importStatus = "";
+    _importProgress = 0;
     notifyListeners();
   }
 
@@ -362,6 +369,8 @@ class AppState extends ChangeNotifier {
     _lastAnswerRecord = null;
     _currentQuestionStats = {};
     _analysisLoading = false;
+    _answerHistory.clear();
+    _answerHistory.length = _quizQuestions.length;
 
     notifyListeners();
   }
@@ -372,6 +381,11 @@ class AppState extends ChangeNotifier {
     _lastAnswerRecord = await _quizService.submitAnswer(userAnswer);
     _currentSession = _quizService.currentSession;
 
+    // 存储答题历史
+    if (_currentQuestionIndex < _answerHistory.length) {
+      _answerHistory[_currentQuestionIndex] = _lastAnswerRecord;
+    }
+
     // 加载单题统计
     final qId = _quizService.currentQuestion!.id!;
     _currentQuestionStats = await _quizService.getQuestionStats(qId);
@@ -380,7 +394,33 @@ class AppState extends ChangeNotifier {
     _currentAnalysis = null;
     _analysisLoading = false;
 
+    // 更新 FSRS 状态（如果这道题已有 FSRS 卡，则更新；如果答错且没有卡，则创建）
+    _updateFSRSIfNeeded(qId);
+
     notifyListeners();
+  }
+
+  /// 更新 FSRS 间隔重复状态
+  Future<void> _updateFSRSIfNeeded(int questionId) async {
+    final record = _lastAnswerRecord;
+    if (record == null) return;
+
+    final reactionMs = _quizService.answerReactionMs;
+    final rating = FSRSService.inferRating(record.isCorrect, reactionMs);
+
+    final existingCard = await _db.getFSRSCard(questionId);
+    final now = DateTime.now();
+
+    if (existingCard != null) {
+      // 已有卡：根据评分更新间隔
+      final updated = FSRSService.schedule(existingCard, rating, now,
+          reactionMs: reactionMs);
+      await _db.upsertFSRSCard(updated);
+    } else if (!record.isCorrect) {
+      // 第一次答错：创建新卡
+      final card = FSRSService.initCard(questionId, now);
+      await _db.upsertFSRSCard(card);
+    }
   }
 
   Future<void> _loadAnalysis() async {
@@ -427,11 +467,29 @@ class AppState extends ChangeNotifier {
     if (_quizService.hasNext) {
       _quizService.nextQuestion();
       _currentQuestionIndex = _quizService.currentIndex;
-      _currentAnalysis = null;
-      _lastAnswerRecord = null;
-      _currentQuestionStats = {};
+      _restoreAnswerState();
       notifyListeners();
     }
+  }
+
+  /// 返回上一题（只查看已答状态，不可修改答案）
+  void previousQuestion() {
+    if (_quizService.hasPrevious) {
+      _quizService.previousQuestion();
+      _currentQuestionIndex = _quizService.currentIndex;
+      _restoreAnswerState();
+      notifyListeners();
+    }
+  }
+
+  void _restoreAnswerState() {
+    _currentAnalysis = null;
+    if (_currentQuestionIndex < _answerHistory.length) {
+      _lastAnswerRecord = _answerHistory[_currentQuestionIndex];
+    } else {
+      _lastAnswerRecord = null;
+    }
+    _currentQuestionStats = {};
   }
 
   Future<QuizSession> endSession() async {
@@ -457,37 +515,59 @@ class AppState extends ChangeNotifier {
     return await _db.isInErrorBook(questionId);
   }
 
-  /// 错题重刷模式
-  Future<void> startErrorReview() async {
-    final questions = await _db.getErrorReviewQuestions();
-    if (questions.isEmpty) return;
+  /// 错题重刷模式（全题库 FSRS 到期题目 + 收藏）
+  /// [bankIds] 为 null 或空时，从所有题库抽题；否则只从指定题库抽题
+  Future<void> startErrorReview({Set<int>? bankIds}) async {
+    // 使用 FSRS 到期题目，按题库分组获取
+    final questionsByBank = await _db.getDueReviewQuestionsByBank();
+    if (questionsByBank.isEmpty) return;
 
-    questions.shuffle();
-    final count = questions.length > _selectedQuestionCount
+    // 按 bankIds 过滤（null/空 = 全题库）
+    final allQuestions = <Question>[];
+    for (final entry in questionsByBank.entries) {
+      if (bankIds == null || bankIds.isEmpty || bankIds.contains(entry.key)) {
+        allQuestions.addAll(entry.value);
+      }
+    }
+    if (allQuestions.isEmpty) return;
+
+    allQuestions.shuffle();
+    final count = allQuestions.length > _selectedQuestionCount
         ? _selectedQuestionCount
-        : questions.length;
+        : allQuestions.length;
 
-    _quizQuestions = questions.take(count).toList();
+    final selectedQuestions = allQuestions.take(count).toList();
+
+    final session = QuizSession(
+      bankIds: bankIds?.join(',') ?? 'all',
+      mode: 'error_review',
+      totalQuestions: selectedQuestions.length,
+      startTime: DateTime.now().toIso8601String(),
+    );
+    final sessionWithId = QuizSession(
+      id: await _db.insertSession(session),
+      bankIds: session.bankIds,
+      mode: session.mode,
+      totalQuestions: session.totalQuestions,
+      startTime: session.startTime,
+    );
+
+    _quizService.loadQuiz(questions: selectedQuestions, session: sessionWithId);
+    _quizQuestions = _quizService.questions;
+    _currentSession = _quizService.currentSession;
     _currentQuestionIndex = 0;
     _currentAnalysis = null;
     _lastAnswerRecord = null;
     _currentQuestionStats = {};
-
-    _currentSession = QuizSession(
-      bankIds: 'error_review',
-      mode: 'error_review',
-      totalQuestions: _quizQuestions.length,
-      startTime: DateTime.now().toIso8601String(),
-    );
-    _currentSession = QuizSession(
-      id: await _db.insertSession(_currentSession!),
-      bankIds: _currentSession!.bankIds,
-      mode: _currentSession!.mode,
-      totalQuestions: _currentSession!.totalQuestions,
-      startTime: _currentSession!.startTime,
-    );
+    _answerHistory.clear();
+    _answerHistory.length = _quizQuestions.length;
 
     notifyListeners();
+  }
+
+  /// 获取错题本统计（按题库分组）：到期题数 + 收藏题数
+  Future<List<Map<String, dynamic>>> getErrorBookStats() async {
+    return await _db.getErrorStatsByBank();
   }
 
   Future<int> getErrorBookCount() async {

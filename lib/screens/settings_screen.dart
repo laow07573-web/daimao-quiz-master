@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
+import '../services/debug_log_service.dart';
 import '../models/app_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,10 +17,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _endpointController = TextEditingController();
   final _modelController = TextEditingController();
   bool _obscureKey = true;
+  bool _debugEnabled = false;
 
   @override
   void initState() {
     super.initState();
+    _debugEnabled = DebugLogService.instance.enabled;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final settings = context.read<AppState>().settings;
       _apiKeyController.text = settings.apiKey;
@@ -37,13 +41,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('设置'),
-        elevation: 0,
-        backgroundColor: const Color(0xFF4A90D9),
-        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -54,37 +56,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2)),
-                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.api, color: Color(0xFF4A90D9), size: 20),
-                      SizedBox(width: 8),
+                      Icon(Icons.api, color: cs.primary, size: 20),
+                      const SizedBox(width: 8),
                       Text('AI 接口配置',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
+                              fontWeight: FontWeight.bold, fontSize: 16, color: cs.onSurface)),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     '默认使用 DeepSeek API，填写你的 API Key 即可使用。也可自定义接口地址和模型。',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
 
                   // API Key
-                  const Text('API Key',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text('API Key',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _apiKeyController,
@@ -109,8 +105,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 14),
 
                   // API Endpoint
-                  const Text('API 地址',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text('API 地址',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _endpointController,
@@ -126,8 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 14),
 
                   // Model
-                  const Text('模型名称',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text('模型名称',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _modelController,
@@ -149,13 +145,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90D9),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
                 onPressed: () {
                   final newSettings = AppSettings(
                     apiKey: _apiKeyController.text.trim(),
@@ -168,9 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   context.read<AppState>().updateSettings(newSettings);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('设置已保存'),
-                      backgroundColor: Colors.green,
+                    SnackBar(
+                      content: const Text('设置已保存'),
+                      backgroundColor: cs.tertiary,
                     ),
                   );
                   Navigator.pop(context);
@@ -181,43 +170,214 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
 
+            const SizedBox(height: 24),
+
+            // 音效开关
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.music_note, color: cs.tertiary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('音效', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.onSurface)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('答对/答错时播放提示音', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  const SizedBox(height: 8),
+                  Consumer<AppState>(
+                    builder: (context, appState, _) => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(appState.settings.soundEnabled ? '音效已开启' : '音效已关闭',
+                          style: TextStyle(fontSize: 14, color: cs.onSurface)),
+                      value: appState.settings.soundEnabled,
+                      onChanged: (v) {
+                        appState.updateSettings(appState.settings.copyWith(soundEnabled: v));
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 调试日志
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.bug_report, color: cs.secondary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('调试日志',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16, color: cs.onSurface)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '开启后记录 AI 渲染链路、答案提交等关键数据，帮助排查前端 Bug。',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            _debugEnabled ? '日志已开启' : '日志已关闭',
+                            style: TextStyle(fontSize: 14, color: cs.onSurface),
+                          ),
+                          value: _debugEnabled,
+                          onChanged: (v) {
+                            setState(() => _debugEnabled = v);
+                            if (v) {
+                              DebugLogService.instance.enable();
+                            } else {
+                              DebugLogService.instance.disable();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.file_download, size: 16),
+                          label: const Text('导出日志文件', style: TextStyle(fontSize: 13)),
+                          onPressed: () async {
+                            try {
+                              if (!DebugLogService.instance.enabled) {
+                                DebugLogService.instance.enable();
+                              }
+                              final file = await DebugLogService.instance.exportToFile();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('日志已导出到: ${file.path}'),
+                                    backgroundColor: cs.tertiary,
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('导出失败: $e'),
+                                    backgroundColor: cs.error,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: const Text('清空', style: TextStyle(fontSize: 13)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.error,
+                        ),
+                        onPressed: () {
+                          DebugLogService.instance.clear();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('日志已清空'),
+                                backgroundColor: cs.onSurfaceVariant,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.share, size: 16),
+                        label: const Text('分享', style: TextStyle(fontSize: 13)),
+                        style: OutlinedButton.styleFrom(foregroundColor: cs.primary),
+                        onPressed: () async {
+                          try {
+                            if (!DebugLogService.instance.enabled) {
+                              DebugLogService.instance.enable();
+                            }
+                            final file = await DebugLogService.instance.exportToFile();
+                            if (mounted) {
+                              await Share.shareXFiles(
+                                [XFile(file.path)], subject: '呆猫刷题宝调试日志',
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('分享失败: $e'), backgroundColor: cs.error),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // 使用说明
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2)),
-                ],
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('使用说明',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          color: Color(0xFF333333))),
-                  SizedBox(height: 12),
+                          color: cs.onSurface)),
+                  const SizedBox(height: 12),
                   _HelpItem(
                     icon: Icons.lock_outline,
                     text: 'API Key 仅保存在本地，不会上传到任何服务器',
+                    cs: cs,
                   ),
                   _HelpItem(
                     icon: Icons.cached,
                     text: 'AI 解析结果会本地缓存，同一道题不会重复消耗 Token',
+                    cs: cs,
                   ),
                   _HelpItem(
                     icon: Icons.file_present,
                     text: '支持导入 DOC/DOCX 格式题库文件，自动识别题目和选项',
+                    cs: cs,
                   ),
                   _HelpItem(
                     icon: Icons.phone_android,
                     text: '支持 Windows 和 Android 双平台运行',
+                    cs: cs,
                   ),
                 ],
               ),
@@ -232,8 +392,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 class _HelpItem extends StatelessWidget {
   final IconData icon;
   final String text;
+  final ColorScheme cs;
 
-  const _HelpItem({required this.icon, required this.text});
+  const _HelpItem({required this.icon, required this.text, required this.cs});
 
   @override
   Widget build(BuildContext context) {
@@ -242,12 +403,11 @@ class _HelpItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: Color(0xFF4A90D9)),
+          Icon(icon, size: 18, color: cs.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(text,
-                style:
-                    const TextStyle(fontSize: 13, color: Color(0xFF666666), height: 1.4)),
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.4)),
           ),
         ],
       ),

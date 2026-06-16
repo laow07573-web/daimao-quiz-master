@@ -42,8 +42,7 @@ class _ImportScreenState extends State<ImportScreen> {
       body: Consumer<AppState>(
         builder: (context, appState, _) {
           final isProcessing =
-              appState.importStatus.contains('解析') ||
-              appState.importStatus.contains('提取');
+              appState.importStatus.contains('解析中') || appState.importStatus.contains('提取');
 
           return Padding(
             padding: const EdgeInsets.all(16),

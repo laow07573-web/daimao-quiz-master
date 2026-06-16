@@ -5,11 +5,13 @@ class AppSettings {
   String apiKey;
   String apiEndpoint;
   String model;
+  bool soundEnabled;
 
   AppSettings({
     this.apiKey = '',
     this.apiEndpoint = defaultApiEndpoint,
     this.model = defaultModel,
+    this.soundEnabled = true,
   });
 
   bool get isConfigured => apiKey.isNotEmpty;
@@ -19,6 +21,7 @@ class AppSettings {
       'api_key': apiKey,
       'api_endpoint': apiEndpoint,
       'model': model,
+      'sound_enabled': soundEnabled ? '1' : '0',
     };
   }
 
@@ -27,6 +30,7 @@ class AppSettings {
       apiKey: map['api_key'] ?? '',
       apiEndpoint: map['api_endpoint'] ?? defaultApiEndpoint,
       model: map['model'] ?? defaultModel,
+      soundEnabled: map['sound_enabled'] != '0',
     );
   }
 
@@ -34,11 +38,13 @@ class AppSettings {
     String? apiKey,
     String? apiEndpoint,
     String? model,
+    bool? soundEnabled,
   }) {
     return AppSettings(
       apiKey: apiKey ?? this.apiKey,
       apiEndpoint: apiEndpoint ?? this.apiEndpoint,
       model: model ?? this.model,
+      soundEnabled: soundEnabled ?? this.soundEnabled,
     );
   }
 }

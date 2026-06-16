@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
 import '../widgets/ai_response_widget.dart';
+import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -14,8 +17,10 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   final TextEditingController _followUpController = TextEditingController();
-  final TextEditingController _fillBlankController = TextEditingController();
+  final List<TextEditingController> _fillBlankControllers = [];
+  final TextEditingController _textAnswerController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _showManualAnalysis = false;
   String? _followUpResponse;
   bool _followUpLoading = false;
@@ -23,12 +28,16 @@ class _QuizScreenState extends State<QuizScreen> {
   int? _lastQuestionId;
   bool _showAnalysis = false;
   final Set<String> _selectedOptions = {};
+  bool _isMemorizeMode = false;
 
   @override
   void dispose() {
     _followUpController.dispose();
-    _fillBlankController.dispose();
+    for (final c in _fillBlankControllers) { c.dispose(); }
+    _fillBlankControllers.clear();
+    _textAnswerController.dispose();
     _scrollController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -36,8 +45,8 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
+        final cs = Theme.of(context).colorScheme;
         final question = appState.currentQuestion;
-        // 检查错题本状态
         if (question?.id != null) {
           appState.isInErrorBook(question!.id!).then((inBook) {
             if (mounted && _inErrorBook != inBook) {
@@ -56,21 +65,22 @@ class _QuizScreenState extends State<QuizScreen> {
         final lastRecord = appState.lastAnswerRecord;
         final isAnswered = lastRecord != null;
 
-        // Reset analysis display on question change
         if (appState.currentQuestion?.id != _lastQuestionId) {
           _showAnalysis = false;
           _lastQuestionId = appState.currentQuestion?.id;
         }
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
+          backgroundColor: cs.surface,
           appBar: AppBar(
             title: Text(
                 '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
-            elevation: 0,
-            backgroundColor: const Color(0xFF4A90D9),
-            foregroundColor: Colors.white,
             actions: [
+              IconButton(
+                icon: Icon(_isMemorizeMode ? Icons.visibility_off : Icons.visibility, size: 20),
+                tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
+                onPressed: () => setState(() => _isMemorizeMode = !_isMemorizeMode),
+              ),
               if (isAnswered && !appState.isLastQuestion)
                 TextButton(
                   onPressed: () => _handleEndSession(context, appState),
@@ -82,12 +92,22 @@ class _QuizScreenState extends State<QuizScreen> {
           body: Column(
             children: [
               // 进度条
-              LinearProgressIndicator(
-                value: (appState.currentQuestionIndex + 1) /
-                    appState.quizQuestions.length,
-                backgroundColor: Colors.grey[200],
-                color: const Color(0xFF4A90D9),
-                minHeight: 4,
+              TweenAnimationBuilder<double>(
+                tween: Tween(
+                  begin: 0,
+                  end: (appState.currentQuestionIndex + (isAnswered ? 1 : 0)) /
+                      appState.quizQuestions.length,
+                ),
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+                builder: (context, value, _) {
+                  return LinearProgressIndicator(
+                    value: value,
+                    backgroundColor: cs.surfaceContainerHighest,
+                    color: cs.primary,
+                    minHeight: 4,
+                  );
+                },
               ),
 
               // 滚动区域
@@ -95,34 +115,49 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: SingleChildScrollView(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildQuestionCard(question, appState),
-                      const SizedBox(height: 16),
-                      if (!isAnswered)
-                        ...[_buildOptionsArea(appState, question)]
-                      else ...[
-                        _buildAnsweredOptions(appState, question),
-                        const SizedBox(height: 12),
-                        _buildResultFeedback(appState, question),
-                        const SizedBox(height: 8),
-                        if (_showAnalysis || appState.currentAnalysis != null)
-                          _buildAnalysisArea(appState, question)
-                        else
-                          _buildShowAnalysisButton(appState),
-                        if (appState.currentAnalysis != null) ...[
-                          const SizedBox(height: 4),
-                          _buildRegenerateButton(appState),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      return SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.25, 0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: Column(
+                      key: ValueKey(question.id),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildQuestionCard(question, appState, cs),
+                        const SizedBox(height: 16),
+                        if (_isMemorizeMode)
+                          _buildMemorizeAnswer(question, cs)
+                        else if (!isAnswered)
+                          ...[_buildOptionsArea(appState, question, cs)]
+                        else ...[
+                          _buildAnsweredResult(appState, question, cs),
+                          const SizedBox(height: 12),
+                          _buildResultFeedback(appState, question, cs),
+                          const SizedBox(height: 8),
+                          if (_showAnalysis || appState.currentAnalysis != null)
+                            _buildAnalysisArea(appState, question, cs)
+                          else
+                            _buildShowAnalysisButton(appState, cs),
+                          if (appState.currentAnalysis != null) ...[
+                            const SizedBox(height: 4),
+                            _buildRegenerateButton(appState, cs),
+                          ],
                         ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
 
               // 底部按钮
-              if (isAnswered) _buildBottomBar(appState),
+              if (isAnswered) _buildBottomBar(appState, cs),
             ],
           ),
         );
@@ -130,61 +165,107 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildQuestionCard(Question question, AppState appState) {
+  Widget _buildMemorizeAnswer(Question question, ColorScheme cs) {
+    final correct = question.correctAnswer;
+    final qt = question.questionType;
+    String display;
+    if (qt == 'true_false') {
+      display = correct == '对' ? '✓ 正确' : '✗ 错误';
+    } else if (qt == 'single_choice' || qt == 'multi_choice') {
+      display = correct;
+    } else {
+      display = correct;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.primary.withOpacity(0.15), cs.primary.withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.lightbulb_outline, color: Color(0xFFF0AD4E), size: 24),
+          const SizedBox(height: 8),
+          const Text('参考答案',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFF0AD4E))),
+          const SizedBox(height: 12),
+          Text(display,
+              style: TextStyle(fontSize: 16, height: 1.6, color: cs.onSurface, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center),
+          if (question.analysis != null && question.analysis!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Text(question.analysis!,
+                style: TextStyle(fontSize: 13, height: 1.5, color: cs.onSurfaceVariant)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard(Question question, AppState appState, ColorScheme cs) {
     final stats = appState.currentQuestionStats;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2)),
-        ],
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 题型标签 + 统计
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4A90D9).withOpacity(0.1),
+                  color: cs.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   question.questionType == 'multi_choice' ? '多选' :
                   question.questionType == 'fill_blank' ? '填空' :
-                  question.questionType == 'true_false' ? '判断' : '单选',
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF4A90D9)),
+                  question.questionType == 'true_false' ? '判断' :
+                  question.questionType == 'ming_jie' ? '名解' :
+                  question.questionType == 'jian_da' ? '简答' :
+                  question.questionType == 'jie_da' ? '问答' : '单选',
+                  style: TextStyle(fontSize: 12, color: cs.primary),
                 ),
               ),
               const Spacer(),
               if (stats.isNotEmpty)
                 Text(
                   '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
             ],
           ),
           const SizedBox(height: 12),
           Text(question.title,
-              style:
-                  const TextStyle(fontSize: 16, height: 1.6, fontWeight: FontWeight.w500)),
+              style: TextStyle(fontSize: 16, height: 1.6, fontWeight: FontWeight.w500, color: cs.onSurface)),
         ],
       ),
     );
   }
 
-  Widget _buildOptionsArea(AppState appState, Question question) {
-    if (question.questionType == 'fill_blank') {
-      return _buildFillBlankInput(appState);
+  Widget _buildOptionsArea(AppState appState, Question question, ColorScheme cs) {
+    final qt = question.questionType;
+    if (qt == 'fill_blank') {
+      return _buildFillBlankInput(appState, cs);
+    }
+    if (qt == 'true_false') {
+      return _buildTrueFalseButtons(appState, cs);
+    }
+    if (qt == 'ming_jie' || qt == 'jian_da' || qt == 'jie_da') {
+      return _buildTextAnswerInput(appState, cs, qt);
     }
     final options = question.options;
     final isMulti = question.questionType == 'multi_choice';
@@ -199,6 +280,7 @@ class _QuizScreenState extends State<QuizScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: GestureDetector(
           onTap: () {
+            HapticFeedback.selectionClick();
             if (isMulti) {
               setState(() {
                 if (selected) {
@@ -209,16 +291,17 @@ class _QuizScreenState extends State<QuizScreen> {
               });
             } else {
               _selectedOptions.clear();
-              appState.submitAnswer(label);
+              _handleSubmitAnswer(appState, label);
             }
           },
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFF4A90D9).withOpacity(0.08) : Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              color: selected ? cs.primary.withOpacity(0.08) : cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? const Color(0xFF4A90D9) : const Color(0xFFE0E0E0),
+                color: selected ? cs.primary : cs.outlineVariant,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -228,19 +311,19 @@ class _QuizScreenState extends State<QuizScreen> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: selected ? const Color(0xFF4A90D9) : const Color(0xFF4A90D9).withOpacity(0.1),
+                    color: selected ? cs.primary : cs.primary.withOpacity(0.12),
                     shape: isMulti ? BoxShape.rectangle : BoxShape.circle,
                     borderRadius: isMulti ? BorderRadius.circular(4) : null,
                   ),
                   child: Center(
                     child: selected
                         ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A90D9), fontSize: 14)),
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary, fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(option, style: const TextStyle(fontSize: 15, height: 1.4)),
+                  child: Text(option, style: TextStyle(fontSize: 15, height: 1.4, color: cs.onSurface)),
                 ),
               ],
             ),
@@ -260,15 +343,13 @@ class _QuizScreenState extends State<QuizScreen> {
               icon: const Icon(Icons.check_circle),
               label: Text('确认提交 (已选${_selectedOptions.length}项)', style: const TextStyle(fontSize: 15)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedOptions.isEmpty ? const Color(0xFFCCCCCC) : const Color(0xFF4A90D9),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                backgroundColor: _selectedOptions.isEmpty ? cs.surfaceContainerHighest : cs.primary,
+                foregroundColor: _selectedOptions.isEmpty ? cs.onSurfaceVariant : cs.onPrimary,
               ),
               onPressed: _selectedOptions.isEmpty ? null : () {
                 final answer = _selectedOptions.toList()..sort();
                 _selectedOptions.clear();
-                appState.submitAnswer(answer.join(','));
+                _handleSubmitAnswer(appState, answer.join(','));
               },
             ),
           ),
@@ -279,31 +360,36 @@ class _QuizScreenState extends State<QuizScreen> {
     return Column(children: optionWidgets);
   }
 
-  Widget _buildFillBlankInput(AppState appState) {
+  Widget _buildFillBlankInput(AppState appState, ColorScheme cs) {
+    final title = appState.currentQuestion?.title ?? '';
+    final blankCount = RegExp(r'_{2,}|（\s*）|\(\s*\)').allMatches(title).length;
+    final n = blankCount > 0 ? blankCount : 1;
+
+    while (_fillBlankControllers.length < n) {
+      _fillBlankControllers.add(TextEditingController());
+    }
+
     return Column(
       children: [
-        TextField(
-          controller: _fillBlankController,
-          decoration: InputDecoration(
-            hintText: '请输入答案...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            prefixIcon: const Icon(Icons.edit),
+        for (int i = 0; i < n; i++) ...[
+          TextField(
+            controller: _fillBlankControllers[i],
+            decoration: InputDecoration(
+              hintText: n == 1 ? '请输入答案...' : '第 ${i + 1} 空',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              prefixIcon: const Icon(Icons.edit),
+            ),
+            style: TextStyle(fontSize: 15, color: cs.onSurface),
+            onSubmitted: (v) => _submitFillBlank(appState),
           ),
-          style: const TextStyle(fontSize: 15),
-          onSubmitted: (v) => _submitFillBlank(appState),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 8),
+        ],
+        const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             icon: const Icon(Icons.check),
             label: const Text('提交答案'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4A90D9),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
             onPressed: () => _submitFillBlank(appState),
           ),
         ),
@@ -311,30 +397,55 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  void _submitFillBlank(AppState appState) {
-    final answer = _fillBlankController.text.trim();
-    if (answer.isEmpty) return;
-    _fillBlankController.clear();
-    appState.submitAnswer(answer);
+  Widget _buildTextAnswerInput(AppState appState, ColorScheme cs, String type) {
+    final label = type == 'ming_jie' ? '名解' : type == 'jian_da' ? '简答' : '问答';
+    return Column(
+      children: [
+        TextField(
+          controller: _textAnswerController,
+          maxLines: 6,
+          decoration: InputDecoration(
+            hintText: '请输入$label答案...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            alignLabelWithHint: true,
+          ),
+          style: TextStyle(fontSize: 15, color: cs.onSurface),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.check),
+            label: const Text('提交答案'),
+            onPressed: () {
+              final answer = _textAnswerController.text.trim();
+              if (answer.isEmpty) return;
+              _textAnswerController.clear();
+              _handleSubmitAnswer(appState, answer);
+            },
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _buildTrueFalseButtons(AppState appState) {
+  Widget _buildTrueFalseButtons(AppState appState, ColorScheme cs) {
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => appState.submitAnswer('对'),
+            onTap: () => _handleSubmitAnswer(appState, '对'),
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF5CB85C)),
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cs.tertiary),
               ),
               child: const Center(
                 child: Text('✓  正确',
                     style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF5CB85C))),
               ),
@@ -344,18 +455,18 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: GestureDetector(
-            onTap: () => appState.submitAnswer('错'),
+            onTap: () => _handleSubmitAnswer(appState, '错'),
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFD9534F)),
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cs.error),
               ),
               child: const Center(
                 child: Text('✗  错误',
                     style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFD9534F))),
               ),
@@ -366,8 +477,108 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  /// 答题后选项：显示三态（普通/用户错/正确）
-  Widget _buildAnsweredOptions(AppState appState, Question question) {
+  void _submitFillBlank(AppState appState) {
+    final answer = _fillBlankControllers
+        .map((c) => c.text.trim())
+        .join('；');
+    if (answer.isEmpty) return;
+    for (final c in _fillBlankControllers) { c.clear(); }
+    _handleSubmitAnswer(appState, answer);
+  }
+
+  Future<void> _handleSubmitAnswer(AppState appState, String answer) async {
+    await appState.submitAnswer(answer);
+    if (!mounted) return;
+    final record = appState.lastAnswerRecord;
+    if (record != null) {
+      if (record.isCorrect) {
+        HapticFeedback.lightImpact();
+        _playSound('correct.wav', appState);
+      } else {
+        HapticFeedback.mediumImpact();
+        _playSound('wrong.wav', appState);
+      }
+    }
+    if (record != null && record.isCorrect && !appState.isLastQuestion) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) {
+        _advanceQuestion(appState);
+      }
+    }
+  }
+
+  void _playSound(String asset, AppState appState) {
+    if (!appState.settings.soundEnabled) return;
+    try {
+      _audioPlayer.play(AssetSource(asset));
+    } catch (_) {}
+  }
+
+  void _advanceQuestion(AppState appState) {
+    _showAnalysis = false;
+    _showManualAnalysis = false;
+    _followUpController.clear();
+    _followUpResponse = null;
+    appState.nextQuestion();
+    _scrollController.jumpTo(0);
+  }
+
+  Widget _buildAnsweredResult(AppState appState, Question question, ColorScheme cs) {
+    final qt = question.questionType;
+    if (qt == 'fill_blank' || qt == 'true_false') {
+      final lastRecord = appState.lastAnswerRecord;
+      final userAnswer = lastRecord?.userAnswer ?? '';
+      final correctAnswer = question.correctAnswer;
+      final isCorrect = lastRecord?.isCorrect ?? false;
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isCorrect ? cs.tertiaryContainer : cs.errorContainer,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isCorrect ? cs.tertiary : cs.error),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(isCorrect ? Icons.check_circle : Icons.cancel,
+                    color: isCorrect ? cs.tertiary : cs.error, size: 20),
+                const SizedBox(width: 8),
+                Text(isCorrect ? '回答正确' : '回答错误',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isCorrect ? cs.onTertiaryContainer : cs.onErrorContainer)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (qt == 'fill_blank') ...[
+              Text('你的答案: $userAnswer',
+                  style: TextStyle(fontSize: 14, color: isCorrect ? cs.onTertiaryContainer : cs.onErrorContainer)),
+              if (!isCorrect) ...[
+                const SizedBox(height: 4),
+                Text('正确答案: $correctAnswer',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: cs.tertiary)),
+              ],
+            ],
+            if (qt == 'true_false') ...[
+              Text('你选择了: ${userAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
+                  style: TextStyle(fontSize: 14, color: isCorrect ? cs.onTertiaryContainer : cs.onErrorContainer)),
+              if (!isCorrect)
+                Text('正确答案: ${correctAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: cs.tertiary)),
+            ],
+          ],
+        ),
+      );
+    }
+    return _buildAnsweredOptions(appState, question, cs);
+  }
+
+  Widget _buildAnsweredOptions(AppState appState, Question question, ColorScheme cs) {
     final lastRecord = appState.lastAnswerRecord;
     final userAnswer = lastRecord?.userAnswer ?? '';
     final correctAnswer = question.correctAnswer.toUpperCase().trim();
@@ -385,17 +596,17 @@ class _QuizScreenState extends State<QuizScreen> {
         final isCorrect = correctAnswers.contains(label);
         final isUserWrong = !isCorrect && userAnswers.contains(label);
 
-        Color bgColor = Colors.white;
-        Color textColor = const Color(0xFF333333);
-        Color borderColor = const Color(0xFFE0E0E0);
+        Color bgColor = cs.surfaceContainerHighest;
+        Color textColor = cs.onSurface;
+        Color borderColor = cs.outlineVariant;
         if (isCorrect) {
-          bgColor = const Color(0xFFE8F5E9);
-          textColor = const Color(0xFF2E7D32);
-          borderColor = const Color(0xFF4CAF50);
+          bgColor = cs.tertiaryContainer;
+          textColor = cs.onTertiaryContainer;
+          borderColor = cs.tertiary;
         } else if (isUserWrong) {
-          bgColor = const Color(0xFFFFEBEE);
-          textColor = const Color(0xFFC62828);
-          borderColor = const Color(0xFFEF5350);
+          bgColor = cs.errorContainer;
+          textColor = cs.onErrorContainer;
+          borderColor = cs.error;
         }
 
         return Padding(
@@ -405,7 +616,7 @@ class _QuizScreenState extends State<QuizScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: bgColor,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderColor),
             ),
             child: Row(
@@ -413,13 +624,13 @@ class _QuizScreenState extends State<QuizScreen> {
                 Container(
                   width: 26, height: 26,
                   decoration: BoxDecoration(
-                    color: isCorrect ? const Color(0xFF4CAF50) : isUserWrong ? const Color(0xFFEF5350) : const Color(0xFFE0E0E0),
+                    color: isCorrect ? cs.tertiary : isUserWrong ? cs.error : cs.outlineVariant,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white)
                         : isUserWrong ? const Icon(Icons.close, size: 14, color: Colors.white)
-                        : Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF999999))),
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: cs.onSurfaceVariant)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -436,36 +647,30 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  /// 结果反馈：两行加粗正确/用户答案
-  Widget _buildResultFeedback(AppState appState, Question question) {
+  Widget _buildResultFeedback(AppState appState, Question question, ColorScheme cs) {
     final lastRecord = appState.lastAnswerRecord;
     if (lastRecord == null) return const SizedBox.shrink();
     final correct = question.correctAnswer;
     final user = lastRecord.userAnswer;
+    DebugLogService.instance.logResultFeedback(correct, user ?? 'null');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('正确答案: ',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+        Text('正确答案: $correct',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.tertiary)),
         const SizedBox(height: 4),
-        Text('你的答案: ',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFC62828))),
+        Text('你的答案: $user',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.error)),
       ],
     );
   }
 
-  /// 查看解析按钮
-  Widget _buildShowAnalysisButton(AppState appState) {
+  Widget _buildShowAnalysisButton(AppState appState, ColorScheme cs) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.psychology, size: 18),
         label: const Text('查看 AI 解析'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF4A90D9),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
         onPressed: () {
           setState(() => _showAnalysis = true);
           appState.showAnalysis();
@@ -474,15 +679,14 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  /// 重新生成解析按钮
-  Widget _buildRegenerateButton(AppState appState) {
+  Widget _buildRegenerateButton(AppState appState, ColorScheme cs) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.refresh, size: 16),
         label: const Text('重新生成解析', style: TextStyle(fontSize: 13)),
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF999999),
+          foregroundColor: cs.onSurfaceVariant,
           padding: const EdgeInsets.symmetric(vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -491,11 +695,10 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildAnalysisArea(AppState appState, Question question) {
+  Widget _buildAnalysisArea(AppState appState, Question question, ColorScheme cs) {
     final lastRecord = appState.lastAnswerRecord;
     final isCorrect = lastRecord?.isCorrect ?? false;
 
-    // 做对的题，默认不展示解析，除非手动点击查看
     if (isCorrect && !_showManualAnalysis) {
       return GestureDetector(
         onTap: () {
@@ -505,68 +708,60 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE0E0E0)),
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.outlineVariant),
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.lightbulb_outline, color: Color(0xFF999999), size: 18),
-              SizedBox(width: 8),
+              Icon(Icons.lightbulb_outline, color: cs.onSurfaceVariant, size: 18),
+              const SizedBox(width: 8),
               Text('查看AI解析',
-                  style: TextStyle(color: Color(0xFF4A90D9), fontSize: 14)),
+                  style: TextStyle(color: cs.primary, fontSize: 14)),
             ],
           ),
         ),
       );
     }
 
-    // 显示AI解析
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 1)),
-        ],
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.psychology_outlined,
-                  color: Color(0xFF4A90D9), size: 20),
+              Icon(Icons.psychology_outlined,
+                  color: cs.primary, size: 20),
               const SizedBox(width: 8),
-              const Text('AI解析',
+              Text('AI解析',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
-                      color: Color(0xFF4A90D9))),
+                      color: cs.primary)),
               const Spacer(),
               if (appState.analysisLoading)
-                const SizedBox(
+                SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2)),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
             ],
           ),
           const SizedBox(height: 10),
           if (appState.currentAnalysis != null)
             AiResponseWidget(text: appState.currentAnalysis!)
           else if (appState.analysisLoading)
-            const Text('正在生成AI解析...',
-                style: TextStyle(color: Color(0xFF999999), fontSize: 14))
+            Text('正在生成AI解析...',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14))
           else
-            const Text('解析生成失败',
-                style: TextStyle(color: Color(0xFF999999), fontSize: 14)),
+            Text('解析生成失败',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
 
-          // 追问区域
           if (appState.currentAnalysis != null &&
               appState.currentAnalysis!.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -592,12 +787,6 @@ class _QuizScreenState extends State<QuizScreen> {
                 ElevatedButton.icon(
                   icon: const Icon(Icons.send, size: 16),
                   label: const Text('追问', style: TextStyle(fontSize: 13)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90D9),
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
                   onPressed: () async {
                     final q = _followUpController.text.trim();
                     if (q.isEmpty) return;
@@ -615,15 +804,14 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
               ],
             ),
-            // 追问回复
             if (_followUpLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
                 child: Row(
                   children: [
-                    SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                    SizedBox(width: 8),
-                    Text('AI 正在回复...', style: TextStyle(fontSize: 13, color: Color(0xFF999999))),
+                    SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
+                    const SizedBox(width: 8),
+                    Text('AI 正在回复...', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -634,10 +822,10 @@ class _QuizScreenState extends State<QuizScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A90D9).withOpacity(0.05),
+                    color: cs.primary.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: _buildFollowUpContent(_followUpResponse!),
+                  child: AiResponseWidget(text: _followUpResponse!, fontSize: 12),
                 ),
               ),
           ],
@@ -646,14 +834,14 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildBottomBar(AppState appState) {
+  Widget _buildBottomBar(AppState appState, ColorScheme cs) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: cs.shadow.withOpacity(0.08),
               blurRadius: 10,
               offset: const Offset(0, -2)),
         ],
@@ -662,13 +850,6 @@ class _QuizScreenState extends State<QuizScreen> {
           ? SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A90D9),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
                 onPressed: () => _handleEndSession(context, appState),
                 child: const Text('完成刷题，查看小结',
                     style: TextStyle(fontSize: 16)),
@@ -680,11 +861,6 @@ class _QuizScreenState extends State<QuizScreen> {
                   child: OutlinedButton.icon(
                     icon: Icon(_inErrorBook ? Icons.bookmark : Icons.bookmark_border, size: 17),
                     label: Text(_inErrorBook ? '已收藏' : '错题本', style: const TextStyle(fontSize: 13)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF4A90D9),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
                     onPressed: () async {
                       final q = appState.currentQuestion;
                       if (q?.id != null) {
@@ -698,22 +874,29 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90D9),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                if (appState.hasPrevious) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: const Text('上一题', style: TextStyle(fontSize: 14)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: cs.onSurfaceVariant,
+                      ),
+                      onPressed: () {
+                        _showAnalysis = false;
+                        _showManualAnalysis = false;
+                        _followUpController.clear();
+                        _followUpResponse = null;
+                        appState.previousQuestion();
+                        _scrollController.jumpTo(0);
+                      },
                     ),
-                    onPressed: () {
-                      _showAnalysis = false;
-                      _showManualAnalysis = false;
-                      _followUpController.clear();
-                      appState.nextQuestion();
-                      _scrollController.jumpTo(0);
-                    },
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _advanceQuestion(appState),
                     child: const Text('下一题', style: TextStyle(fontSize: 16)),
                   ),
                 ),
@@ -733,9 +916,5 @@ class _QuizScreenState extends State<QuizScreen> {
         builder: (_) => SessionSummaryScreen(session: session),
       ),
     );
-  }
-
-  Widget _buildFollowUpContent(String raw) {
-    return AiResponseWidget(text: raw, fontSize: 12);
   }
 }

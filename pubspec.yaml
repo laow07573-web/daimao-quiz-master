@@ -1,7 +1,7 @@
 name: flashcard_app
 description: 刷题软件 - 支持本地题库、AI解析、数据统计的跨平台刷题工具
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.26.6+17
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -32,6 +32,8 @@ dependencies:
   google_fonts: ^6.1.0
   shimmer: ^3.0.0
   flutter_markdown: ^0.7.1
+  audioplayers: ^6.1.0
+  share_plus: ^10.1.4
   
   # 工具
   intl: ^0.18.1

@@ -6,6 +6,7 @@ import 'bank_manage_screen.dart';
 import 'import_screen.dart';
 import 'settings_screen.dart';
 import 'quiz_screen.dart';
+import 'error_book_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,15 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        title: const Text('刷题宝',
+        title: const Text('呆猫刷题宝',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: const Color(0xFF4A90D9),
-        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -58,18 +56,17 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStatsCards(appState),
+                  _buildStatsCards(appState, cs),
                   const SizedBox(height: 24),
-                  _buildWeaknessSection(appState),
+                  _buildWeaknessSection(appState, cs),
                   const SizedBox(height: 24),
-                  _buildQuickActions(appState),
+                  _buildQuickActions(appState, cs),
                   const SizedBox(height: 24),
-                  // 底部署名
-                  const Align(
+                  Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
-                      '本软件由b站：笨蛋鱼坏蛋猫 开发',
-                      style: TextStyle(fontSize: 11, color: Color(0xFFBBBBBB)),
+                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.26.6.17 beta',
+                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.4)),
                     ),
                   ),
                 ],
@@ -81,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsCards(AppState appState) {
+  Widget _buildStatsCards(AppState appState, ColorScheme cs) {
     final stats = appState.homeStats;
     return Row(
       children: [
@@ -90,7 +87,8 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.timer_outlined,
             label: '累计刷题时长',
             value: stats?.formattedDuration ?? '0分钟',
-            color: const Color(0xFF4A90D9),
+            color: cs.primary,
+            cs: cs,
           ),
         ),
         const SizedBox(width: 12),
@@ -100,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: '总刷题量',
             value: '${stats?.totalQuestions ?? 0} 题',
             color: const Color(0xFF5CB85C),
+            cs: cs,
           ),
         ),
         const SizedBox(width: 12),
@@ -108,37 +107,31 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.trending_up,
             label: '平均正确率',
             value: stats?.formattedAccuracy ?? '0%',
-            color: const Color(0xFFF0AD4E),
+            color: cs.secondary,
+            cs: cs,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildWeaknessSection(AppState appState) {
+  Widget _buildWeaknessSection(AppState appState, ColorScheme cs) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.lightbulb_outline, color: Colors.orange[700]),
+              Icon(Icons.lightbulb_outline, color: cs.secondary),
               const SizedBox(width: 8),
-              const Text('薄弱点分析',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('薄弱点分析',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
               const Spacer(),
               TextButton.icon(
                 icon: const Icon(Icons.refresh, size: 16),
@@ -149,42 +142,43 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           if (appState.weaknessAnalysis == null)
-            const Center(
+            Center(
                 child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
+              padding: const EdgeInsets.all(16),
+              child: CircularProgressIndicator(color: cs.primary),
             ))
           else
             AiResponseWidget(
               text: appState.weaknessAnalysis!,
               fontSize: 14,
-              color: const Color(0xFF666666),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActions(AppState appState) {
+  Widget _buildQuickActions(AppState appState, ColorScheme cs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('快速操作',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('快速操作',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
         const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: _ActionCard(
-                icon: Icons.play_arrow_rounded,
-                label: '开始刷题',
+                icon: Icons.rocket_launch_rounded,
+                customImage: 'assets/burst_icon.png',
+                label: '定向爆破',
                 subtitle: appState.selectedBankIds.isEmpty
                     ? '请先选择题库'
                     : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount}题',
-                color: const Color(0xFF4A90D9),
+                color: cs.primary,
+                cs: cs,
                 onTap: appState.selectedBankIds.isEmpty
                     ? null
-                    : () => _startQuiz(context, appState),
+                    : () => _showQuizModePicker(context, appState),
               ),
             ),
             const SizedBox(width: 12),
@@ -194,6 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: '管理题库',
                 subtitle: '${appState.banks.length} 个题库',
                 color: const Color(0xFF5CB85C),
+                cs: cs,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -206,18 +201,23 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         _ActionCard(
           icon: Icons.replay_rounded,
-          label: '错题重刷',
-          subtitle: '错3次以上 + 收藏题目',
-          color: const Color(0xFFD9534F),
+          label: '错题本',
+          subtitle: '使用FSRS算法全权生成',
+          color: cs.error,
+          cs: cs,
           fullWidth: true,
-          onTap: () => _startErrorReview(context, appState),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ErrorBookScreen()),
+          ),
         ),
         const SizedBox(height: 12),
         _ActionCard(
           icon: Icons.upload_file,
           label: '导入题库',
           subtitle: '支持 DOC/DOCX 格式批量上传',
-          color: const Color(0xFFF0AD4E),
+          color: cs.secondary,
+          cs: cs,
           fullWidth: true,
           onTap: () => Navigator.push(
             context,
@@ -228,23 +228,76 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _startErrorReview(BuildContext context, AppState appState) async {
-    if (!appState.settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-    await appState.startErrorReview();
-    if (appState.quizQuestions.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('暂无错题，继续刷题积累吧！')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+  void _showQuizModePicker(BuildContext context, AppState appState) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('选择刷题模式',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount} 题/轮',
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              _ModeOption(
+                icon: Icons.flash_on_rounded,
+                label: '正常刷题',
+                desc: '答完即判，立刻校对解析',
+                color: cs.primary,
+                cs: cs,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _startQuiz(context, appState);
+                },
+              ),
+              const SizedBox(height: 10),
+              _ModeOption(
+                icon: Icons.school_rounded,
+                label: '练习模式',
+                desc: '不限时，可反复修改答案',
+                color: cs.secondary,
+                cs: cs,
+                enabled: false,
+                onTap: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 10),
+              _ModeOption(
+                icon: Icons.visibility_rounded,
+                label: '背题模式',
+                desc: '直接展示答案，快速浏览记忆',
+                color: cs.tertiary,
+                cs: cs,
+                enabled: false,
+                onTap: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _startQuiz(BuildContext context, AppState appState) async {
@@ -280,12 +333,14 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final ColorScheme cs;
 
   const _StatCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    required this.cs,
   });
 
   @override
@@ -293,25 +348,24 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2)),
-        ],
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+            child: Text(value,
+                key: ValueKey(value),
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          ),
           const SizedBox(height: 4),
           Text(label,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF999999))),
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
         ],
       ),
     );
@@ -320,17 +374,21 @@ class _StatCard extends StatelessWidget {
 
 class _ActionCard extends StatelessWidget {
   final IconData icon;
+  final String? customImage;
   final String label;
   final String subtitle;
   final Color color;
+  final ColorScheme cs;
   final VoidCallback? onTap;
   final bool fullWidth;
 
   const _ActionCard({
     required this.icon,
+    this.customImage,
     required this.label,
     required this.subtitle,
     required this.color,
+    required this.cs,
     this.onTap,
     this.fullWidth = false,
   });
@@ -343,22 +401,18 @@ class _ActionCard extends StatelessWidget {
         width: fullWidth ? double.infinity : null,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2)),
-          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration:
-                  BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 24),
+                  BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+              child: customImage != null
+                  ? Image.asset(customImage!, width: 36, height: 36, color: color)
+                  : Icon(icon, color: color, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -366,16 +420,101 @@ class _ActionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(label,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 15)),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 15, color: cs.onSurface)),
                   const SizedBox(height: 2),
                   Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF999999))),
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
+            Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String desc;
+  final Color color;
+  final ColorScheme cs;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ModeOption({
+    required this.icon,
+    required this.label,
+    required this.desc,
+    required this.color,
+    required this.cs,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: enabled ? cs.surfaceContainerHighest : cs.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: enabled ? cs.outlineVariant : cs.outlineVariant.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(enabled ? 0.12 : 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: enabled ? color : cs.onSurfaceVariant, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(label,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: enabled ? cs.onSurface : cs.onSurfaceVariant)),
+                      if (!enabled) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.outlineVariant.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text('即将开放',
+                              style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(desc,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: enabled ? cs.onSurfaceVariant : cs.onSurfaceVariant.withOpacity(0.5))),
+                ],
+              ),
+            ),
+            if (enabled)
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
           ],
         ),
       ),
