@@ -181,6 +181,16 @@ class _ImportScreenState extends State<ImportScreen> {
 
                   const SizedBox(height: 12),
 
+                  // 余额提示
+                  if (appState.aiService?.cachedBalance != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '💰 余额 ¥${appState.aiService!.cachedBalance!.toStringAsFixed(2)}，预估可再导入 ${appState.getEstimatedRemainingQuestions() > 0 ? "~${appState.getEstimatedRemainingQuestions()} 题" : "..."}',
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+
                   // 开始导入
                   SizedBox(
                     width: double.infinity,

@@ -7,15 +7,9 @@ import '../services/app_state.dart';
 import '../widgets/ai_response_widget.dart';
 import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
-import '../widgets/answer_sheet_widget.dart';
-import '../widgets/question_edit_dialog.dart';
-import 'practice_summary_screen.dart';
-
-enum QuizMode { normal, memorize, practice }
 
 class QuizScreen extends StatefulWidget {
-  final QuizMode quizMode;
-  const QuizScreen({super.key, this.quizMode = QuizMode.normal});
+  const QuizScreen({super.key});
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -35,33 +29,8 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _showAnalysis = false;
   final Set<String> _selectedOptions = {};
   bool _isMemorizeMode = false;
-  // 练习模式状态
-  final List<PracticeAnswerState> _practiceAnswers = [];
-  int _practiceElapsedSeconds = 0;
-  DateTime _practiceStartTime = DateTime.now();
 
   @override
-  @override
-  void initState() {
-    super.initState();
-    if (widget.quizMode == QuizMode.practice) _startPracticeTimer();
-    if (widget.quizMode == QuizMode.memorize) {
-      _isMemorizeMode = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<AppState>().skipFSRS = true;
-      });
-    }
-  }
-
-  void _startPracticeTimer() {
-    if (widget.quizMode != QuizMode.practice) return;
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() => _practiceElapsedSeconds = DateTime.now().difference(_practiceStartTime).inSeconds);
-      _startPracticeTimer();
-    });
-  }
-
   void dispose() {
     _followUpController.dispose();
     for (final c in _fillBlankControllers) { c.dispose(); }
@@ -96,13 +65,6 @@ class _QuizScreenState extends State<QuizScreen> {
         final lastRecord = appState.lastAnswerRecord;
         final isAnswered = lastRecord != null;
 
-        final isPractice = widget.quizMode == QuizMode.practice;
-        if (isPractice && _practiceAnswers.length != appState.quizQuestions.length) {
-          _practiceAnswers.clear();
-          for (int i = 0; i < appState.quizQuestions.length; i++) {
-            _practiceAnswers.add(PracticeAnswerState());
-          }
-        }
         if (appState.currentQuestion?.id != _lastQuestionId) {
           _showAnalysis = false;
           _lastQuestionId = appState.currentQuestion?.id;
@@ -114,18 +76,6 @@ class _QuizScreenState extends State<QuizScreen> {
             title: Text(
                 '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
             actions: [
-              if (!isPractice)
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 18),
-                  tooltip: '编辑此题',
-                  onPressed: () => _showEditDialog(context, appState),
-                ),
-              if (isPractice)
-                IconButton(
-                  icon: const Icon(Icons.list_alt, size: 20),
-                  tooltip: '答题卡',
-                  onPressed: () => _showAnswerSheet(context, appState, cs),
-                ),
               IconButton(
                 icon: Icon(_isMemorizeMode ? Icons.visibility_off : Icons.visibility, size: 20),
                 tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
@@ -562,82 +512,6 @@ class _QuizScreenState extends State<QuizScreen> {
     try {
       _audioPlayer.play(AssetSource(asset));
     } catch (_) {}
-  }
-
-  void _showEditDialog(BuildContext context, AppState appState) {
-    final q = appState.currentQuestion;
-    if (q == null) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => QuestionEditDialog(
-        question: q,
-        onSave: (title, answer, type) {
-          appState.updateCurrentQuestion(title, answer, type);
-        },
-      ),
-    );
-  }
-
-  void _showAnswerSheet(BuildContext context, AppState appState, ColorScheme cs) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => AnswerSheetWidget(
-        answers: _practiceAnswers,
-        currentIndex: appState.currentQuestionIndex,
-        onJumpTo: (i) {
-          Navigator.pop(context);
-          while (appState.currentQuestionIndex > i && appState.hasPrevious) {
-            appState.previousQuestion();
-          }
-          while (appState.currentQuestionIndex < i && !appState.isLastQuestion) {
-            appState.nextQuestion();
-          }
-        },
-      ),
-    );
-  }
-
-  String _formatSeconds(int total) {
-    final m = total ~/ 60;
-    final s = total % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  void _showPracticeSubmitDialog(BuildContext context, int blankCount) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('存在未作答题目'),
-        content: Text('还有 $blankCount 道题未作答，确定提交？\n\n空白题将不计入正确率。'),
-        actions: [
-          TextButton(onPressed: () { Navigator.pop(ctx); _jumpToFirstBlank(); }, child: const Text('继续作答')),
-          FilledButton(onPressed: () { Navigator.pop(ctx); _submitPractice(context.read<AppState>()); }, child: const Text('直接提交')),
-        ],
-      ),
-    );
-  }
-
-  void _jumpToFirstBlank() {
-    final appState = context.read<AppState>();
-    for (int i = 0; i < _practiceAnswers.length; i++) {
-      if (!_practiceAnswers[i].answered) {
-        while (appState.currentQuestionIndex > i && appState.hasPrevious) appState.previousQuestion();
-        while (appState.currentQuestionIndex < i) appState.nextQuestion();
-        return;
-      }
-    }
-  }
-
-  Future<void> _submitPractice(AppState appState) async {
-    await appState.endSession();
-    final correct = _practiceAnswers.where((a) => a.answered && a.correct).length;
-    final wrong = _practiceAnswers.where((a) => a.answered && !a.correct).length;
-    final blank = _practiceAnswers.where((a) => !a.answered).length;
-    _audioPlayer.dispose();
-    if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(
-      builder: (_) => PracticeSummaryScreen(correct: correct, wrong: wrong, blank: blank, elapsedSeconds: _practiceElapsedSeconds),
-    ));
   }
 
   void _advanceQuestion(AppState appState) {

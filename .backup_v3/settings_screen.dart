@@ -18,6 +18,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _modelController = TextEditingController();
   bool _obscureKey = true;
   bool _debugEnabled = false;
+  double? _balance;
+  int _estimated = -1;
+  bool _balanceLoading = false;
 
   @override
   void initState() {
@@ -28,7 +31,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _apiKeyController.text = settings.apiKey;
       _endpointController.text = settings.apiEndpoint;
       _modelController.text = settings.model;
+      _fetchBalance();
     });
+  }
+
+  Future<void> _fetchBalance() async {
+    if (_balanceLoading) return;
+    setState(() => _balanceLoading = true);
+    final appState = context.read<AppState>();
+    final balance = await appState.fetchAIBalance();
+    if (mounted) {
+      setState(() {
+        _balance = balance;
+        _estimated = appState.getEstimatedRemainingQuestions();
+        _balanceLoading = false;
+      });
+    }
   }
 
   @override
@@ -103,6 +121,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+
+                  // 余额展示
+                  if (_balance != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet, size: 18, color: Color(0xFFF0AD4E)),
+                          const SizedBox(width: 8),
+                          Text('剩余 ¥${_balance!.toStringAsFixed(2)}',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onPrimaryContainer)),
+                          if (_estimated > 0) ...[
+                            const SizedBox(width: 8),
+                            Text('≈ ${_estimated} 题',
+                                style: TextStyle(fontSize: 12, color: cs.onPrimaryContainer.withOpacity(0.7))),
+                          ],
+                          const Spacer(),
+                          _balanceLoading
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : IconButton(
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                  onPressed: _fetchBalance,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   // API Endpoint
                   Text('API 地址',

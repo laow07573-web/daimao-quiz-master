@@ -262,15 +262,6 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  Future<void> updateQuestion(int id, String title, String correctAnswer, String questionType) async {
-    final db = await database;
-    await db.update('questions', {
-      'title': title,
-      'correct_answer': correctAnswer,
-      'question_type': questionType,
-    }, where: 'id = ?', whereArgs: [id]);
-  }
-
   Future<List<Question>> getQuestionsByBank(int bankId) async {
     final db = await database;
     final maps = await db.query('questions',

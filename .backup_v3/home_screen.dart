@@ -56,6 +56,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // API 余额不足警告
+                  if (appState.aiService != null &&
+                      appState.aiService!.cachedBalance != null &&
+                      appState.aiService!.cachedBalance! > 0 &&
+                      appState.aiService!.cachedBalance! < 1.0)
+                    _buildBalanceWarning(cs),
                   _buildStatsCards(appState, cs),
                   const SizedBox(height: 24),
                   _buildWeaknessSection(appState, cs),
@@ -78,38 +84,73 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildBalanceWarning(ColorScheme cs) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFFC107)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber, color: Color(0xFF856404)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'API 余额不足 ¥1，建议尽快充值以免影响使用',
+              style: TextStyle(fontSize: 13, color: Colors.brown[800]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatsCards(AppState appState, ColorScheme cs) {
     final stats = appState.homeStats;
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.timer_outlined,
-            label: '累计刷题时长',
-            value: stats?.formattedDuration ?? '0分钟',
-            color: cs.primary,
-            cs: cs,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                icon: Icons.timer_outlined,
+                label: '累计刷题时长',
+                value: stats?.formattedDuration ?? '0分钟',
+                color: cs.primary,
+                cs: cs,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                icon: Icons.quiz_outlined,
+                label: '总刷题量',
+                value: '${stats?.totalQuestions ?? 0} 题',
+                color: const Color(0xFF5CB85C),
+                cs: cs,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                icon: Icons.trending_up,
+                label: '平均正确率',
+                value: stats?.formattedAccuracy ?? '0%',
+                color: cs.secondary,
+                cs: cs,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.quiz_outlined,
-            label: '总刷题量',
-            value: '${stats?.totalQuestions ?? 0} 题',
-            color: const Color(0xFF5CB85C),
-            cs: cs,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.trending_up,
-            label: '平均正确率',
-            value: stats?.formattedAccuracy ?? '0%',
-            color: cs.secondary,
-            cs: cs,
-          ),
+        const SizedBox(height: 4),
+        Text(
+          '仅统计按「结束」完成的会话时长，中途退出不计',
+          style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
         ),
       ],
     );

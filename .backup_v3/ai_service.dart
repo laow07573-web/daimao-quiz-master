@@ -10,6 +10,14 @@ class AIService {
   final DatabaseService _db = DatabaseService.instance;
   final http.Client _client = http.Client();
 
+  // 余额与消耗追踪
+  int _totalTokensUsed = 0;
+  int get totalTokensUsed => _totalTokensUsed;
+  double? _cachedBalance;
+  DateTime? _balanceCacheTime;
+  double? get cachedBalance => _cachedBalance;
+  static const _balanceCacheDuration = Duration(minutes: 5);
+
   AIService(this._settings);
 
   /// 使用 AI 从原始文本中批量解析题目
@@ -120,6 +128,7 @@ $chunk
         final content = data['choices']?[0]?['message']?['content'] as String?;
         if (content == null) return [];
         logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
+        _trackUsage(data);
 
         // 解析 JSON 响应
         final parsed = jsonDecode(content);
@@ -341,6 +350,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
         final data = jsonDecode(decoded);
         final content = data['choices']?[0]?['message']?['content'] as String?;
         logger.log('PIPE:DECODE', 'contentLen=${content?.length ?? 0}  hasChoices=${data['choices'] != null}');
+        _trackUsage(data);
         return content ?? 'AI解析生成失败，请稍后重试。';
       } else {
         return 'AI服务返回错误 (${response.statusCode})，请检查API配置。';
@@ -348,6 +358,51 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     } catch (e) {
       return 'AI请求失败: ${e.toString()}';
     }
+  }
+
+  void _trackUsage(Map<String, dynamic> data) {
+    final usage = data['usage'];
+    if (usage != null) {
+      _totalTokensUsed += (usage['total_tokens'] as int?) ?? 0;
+    }
+  }
+
+  /// 查询 DeepSeek API 余额（元）
+  Future<double?> fetchBalance() async {
+    if (_settings.apiKey.isEmpty) return null;
+    if (_cachedBalance != null && _balanceCacheTime != null &&
+        DateTime.now().difference(_balanceCacheTime!) < _balanceCacheDuration) {
+      return _cachedBalance;
+    }
+    try {
+      final response = await _client.get(
+        Uri.parse('https://api.deepseek.com/user/balance'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${_settings.apiKey}',
+        },
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final infos = data['balance_infos'] as List?;
+        if (infos != null && infos.isNotEmpty) {
+          final total = double.tryParse(infos[0]['total_balance']?.toString() ?? '') ?? 0;
+          _cachedBalance = total;
+          _balanceCacheTime = DateTime.now();
+          return total;
+        }
+      }
+    } catch (_) {}
+    return _cachedBalance;
+  }
+
+  /// 估算剩余可刷题数
+  int getEstimatedRemainingQuestions() {
+    final balance = _cachedBalance;
+    if (balance == null || _totalTokensUsed == 0) return -1;
+    final avgPrice = (_totalTokensUsed / 1000000.0) * 0.002; // ~0.002元/题
+    if (avgPrice <= 0) return -1;
+    return (balance / avgPrice).round();
   }
 
   void dispose() {

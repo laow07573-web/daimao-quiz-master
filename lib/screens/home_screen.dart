@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
-                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.26.6.17 beta',
+                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.26.6.17',
                       style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.4)),
                     ),
                   ),
@@ -111,36 +111,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildStatsCards(AppState appState, ColorScheme cs) {
     final stats = appState.homeStats;
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.timer_outlined,
-            label: '累计刷题时长',
-            value: stats?.formattedDuration ?? '0分钟',
-            color: cs.primary,
-            cs: cs,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                icon: Icons.timer_outlined,
+                label: '累计刷题时长',
+                value: stats?.formattedDuration ?? '0分钟',
+                color: cs.primary,
+                cs: cs,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                icon: Icons.quiz_outlined,
+                label: '总刷题量',
+                value: '${stats?.totalQuestions ?? 0} 题',
+                color: const Color(0xFF5CB85C),
+                cs: cs,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                icon: Icons.trending_up,
+                label: '平均正确率',
+                value: stats?.formattedAccuracy ?? '0%',
+                color: cs.secondary,
+                cs: cs,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.quiz_outlined,
-            label: '总刷题量',
-            value: '${stats?.totalQuestions ?? 0} 题',
-            color: const Color(0xFF5CB85C),
-            cs: cs,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.trending_up,
-            label: '平均正确率',
-            value: stats?.formattedAccuracy ?? '0%',
-            color: cs.secondary,
-            cs: cs,
-          ),
+        const SizedBox(height: 4),
+        Text(
+          '仅统计按「结束」完成的会话时长，中途退出不计',
+          style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
         ),
       ],
     );
@@ -307,11 +317,13 @@ class _HomeScreenState extends State<HomeScreen> {
               _ModeOption(
                 icon: Icons.school_rounded,
                 label: '练习模式',
-                desc: '不限时，可反复修改答案',
+                desc: '不限时，支持答题卡和跳题',
                 color: cs.secondary,
                 cs: cs,
-                enabled: false,
-                onTap: () => Navigator.pop(ctx),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _startPractice(context, appState);
+                },
               ),
               const SizedBox(height: 10),
               _ModeOption(
@@ -320,8 +332,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 desc: '直接展示答案，快速浏览记忆',
                 color: cs.tertiary,
                 cs: cs,
-                enabled: false,
-                onTap: () => Navigator.pop(ctx),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _startMemorize(context, appState);
+                },
               ),
               const SizedBox(height: 12),
             ],
@@ -356,6 +370,48 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const QuizScreen()),
     );
+  }
+
+  Future<void> _startPractice(BuildContext context, AppState appState) async {
+    if (!appState.settings.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    await appState.startQuiz();
+    if (appState.quizQuestions.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('所选题库中没有题目，请先导入题目')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => QuizScreen(quizMode: QuizMode.practice),
+    ));
+  }
+
+  Future<void> _startMemorize(BuildContext context, AppState appState) async {
+    if (!appState.settings.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    await appState.startQuiz();
+    if (appState.quizQuestions.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('所选题库中没有题目，请先导入题目')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => QuizScreen(quizMode: QuizMode.memorize),
+    ));
   }
 }
 

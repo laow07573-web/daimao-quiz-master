@@ -55,8 +55,6 @@ class AppState extends ChangeNotifier {
 
   // 答题历史（按题目索引存储，支持前后翻题）
   final List<AnswerRecord?> _answerHistory = [];
-  bool _skipFSRS = false;
-  void set skipFSRS(bool v) => _skipFSRS = v;
   bool get hasPrevious => _currentQuestionIndex > 0;
 
   // 单题统计
@@ -407,7 +405,7 @@ class AppState extends ChangeNotifier {
     _analysisLoading = false;
 
     // 更新 FSRS 状态（如果这道题已有 FSRS 卡，则更新；如果答错且没有卡，则创建）
-    if (!_skipFSRS) _updateFSRSIfNeeded(qId);
+    _updateFSRSIfNeeded(qId);
 
     notifyListeners();
   }
@@ -502,18 +500,6 @@ class AppState extends ChangeNotifier {
       _lastAnswerRecord = null;
     }
     _currentQuestionStats = {};
-  }
-
-  Future<void> updateCurrentQuestion(String title, String answer, String? type) async {
-    final q = currentQuestion;
-    if (q == null) return;
-    await _db.updateQuestion(q.id!, title, answer, type ?? q.questionType);
-    _quizQuestions[_currentQuestionIndex] = q.copyWith(
-      title: title,
-      correctAnswer: answer,
-      questionType: type ?? q.questionType,
-    );
-    notifyListeners();
   }
 
   Future<QuizSession> endSession() async {
