@@ -16,3 +16,8 @@ windows/flutter/
 *.apk
 *.zip
 .gradle/
+
+.backup_*
+release*.json
+tool/gen_audio.dart
+.idea/
