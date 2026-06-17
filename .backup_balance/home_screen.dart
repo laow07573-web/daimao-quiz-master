@@ -56,12 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // API 余额不足警告
-                  if (appState.aiService != null &&
-                      appState.aiService!.cachedBalance != null &&
-                      appState.aiService!.cachedBalance! > 0 &&
-                      appState.aiService!.cachedBalance! < 1.0)
-                    _buildBalanceWarning(cs),
                   _buildStatsCards(appState, cs),
                   const SizedBox(height: 24),
                   _buildWeaknessSection(appState, cs),
@@ -80,31 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildBalanceWarning(ColorScheme cs) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3CD),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFC107)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber, color: Color(0xFF856404)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'API 余额不足 ¥1，建议尽快充值以免影响使用',
-              style: TextStyle(fontSize: 13, color: Colors.brown[800]),
-            ),
-          ),
-        ],
       ),
     );
   }

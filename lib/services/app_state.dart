@@ -214,6 +214,16 @@ class AppState extends ChangeNotifier {
     _aiService = AIService(_settings);
   }
 
+  AIService? get aiService => _aiService;
+
+  Future<double?> fetchAIBalance() async {
+    return await _aiService?.fetchBalance();
+  }
+
+  int getEstimatedRemainingQuestions() {
+    return _aiService?.getEstimatedRemainingQuestions() ?? -1;
+  }
+
   // ======================== 设置 ========================
 
   Future<void> _loadSettings() async {
