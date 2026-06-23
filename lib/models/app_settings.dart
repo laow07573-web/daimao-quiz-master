@@ -1,3 +1,5 @@
+import '../services/key_crypto.dart';
+
 class AppSettings {
   static const String defaultApiEndpoint = 'https://api.deepseek.com/v1/chat/completions';
   static const String defaultModel = 'deepseek-chat';
@@ -18,7 +20,7 @@ class AppSettings {
 
   Map<String, String> toMap() {
     return {
-      'api_key': apiKey,
+      'api_key': KeyCrypto.encrypt(apiKey),
       'api_endpoint': apiEndpoint,
       'model': model,
       'sound_enabled': soundEnabled ? '1' : '0',
@@ -27,7 +29,7 @@ class AppSettings {
 
   factory AppSettings.fromMap(Map<String, String> map) {
     return AppSettings(
-      apiKey: map['api_key'] ?? '',
+      apiKey: KeyCrypto.decrypt(map['api_key'] ?? ''),
       apiEndpoint: map['api_endpoint'] ?? defaultApiEndpoint,
       model: map['model'] ?? defaultModel,
       soundEnabled: map['sound_enabled'] != '0',

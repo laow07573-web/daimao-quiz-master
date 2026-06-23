@@ -57,6 +57,8 @@ class AppState extends ChangeNotifier {
   final List<AnswerRecord?> _answerHistory = [];
   bool _skipFSRS = false;
   void set skipFSRS(bool v) => _skipFSRS = v;
+  bool _noShuffle = false;
+  void set noShuffle(bool v) => _noShuffle = v;
   bool get hasPrevious => _currentQuestionIndex > 0;
 
   // 单题统计
@@ -203,6 +205,7 @@ class AppState extends ChangeNotifier {
   // 刷题模式
   int _selectedQuestionCount = 50;
   int get selectedQuestionCount => _selectedQuestionCount;
+  void setQuestionCount(int count) { _selectedQuestionCount = count; notifyListeners(); }
 
   // 初始化
   Future<void> init() async {
@@ -372,6 +375,7 @@ class AppState extends ChangeNotifier {
       bankIds: _selectedBankIds.toList(),
       mode: _selectedBankIds.length > 1 ? 'mixed' : 'single',
       questionCount: _selectedQuestionCount,
+      noShuffle: _noShuffle,
     );
 
     _currentSession = _quizService.currentSession;

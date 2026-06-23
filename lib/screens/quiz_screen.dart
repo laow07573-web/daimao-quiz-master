@@ -126,16 +126,16 @@ class _QuizScreenState extends State<QuizScreen> {
                   tooltip: '答题卡',
                   onPressed: () => _showAnswerSheet(context, appState, cs),
                 ),
-              IconButton(
-                icon: Icon(_isMemorizeMode ? Icons.visibility_off : Icons.visibility, size: 20),
-                tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
-                onPressed: () => setState(() => _isMemorizeMode = !_isMemorizeMode),
-              ),
-              if (isAnswered && !appState.isLastQuestion)
+              if (widget.quizMode != QuizMode.memorize)
+                IconButton(
+                  icon: Icon(_isMemorizeMode ? Icons.visibility_off : Icons.visibility, size: 20),
+                  tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
+                  onPressed: () => setState(() => _isMemorizeMode = !_isMemorizeMode),
+                ),
+              if (widget.quizMode == QuizMode.memorize)
                 TextButton(
-                  onPressed: () => _handleEndSession(context, appState),
-                  child:
-                      const Text('结束', style: TextStyle(color: Colors.white70)),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('结束', style: TextStyle(color: Colors.white70)),
                 ),
             ],
           ),
@@ -162,7 +162,25 @@ class _QuizScreenState extends State<QuizScreen> {
 
               // 滚动区域
               Expanded(
-                child: SingleChildScrollView(
+                child: GestureDetector(
+                  onHorizontalDragEnd: (details) {
+                    if (details.primaryVelocity == null) return;
+                    if (details.primaryVelocity! < -300) {
+                      if (_isMemorizeMode || isAnswered) {
+                        _advanceQuestion(appState);
+                      }
+                    } else if (details.primaryVelocity! > 300) {
+                      if (appState.hasPrevious) {
+                        _showAnalysis = false;
+                        _showManualAnalysis = false;
+                        _followUpController.clear();
+                        _followUpResponse = null;
+                        appState.previousQuestion();
+                        _scrollController.jumpTo(0);
+                      }
+                    }
+                  },
+                  child: SingleChildScrollView(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
                   child: AnimatedSwitcher(
@@ -183,7 +201,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         _buildQuestionCard(question, appState, cs),
                         const SizedBox(height: 16),
                         if (_isMemorizeMode)
-                          _buildMemorizeAnswer(question, cs)
+                          _buildMemorizeOptions(question, cs, appState)
                         else if (!isAnswered)
                           ...[_buildOptionsArea(appState, question, cs)]
                         else ...[
@@ -204,15 +222,42 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
                 ),
-              ),
+            ),
+          ),
 
-              // 底部按钮
-              if (isAnswered) _buildBottomBar(appState, cs),
+              // 底部按钮：已答或背题模式均显示
+              if (isAnswered || widget.quizMode == QuizMode.memorize) _buildBottomBar(appState, cs),
             ],
           ),
         );
       },
     );
+  }
+
+  /// 背题模式：选项中高亮正确选项
+  Widget _buildMemorizeOptions(Question question, ColorScheme cs, AppState appState) {
+    final options = question.questionType == 'true_false' ? ['对', '错'] : question.options;
+    if (options.isEmpty) {
+      return Container(
+        width: double.infinity, padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF4CAF50))),
+        child: Text('正确答案: ${question.correctAnswer}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+      );
+    }
+    final correctSet = question.questionType == 'multi_choice' ? question.correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {question.correctAnswer.toUpperCase().trim()};
+    return Column(children: List.generate(options.length, (i) {
+      final label = question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : String.fromCharCode(65 + i);
+      final isCorrect = correctSet.contains(question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : label);
+      return Padding(padding: const EdgeInsets.only(bottom: 8), child: Container(
+        width: double.infinity, padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: isCorrect ? const Color(0xFFE8F5E9) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? const Color(0xFF4CAF50) : cs.outlineVariant)),
+        child: Row(children: [
+          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? const Color(0xFF4CAF50) : cs.surfaceContainerHighest, shape: BoxShape.circle), child: Center(child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white) : Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF999999))))),
+          const SizedBox(width: 12),
+          Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? const Color(0xFF2E7D32) : cs.onSurface, height: 1.4))),
+        ]),
+      ));
+    }));
   }
 
   Widget _buildMemorizeAnswer(Question question, ColorScheme cs) {
@@ -976,9 +1021,13 @@ class _QuizScreenState extends State<QuizScreen> {
           ? SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => _handleEndSession(context, appState),
-                child: const Text('完成刷题，查看小结',
-                    style: TextStyle(fontSize: 16)),
+                onPressed: () {
+                  if (widget.quizMode == QuizMode.memorize) { Navigator.pop(context); }
+                  else { _handleEndSession(context, appState); }
+                },
+                child: Text(
+                    widget.quizMode == QuizMode.memorize ? '回到首页' : '完成刷题，查看小结',
+                    style: const TextStyle(fontSize: 16)),
               ),
             )
           : Row(

@@ -1,3 +1,4 @@
+import 'practice_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
@@ -214,12 +215,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: '定向爆破',
                 subtitle: appState.selectedBankIds.isEmpty
                     ? '请先选择题库'
-                    : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount}题',
+                    : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}'}',
                 color: cs.primary,
                 cs: cs,
                 onTap: appState.selectedBankIds.isEmpty
                     ? null
-                    : () => _showQuizModePicker(context, appState),
+                    : () => _showCountPicker(context, appState),
               ),
             ),
             const SizedBox(width: 12),
@@ -269,6 +270,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showCountPicker(BuildContext context, AppState appState) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurfaceVariant.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 20),
+            Text('选择刷题数量', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            Wrap(spacing: 12, runSpacing: 12, alignment: WrapAlignment.center, children: [
+              ...[10, 20, 30, 50, 80, 100].map((n) => ChoiceChip(
+                label: Text('$n 题'), selected: appState.selectedQuestionCount == n,
+                onSelected: (_) { appState.setQuestionCount(n); Navigator.pop(ctx); _showQuizModePicker(context, appState); },
+              )),
+              ChoiceChip(label: const Text('全部'), selected: false, onSelected: (_) { appState.setQuestionCount(9999); Navigator.pop(ctx); _showQuizModePicker(context, appState); }),
+              ChoiceChip(label: const Text('自定义'), selected: false, onSelected: (_) { Navigator.pop(ctx); _showCustomCountDialog(context, appState); }),
+            ]),
+            const SizedBox(height: 12),
+            Text('当前: ${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  void _showCustomCountDialog(BuildContext context, AppState appState) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('自定义题目数'),
+        content: TextField(controller: ctrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '输入题数', border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(onPressed: () {
+            final n = int.tryParse(ctrl.text);
+            if (n != null && n > 0) { appState.setQuestionCount(n); Navigator.pop(ctx); _showQuizModePicker(context, appState); }
+          }, child: const Text('确定')),
+        ],
+      ),
+    );
+  }
+
   void _showQuizModePicker(BuildContext context, AppState appState) {
     final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
@@ -298,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface),
                   textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount} 题/轮',
+              Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
                   style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center),
               const SizedBox(height: 20),
@@ -315,9 +364,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 10),
               _ModeOption(
-                icon: Icons.school_rounded,
-                label: '练习模式',
-                desc: '不限时，支持答题卡和跳题',
+                icon: Icons.edit_square,
+                label: '练习',
+                desc: '答题卡模式，限时/不限时，统一批改',
                 color: cs.secondary,
                 cs: cs,
                 onTap: () {
@@ -379,6 +428,12 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+    if (appState.selectedBankIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先在首页选择题库')),
+      );
+      return;
+    }
     await appState.startQuiz();
     if (appState.quizQuestions.isEmpty) {
       if (!mounted) return;
@@ -389,7 +444,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (!mounted) return;
     Navigator.push(context, MaterialPageRoute(
-      builder: (_) => QuizScreen(quizMode: QuizMode.practice),
+      builder: (_) => PracticeEntryScreen(questions: appState.quizQuestions),
     ));
   }
 
@@ -400,7 +455,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+    appState.noShuffle = true;
     await appState.startQuiz();
+    appState.noShuffle = false;
     if (appState.quizQuestions.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

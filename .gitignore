@@ -21,3 +21,6 @@ windows/flutter/
 release*.json
 tool/gen_audio.dart
 .idea/
+.restore/
+android/.kotlin/
+*.jks

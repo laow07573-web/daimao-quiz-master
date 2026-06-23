@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
 import '../services/debug_log_service.dart';
 import '../models/app_settings.dart';
+import '../services/theme_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -256,6 +257,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 主题切换
+            Text('主题外观', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.onSurface)),
+            const SizedBox(height: 8),
+            Consumer<ThemeService>(
+              builder: (context, themeService, _) => Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(children: [
+                    ...AppTheme.values.map((t) {
+                      final label = ThemeService.labelOf(t);
+                      final selected = themeService.current == t;
+                      return RadioListTile<AppTheme>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(label, style: const TextStyle(fontSize: 14)),
+                        value: t,
+                        groupValue: themeService.current,
+                        onChanged: (v) => themeService.switchTo(v!),
+                      );
+                    }),
+                  ]),
+                ),
               ),
             ),
 

@@ -39,6 +39,7 @@ class QuizService {
     required String mode,
     required int questionCount,
     List<QuestionBank>? allBanks,
+    bool noShuffle = false,
   }) async {
     // 从指定题库中随机抽取题目
     final allQuestions = await _db.getQuestionsByBanks(bankIds);
@@ -47,10 +48,10 @@ class QuizService {
       _questions = [];
     } else if (allQuestions.length <= questionCount) {
       _questions = allQuestions;
-      _questions.shuffle();
+      if (!noShuffle) _questions.shuffle();
     } else {
       _questions = allQuestions;
-      _questions.shuffle(Random());
+      if (!noShuffle) _questions.shuffle(Random());
       _questions = _questions.take(questionCount).toList();
     }
 

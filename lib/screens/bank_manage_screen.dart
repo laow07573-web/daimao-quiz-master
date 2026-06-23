@@ -135,41 +135,6 @@ class _BankManageScreenState extends State<BankManageScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text('每轮题量: ',
-              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [50, 100, 150, 200, 250, 300].map((count) {
-              final isSelected = appState.selectedQuestionCount == count;
-              return GestureDetector(
-                onTap: () => appState.setSelectedQuestionCount(count),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color:
-                        isSelected ? cs.primary : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? cs.primary : cs.outlineVariant,
-                    ),
-                  ),
-                  child: Text(
-                    '$count 题',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
         ],
       ),
     );
