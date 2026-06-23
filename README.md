@@ -120,7 +120,7 @@ flutter build windows --release
 flutter build apk --release --obfuscate --split-debug-info=build/debug-info
 ```
 
-> 签名文件：`刷题宝_正式签名.jks`（密码 quizmaster2024，别名 quiz），请妥善备份
+> 签名文件请自行生成并妥善备份，勿提交至仓库
 
 ---
 
