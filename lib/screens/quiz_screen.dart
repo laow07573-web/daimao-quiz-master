@@ -575,6 +575,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void _submitFillBlank(AppState appState) {
     final answer = _fillBlankControllers
         .map((c) => c.text.trim())
+        .where((t) => t.isNotEmpty)
         .join('；');
     if (answer.isEmpty) return;
     for (final c in _fillBlankControllers) { c.clear(); }
