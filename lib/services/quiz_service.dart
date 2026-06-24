@@ -97,6 +97,7 @@ class QuizService {
       final userParts = normalizedUser
           .split(RegExp(r'[；;]'))
           .map((s) => _stripPunct(s))
+          .where((s) => s.isNotEmpty)
           .toList();
       isCorrect = correctParts.isNotEmpty &&
           correctParts.length == userParts.length &&

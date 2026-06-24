@@ -460,6 +460,10 @@ class _QuizScreenState extends State<QuizScreen> {
     final blankCount = RegExp(r'_{2,}|（\s*）|\(\s*\)').allMatches(title).length;
     final n = blankCount > 0 ? blankCount : 1;
 
+    // 清理超过当前题目的旧控制器
+    while (_fillBlankControllers.length > n) {
+      _fillBlankControllers.removeLast().dispose();
+    }
     while (_fillBlankControllers.length < n) {
       _fillBlankControllers.add(TextEditingController());
     }
