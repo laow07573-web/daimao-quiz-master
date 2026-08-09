@@ -464,7 +464,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(children: [
                     ...AppTheme.values.map((t) {
                       final label = ThemeService.labelOf(t);
-                      final selected = themeService.current == t;
                       return RadioListTile<AppTheme>(
                         dense: true,
                         contentPadding: EdgeInsets.zero,

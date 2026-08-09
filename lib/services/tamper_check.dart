@@ -1,9 +1,6 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 签名校验：首次运行锁定签名，后续检测变化则弹窗告警
@@ -13,7 +10,7 @@ class TamperCheck {
   static Future<bool> verify() async {
     try {
       if (kDebugMode) return true;
-      
+
       if (Platform.isAndroid) {
         return await _verifyAndroid();
       } else if (Platform.isWindows) {
@@ -49,14 +46,5 @@ class TamperCheck {
       return true;
     }
     return stored == currentHash;
-  }
-
-  static String _quickHash(List<int> bytes) {
-    var h = 0x811C9DC5;
-    for (final b in bytes) {
-      h ^= b;
-      h = (h * 0x01000193) & 0xFFFFFFFF;
-    }
-    return h.toRadixString(16);
   }
 }

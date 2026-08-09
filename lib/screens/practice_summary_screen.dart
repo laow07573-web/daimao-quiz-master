@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/app_state.dart';
 
 class PracticeSummaryScreen extends StatelessWidget {
   final int correct;
@@ -17,7 +16,6 @@ class PracticeSummaryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = correct + wrong + blank;
     final answered = correct + wrong;
     final acc = answered > 0 ? (correct / answered * 100).toStringAsFixed(1) : '0';
     final cs = Theme.of(context).colorScheme;

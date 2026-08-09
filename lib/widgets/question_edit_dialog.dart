@@ -46,7 +46,6 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
       title: const Text('编辑题目'),
       content: SingleChildScrollView(

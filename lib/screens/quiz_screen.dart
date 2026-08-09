@@ -9,7 +9,6 @@ import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
 import '../widgets/answer_sheet_widget.dart';
 import '../widgets/question_edit_dialog.dart';
-import 'practice_summary_screen.dart';
 
 enum QuizMode { normal, memorize, practice }
 
@@ -37,28 +36,16 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isMemorizeMode = false;
   // 练习模式状态
   final List<PracticeAnswerState> _practiceAnswers = [];
-  int _practiceElapsedSeconds = 0;
-  DateTime _practiceStartTime = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    if (widget.quizMode == QuizMode.practice) _startPracticeTimer();
     if (widget.quizMode == QuizMode.memorize) {
       _isMemorizeMode = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<AppState>().skipFSRS = true;
       });
     }
-  }
-
-  void _startPracticeTimer() {
-    if (widget.quizMode != QuizMode.practice) return;
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() => _practiceElapsedSeconds = DateTime.now().difference(_practiceStartTime).inSeconds);
-      _startPracticeTimer();
-    });
   }
 
   void dispose() {
@@ -272,52 +259,6 @@ class _QuizScreenState extends State<QuizScreen> {
         ]),
       ));
     }));
-  }
-
-  Widget _buildMemorizeAnswer(Question question, ColorScheme cs) {
-    final correct = question.correctAnswer;
-    final qt = question.questionType;
-    String display;
-    if (qt == 'true_false') {
-      display = correct == '对' ? '✓ 正确' : '✗ 错误';
-    } else if (qt == 'single_choice' || qt == 'multi_choice') {
-      display = correct;
-    } else {
-      display = correct;
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [cs.primary.withOpacity(0.15), cs.primary.withOpacity(0.05)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.primary.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.lightbulb_outline, color: Color(0xFFF0AD4E), size: 24),
-          const SizedBox(height: 8),
-          const Text('参考答案',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFF0AD4E))),
-          const SizedBox(height: 12),
-          Text(display,
-              style: TextStyle(fontSize: 16, height: 1.6, color: cs.onSurface, fontWeight: FontWeight.w500),
-              textAlign: TextAlign.center),
-          if (question.analysis != null && question.analysis!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-            Text(question.analysis!,
-                style: TextStyle(fontSize: 13, height: 1.5, color: cs.onSurfaceVariant)),
-          ],
-        ],
-      ),
-    );
   }
 
   Widget _buildQuestionCard(Question question, AppState appState, ColorScheme cs) {
@@ -663,49 +604,6 @@ class _QuizScreenState extends State<QuizScreen> {
         },
       ),
     );
-  }
-
-  String _formatSeconds(int total) {
-    final m = total ~/ 60;
-    final s = total % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  void _showPracticeSubmitDialog(BuildContext context, int blankCount) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('存在未作答题目'),
-        content: Text('还有 $blankCount 道题未作答，确定提交？\n\n空白题将不计入正确率。'),
-        actions: [
-          TextButton(onPressed: () { Navigator.pop(ctx); _jumpToFirstBlank(); }, child: const Text('继续作答')),
-          FilledButton(onPressed: () { Navigator.pop(ctx); _submitPractice(context.read<AppState>()); }, child: const Text('直接提交')),
-        ],
-      ),
-    );
-  }
-
-  void _jumpToFirstBlank() {
-    final appState = context.read<AppState>();
-    for (int i = 0; i < _practiceAnswers.length; i++) {
-      if (!_practiceAnswers[i].answered) {
-        while (appState.currentQuestionIndex > i && appState.hasPrevious) appState.previousQuestion();
-        while (appState.currentQuestionIndex < i) appState.nextQuestion();
-        return;
-      }
-    }
-  }
-
-  Future<void> _submitPractice(AppState appState) async {
-    await appState.endSession();
-    final correct = _practiceAnswers.where((a) => a.answered && a.correct).length;
-    final wrong = _practiceAnswers.where((a) => a.answered && !a.correct).length;
-    final blank = _practiceAnswers.where((a) => !a.answered).length;
-    _audioPlayer.dispose();
-    if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(
-      builder: (_) => PracticeSummaryScreen(correct: correct, wrong: wrong, blank: blank, elapsedSeconds: _practiceElapsedSeconds),
-    ));
   }
 
   void _advanceQuestion(AppState appState) {

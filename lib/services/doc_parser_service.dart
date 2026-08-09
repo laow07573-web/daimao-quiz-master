@@ -295,7 +295,7 @@ class DocParserService {
 
     // 推测题型
     String questionType = 'single_choice';
-    if (correctAnswer != null && correctAnswer!.contains(',')) {
+    if (correctAnswer != null && correctAnswer.contains(',')) {
       questionType = 'multi_choice';
     } else if (options.isEmpty) {
       // 无选项：看答案判断是填空还是判断
@@ -323,11 +323,6 @@ class DocParserService {
   static String? _detectOptionLabel(String line) {
     final match = RegExp(r'^\s*([A-Z])[\.、．\s]', caseSensitive: true).firstMatch(line);
     return match?.group(1);
-  }
-
-  static bool _isOptionLine(String line, String label) {
-    return RegExp('^\\s*${label}[\.、．\\s]', caseSensitive: false)
-        .hasMatch(line);
   }
 
   static String _cleanOption(String line, String label) {

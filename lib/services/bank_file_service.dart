@@ -58,13 +58,11 @@ class BankFileService {
       groups[baseName] = questions;
     } else if (data is Map) {
       // 分组：{ 组名: [...] }
-      var total = 0;
       for (final entry in data.entries) {
         if (entry.value is! List) continue;
         final questions = _parseQuestions(entry.value as List, now);
         if (questions.isEmpty) continue;
         groups['${entry.key}'] = questions;
-        total += questions.length;
       }
       if (groups.isEmpty) {
         lastError = '文件中没有有效题目分组';

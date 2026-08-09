@@ -701,7 +701,6 @@ class _ModeOption extends StatelessWidget {
   final String desc;
   final Color color;
   final ColorScheme cs;
-  final bool enabled;
   final VoidCallback onTap;
 
   const _ModeOption({
@@ -711,31 +710,28 @@ class _ModeOption extends StatelessWidget {
     required this.color,
     required this.cs,
     required this.onTap,
-    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: enabled ? onTap : null,
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: enabled ? cs.surfaceContainerHighest : cs.surfaceContainerHighest.withOpacity(0.5),
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: enabled ? cs.outlineVariant : cs.outlineVariant.withOpacity(0.3),
-          ),
+          border: Border.all(color: cs.outlineVariant),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(enabled ? 0.12 : 0.05),
+                color: color.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: enabled ? color : cs.onSurfaceVariant, size: 22),
+              child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -748,31 +744,16 @@ class _ModeOption extends StatelessWidget {
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
-                              color: enabled ? cs.onSurface : cs.onSurfaceVariant)),
-                      if (!enabled) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: cs.outlineVariant.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text('即将开放',
-                              style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
-                        ),
-                      ],
+                              color: cs.onSurface)),
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(desc,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: enabled ? cs.onSurfaceVariant : cs.onSurfaceVariant.withOpacity(0.5))),
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),
-            if (enabled)
-              Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
+            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
           ],
         ),
       ),
