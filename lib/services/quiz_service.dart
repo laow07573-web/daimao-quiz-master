@@ -76,6 +76,72 @@ class QuizService {
     _answerStartTime = DateTime.now();
   }
 
+  /// 共享答案判定（刷题与练习共用）
+  /// - 单选/判断：忽略大小写与首尾空白
+  /// - 多选：集合比较（忽略顺序与分隔符）
+  /// - 填空：逐空去标点比对，空数不一致判错
+  /// - 名解/简答/问答：去标点后包含匹配，答案过短判错
+  /// - 空答案一律判错
+  static bool judgeAnswer(Question question, String userAnswer) {
+    final correctAnswer = question.correctAnswer.trim();
+    final normalizedUser = userAnswer.trim();
+    if (normalizedUser.isEmpty) return false;
+    if (correctAnswer.isEmpty) return false;
+
+    if (question.questionType == 'multi_choice') {
+      // 多选集合比较：忽略顺序与分隔符（A,C / C、A / c a）
+      final correctSet = _parseChoiceSet(correctAnswer);
+      final userSet = _parseChoiceSet(normalizedUser);
+      if (correctSet.isEmpty || userSet.isEmpty) return false;
+      return setEquals(correctSet, userSet);
+    }
+
+    if (question.questionType == 'fill_blank') {
+      // 填空：按分号拆分，逐空比对（去除标点符号）
+      final correctParts = correctAnswer
+          .split(RegExp(r'[；;]'))
+          .map((s) => stripPunct(s))
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final userParts = normalizedUser
+          .split(RegExp(r'[；;]'))
+          .map((s) => stripPunct(s))
+          .where((s) => s.isNotEmpty)
+          .toList();
+      return correctParts.isNotEmpty &&
+          correctParts.length == userParts.length &&
+          List.generate(correctParts.length,
+                  (i) => correctParts[i] == (i < userParts.length ? userParts[i] : ''))
+              .every((v) => v);
+    }
+
+    if (question.questionType == 'ming_jie' ||
+        question.questionType == 'jian_da' ||
+        question.questionType == 'jie_da') {
+      // 名解/简答/问答：去除标点后做包含匹配
+      final userClean = stripPunct(normalizedUser);
+      final correctClean = stripPunct(correctAnswer);
+      return userClean.length > 3 &&
+          (correctClean.contains(userClean) || userClean.contains(correctClean));
+    }
+
+    return normalizedUser.toUpperCase() == correctAnswer.toUpperCase();
+  }
+
+  /// 解析选择题答案字符串为字母集合（忽略顺序/分隔符/大小写）
+  static Set<String> _parseChoiceSet(String s) {
+    return s
+        .split(RegExp(r'[,，、;；\s/]+'))
+        .map((e) => e.trim().toUpperCase())
+        .where((e) => e.isNotEmpty && RegExp(r'^[A-Z]$').hasMatch(e))
+        .toSet();
+  }
+
+  static bool setEquals(Set<String> a, Set<String> b) {
+    if (a.length != b.length) return false;
+    return a.containsAll(b);
+  }
+
   /// 提交答案
   Future<AnswerRecord> submitAnswer(String userAnswer) async {
     final question = currentQuestion;
@@ -83,42 +149,11 @@ class QuizService {
       throw StateError('没有活跃的刷题会话');
     }
 
-    final correctAnswer = question.correctAnswer.trim();
-    final normalizedUser = userAnswer.trim();
-    final bool isCorrect;
-
-    if (question.questionType == 'fill_blank') {
-      // 填空：按分号拆分，逐空比对（去除标点符号）
-      final correctParts = correctAnswer
-          .split(RegExp(r'[；;]'))
-          .map((s) => _stripPunct(s))
-          .where((s) => s.isNotEmpty)
-          .toList();
-      final userParts = normalizedUser
-          .split(RegExp(r'[；;]'))
-          .map((s) => _stripPunct(s))
-          .where((s) => s.isNotEmpty)
-          .toList();
-      isCorrect = correctParts.isNotEmpty &&
-          correctParts.length == userParts.length &&
-          List.generate(correctParts.length,
-                  (i) => correctParts[i] == (i < userParts.length ? userParts[i] : ''))
-              .every((v) => v);
-    } else if (question.questionType == 'ming_jie' ||
-        question.questionType == 'jian_da' ||
-        question.questionType == 'jie_da') {
-      // 名解/简答/问答：去除标点后做包含匹配
-      final userClean = _stripPunct(normalizedUser);
-      final correctClean = _stripPunct(correctAnswer);
-      isCorrect = userClean.length > 3 &&
-          (correctClean.contains(userClean) || userClean.contains(correctClean));
-    } else {
-      isCorrect = normalizedUser.toUpperCase() == correctAnswer.toUpperCase();
-    }
+    final isCorrect = judgeAnswer(question, userAnswer);
 
     DebugLogService.instance.logAnswerSubmit(
       userAnswer: userAnswer,
-      correctAnswer: correctAnswer,
+      correctAnswer: question.correctAnswer,
       isCorrect: isCorrect,
       questionType: question.questionType,
       questionTitle: question.title,
@@ -224,13 +259,15 @@ class QuizService {
   }
 
   /// 去除标点、空白符号，统一为纯文本用于比对
-  static String _stripPunct(String s) {
+  static String stripPunct(String s) {
     return s
         .replaceAll(RegExp(r'^[\s]*[（(]?\d+[)）.．、\s]*'), '')
         .replaceAll(RegExp(r'^[\s]*[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳][、.\s]*'), '')
         .replaceAll(
-            RegExp(r'[，。！？；：、""''「」『』【】《》（）·…—\s,.!\?;:\"' +
-                r"'\(\)\[\]\\/\-_=+*&^%\$#@~`|{}<>]"),
+            // 字符类分三段 raw 拼接（避免非 raw 字符串吞掉 \s）
+            RegExp(r'[，。！？；：、""' +
+                r"「」『』【】《》（）·…—\s,.!?;:'" +
+                r'\(\)\[\]\\/\-_=+*&^%$#@~`|{}<>]'),
             '')
         .trim()
         .toUpperCase();

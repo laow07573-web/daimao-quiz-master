@@ -238,10 +238,12 @@ class AppState extends ChangeNotifier {
     final apiEndpoint =
         await _db.getSetting('api_endpoint') ?? AppSettings.defaultApiEndpoint;
     final model = await _db.getSetting('model') ?? AppSettings.defaultModel;
+    final soundEnabled = (await _db.getSetting('sound_enabled') ?? '1') == '1';
     _settings = AppSettings(
       apiKey: apiKey,
       apiEndpoint: apiEndpoint,
       model: model,
+      soundEnabled: soundEnabled,
     );
     _initAIService();
     notifyListeners();
@@ -252,6 +254,7 @@ class AppState extends ChangeNotifier {
     await _db.setSetting('api_key', KeyCrypto.encrypt(newSettings.apiKey));
     await _db.setSetting('api_endpoint', newSettings.apiEndpoint);
     await _db.setSetting('model', newSettings.model);
+    await _db.setSetting('sound_enabled', newSettings.soundEnabled ? '1' : '0');
     _initAIService();
     notifyListeners();
   }

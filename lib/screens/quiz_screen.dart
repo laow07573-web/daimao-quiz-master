@@ -41,7 +41,6 @@ class _QuizScreenState extends State<QuizScreen> {
   DateTime _practiceStartTime = DateTime.now();
 
   @override
-  @override
   void initState() {
     super.initState();
     if (widget.quizMode == QuizMode.practice) _startPracticeTimer();

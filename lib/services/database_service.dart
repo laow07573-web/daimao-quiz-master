@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -45,10 +46,16 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 4,
+      version: 5,
+      onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  /// 外键级联删除生效（v1.0.2：PRAGMA foreign_keys = ON）
+  Future<void> _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -67,6 +74,7 @@ class DatabaseService {
           analysis TEXT,
           question_type TEXT DEFAULT 'single_choice',
           source TEXT,
+          knowledge_point TEXT,
           created_at TEXT NOT NULL,
           FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
         )
@@ -122,6 +130,10 @@ class DatabaseService {
         )
       ''');
     }
+    if (oldVersion < 5) {
+      await db.execute(
+          'ALTER TABLE questions ADD COLUMN knowledge_point TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -145,6 +157,7 @@ class DatabaseService {
         analysis TEXT,
         question_type TEXT DEFAULT 'single_choice',
         source TEXT,
+        knowledge_point TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
       )
@@ -247,6 +260,13 @@ class DatabaseService {
 
   Future<void> deleteBank(int bankId) async {
     final db = await database;
+    // 显式清理 answer_records（外键级联兜底）
+    final qs = await db.query('questions',
+        columns: ['id'], where: 'bank_id = ?', whereArgs: [bankId]);
+    for (final q in qs) {
+      await db.delete('answer_records',
+          where: 'question_id = ?', whereArgs: [q['id']]);
+    }
     await db.delete('questions', where: 'bank_id = ?', whereArgs: [bankId]);
     await db.delete('question_banks', where: 'id = ?', whereArgs: [bankId]);
   }
@@ -538,7 +558,7 @@ class DatabaseService {
     return map;
   }
 
-  /// 按题库获取错题统计（到期题数 + 收藏题数）
+  /// 按题库获取错题统计（到期题数 + 收藏题数 + 全部去重数）
   Future<List<Map<String, dynamic>>> getErrorStatsByBank() async {
     final db = await database;
     return await db.rawQuery('''
@@ -549,7 +569,12 @@ class DatabaseService {
           WHEN fc.next_review_at IS NOT NULL AND datetime(fc.next_review_at) <= datetime('now', 'localtime')
           THEN q.id END
         ) as due_count,
-        COUNT(DISTINCT CASE WHEN eb.question_id IS NOT NULL THEN q.id END) as bookmark_count
+        COUNT(DISTINCT CASE WHEN eb.question_id IS NOT NULL THEN q.id END) as bookmark_count,
+        COUNT(DISTINCT CASE
+          WHEN (fc.next_review_at IS NOT NULL AND datetime(fc.next_review_at) <= datetime('now', 'localtime'))
+            OR eb.question_id IS NOT NULL
+          THEN q.id END
+        ) as all_count
       FROM question_banks qb
       LEFT JOIN questions q ON q.bank_id = qb.id
       LEFT JOIN fsrs_cards fc ON fc.question_id = q.id
@@ -558,5 +583,314 @@ class DatabaseService {
       HAVING due_count > 0 OR bookmark_count > 0
       ORDER BY qb.name
     ''');
+  }
+
+  // ======================== v1.0.2 新增：统计/模拟/备份 ========================
+
+  /// 错题筛选口径：
+  /// 'all'      = 到期 ∪ 收藏（去重）
+  /// 'wrong'    = 纯到期（FSRS 到期）
+  /// 'bookmark' = 纯收藏
+  String _errorIdSubquery(String mode) {
+    switch (mode) {
+      case 'wrong':
+        return "SELECT question_id FROM fsrs_cards "
+            "WHERE datetime(next_review_at) <= datetime('now', 'localtime')";
+      case 'bookmark':
+        return 'SELECT question_id FROM error_book';
+      default:
+        return "SELECT question_id FROM fsrs_cards "
+            "WHERE datetime(next_review_at) <= datetime('now', 'localtime') "
+            "UNION SELECT question_id FROM error_book";
+    }
+  }
+
+  /// 按筛选模式取错题全量题列表（复习范围与统计口径一致）
+  Future<List<Question>> getFullErrorQuestions(String mode, {int? bankId}) async {
+    final db = await database;
+    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
+    final args = bankId != null ? [bankId] : <Object>[];
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT q.* FROM questions q
+      WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
+      ORDER BY RANDOM()
+    ''', args);
+    return rows.map((m) => Question.fromMap(m)).toList();
+  }
+
+  /// 按筛选模式的错题总数
+  Future<int> getFullErrorCount(String mode, {int? bankId}) async {
+    final db = await database;
+    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
+    final args = bankId != null ? [bankId] : <Object>[];
+    final rows = await db.rawQuery('''
+      SELECT COUNT(DISTINCT q.id) as cnt FROM questions q
+      WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
+    ''', args);
+    return rows.first['cnt'] as int;
+  }
+
+  /// 知识点分组统计（与 getFullErrorQuestions 同口径）
+  Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode, {int? bankId}) async {
+    final db = await database;
+    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
+    final args = bankId != null ? [bankId] : <Object>[];
+    return await db.rawQuery('''
+      SELECT q.knowledge_point as kp, COUNT(DISTINCT q.id) as cnt
+      FROM questions q
+      WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
+        AND q.knowledge_point IS NOT NULL AND q.knowledge_point != ''
+      GROUP BY q.knowledge_point
+      ORDER BY cnt DESC
+    ''', args);
+  }
+
+  /// 按知识点取题（复习范围与主列表同口径）
+  Future<List<Question>> getFullQuestionsByKnowledgePoint(
+      String kp, String mode, {int? bankId}) async {
+    final db = await database;
+    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
+    final args = bankId != null ? [kp, bankId] : [kp];
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT q.* FROM questions q
+      WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
+        AND q.knowledge_point = ?
+      ORDER BY RANDOM()
+    ''', args);
+    return rows.map((m) => Question.fromMap(m)).toList();
+  }
+
+  /// 最近 N 天每日刷题量（无记录天补占位 total=0，COUNT 保证 int）
+  Future<List<Map<String, dynamic>>> getDailyStats(int days) async {
+    final db = await database;
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: days - 1));
+    final rows = await db.rawQuery('''
+      SELECT date(answered_at) as day, COUNT(*) as total
+      FROM answer_records
+      WHERE date(answered_at) >= date(?)
+      GROUP BY date(answered_at)
+    ''', [start.toIso8601String()]);
+    final byDay = <String, int>{};
+    for (final r in rows) {
+      byDay[r['day'] as String] = r['total'] as int;
+    }
+    final result = <Map<String, dynamic>>[];
+    for (var i = 0; i < days; i++) {
+      final d = start.add(Duration(days: i));
+      final key = _dateKey(d);
+      result.add({'date': d, 'total': byDay[key] ?? 0});
+    }
+    return result;
+  }
+
+  static String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// 连续打卡天数（纯函数）：从 upTo（默认昨天）往前数，
+  /// 每日刷题量 >= threshold 记 1 天；假期日期跳过（不中断也不计入）。
+  static int countConsecutiveDays(
+    Map<String, int> dailyTotals, {
+    required DateTime now,
+    List<DateTime>? vacationDays,
+    int threshold = 50,
+    DateTime? upTo,
+  }) {
+    final vacationSet = <String>{
+      ...?vacationDays?.map((d) => _dateKey(d)),
+    };
+    final end = upTo ?? DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
+    var streak = 0;
+    var cursor = DateTime(end.year, end.month, end.day);
+    while (true) {
+      final key = _dateKey(cursor);
+      if (vacationSet.contains(key)) {
+        cursor = cursor.subtract(const Duration(days: 1));
+        continue;
+      }
+      if ((dailyTotals[key] ?? 0) >= threshold) {
+        streak++;
+        cursor = cursor.subtract(const Duration(days: 1));
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  /// 某周期（week/month/all）的答题统计
+  Future<Map<String, dynamic>> getPeriodStats(String period) async {
+    final db = await database;
+    final now = DateTime.now();
+    DateTime? start;
+    switch (period) {
+      case 'week':
+        start = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
+        break;
+      case 'month':
+        start = DateTime(now.year, now.month, 1);
+        break;
+      default:
+        start = null;
+    }
+    final rows = await db.rawQuery('''
+      SELECT
+        COUNT(*) as questions,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+        COALESCE((SELECT SUM(duration_seconds) FROM quiz_sessions
+          ${start != null ? 'WHERE start_time >= ?' : ''}), 0) as duration
+      FROM answer_records
+      ${start != null ? 'WHERE answered_at >= ?' : ''}
+    ''', start != null ? [start.toIso8601String(), start.toIso8601String()] : []);
+    final r = rows.first;
+    return {
+      'questions': (r['questions'] as int?) ?? 0,
+      'correct': (r['correct'] as int?) ?? 0,
+      'duration': (r['duration'] as int?) ?? 0,
+    };
+  }
+
+  /// 会话详情：answer_records JOIN questions 逐题展示
+  Future<List<Map<String, dynamic>>> getSessionDetail(int sessionId) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT ar.id, ar.question_id, ar.user_answer, ar.is_correct,
+             ar.ai_analysis, ar.answered_at,
+             q.title as question_title, q.correct_answer, q.question_type
+      FROM answer_records ar
+      JOIN questions q ON ar.question_id = q.id
+      WHERE ar.session_id = ?
+      ORDER BY ar.id
+    ''', [sessionId]);
+  }
+
+  /// 模拟长期使用（开发者选项）：以首次执行时间为锚点，
+  /// 幂等 —— 已生成过则直接返回，重复调用不会跨午夜生成新数据。
+  Future<void> simulateLongTermUse() async {
+    if (await getSetting('sim_done') == '1') return;
+    final db = await database;
+    final anchorStr = await getSetting('sim_anchor');
+    final anchor = anchorStr != null
+        ? DateTime.parse(anchorStr)
+        : DateTime.now();
+    if (anchorStr == null) {
+      await setSetting('sim_anchor', anchor.toIso8601String());
+    }
+
+    // 模拟题库
+    final existing = await db.query('question_banks',
+        where: 'name = ?', whereArgs: ['模拟题库']);
+    int bankId;
+    if (existing.isNotEmpty) {
+      bankId = existing.first['id'] as int;
+    } else {
+      bankId = await insertBank(QuestionBank(
+        name: '模拟题库',
+        fileSource: 'simulation',
+        questionCount: 40,
+        createdAt: anchor.subtract(const Duration(days: 89)).toIso8601String(),
+      ));
+      final questions = <Question>[];
+      for (var i = 1; i <= 40; i++) {
+        questions.add(Question(
+          bankId: bankId,
+          title: '模拟单选题 $i',
+          options: const ['选项A', '选项B', '选项C', '选项D'],
+          correctAnswer: 'A',
+          analysis: '模拟解析',
+          questionType: 'single_choice',
+          source: 'simulation',
+          createdAt: anchor.toIso8601String(),
+        ));
+      }
+      await insertQuestions(questions);
+    }
+
+    // 90 天随机刷题记录（以锚点做随机种子 → 确定性 → 幂等）
+    final rng = Random(anchor.millisecondsSinceEpoch);
+    final allQuestions = await getQuestionsByBank(bankId);
+    if (allQuestions.isEmpty) return;
+    final dayZero = DateTime(anchor.year, anchor.month, anchor.day)
+        .subtract(const Duration(days: 89));
+    for (var day = 0; day < 90; day++) {
+      final d = dayZero.add(Duration(days: day));
+      final count = day == 89 ? 0 : rng.nextInt(80) + 10; // 10~89 题/天
+      if (count == 0) continue;
+      final sessionId = await insertSession(QuizSession(
+        bankIds: '$bankId',
+        mode: 'single',
+        totalQuestions: count,
+        correctCount: (count * 0.75).round(),
+        wrongCount: count - (count * 0.75).round(),
+        startTime: DateTime(d.year, d.month, d.day, 9).toIso8601String(),
+        endTime: DateTime(d.year, d.month, d.day, 9, 40).toIso8601String(),
+        durationSeconds: 2400,
+      ));
+      for (var i = 0; i < count; i++) {
+        final q = allQuestions[rng.nextInt(allQuestions.length)];
+        final isCorrect = rng.nextDouble() < 0.75;
+        await insertAnswerRecord(AnswerRecord(
+          questionId: q.id!,
+          sessionId: sessionId,
+          userAnswer: isCorrect ? q.correctAnswer : 'B',
+          isCorrect: isCorrect,
+          answeredAt: DateTime(d.year, d.month, d.day, 9, rng.nextInt(30))
+              .toIso8601String(),
+        ));
+      }
+    }
+    await setSetting('sim_done', '1');
+  }
+
+  /// 校验备份文件：SQLite 魔数 + 核心表存在性。返回 null 表示合法，否则返回错误信息
+  Future<String?> validateBackupFile(String filePath) async {
+    final file = File(filePath);
+    if (!await file.exists()) return '文件不存在';
+    final raf = await file.open();
+    try {
+      final header = await raf.read(16);
+      // SQLite 魔数: "SQLite format 3\0"
+      if (header.length < 16 ||
+          String.fromCharCodes(header.sublist(0, 15)) != 'SQLite format 3') {
+        return '不是有效的 SQLite 数据库文件';
+      }
+    } finally {
+      await raf.close();
+    }
+    // 核心表校验：临时打开备份库检查 sqlite_master
+    final tmpDb = await databaseFactory.openDatabase(filePath);
+    try {
+      final tables = await tmpDb.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
+          "('question_banks','questions','answer_records','settings')");
+      final names = tables.map((r) => r['name']).toSet();
+      for (final t in ['question_banks', 'questions', 'answer_records', 'settings']) {
+        if (!names.contains(t)) return '备份缺少核心表: $t';
+      }
+    } finally {
+      await tmpDb.close();
+    }
+    return null;
+  }
+
+  /// 导入备份：校验后关闭当前库，用备份文件替换，下次访问自动重开
+  Future<String?> importBackup(String filePath) async {
+    final err = await validateBackupFile(filePath);
+    if (err != null) return err;
+    final db = await database;
+    await db.close();
+    _database = null;
+    await File(filePath).copy(db.path);
+    return null;
+  }
+
+  /// 导出当前数据库备份到指定路径
+  Future<String?> exportBackup(String destPath) async {
+    final db = await database;
+    await File(db.path).copy(destPath);
+    return null;
   }
 }

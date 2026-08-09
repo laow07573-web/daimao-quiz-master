@@ -9,6 +9,7 @@ class Question {
   final String? analysis;
   final String questionType; // single_choice, multi_choice, true_false
   final String? source;
+  final String? knowledgePoint; // 知识点（v1.0.2: schema v5）
   final String createdAt;
 
   Question({
@@ -20,6 +21,7 @@ class Question {
     this.analysis,
     this.questionType = 'single_choice',
     this.source,
+    this.knowledgePoint,
     required this.createdAt,
   });
 
@@ -46,6 +48,7 @@ class Question {
       'analysis': analysis,
       'question_type': questionType,
       'source': source,
+      'knowledge_point': knowledgePoint,
       'created_at': createdAt,
     };
   }
@@ -84,6 +87,7 @@ class Question {
       analysis: map['analysis'] as String?,
       questionType: map['question_type'] as String? ?? 'single_choice',
       source: map['source'] as String?,
+      knowledgePoint: map['knowledge_point'] as String?,
       createdAt: map['created_at'] as String? ?? DateTime.now().toIso8601String(),
     );
   }
@@ -97,6 +101,7 @@ class Question {
     String? analysis,
     String? questionType,
     String? source,
+    String? knowledgePoint,
     String? createdAt,
   }) {
     return Question(
@@ -108,6 +113,7 @@ class Question {
       analysis: analysis ?? this.analysis,
       questionType: questionType ?? this.questionType,
       source: source ?? this.source,
+      knowledgePoint: knowledgePoint ?? this.knowledgePoint,
       createdAt: createdAt ?? this.createdAt,
     );
   }
