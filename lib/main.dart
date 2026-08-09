@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'services/app_state.dart';
 import 'services/theme_service.dart';
 import 'services/tamper_check.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,7 +71,7 @@ class FlashcardApp extends StatelessWidget {
       theme: theme,
       home: const AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark),
-        child: HomeScreen(),
+        child: MainShell(),
       ),
     );
   }

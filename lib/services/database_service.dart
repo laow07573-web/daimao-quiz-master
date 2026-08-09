@@ -720,6 +720,36 @@ class DatabaseService {
     return streak;
   }
 
+  /// 最近 N 天每日正确率（total/correct，与 getDailyStats 同日口径）
+  Future<List<Map<String, dynamic>>> getDailyAccuracy(int days) async {
+    final db = await database;
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: days - 1));
+    final rows = await db.rawQuery('''
+      SELECT date(answered_at) as day, COUNT(*) as total,
+             SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+      FROM answer_records
+      WHERE date(answered_at) >= date(?)
+      GROUP BY date(answered_at)
+    ''', [start.toIso8601String()]);
+    return rows;
+  }
+
+  /// 按知识点的正确率排行
+  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT q.knowledge_point as kp, COUNT(ar.id) as total,
+             SUM(CASE WHEN ar.is_correct = 1 THEN 1 ELSE 0 END) as correct
+      FROM answer_records ar
+      JOIN questions q ON ar.question_id = q.id
+      WHERE q.knowledge_point IS NOT NULL AND q.knowledge_point != ''
+      GROUP BY q.knowledge_point
+      ORDER BY total DESC
+    ''');
+  }
+
   /// 某周期（week/month/all）的答题统计
   Future<Map<String, dynamic>> getPeriodStats(String period) async {
     final db = await database;
@@ -770,8 +800,15 @@ class DatabaseService {
   /// 模拟长期使用（开发者选项）：以首次执行时间为锚点，
   /// 幂等 —— 已生成过则直接返回，重复调用不会跨午夜生成新数据。
   Future<void> simulateLongTermUse() async {
-    if (await getSetting('sim_done') == '1') return;
     final db = await database;
+    // 幂等：模拟数据已存在则直接返回。
+    // 若标记残留但题库已被删除（如 deleteBank），重置标记重新生成。
+    final simBank = await db.query('question_banks',
+        where: 'name = ?', whereArgs: ['模拟题库']);
+    if (simBank.isNotEmpty && await getSetting('sim_done') == '1') return;
+    if (simBank.isEmpty) {
+      await db.delete('settings', where: "key IN ('sim_done','sim_anchor')");
+    }
     final anchorStr = await getSetting('sim_anchor');
     final anchor = anchorStr != null
         ? DateTime.parse(anchorStr)

@@ -245,6 +245,15 @@ class AppState extends ChangeNotifier {
       model: model,
       soundEnabled: soundEnabled,
     );
+    // v1.0.2 新增设置
+    _vacationModeEnabled = (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
+    final vStart = await _db.getSetting('vacation_start_date');
+    final vEnd = await _db.getSetting('vacation_end_date');
+    _vacationStartDate = vStart != null ? DateTime.tryParse(vStart) : null;
+    _vacationEndDate = vEnd != null ? DateTime.tryParse(vEnd) : null;
+    _reminderEnabled = (await _db.getSetting('reminder_enabled') ?? '0') == '1';
+    final rTime = await _db.getSetting('reminder_time');
+    _reminderTime = rTime != null ? DateTime.tryParse(rTime) : null;
     _initAIService();
     notifyListeners();
   }
@@ -258,6 +267,150 @@ class AppState extends ChangeNotifier {
     _initAIService();
     notifyListeners();
   }
+
+  // ======================== v1.0.2: 假期模式 / 每日提醒设置 ========================
+
+  bool _vacationModeEnabled = false;
+  DateTime? _vacationStartDate;
+  DateTime? _vacationEndDate;
+  bool _reminderEnabled = false;
+  DateTime? _reminderTime;
+
+  bool get vacationModeEnabled => _vacationModeEnabled;
+  DateTime? get vacationStartDate => _vacationStartDate;
+  DateTime? get vacationEndDate => _vacationEndDate;
+  bool get reminderEnabled => _reminderEnabled;
+  DateTime? get reminderTime => _reminderTime;
+
+  /// 假期日期范围（用于连击冻结与日历标注）
+  List<DateTime> get vacationDateRange {
+    final start = _vacationStartDate;
+    final end = _vacationEndDate;
+    if (!_vacationModeEnabled || start == null || end == null) return const [];
+    final result = <DateTime>[];
+    var cursor = DateTime(start.year, start.month, start.day);
+    final last = DateTime(end.year, end.month, end.day);
+    while (!cursor.isAfter(last)) {
+      result.add(cursor);
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return result;
+  }
+
+  /// 保存假期模式（开关 + 起止日期）
+  Future<void> setVacationMode({
+    required bool enabled,
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    _vacationModeEnabled = enabled;
+    if (start != null) _vacationStartDate = start;
+    if (end != null) _vacationEndDate = end;
+    await _db.setSetting('vacation_mode_enabled', enabled ? '1' : '0');
+    if (_vacationStartDate != null) {
+      await _db.setSetting('vacation_start_date', _vacationStartDate!.toIso8601String());
+    }
+    if (_vacationEndDate != null) {
+      await _db.setSetting('vacation_end_date', _vacationEndDate!.toIso8601String());
+    }
+    notifyListeners();
+  }
+
+  /// 保存每日提醒设置
+  Future<void> setReminderSettings({
+    required bool enabled,
+    DateTime? time,
+  }) async {
+    _reminderEnabled = enabled;
+    if (time != null) _reminderTime = time;
+    await _db.setSetting('reminder_enabled', enabled ? '1' : '0');
+    if (_reminderTime != null) {
+      await _db.setSetting('reminder_time', _reminderTime!.toIso8601String());
+    }
+    notifyListeners();
+  }
+
+  // ======================== v1.0.2: 统计页数据 ========================
+
+  /// 首页/统计页切换时刷新战绩数据
+  Future<void> refreshWeeklyStats() async {
+    await _loadHomeStats();
+    notifyListeners();
+  }
+
+  /// 最近 N 天每日刷题量（date: DateTime, total: int）
+  Future<List<Map<String, dynamic>>> getDailyStats(int days) =>
+      _db.getDailyStats(days);
+
+  /// 年度每日刷题量映射（key: 'YYYY-MM-DD'）
+  Future<Map<String, int>> getYearlyTotals() async {
+    final list = await _db.getDailyStats(365);
+    return {
+      for (final d in list)
+        '${(d['date'] as DateTime).year}-'
+            '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
+            '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}':
+            d['total'] as int,
+    };
+  }
+
+  /// 近 30 天趋势数据（含正确率，无记录天占位）
+  Future<List<Map<String, dynamic>>> getTrendData() async {
+    final totals = await _db.getDailyStats(30);
+    final accuracy = await _db.getDailyAccuracy(30);
+    final accByDay = <String, Map<String, dynamic>>{
+      for (final a in accuracy) a['day'] as String: a,
+    };
+    return totals.map((d) {
+      final date = d['date'] as DateTime;
+      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+          '${date.day.toString().padLeft(2, '0')}';
+      final total = d['total'] as int;
+      final acc = accByDay[key];
+      final correct = acc != null ? (acc['correct'] as int?) ?? 0 : 0;
+      return {
+        'date': date,
+        'total': total,
+        'accuracy': total > 0 ? (correct / total) * 100 : 0.0,
+      };
+    }).toList();
+  }
+
+  /// 连续打卡天数（截止昨天，>=50 题/天，假期冻结）
+  Future<int> getStreakDays() async {
+    final totals = await getYearlyTotals();
+    return DatabaseService.countConsecutiveDays(
+      totals,
+      now: DateTime.now(),
+      vacationDays: vacationDateRange,
+    );
+  }
+
+  /// 周期统计（week/month/all）
+  Future<PeriodStats> getPeriodStats(String period) =>
+      _statsService.getPeriodStats(period);
+
+  /// 周期内最长连击
+  Future<int> getPeriodLongestStreak(String period) =>
+      _statsService.getPeriodLongestStreak(period);
+
+  /// 最近会话记录
+  Future<List<QuizSession>> getRecentSessions(int limit) async {
+    final all = await _db.getAllSessions();
+    return all.take(limit).toList();
+  }
+
+  /// 会话详情（answer_records JOIN questions）
+  Future<List<Map<String, dynamic>>> getSessionDetail(int sessionId) =>
+      _db.getSessionDetail(sessionId);
+
+  /// 按知识点正确率排行
+  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() =>
+      _db.getAccuracyByKnowledgePoint();
+
+  /// 各题库正确率（薄弱点分析/统计页排行）
+  Future<List<BankAccuracy>> getBankAccuracies() =>
+      _statsService.getBankAccuracies();
 
   // ======================== 题库管理 ========================
 

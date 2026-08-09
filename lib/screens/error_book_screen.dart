@@ -4,7 +4,10 @@ import '../services/app_state.dart';
 import 'quiz_screen.dart';
 
 class ErrorBookScreen extends StatefulWidget {
-  const ErrorBookScreen({super.key});
+  /// [initialFilter]：'all' 全部（到期∪收藏）/ 'wrong' 错题 / 'bookmark' 收藏
+  const ErrorBookScreen({super.key, this.initialFilter = 'all'});
+
+  final String initialFilter;
 
   @override
   State<ErrorBookScreen> createState() => _ErrorBookScreenState();
