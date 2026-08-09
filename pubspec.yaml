@@ -1,0 +1,52 @@
+name: flashcard_app
+description: 刷题软件 - 支持本地题库、AI解析、数据统计的跨平台刷题工具
+publish_to: 'none'
+version: 1.26.6+17
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 状态管理
+  provider: ^6.1.1
+  
+  # 数据库
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.1
+  path: ^1.8.3
+  
+  # 文件处理
+  file_picker: ^6.1.1
+  archive: ^3.4.9
+  xml: ^6.3.0
+  
+  # 网络请求
+  http: ^1.1.2
+  http_parser: ^4.0.2
+  
+  # UI组件
+  fl_chart: ^0.66.0
+  google_fonts: ^6.1.0
+  shimmer: ^3.0.0
+  flutter_markdown: ^0.7.1
+  audioplayers: ^6.1.0
+  share_plus: ^10.1.4
+  
+  # 工具
+  intl: ^0.18.1
+  shared_preferences: 2.5.3
+  uuid: ^4.2.1
+  path_provider: 2.1.5
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
