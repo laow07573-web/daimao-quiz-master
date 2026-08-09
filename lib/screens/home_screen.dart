@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 import '../widgets/ai_response_widget.dart';
+import '../widgets/weekly_stats_board.dart';
 import 'bank_manage_screen.dart';
 import 'import_screen.dart';
 import 'settings_screen.dart';
@@ -17,13 +18,52 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // v1.0.2: 战绩数据（本周刷题/连续打卡/年度热力）
+  Map<String, int> _yearlyTotals = {};
+  Set<String> _vacationDays = {};
+  int _streakDays = 0;
+  int _weekTotal = 0;
+  bool _statsLoaded = false; // 防横幅首帧闪现
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final appState = context.read<AppState>();
       appState.refreshWeaknessAnalysis();
+      _loadWeeklyData(appState);
     });
+  }
+
+  Future<void> _loadWeeklyData(AppState appState) async {
+    try {
+      final yearly = await appState.getYearlyTotals();
+      final streak = await appState.getStreakDays();
+      final weekStats = await appState.getPeriodStats('week');
+      final vacation = {
+        for (final d in appState.vacationDateRange)
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'
+      };
+      if (!mounted) return;
+      setState(() {
+        _yearlyTotals = yearly;
+        _streakDays = streak;
+        _weekTotal = weekStats.totalQuestions;
+        _vacationDays = vacation;
+        _statsLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _statsLoaded = true);
+    }
+  }
+
+  bool _vacationBlocked(AppState appState) {
+    if (!appState.vacationModeEnabled) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('寒暑假模式中，答题功能已暂停')),
+    );
+    return true;
   }
 
   @override
@@ -50,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onRefresh: () async {
               await appState.init();
               await appState.refreshWeaknessAnalysis();
+              await _loadWeeklyData(appState);
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -57,13 +98,25 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // API 余额不足警告
-                  if (appState.aiService != null &&
+                  // 寒暑假模式横幅
+                  if (appState.vacationModeEnabled)
+                    _buildVacationBanner(cs),
+                  // API 余额不足警告（首帧加载完成后才显示，防闪现）
+                  if (_statsLoaded &&
+                      appState.aiService != null &&
                       appState.aiService!.cachedBalance != null &&
                       appState.aiService!.cachedBalance! > 0 &&
                       appState.aiService!.cachedBalance! < 1.0)
                     _buildBalanceWarning(cs),
                   _buildStatsCards(appState, cs),
+                  const SizedBox(height: 16),
+                  // 本周战绩（v1.0.2）
+                  WeeklyStatsBoard(
+                    dailyTotals: _yearlyTotals,
+                    streakDays: _streakDays,
+                    weekTotal: _weekTotal,
+                    vacationDays: _vacationDays,
+                  ),
                   const SizedBox(height: 24),
                   _buildWeaknessSection(appState, cs),
                   const SizedBox(height: 24),
@@ -72,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
-                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.26.6.17',
+                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.0.2',
                       style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.4)),
                     ),
                   ),
@@ -81,6 +134,31 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildVacationBanner(ColorScheme cs) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: cs.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.error.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.beach_access, color: cs.error, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '寒暑假模式已开启，答题功能暂停，错题本仍可浏览',
+              style: TextStyle(fontSize: 13, color: cs.error),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -200,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickActions(AppState appState, ColorScheme cs) {
+    final vacation = appState.vacationModeEnabled;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -215,12 +294,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: '定向爆破',
                 subtitle: appState.selectedBankIds.isEmpty
                     ? '请先选择题库'
-                    : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}'}',
+                    : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}',
                 color: cs.primary,
                 cs: cs,
+                greyed: vacation,
                 onTap: appState.selectedBankIds.isEmpty
                     ? null
-                    : () => _showCountPicker(context, appState),
+                    : () {
+                        if (vacation) {
+                          _vacationBlocked(appState);
+                          return;
+                        }
+                        _showCountPicker(context, appState);
+                      },
               ),
             ),
             const SizedBox(width: 12),
@@ -231,11 +317,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: '${appState.banks.length} 个题库',
                 color: const Color(0xFF5CB85C),
                 cs: cs,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const BankManageScreen()),
-                ),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const BankManageScreen()),
+                  );
+                  await _loadWeeklyData(appState);
+                },
               ),
             ),
           ],
@@ -248,10 +337,13 @@ class _HomeScreenState extends State<HomeScreen> {
           color: cs.error,
           cs: cs,
           fullWidth: true,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ErrorBookScreen()),
-          ),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ErrorBookScreen()),
+            );
+            await _loadWeeklyData(appState);
+          },
         ),
         const SizedBox(height: 12),
         _ActionCard(
@@ -261,10 +353,13 @@ class _HomeScreenState extends State<HomeScreen> {
           color: cs.secondary,
           cs: cs,
           fullWidth: true,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ImportScreen()),
-          ),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ImportScreen()),
+            );
+            await _loadWeeklyData(appState);
+          },
         ),
       ],
     );
@@ -395,6 +490,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startQuiz(BuildContext context, AppState appState) async {
+    if (_vacationBlocked(appState)) return;
     if (!appState.settings.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -415,13 +511,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const QuizScreen()),
     );
+    // 返回首页后刷新战绩（v1.0.2）
+    await _loadWeeklyData(appState);
   }
 
   Future<void> _startPractice(BuildContext context, AppState appState) async {
+    if (_vacationBlocked(appState)) return;
     if (!appState.settings.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
@@ -443,15 +542,24 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(
+    await Navigator.push(context, MaterialPageRoute(
       builder: (_) => PracticeEntryScreen(questions: appState.quizQuestions),
     ));
+    await _loadWeeklyData(appState);
   }
 
   Future<void> _startMemorize(BuildContext context, AppState appState) async {
+    if (_vacationBlocked(appState)) return;
     if (!appState.settings.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    // v1.0.2: 背题需先选题库
+    if (appState.selectedBankIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先在首页选择题库')),
       );
       return;
     }
@@ -466,9 +574,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(
+    await Navigator.push(context, MaterialPageRoute(
       builder: (_) => QuizScreen(quizMode: QuizMode.memorize),
     ));
+    await _loadWeeklyData(appState);
   }
 }
 
@@ -525,6 +634,7 @@ class _ActionCard extends StatelessWidget {
   final ColorScheme cs;
   final VoidCallback? onTap;
   final bool fullWidth;
+  final bool greyed; // v1.0.2: 寒暑假置灰
 
   const _ActionCard({
     required this.icon,
@@ -535,13 +645,16 @@ class _ActionCard extends StatelessWidget {
     required this.cs,
     this.onTap,
     this.fullWidth = false,
+    this.greyed = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Opacity(
+        opacity: greyed ? 0.45 : 1.0,
+        child: Container(
         width: fullWidth ? double.infinity : null,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
@@ -576,6 +689,7 @@ class _ActionCard extends StatelessWidget {
             Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
           ],
         ),
+      ),
       ),
     );
   }

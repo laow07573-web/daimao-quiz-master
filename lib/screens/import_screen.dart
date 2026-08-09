@@ -17,7 +17,7 @@ class _ImportScreenState extends State<ImportScreen> {
   Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['doc', 'docx'],
+      allowedExtensions: ['doc', 'docx', 'json'], // v1.0.2: 支持 JSON 题库
       allowMultiple: true,
     );
 
@@ -219,6 +219,35 @@ class _ImportScreenState extends State<ImportScreen> {
                       onPressed: isProcessing
                           ? null
                           : () async {
+                              if (_selectedFiles.isEmpty) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('请先选择文件')),
+                                );
+                                return;
+                              }
+                              // v1.0.2: JSON 题库直接分组建库（无需预览）
+                              final jsonFiles = _selectedFiles
+                                  .where((f) => f
+                                      .toLowerCase()
+                                      .endsWith('.json'))
+                                  .toList();
+                              if (jsonFiles.isNotEmpty) {
+                                final (banks, questions) =
+                                    await appState.importJsonFiles(jsonFiles);
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'JSON 导入完成：$banks 个题库，$questions 道题'),
+                                    backgroundColor:
+                                        const Color(0xFF4CAF50),
+                                  ),
+                                );
+                                setState(() => _selectedFiles.clear());
+                                return;
+                              }
                               await appState
                                   .parseForPreview(_selectedFiles);
                               if (appState.previewQuestions.isEmpty) {

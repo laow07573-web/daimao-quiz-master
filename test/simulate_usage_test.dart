@@ -1,15 +1,24 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flashcard_app/services/database_service.dart';
 
 /// 模拟长期使用：幂等性测试（LOCALAPPDATA 隔离环境下运行）
 void main() {
   setUp(() async {
-    // 每个用例独立数据库
+    // 每个用例独立数据库（多测试文件并行隔离）
     await DatabaseService.instance.close();
+    final dir = Directory(
+        Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path);
+    final dbPath = '${dir.path}/flashcard_app/test_simulate.db';
+    DatabaseService.overrideDbPath = dbPath;
+    final dbFile = File(dbPath);
+    if (await dbFile.exists()) await dbFile.delete();
   });
 
   tearDown(() async {
     await DatabaseService.instance.close();
+    DatabaseService.overrideDbPath = null;
   });
 
   test('simulateLongTermUse 幂等：重复调用数据量不变', () async {

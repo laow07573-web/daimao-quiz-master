@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
+import '../services/quiz_service.dart';
 
 enum PracticeTiming { timed, untimed }
 
@@ -118,6 +119,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   int _elapsedSeconds = 0;
   int _remainingSeconds = 0;
   bool _submitted = false;
+  bool _modalOpen = false; // v1.0.2: 挡路弹窗标记（答题卡/退出确认）
 
   @override
   void initState() {
@@ -145,6 +147,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
   void _submit() {
     if (_submitted) return;
     _timer?.cancel();
+    // v1.0.2: 到点自动交卷先关闭挡路弹窗（答题卡/退出确认）
+    if (_modalOpen && mounted) {
+      Navigator.of(context).pop();
+      _modalOpen = false;
+    }
     setState(() => _submitted = true);
     final qs = widget.questions;
     int correct = 0, wrong = 0, blank = 0;
@@ -162,21 +169,19 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   bool _check(Question q, String ua) {
-    final cr = q.correctAnswer.toUpperCase().trim(), u = ua.toUpperCase().trim();
-    if (q.questionType == 'multi_choice') {
-      final crS = cr.split(',').map((e) => e.trim()).toSet(), uaS = u.split(',').map((e) => e.trim()).toSet();
-      return crS.length == uaS.length && crS.containsAll(uaS);
-    }
-    return u == cr;
+    // v1.0.2: 与刷题共用共享判定（多选集合/填空逐空/名解简答包含）
+    return QuizService.judgeAnswer(q, ua);
   }
 
   Future<bool> _onWillPop() async {
     if (_submitted) return true;
+    _modalOpen = true;
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
       title: const Text('退出练习'),
       content: Text(widget.timing == PracticeTiming.timed ? '退出即放弃本次练习。倒计时不暂停，时间走完将自动提交。' : '退出后本次练习记录将不保存。'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('继续练习')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定退出'), style: TextButton.styleFrom(foregroundColor: Colors.red))],
     ));
+    _modalOpen = false;
     return ok ?? false;
   }
 
@@ -273,19 +278,21 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   void _showAnswerCard(ColorScheme cs) {
     final qs = widget.questions;
+    _modalOpen = true;
     showModalBottomSheet(context: context, builder: (_) => Container(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text('答题卡', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
       Wrap(spacing: 10, runSpacing: 10, children: List.generate(qs.length, (i) => GestureDetector(onTap: () { Navigator.pop(context); setState(() => _currentIndex = i); }, child: Container(width: 40, height: 40, decoration: BoxDecoration(shape: BoxShape.circle, color: i == _currentIndex ? cs.primary : _answers.containsKey(i) ? cs.primary.withOpacity(0.35) : cs.surfaceContainerHighest, border: i == _currentIndex ? Border.all(color: cs.onPrimary, width: 2) : null), child: Center(child: Text('${i + 1}', style: TextStyle(color: i == _currentIndex ? cs.onPrimary : cs.onSurface))))))),
       const SizedBox(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [_dot(cs.primary, '当前'), const SizedBox(width: 16), _dot(cs.primary.withOpacity(0.35), '已答'), const SizedBox(width: 16), _dot(cs.surfaceContainerHighest, '未答')]),
-    ])));
+    ]))).then((_) => _modalOpen = false);
   }
 
   Widget _dot(Color c, String l) => Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.circle, color: c)), const SizedBox(width: 4), Text(l, style: const TextStyle(fontSize: 12))]);
 
   void _showSubmit() {
     final total = widget.questions.length, answered = _answers.length;
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('提交练习'), content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('继续检查')), FilledButton(onPressed: () { Navigator.pop(ctx); _submit(); }, child: const Text('确认提交'))]));
+    _modalOpen = true;
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('提交练习'), content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('继续检查')), FilledButton(onPressed: () { Navigator.pop(ctx); _submit(); }, child: const Text('确认提交'))])).then((_) => _modalOpen = false);
   }
 }
 

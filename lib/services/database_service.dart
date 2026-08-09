@@ -12,6 +12,8 @@ import 'fsrs_service.dart';
 class DatabaseService {
   static DatabaseService? _instance;
   static Database? _database;
+  /// 测试用：覆盖数据库文件路径（多测试文件并行时按文件隔离，防互相清库）
+  static String? overrideDbPath;
 
   DatabaseService._();
 
@@ -33,7 +35,9 @@ class DatabaseService {
     }
 
     String dbPath;
-    if (Platform.isAndroid) {
+    if (overrideDbPath != null) {
+      dbPath = overrideDbPath!;
+    } else if (Platform.isAndroid) {
       dbPath = join(await getDatabasesPath(), 'flashcard.db');
     } else {
       dbPath = join(
@@ -606,10 +610,13 @@ class DatabaseService {
   }
 
   /// 按筛选模式取错题全量题列表（复习范围与统计口径一致）
-  Future<List<Question>> getFullErrorQuestions(String mode, {int? bankId}) async {
+  Future<List<Question>> getFullErrorQuestions(String mode,
+      {Set<int>? bankIds}) async {
     final db = await database;
-    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
-    final args = bankId != null ? [bankId] : <Object>[];
+    final bankWhere = (bankIds != null && bankIds.isNotEmpty)
+        ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
+        : '';
+    final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     final rows = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
@@ -619,10 +626,12 @@ class DatabaseService {
   }
 
   /// 按筛选模式的错题总数
-  Future<int> getFullErrorCount(String mode, {int? bankId}) async {
+  Future<int> getFullErrorCount(String mode, {Set<int>? bankIds}) async {
     final db = await database;
-    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
-    final args = bankId != null ? [bankId] : <Object>[];
+    final bankWhere = (bankIds != null && bankIds.isNotEmpty)
+        ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
+        : '';
+    final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     final rows = await db.rawQuery('''
       SELECT COUNT(DISTINCT q.id) as cnt FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
@@ -631,10 +640,13 @@ class DatabaseService {
   }
 
   /// 知识点分组统计（与 getFullErrorQuestions 同口径）
-  Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode, {int? bankId}) async {
+  Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode,
+      {Set<int>? bankIds}) async {
     final db = await database;
-    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
-    final args = bankId != null ? [bankId] : <Object>[];
+    final bankWhere = (bankIds != null && bankIds.isNotEmpty)
+        ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
+        : '';
+    final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     return await db.rawQuery('''
       SELECT q.knowledge_point as kp, COUNT(DISTINCT q.id) as cnt
       FROM questions q
@@ -647,10 +659,15 @@ class DatabaseService {
 
   /// 按知识点取题（复习范围与主列表同口径）
   Future<List<Question>> getFullQuestionsByKnowledgePoint(
-      String kp, String mode, {int? bankId}) async {
+      String kp, String mode,
+      {Set<int>? bankIds}) async {
     final db = await database;
-    final bankWhere = bankId != null ? 'AND q.bank_id = ?' : '';
-    final args = bankId != null ? [kp, bankId] : [kp];
+    final bankWhere = (bankIds != null && bankIds.isNotEmpty)
+        ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
+        : '';
+    final args = bankIds != null && bankIds.isNotEmpty
+        ? [kp, ...bankIds]
+        : [kp];
     final rows = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere

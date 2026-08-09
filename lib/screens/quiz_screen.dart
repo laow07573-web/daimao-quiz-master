@@ -62,6 +62,11 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void dispose() {
+    // v1.0.2: 背题模式 dispose 复位 skipFSRS（防泄漏到后续会话）
+    try {
+      final appState = context.read<AppState>();
+      if (appState.skipFSRS) appState.skipFSRS = false;
+    } catch (_) {}
     _followUpController.dispose();
     for (final c in _fillBlankControllers) { c.dispose(); }
     _fillBlankControllers.clear();
@@ -103,7 +108,17 @@ class _QuizScreenState extends State<QuizScreen> {
           }
         }
         if (appState.currentQuestion?.id != _lastQuestionId) {
+          // v1.0.2: 切题清空作答残留（多选状态/填空草稿/简答草稿/追问状态）
           _showAnalysis = false;
+          _showManualAnalysis = false;
+          _selectedOptions.clear();
+          for (final c in _fillBlankControllers) {
+            c.clear();
+          }
+          _textAnswerController.clear();
+          _followUpController.clear();
+          _followUpResponse = null;
+          _followUpLoading = false;
           _lastQuestionId = appState.currentQuestion?.id;
         }
 
@@ -576,11 +591,15 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _submitFillBlank(AppState appState) {
-    final answer = _fillBlankControllers
-        .map((c) => c.text.trim())
-        .where((t) => t.isNotEmpty)
-        .join('；');
-    if (answer.isEmpty) return;
+    // v1.0.2: 填空提交要求所有空填满（与逐空判定一致）
+    final texts = _fillBlankControllers.map((c) => c.text.trim()).toList();
+    if (texts.any((t) => t.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写所有空后再提交')),
+      );
+      return;
+    }
+    final answer = texts.join('；');
     for (final c in _fillBlankControllers) { c.clear(); }
     _handleSubmitAnswer(appState, answer);
   }
@@ -865,7 +884,18 @@ class _QuizScreenState extends State<QuizScreen> {
           padding: const EdgeInsets.symmetric(vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        onPressed: () => appState.regenerateAnalysis(),
+        onPressed: () {
+          // v1.0.2: API 未配置拦截重新生成
+          if (!appState.settings.isConfigured) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('请先在设置中配置 DeepSeek API Key'),
+                  backgroundColor: Colors.orange),
+            );
+            return;
+          }
+          appState.regenerateAnalysis();
+        },
       ),
     );
   }
@@ -877,6 +907,15 @@ class _QuizScreenState extends State<QuizScreen> {
     if (isCorrect && !_showManualAnalysis) {
       return GestureDetector(
         onTap: () {
+          // v1.0.2: API 未配置拦截解析请求
+          if (!appState.settings.isConfigured) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('请先在设置中配置 DeepSeek API Key'),
+                  backgroundColor: Colors.orange),
+            );
+            return;
+          }
           setState(() => _showManualAnalysis = true);
           appState.showAnalysis();
         },
@@ -963,6 +1002,15 @@ class _QuizScreenState extends State<QuizScreen> {
                   icon: const Icon(Icons.send, size: 16),
                   label: const Text('追问', style: TextStyle(fontSize: 13)),
                   onPressed: () async {
+                    // v1.0.2: API 未配置拦截追问
+                    if (!appState.settings.isConfigured) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('请先在设置中配置 DeepSeek API Key'),
+                            backgroundColor: Colors.orange),
+                      );
+                      return;
+                    }
                     final q = _followUpController.text.trim();
                     if (q.isEmpty) return;
                     _followUpController.clear();

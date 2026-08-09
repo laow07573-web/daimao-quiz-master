@@ -7,6 +7,7 @@ import '../models/answer_record.dart';
 import '../models/app_settings.dart';
 import 'database_service.dart';
 import 'doc_parser_service.dart';
+import 'bank_file_service.dart';
 import 'ai_service.dart';
 import 'quiz_service.dart';
 import 'stats_service.dart';
@@ -56,8 +57,9 @@ class AppState extends ChangeNotifier {
 
   // 答题历史（按题目索引存储，支持前后翻题）
   final List<AnswerRecord?> _answerHistory = [];
-  bool _skipFSRS = false;
-  void set skipFSRS(bool v) => _skipFSRS = v;
+bool _skipFSRS = false;
+bool get skipFSRS => _skipFSRS;
+void set skipFSRS(bool v) => _skipFSRS = v;
   bool _noShuffle = false;
   void set noShuffle(bool v) => _noShuffle = v;
   bool get hasPrevious => _currentQuestionIndex > 0;
@@ -504,6 +506,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// JSON 题库导入（v1.0.2：分组建库，无需预览）
+  /// 返回 (题库数, 题目数)
+  Future<(int, int)> importJsonFiles(List<String> filePaths) async {
+    var banks = 0;
+    var questions = 0;
+    for (final p in filePaths) {
+      final r = await BankFileService.importJsonFile(p);
+      banks += r.$1;
+      questions += r.$2;
+    }
+    await _loadBanks();
+    notifyListeners();
+    return (banks, questions);
+  }
+
+  /// 删除题库（同时清理答案记录）
   Future<void> deleteBank(int bankId) async {
     await _db.deleteBank(bankId);
     _selectedBankIds.remove(bankId);
@@ -701,32 +719,62 @@ class AppState extends ChangeNotifier {
     return await _db.isInErrorBook(questionId);
   }
 
-  /// 错题重刷模式（全题库 FSRS 到期题目 + 收藏）
-  /// [bankIds] 为 null 或空时，从所有题库抽题；否则只从指定题库抽题
-  Future<void> startErrorReview({Set<int>? bankIds}) async {
-    // 使用 FSRS 到期题目，按题库分组获取
-    final questionsByBank = await _db.getDueReviewQuestionsByBank();
-    if (questionsByBank.isEmpty) return;
+  /// 获取错题本统计（按题库分组）：到期题数 + 收藏题数 + 全部去重
+  Future<List<Map<String, dynamic>>> getErrorBookStats() async {
+    return await _db.getErrorStatsByBank();
+  }
 
-    // 按 bankIds 过滤（null/空 = 全题库）
-    final allQuestions = <Question>[];
-    for (final entry in questionsByBank.entries) {
-      if (bankIds == null || bankIds.isEmpty || bankIds.contains(entry.key)) {
-        allQuestions.addAll(entry.value);
-      }
+  Future<int> getErrorBookCount() async {
+    return await _db.getErrorBookCount();
+  }
+
+  // ======================== v1.0.2: 错题本筛选/知识点 ========================
+
+  /// 按筛选模式取错题全量题列表（mode: all/wrong/bookmark）
+  Future<List<Question>> getFullErrorQuestions(String mode,
+          {Set<int>? bankIds}) =>
+      _db.getFullErrorQuestions(mode, bankIds: bankIds);
+
+  /// 按筛选模式的错题总数
+  Future<int> getFullErrorCount(String mode, {Set<int>? bankIds}) =>
+      _db.getFullErrorCount(mode, bankIds: bankIds);
+
+  /// 知识点分组统计（与主列表同口径）
+  Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode,
+          {Set<int>? bankIds}) =>
+      _db.getKnowledgePointStats(mode, bankIds: bankIds);
+
+  /// 按知识点取题（复习范围与主列表同口径）
+  Future<List<Question>> getFullQuestionsByKnowledgePoint(
+          String kp, String mode,
+          {Set<int>? bankIds}) =>
+      _db.getFullQuestionsByKnowledgePoint(kp, mode, bankIds: bankIds);
+
+  /// 错题复习：按筛选模式取题（all/wrong/bookmark）+ 可选知识点
+  /// [kp] 非空时复习指定知识点（会话 mode = kp_review）
+  Future<void> startErrorReview({
+    String mode = 'all',
+    Set<int>? bankIds,
+    String? kp,
+  }) async {
+    final List<Question> questions;
+    if (kp != null && kp.isNotEmpty) {
+      questions =
+          await _db.getFullQuestionsByKnowledgePoint(kp, mode, bankIds: bankIds);
+    } else {
+      questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
     }
-    if (allQuestions.isEmpty) return;
+    if (questions.isEmpty) return;
 
-    allQuestions.shuffle();
-    final count = allQuestions.length > _selectedQuestionCount
+    questions.shuffle();
+    final count = questions.length > _selectedQuestionCount
         ? _selectedQuestionCount
-        : allQuestions.length;
-
-    final selectedQuestions = allQuestions.take(count).toList();
+        : questions.length;
+    final selectedQuestions = questions.take(count).toList();
 
     final session = QuizSession(
       bankIds: bankIds?.join(',') ?? 'all',
-      mode: 'error_review',
+      mode: kp != null && kp.isNotEmpty ? 'kp_review' : 'error_review',
       totalQuestions: selectedQuestions.length,
       startTime: DateTime.now().toIso8601String(),
     );
@@ -749,15 +797,6 @@ class AppState extends ChangeNotifier {
     _answerHistory.length = _quizQuestions.length;
 
     notifyListeners();
-  }
-
-  /// 获取错题本统计（按题库分组）：到期题数 + 收藏题数
-  Future<List<Map<String, dynamic>>> getErrorBookStats() async {
-    return await _db.getErrorStatsByBank();
-  }
-
-  Future<int> getErrorBookCount() async {
-    return await _db.getErrorBookCount();
   }
 
   // ======================== 统计 ========================

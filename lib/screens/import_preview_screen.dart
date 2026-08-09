@@ -181,8 +181,10 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
     }
     if (q.correctAnswer.trim().isEmpty) {
       errors.add(_QuestionError('缺少答案', true));
-    } else if (q.questionType != 'true_false' &&
+    } else if ((q.questionType == 'single_choice' ||
+            q.questionType == 'multi_choice') &&
         !RegExp(r'^[A-Da-d,]+$').hasMatch(q.correctAnswer)) {
+      // v1.0.2: 答案格式校验只查选择题（填空/名解/简答为文本答案）
       errors.add(_QuestionError('答案格式异常', false));
     }
     return errors;

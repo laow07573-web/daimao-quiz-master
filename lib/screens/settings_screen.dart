@@ -61,11 +61,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: cs.surface,
-      appBar: AppBar(
-        title: const Text('设置'),
-      ),
+    // v1.0.2: 未保存修改拦截
+    final settings = context.watch<AppState>().settings;
+    final dirty = _apiKeyController.text != settings.apiKey ||
+        _endpointController.text != settings.apiEndpoint ||
+        _modelController.text != settings.model;
+    return PopScope(
+      canPop: !dirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('有未保存的修改'),
+            content: const Text('API 配置修改尚未保存，确定离开？'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('继续编辑')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('离开', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+        if (leave == true && mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: cs.surface,
+        appBar: AppBar(
+          title: const Text('设置'),
+        ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -257,6 +284,163 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 假期模式（v1.0.2）
+            Consumer<AppState>(
+              builder: (context, appState, _) => Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.beach_access, color: cs.error, size: 20),
+                        const SizedBox(width: 8),
+                        Text('寒暑假模式',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: cs.onSurface)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('开启后暂停每日提醒与答题，错题本仍可浏览；连击在假期内冻结',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(appState.vacationModeEnabled ? '已开启' : '已关闭',
+                          style:
+                              TextStyle(fontSize: 14, color: cs.onSurface)),
+                      value: appState.vacationModeEnabled,
+                      onChanged: (v) async {
+                        final now = DateTime.now();
+                        final start = appState.vacationStartDate ??
+                            DateTime(now.year, now.month, 1);
+                        final end = appState.vacationEndDate ??
+                            DateTime(now.year, now.month + 1, 0);
+                        await appState.setVacationMode(
+                            enabled: v, start: start, end: end);
+                      },
+                    ),
+                    if (appState.vacationModeEnabled) ...[
+                      // 起止日期联动：选开始上限=结束日，选结束下限=开始日
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DateField(
+                              label: '开始日期',
+                              value: appState.vacationStartDate,
+                              firstDate: DateTime(2000),
+                              lastDate: appState.vacationEndDate ??
+                                  DateTime(2100),
+                              onChanged: (d) => appState.setVacationMode(
+                                  enabled: true,
+                                  start: d,
+                                  end: appState.vacationEndDate),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DateField(
+                              label: '结束日期',
+                              value: appState.vacationEndDate,
+                              firstDate: appState.vacationStartDate ??
+                                  DateTime(2000),
+                              lastDate: DateTime(2100),
+                              onChanged: (d) => appState.setVacationMode(
+                                  enabled: true,
+                                  start: appState.vacationStartDate,
+                                  end: d),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 每日提醒（v1.0.2）
+            Consumer<AppState>(
+              builder: (context, appState, _) => Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.notifications_outlined,
+                            color: cs.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Text('每日提醒',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: cs.onSurface)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('每天定时提醒刷题（前台服务 + 闹钟双保险）',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(appState.reminderEnabled ? '已开启' : '已关闭',
+                          style:
+                              TextStyle(fontSize: 14, color: cs.onSurface)),
+                      value: appState.reminderEnabled,
+                      onChanged: (v) => appState.setReminderSettings(
+                          enabled: v,
+                          time: appState.reminderTime ??
+                              DateTime(DateTime.now().year,
+                                  DateTime.now().month, DateTime.now().day, 20)),
+                    ),
+                    if (appState.reminderEnabled)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(Icons.schedule, size: 20),
+                        title: Text(
+                          '提醒时间：${_fmtTime(appState.reminderTime)}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        trailing: const Icon(Icons.edit, size: 18),
+                        onTap: () async {
+                          final now = DateTime.now();
+                          final current = appState.reminderTime ??
+                              DateTime(now.year, now.month, now.day, 20);
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(current),
+                          );
+                          if (picked != null) {
+                            await appState.setReminderSettings(
+                                enabled: true,
+                                time: DateTime(current.year, current.month,
+                                    current.day, picked.hour, picked.minute));
+                          }
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
 
@@ -461,6 +645,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
+
+  String _fmtTime(DateTime? t) {
+    if (t == null) return '20:00';
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final DateTime? value;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final ValueChanged<DateTime> onChanged;
+
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.firstDate,
+    required this.lastDate,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: value ?? DateTime.now(),
+          firstDate: firstDate,
+          lastDate: lastDate,
+          helpText: label,
+        );
+        if (picked != null) onChanged(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cs.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today, size: 14, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(
+              value == null
+                  ? label
+                  : '${value!.year}-${value!.month.toString().padLeft(2, '0')}-${value!.day.toString().padLeft(2, '0')}',
+              style: TextStyle(fontSize: 13, color: cs.onSurface),
             ),
           ],
         ),
