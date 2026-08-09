@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
 import '../services/debug_log_service.dart';
+import '../services/reminder_service.dart';
 import '../models/app_settings.dart';
 import '../services/theme_service.dart';
 
@@ -330,6 +331,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             DateTime(now.year, now.month + 1, 0);
                         await appState.setVacationMode(
                             enabled: v, start: start, end: end);
+                        // v1.0.2: 假期切换同步提醒启停
+                        await ReminderService.instance.syncSchedule();
                       },
                     ),
                     if (appState.vacationModeEnabled) ...[
@@ -407,11 +410,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style:
                               TextStyle(fontSize: 14, color: cs.onSurface)),
                       value: appState.reminderEnabled,
-                      onChanged: (v) => appState.setReminderSettings(
-                          enabled: v,
-                          time: appState.reminderTime ??
-                              DateTime(DateTime.now().year,
-                                  DateTime.now().month, DateTime.now().day, 20)),
+                      onChanged: (v) async {
+                        await appState.setReminderSettings(
+                            enabled: v,
+                            time: appState.reminderTime ??
+                                DateTime(DateTime.now().year,
+                                    DateTime.now().month, DateTime.now().day, 20));
+                        // v1.0.2: 提醒开关同步启停前台服务与闹钟
+                        await ReminderService.instance.syncSchedule();
+                      },
                     ),
                     if (appState.reminderEnabled)
                       ListTile(
@@ -436,6 +443,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 enabled: true,
                                 time: DateTime(current.year, current.month,
                                     current.day, picked.hour, picked.minute));
+                            await ReminderService.instance.syncSchedule();
                           }
                         },
                       ),

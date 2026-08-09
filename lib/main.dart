@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'services/app_state.dart';
 import 'services/theme_service.dart';
 import 'services/tamper_check.dart';
+import 'services/reminder_service.dart';
 import 'screens/main_shell.dart';
 
 void main() async {
@@ -19,6 +20,11 @@ void main() async {
   final appState = AppState();
   await appState.init();
   final themeService = ThemeService();
+
+  // v1.0.2: 每日提醒（前台服务 + AlarmManager 双保险）
+  await ReminderService.instance.init();
+  await ReminderService.instance.syncSchedule();
+  ReminderService.instance.catchUpReminderIfMissed();
 
   runApp(
     MultiProvider(

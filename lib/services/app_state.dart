@@ -8,6 +8,7 @@ import '../models/app_settings.dart';
 import 'database_service.dart';
 import 'doc_parser_service.dart';
 import 'bank_file_service.dart';
+import 'reminder_service.dart';
 import 'ai_service.dart';
 import 'quiz_service.dart';
 import 'stats_service.dart';
@@ -521,6 +522,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     return (banks, questions);
   }
 
+  /// 模拟长期使用（开发者选项，幂等）
+  Future<void> simulateLongTermUse() => _db.simulateLongTermUse();
+
   /// 删除题库（同时清理答案记录）
   Future<void> deleteBank(int bankId) async {
     await _db.deleteBank(bankId);
@@ -700,6 +704,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _currentSession = await _quizService.endSession();
     _quizService.reset();
     await _loadHomeStats();
+    // v1.0.2: 答题完成后续排明天提醒
+    try {
+      await ReminderService.instance.rescheduleNextDay();
+    } catch (_) {}
     notifyListeners();
     return _currentSession!;
   }

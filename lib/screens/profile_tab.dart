@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'developer_options_screen.dart';
 import 'settings_screen.dart';
 
 /// 我的页（v1.0.2）：问候语（Roboto 字体，深夜「夜深了…」）、名字、入口
@@ -71,6 +72,16 @@ class _ProfileTabState extends State<ProfileTab> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _EntryTile(
+            icon: Icons.developer_mode,
+            title: '开发者选项',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const DeveloperOptionsScreen()),
             ),
           ),
           const SizedBox(height: 8),
