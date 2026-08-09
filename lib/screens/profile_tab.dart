@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'developer_options_screen.dart';
 import 'settings_screen.dart';
 
-/// 我的页（v1.0.2）：问候语（Roboto 字体，深夜「夜深了…」）、名字、入口
+/// 我的页（v1.0.2）：问候语、名字、入口
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
 
@@ -45,21 +44,43 @@ class _ProfileTabState extends State<ProfileTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _greeting,
-                  style: GoogleFonts.roboto(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '呆猫刷题宝',
-                  style: GoogleFonts.roboto(
-                    fontSize: 14,
-                    color: cs.onPrimary.withOpacity(0.85),
-                  ),
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/app_logo.png',
+                        width: 44,
+                        height: 44,
+                        errorBuilder: (_, __, ___) => Icon(
+                            Icons.school, size: 36, color: cs.onPrimary),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _greeting,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '呆猫刷题宝',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: cs.onPrimary.withOpacity(0.85),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

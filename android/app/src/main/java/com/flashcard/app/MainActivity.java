@@ -2,6 +2,8 @@ package com.flashcard.app;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.TextUtils;
 import io.flutter.embedding.android.FlutterActivity;
@@ -54,6 +56,21 @@ public class MainActivity extends FlutterActivity {
                 } else if (call.method.equals("openAccessibilitySettings")) {
                     try {
                         Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(intent);
+                        result.success(true);
+                    } catch (Exception e) {
+                        result.error("INTENT_ERROR", e.getMessage(), null);
+                    }
+                } else if (call.method.equals("isIgnoringBatteryOptimizations")) {
+                    // 与里程碑一致：设置页可引导用户忽略电池优化，保提醒服务不被系统清理
+                    PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                    result.success(pm.isIgnoringBatteryOptimizations(getPackageName()));
+                } else if (call.method.equals("requestIgnoreBatteryOptimizations")) {
+                    try {
+                        Intent intent = new Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:" + getPackageName()));
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(intent);
                         result.success(true);

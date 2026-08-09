@@ -138,6 +138,16 @@ class _ImportScreenState extends State<ImportScreen> {
                         const Text('AI 将自动识别题目、选项和答案',
                             style: TextStyle(
                                 fontSize: 12, color: Color(0xFF999999))),
+                        const SizedBox(height: 4),
+                        // v1.0.2 对齐里程碑：JSON 直导入库提示
+                        const Text('导入 .json 题库文件，无需 AI 解析，题目答案直接入库',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF999999))),
+                        const SizedBox(height: 4),
+                        const Text(
+                            '选择本软件导出的 .json 题库文件（可多选）。导入完成后会显示导入报告。',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF999999))),
                       ],
                     ),
                   ),

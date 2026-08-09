@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../models/question.dart';
+import '../services/ai_service.dart';
 import '../services/app_state.dart';
 import '../services/debug_log_service.dart';
+import '../services/keepalive_service.dart';
 import '../services/reminder_service.dart';
 import '../models/app_settings.dart';
 import '../services/theme_service.dart';
@@ -23,6 +28,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double? _balance;
   int _estimated = -1;
   bool _balanceLoading = false;
+  // v1.0.2 对齐里程碑：保活状态 / 电池优化 / 未打标签数
+  bool _accessibilityOn = false;
+  bool _batteryIgnored = true;
+  int _untaggedCount = 0;
 
   @override
   void initState() {
@@ -34,7 +43,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _endpointController.text = settings.apiEndpoint;
       _modelController.text = settings.model;
       _fetchBalance();
+      _loadKeepaliveStatus();
+      _loadUntaggedCount();
     });
+  }
+
+  Future<void> _loadKeepaliveStatus() async {
+    final acc = await KeepAliveService.instance.isAccessibilityEnabled();
+    final bat = await KeepAliveService.instance.isIgnoringBatteryOptimizations();
+    if (!mounted) return;
+    setState(() {
+      _accessibilityOn = acc;
+      _batteryIgnored = bat;
+    });
+  }
+
+  Future<void> _loadUntaggedCount() async {
+    final count = await context.read<AppState>().getUntaggedErrorCount();
+    if (!mounted) return;
+    setState(() => _untaggedCount = count);
   }
 
   Future<void> _fetchBalance() async {
@@ -251,7 +278,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+            // v1.0.2 对齐里程碑：为剩余题目打标签
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.sell_outlined, color: cs.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('为剩余题目打标签',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: cs.onSurface)),
+                      ),
+                      if (_untaggedCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.error.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text('$_untaggedCount 题未打标签',
+                              style: TextStyle(
+                                  fontSize: 11, color: cs.error)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '部分错题未打知识点标签，可去设置页「为剩余题目打标签」补齐后精炼更准。',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: Text(
+                          _untaggedCount > 0 ? '开始打标签' : '暂无未打标签题目',
+                          style: const TextStyle(fontSize: 13)),
+                      onPressed: (_untaggedCount > 0 &&
+                              context.read<AppState>().settings.isConfigured)
+                          ? () => _startTagging(context)
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
 
             // 音效开关
             Container(
@@ -313,9 +398,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('开启后暂停每日提醒与答题，错题本仍可浏览；连击在假期内冻结',
-                        style: TextStyle(
-                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    // v1.0.2 对齐里程碑：寒暑假模式说明文案
+                    Text(
+                      '作用：开启后暂停每日提醒、错题 FSRS 复习与答题练习，本周战绩日历自动标注假期区间；连击冻结，假期不刷题也不断卡。',
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                    ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -447,8 +535,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           }
                         },
                       ),
+                    const SizedBox(height: 4),
+                    // v1.0.2 对齐里程碑：测试通知
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.notifications_active, size: 16),
+                        label: const Text('发送测试通知', style: TextStyle(fontSize: 13)),
+                        onPressed: () async {
+                          await ReminderService.instance.sendTestNotification();
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('测试通知已发送，下拉通知栏查看')),
+                          );
+                        },
+                      ),
+                    ),
                   ],
                 ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // v1.0.2 对齐里程碑：保活（无障碍 + 电池优化）
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.shield_outlined, color: cs.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('保活（无障碍）',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: cs.onSurface)),
+                      const Spacer(),
+                      Icon(
+                        _accessibilityOn
+                            ? Icons.check_circle
+                            : Icons.error_outline,
+                        size: 18,
+                        color: _accessibilityOn ? cs.primary : cs.error,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _accessibilityOn
+                        ? '无障碍保活已开启，提醒服务受系统守护'
+                        : '未开启无障碍保活，提醒服务可能被系统清理',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: _accessibilityOn ? cs.primary : cs.error),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '在无障碍设置中找到「呆猫刷题宝」并开启，系统将守护提醒服务不被强杀',
+                    style:
+                        TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '若仍被清理：最近任务中长按本应用并锁定',
+                    style:
+                        TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.accessibility_new, size: 16),
+                          label: Text(
+                              _accessibilityOn ? '已开启保活' : '开启无障碍保活',
+                              style: const TextStyle(fontSize: 12)),
+                          onPressed: () async {
+                            await KeepAliveService.instance
+                                .openAccessibilitySettings();
+                            await _loadKeepaliveStatus();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: Icon(
+                              _batteryIgnored
+                                  ? Icons.battery_alert
+                                  : Icons.battery_charging_full,
+                              size: 16),
+                          label: Text(
+                              _batteryIgnored ? '忽略电池优化' : '已忽略电池优化',
+                              style: const TextStyle(fontSize: 12)),
+                          onPressed: _batteryIgnored
+                              ? null
+                              : () async {
+                                  await KeepAliveService.instance
+                                      .requestIgnoreBatteryOptimizations();
+                                  await _loadKeepaliveStatus();
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
 
@@ -663,6 +862,188 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _fmtTime(DateTime? t) {
     if (t == null) return '20:00';
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// v1.0.2 对齐里程碑：为剩余题目打标签（进度 + 暂停/继续 + 预览确认）
+  Future<void> _startTagging(BuildContext context) async {
+    final appState = context.read<AppState>();
+    final ai = appState.aiService;
+    if (ai == null) return;
+    final questions = await appState.getUntaggedErrorQuestions();
+    if (!mounted || questions.isEmpty) return;
+    final applied = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _TaggingDialog(
+          questions: questions, ai: ai, appState: appState),
+    );
+    if (!mounted) return;
+    if (applied != null && applied > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已为 $applied 道题目打标签'),
+          backgroundColor: Theme.of(context).colorScheme.tertiary,
+        ),
+      );
+    }
+    await _loadUntaggedCount();
+  }
+}
+
+/// 打标签进度对话框：逐题调用 AI，支持暂停/继续，完成后预览确认应用
+class _TaggingDialog extends StatefulWidget {
+  final List<Question> questions;
+  final AIService ai;
+  final AppState appState;
+
+  const _TaggingDialog({
+    required this.questions,
+    required this.ai,
+    required this.appState,
+  });
+
+  @override
+  State<_TaggingDialog> createState() => _TaggingDialogState();
+}
+
+class _TaggingDialogState extends State<_TaggingDialog> {
+  int _done = 0;
+  bool _paused = false;
+  bool _finished = false;
+  bool _applying = false;
+  bool _cancelled = false;
+  Completer<void>? _resumeCompleter;
+  final List<(Question, String)> _labels = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    for (final q in widget.questions) {
+      if (_cancelled) break;
+      while (_paused) {
+        final c = _resumeCompleter;
+        if (c == null) break;
+        await c.future;
+      }
+      if (_cancelled) break;
+      final kp = await widget.ai.tagKnowledgePoint(q);
+      if (_cancelled) break;
+      _labels.add((q, kp));
+      if (mounted) setState(() => _done++);
+    }
+    if (!mounted) return;
+    setState(() => _finished = true);
+  }
+
+  void _togglePause() {
+    if (_paused) {
+      final c = _resumeCompleter;
+      setState(() => _paused = false);
+      c?.complete();
+    } else {
+      _resumeCompleter = Completer<void>();
+      setState(() => _paused = true);
+    }
+  }
+
+  Future<void> _apply() async {
+    setState(() => _applying = true);
+    for (final (q, kp) in _labels) {
+      if (q.id != null) {
+        await widget.appState.updateQuestionKnowledgePoint(q.id!, kp);
+      }
+    }
+    if (!mounted) return;
+    Navigator.pop(context, _labels.length);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: Text(_finished
+          ? '预览确认'
+          : _paused
+              ? '打标签已暂停，可随时继续'
+              : '正在打标签：已打 $_done/${widget.questions.length} 道题目，请预览确认'),
+      content: SizedBox(
+        width: 340,
+        height: 340,
+        child: _finished
+            ? ListView.builder(
+                itemCount: _labels.length,
+                itemBuilder: (context, i) {
+                  final (q, kp) = _labels[i];
+                  final failed = kp.startsWith('AI');
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                        failed ? Icons.warning_amber : Icons.label_outline,
+                        size: 16,
+                        color: failed ? cs.error : cs.primary),
+                    title: Text(q.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12)),
+                    trailing: Text(kp,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: failed ? cs.error : cs.primary)),
+                  );
+                },
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 3)),
+                  const SizedBox(height: 16),
+                  Text(
+                    _paused ? '已暂停，可随时继续' : '正在逐题识别知识点...',
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+      ),
+      actions: _finished
+          ? [
+              TextButton(
+                onPressed: () => Navigator.pop(context, 0),
+                child: const Text('放弃'),
+              ),
+              TextButton(
+                onPressed: _applying ? null : _apply,
+                child: _applying
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('确认应用'),
+              ),
+            ]
+          : [
+              TextButton(
+                onPressed: () {
+                  _cancelled = true;
+                  _resumeCompleter?.complete();
+                  Navigator.pop(context, 0);
+                },
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: _togglePause,
+                child: Text(_paused ? '继续' : '暂停'),
+              ),
+            ],
+    );
   }
 }
 

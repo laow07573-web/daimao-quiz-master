@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
 import 'quiz_screen.dart';
 
 /// 错题本（v1.0.2 重写）
 /// 三个筛选：全部（到期∪收藏去重）/ 错题（纯到期）/ 收藏
-/// 知识点分组面板：计数与复习范围同口径
+/// 知识点分组面板：计数与复习范围同口径；空知识点并入「未打标签」
 /// 切换筛选清空已选题库；无匹配清残留题；寒暑假 + API 未配置统一拦截
+/// v1.0.2 对齐里程碑：生成建议（本地精炼 + AI 深度诊断）/ 导出错题 JSON
 class ErrorBookScreen extends StatefulWidget {
   /// [initialFilter]：'all' 全部（到期∪收藏）/ 'wrong' 错题 / 'bookmark' 收藏
   const ErrorBookScreen({super.key, this.initialFilter = 'all'});
@@ -23,12 +25,19 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
   final Set<int> _selectedBanks = {};
   late String _filter = widget.initialFilter;
   List<Map<String, dynamic>> _kpStats = [];
+  bool _adviceLoading = false;
 
   static const _filters = [
     ('all', '全部'),
     ('wrong', '错题'),
     ('bookmark', '收藏'),
   ];
+
+  String get _emptyText => switch (_filter) {
+        'wrong' => '当前没有到期的错题',
+        'bookmark' => '当前没有收藏的题目',
+        _ => '当前没有错题或收藏',
+      };
 
   @override
   void initState() {
@@ -112,12 +121,87 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     if (!appState.settings.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('请先在设置中配置 DeepSeek API Key'),
+            content: Text('请先填写 API Key 再使用此功能'),
             backgroundColor: Colors.orange),
       );
       return true;
     }
     return false;
+  }
+
+  /// v1.0.2 对齐里程碑：AI 生成建议（薄弱知识点精炼 + 复习优先级）
+  Future<void> _generateAdvice() async {
+    final appState = context.read<AppState>();
+    if (_guard(appState)) return;
+    if (_kpStats.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无错题数据，无法精炼。')),
+      );
+      return;
+    }
+    final ai = appState.aiService;
+    if (ai == null) return;
+
+    setState(() => _adviceLoading = true);
+    // 统计文本：知识点 + 错题数 + 正确率（本地精炼已按错题统计排序）
+    final accByKp = await appState.getAccuracyByKnowledgePoint();
+    final statsText = _kpStats
+        .map((s) {
+          final kp = s['kp'] as String;
+          final row = accByKp
+              .where((a) => (a['kp'] as String?) == kp)
+              .firstOrNull;
+          final total = (row?['total'] as int?) ?? 0;
+          final correct = (row?['correct'] as int?) ?? 0;
+          final acc =
+              total > 0 ? '${(correct / total * 100).toStringAsFixed(1)}%' : '无记录';
+          return '**$kp**：错题 ${s['cnt']} 道，正确率 $acc';
+        })
+        .join('\n');
+
+    final result = await ai.generateKpAdvice(statsText);
+    if (!mounted) return;
+    setState(() => _adviceLoading = false);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('薄弱知识点建议'),
+        content: SingleChildScrollView(
+          child: SelectableText(result,
+              style: const TextStyle(fontSize: 13, height: 1.5)),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('好的')),
+        ],
+      ),
+    );
+  }
+
+  /// v1.0.2 对齐里程碑：导出当前筛选错题为 .json 题库文件
+  Future<void> _exportJson() async {
+    final appState = context.read<AppState>();
+    final path = await appState.exportErrorQuestionsJson(_filter,
+        bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
+    if (!mounted) return;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前筛选下暂无错题')),
+      );
+      return;
+    }
+    final count = await appState.getFullErrorCount(_filter,
+        bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('（共 $count 题）已导出为 .json 文件。'),
+        backgroundColor: Theme.of(context).colorScheme.tertiary,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    try {
+      await Share.shareXFiles([XFile(path)], subject: '呆猫刷题宝错题导出');
+    } catch (_) {}
   }
 
   Future<void> _startReview() async {
@@ -163,6 +247,14 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('错题本'),
+        actions: [
+          // v1.0.2 对齐里程碑：导出错题为 .json
+          IconButton(
+            tooltip: '导出错题',
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: _exportJson,
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -174,7 +266,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                       Icon(Icons.check_circle_outline,
                           size: 64, color: cs.primary.withOpacity(0.6)),
                       const SizedBox(height: 16),
-                      const Text('暂无错题', style: TextStyle(fontSize: 16)),
+                      Text(_emptyText, style: const TextStyle(fontSize: 16)),
                       const SizedBox(height: 8),
                       Text('继续刷题积累吧！',
                           style: TextStyle(
@@ -229,19 +321,37 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                         ],
                       ),
                     ),
-                    // 知识点分组面板（v1.0.2）
+                    // 知识点分组面板（v1.0.2，对齐里程碑：薄弱知识点 + 优先复习）
                     if (_kpStats.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerHighest.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Column(
                             children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.insights,
+                                      size: 15, color: cs.tertiary),
+                                  const SizedBox(width: 6),
+                                  Text('薄弱知识点',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurface)),
+                                  const Spacer(),
+                                  Text('点击优先复习',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: cs.onSurfaceVariant)),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
                               for (final kp in _kpStats.take(6))
                                 InkWell(
                                   borderRadius: BorderRadius.circular(6),
@@ -278,6 +388,58 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                     ),
                                   ),
                                 ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // 生成建议（v1.0.2 对齐里程碑）
+                    if (_kpStats.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.tertiaryContainer.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                    height: 1.4),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                    height: 1.4),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.tonalIcon(
+                                  icon: _adviceLoading
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2))
+                                      : const Icon(Icons.auto_awesome,
+                                          size: 16),
+                                  label: Text(
+                                      _adviceLoading ? '正在生成建议...' : '生成建议',
+                                      style:
+                                          const TextStyle(fontSize: 13)),
+                                  onPressed:
+                                      _adviceLoading ? null : _generateAdvice,
+                                ),
+                              ),
                             ],
                           ),
                         ),

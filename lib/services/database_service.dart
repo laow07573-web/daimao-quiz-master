@@ -49,7 +49,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 5,
+      version: 6,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -137,6 +137,11 @@ class DatabaseService {
       await db.execute(
           'ALTER TABLE questions ADD COLUMN knowledge_point TEXT');
     }
+    if (oldVersion < 6) {
+      // v1.0.2 对齐里程碑：隐藏今日答题记录（统计查询统一排除 hidden=1）
+      await db.execute(
+          'ALTER TABLE answer_records ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -189,6 +194,7 @@ class DatabaseService {
         is_correct INTEGER NOT NULL,
         ai_analysis TEXT,
         answered_at TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
     ''');
@@ -450,6 +456,7 @@ class DatabaseService {
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
       JOIN question_banks qb ON q.bank_id = qb.id
+      WHERE ar.hidden = 0
       GROUP BY qb.id
     ''');
   }
@@ -538,6 +545,17 @@ class DatabaseService {
     final db = await database;
     await db.insert('fsrs_cards', card.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// 某题库下今天到期的复习卡数（模拟 dueToday 校验用）
+  Future<int> countDueReviewCards(int bankId) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT COUNT(*) as cnt FROM fsrs_cards
+      WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)
+        AND datetime(next_review_at) <= datetime('now', 'localtime')
+    ''', [bankId]);
+    return (rows.first['cnt'] as int?) ?? 0;
   }
 
   /// 获取到期的 FSRS 错题（按题库分组）
@@ -638,7 +656,8 @@ class DatabaseService {
     return rows.first['cnt'] as int;
   }
 
-  /// 知识点分组统计（与 getFullErrorQuestions 同口径）
+  /// 知识点分组统计（与 getFullErrorQuestions 同口径）。
+  /// 与里程碑一致：空知识点并入「未打标签」分组；AI 失败标记按前缀分组。
   Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode,
       {Set<int>? bankIds}) async {
     final db = await database;
@@ -647,16 +666,24 @@ class DatabaseService {
         : '';
     final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     return await db.rawQuery('''
-      SELECT q.knowledge_point as kp, COUNT(DISTINCT q.id) as cnt
+      SELECT
+        CASE
+          WHEN q.knowledge_point IS NULL OR q.knowledge_point = '' THEN '未打标签'
+          ELSE q.knowledge_point
+        END as kp,
+        COUNT(DISTINCT q.id) as cnt
       FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
-        AND q.knowledge_point IS NOT NULL AND q.knowledge_point != ''
-      GROUP BY q.knowledge_point
+      GROUP BY
+        CASE
+          WHEN q.knowledge_point IS NULL OR q.knowledge_point = '' THEN '未打标签'
+          ELSE q.knowledge_point
+        END
       ORDER BY cnt DESC
     ''', args);
   }
 
-  /// 按知识点取题（复习范围与主列表同口径）
+  /// 按知识点取题（复习范围与主列表同口径；'未打标签' 匹配空知识点）
   Future<List<Question>> getFullQuestionsByKnowledgePoint(
       String kp, String mode,
       {Set<int>? bankIds}) async {
@@ -664,16 +691,128 @@ class DatabaseService {
     final bankWhere = (bankIds != null && bankIds.isNotEmpty)
         ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
         : '';
+    final untagged = kp == '未打标签';
     final args = bankIds != null && bankIds.isNotEmpty
-        ? [kp, ...bankIds]
-        : [kp];
+        ? [...(untagged ? <Object>[] : [kp]), ...bankIds]
+        : (untagged ? <Object>[] : [kp]);
     final rows = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
-        AND q.knowledge_point = ?
+        ${untagged ? "AND (q.knowledge_point IS NULL OR q.knowledge_point = '')"
+                   : 'AND q.knowledge_point = ?'}
       ORDER BY RANDOM()
     ''', args);
     return rows.map((m) => Question.fromMap(m)).toList();
+  }
+
+  // ======================== v1.0.2 对齐里程碑：AI 打标签 ========================
+
+  /// 未打知识标签的错题数（空知识点，不含 AI 失败标记）
+  Future<int> getUntaggedErrorCount() async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT COUNT(DISTINCT q.id) as cnt
+      FROM questions q
+      WHERE q.id IN (SELECT question_id FROM error_book)
+        AND (q.knowledge_point IS NULL OR q.knowledge_point = '')
+    ''');
+    return (rows.first['cnt'] as int?) ?? 0;
+  }
+
+  /// 未打知识标签的错题（limit 批处理上限）
+  Future<List<Question>> getUntaggedErrorQuestions({int limit = 200}) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT q.* FROM questions q
+      WHERE q.id IN (SELECT question_id FROM error_book)
+        AND (q.knowledge_point IS NULL OR q.knowledge_point = '')
+      LIMIT ?
+    ''', [limit]);
+    return rows.map((m) => Question.fromMap(m)).toList();
+  }
+
+  /// 更新题目知识点标签
+  Future<void> updateQuestionKnowledgePoint(int questionId, String kp) async {
+    final db = await database;
+    await db.update('questions', {'knowledge_point': kp},
+        where: 'id = ?', whereArgs: [questionId]);
+  }
+
+  // ======================== v1.0.2 对齐里程碑：改判 / 隐藏今日记录 ========================
+
+  /// 改判一条作答记录（会话统计同步修正；FSRS 卡片按新结果补一次复习）
+  Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) async {
+    final db = await database;
+    final rows = await db.query('answer_records',
+        where: 'id = ?', whereArgs: [recordId]);
+    if (rows.isEmpty) return;
+    final record = rows.first;
+    final oldCorrect = (record['is_correct'] as int) == 1;
+    if (oldCorrect == isCorrect) return;
+
+    await db.update('answer_records', {'is_correct': isCorrect ? 1 : 0},
+        where: 'id = ?', whereArgs: [recordId]);
+
+    // 会话统计修正
+    final sessionId = record['session_id'];
+    if (sessionId != null) {
+      final sessions = await db.query('quiz_sessions',
+          where: 'id = ?', whereArgs: [sessionId]);
+      if (sessions.isNotEmpty) {
+        final s = sessions.first;
+        final correct = (s['correct_count'] as int? ?? 0) + (isCorrect ? 1 : -1);
+        final wrong = (s['wrong_count'] as int? ?? 0) + (isCorrect ? -1 : 1);
+        await db.update('quiz_sessions',
+            {'correct_count': correct < 0 ? 0 : correct,
+             'wrong_count': wrong < 0 ? 0 : wrong},
+            where: 'id = ?', whereArgs: [sessionId]);
+      }
+    }
+
+    // FSRS：以改判后的结果补记一次
+    final questionId = record['question_id'] as int;
+    final now = DateTime.now();
+    final existing = await getFSRSCard(questionId);
+    if (existing != null) {
+      await upsertFSRSCard(
+          FSRSService.schedule(existing, isCorrect ? 3 : 1, now));
+    } else {
+      await upsertFSRSCard(FSRSService.initCard(questionId, now));
+    }
+  }
+
+  /// 隐藏今日全部作答记录（统计口径：今日从打卡/统计中剔除）
+  Future<int> hideTodayRecords() async {
+    final db = await database;
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    return await db.rawUpdate('''
+      UPDATE answer_records SET hidden = 1
+      WHERE hidden = 0 AND date(answered_at) = date(?)
+    ''', [day.toIso8601String()]);
+  }
+
+  /// 恢复全部被隐藏的今日作答记录
+  Future<int> restoreTodayRecords() async {
+    final db = await database;
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    return await db.rawUpdate('''
+      UPDATE answer_records SET hidden = 0
+      WHERE hidden = 1 AND date(answered_at) = date(?)
+    ''', [day.toIso8601String()]);
+  }
+
+  /// 今日被隐藏的作答记录条数
+  Future<int> getHiddenTodayRecordCount() async {
+    final db = await database;
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    final rows = await db.rawQuery('''
+      SELECT COUNT(*) as cnt FROM answer_records
+      WHERE hidden = 1 AND date(answered_at) = date(?)
+    ''', [day.toIso8601String()]);
+    return (rows.first['cnt'] as int?) ?? 0;
   }
 
   /// 最近 N 天每日刷题量（无记录天补占位 total=0，COUNT 保证 int）
@@ -685,7 +824,7 @@ class DatabaseService {
     final rows = await db.rawQuery('''
       SELECT date(answered_at) as day, COUNT(*) as total
       FROM answer_records
-      WHERE date(answered_at) >= date(?)
+      WHERE hidden = 0 AND date(answered_at) >= date(?)
       GROUP BY date(answered_at)
     ''', [start.toIso8601String()]);
     final byDay = <String, int>{};
@@ -746,7 +885,7 @@ class DatabaseService {
       SELECT date(answered_at) as day, COUNT(*) as total,
              SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
       FROM answer_records
-      WHERE date(answered_at) >= date(?)
+      WHERE hidden = 0 AND date(answered_at) >= date(?)
       GROUP BY date(answered_at)
     ''', [start.toIso8601String()]);
     return rows;
@@ -789,7 +928,7 @@ class DatabaseService {
         COALESCE((SELECT SUM(duration_seconds) FROM quiz_sessions
           ${start != null ? 'WHERE start_time >= ?' : ''}), 0) as duration
       FROM answer_records
-      ${start != null ? 'WHERE answered_at >= ?' : ''}
+      WHERE hidden = 0 ${start != null ? 'AND answered_at >= ?' : ''}
     ''', start != null ? [start.toIso8601String(), start.toIso8601String()] : []);
     final r = rows.first;
     return {
@@ -813,64 +952,83 @@ class DatabaseService {
     ''', [sessionId]);
   }
 
-  /// 模拟长期使用（开发者选项）：以首次执行时间为锚点，
-  /// 幂等 —— 已生成过则直接返回，重复调用不会跨午夜生成新数据。
-  Future<void> simulateLongTermUse() async {
+  /// 模拟长期使用（v1.0.2 对齐里程碑）：
+  /// 基于当前题库生成过去 N 天的刷题记录、错题与复习卡；
+  /// 重复执行会先清理上次模拟的数据，可放心多试。
+  /// [randomWeakKp]：随机 1~2 个知识点作为薄弱点（打标签 + 降低答对率）
+  /// [dueToday]：把所有复习卡设为今天到期，便于测试错题复习
+  /// 返回 (作答记录条数, 复习卡数)
+  Future<(int, int)> simulateLongTermUse({
+    int days = 90,
+    bool randomWeakKp = false,
+    bool dueToday = false,
+  }) async {
     final db = await database;
-    // 幂等：模拟数据已存在则直接返回。
-    // 若标记残留但题库已被删除（如 deleteBank），重置标记重新生成。
-    final simBank = await db.query('question_banks',
-        where: 'name = ?', whereArgs: ['模拟题库']);
-    if (simBank.isNotEmpty && await getSetting('sim_done') == '1') return;
-    if (simBank.isEmpty) {
-      await db.delete('settings', where: "key IN ('sim_done','sim_anchor')");
-    }
+
+    // 锚点持久化：重复执行仍以首次锚点为种子（确定性 → 数据量不变）
     final anchorStr = await getSetting('sim_anchor');
     final anchor = anchorStr != null
         ? DateTime.parse(anchorStr)
-        : DateTime.now();
+        : DateTime.now().subtract(Duration(days: days - 1));
     if (anchorStr == null) {
       await setSetting('sim_anchor', anchor.toIso8601String());
     }
 
-    // 模拟题库
-    final existing = await db.query('question_banks',
-        where: 'name = ?', whereArgs: ['模拟题库']);
-    int bankId;
-    if (existing.isNotEmpty) {
-      bankId = existing.first['id'] as int;
-    } else {
-      bankId = await insertBank(QuestionBank(
-        name: '模拟题库',
-        fileSource: 'simulation',
-        questionCount: 40,
-        createdAt: anchor.subtract(const Duration(days: 89)).toIso8601String(),
-      ));
-      final questions = <Question>[];
-      for (var i = 1; i <= 40; i++) {
-        questions.add(Question(
-          bankId: bankId,
-          title: '模拟单选题 $i',
-          options: const ['选项A', '选项B', '选项C', '选项D'],
-          correctAnswer: 'A',
-          analysis: '模拟解析',
-          questionType: 'single_choice',
-          source: 'simulation',
-          createdAt: anchor.toIso8601String(),
-        ));
-      }
-      await insertQuestions(questions);
+    // 重复执行会先清理上次模拟的数据，可放心多试
+    final oldBank = await db
+        .query('question_banks', where: 'name = ?', whereArgs: ['模拟题库']);
+    if (oldBank.isNotEmpty) {
+      final oldId = oldBank.first['id'] as int;
+      // quiz_sessions 无外键（bank_ids 为文本），需显式清理
+      await db.delete('quiz_sessions',
+          where: 'bank_ids = ?', whereArgs: ['$oldId']);
+      await db.delete('question_banks', where: 'id = ?', whereArgs: [oldId]);
     }
+    await db.delete('settings', where: "key = 'sim_done'");
 
-    // 90 天随机刷题记录（以锚点做随机种子 → 确定性 → 幂等）
     final rng = Random(anchor.millisecondsSinceEpoch);
+
+    // 模拟题库（40 题）
+    final bankId = await insertBank(QuestionBank(
+      name: '模拟题库',
+      fileSource: 'simulation',
+      questionCount: 40,
+      createdAt: anchor.toIso8601String(),
+    ));
+
+    // 随机 1~2 个知识点作为薄弱点（若启用）
+    const kpPool = ['细菌的形态结构', '消毒灭菌', '免疫应答', '临床检验基础', '血液学检验'];
+    final weakKps = randomWeakKp
+        ? (kpPool.toList()..shuffle(rng)).take(rng.nextInt(2) + 1).toList()
+        : <String>[];
+
+    final questions = <Question>[];
+    for (var i = 1; i <= 40; i++) {
+      // 前 24 题归入薄弱知识点，其余无标签
+      final kp = weakKps.isEmpty || i > 24 ? null : weakKps[(i - 1) % weakKps.length];
+      questions.add(Question(
+        bankId: bankId,
+        title: '模拟单选题 $i',
+        options: const ['选项A', '选项B', '选项C', '选项D'],
+        correctAnswer: 'A',
+        analysis: '模拟解析',
+        questionType: 'single_choice',
+        source: 'simulation',
+        knowledgePoint: kp,
+        createdAt: anchor.toIso8601String(),
+      ));
+    }
+    await insertQuestions(questions);
     final allQuestions = await getQuestionsByBank(bankId);
-    if (allQuestions.isEmpty) return;
-    final dayZero = DateTime(anchor.year, anchor.month, anchor.day)
-        .subtract(const Duration(days: 89));
-    for (var day = 0; day < 90; day++) {
+    if (allQuestions.isEmpty) return (0, 0);
+
+    var recordCount = 0;
+    var cardCount = 0;
+    final dayZero = DateTime(anchor.year, anchor.month, anchor.day);
+    for (var day = 0; day < days; day++) {
       final d = dayZero.add(Duration(days: day));
-      final count = day == 89 ? 0 : rng.nextInt(80) + 10; // 10~89 题/天
+      // 最后一天（今天）不生成数据，避免影响实时打卡/连击
+      final count = day == days - 1 ? 0 : rng.nextInt(80) + 10;
       if (count == 0) continue;
       final sessionId = await insertSession(QuizSession(
         bankIds: '$bankId',
@@ -882,20 +1040,57 @@ class DatabaseService {
         endTime: DateTime(d.year, d.month, d.day, 9, 40).toIso8601String(),
         durationSeconds: 2400,
       ));
+      // 批处理插入，避免逐条 await 拖慢测试/模拟
+      final recordBatch = db.batch();
+      final cardBatch = db.batch();
+      final wrongQuestionIds = <int>{};
       for (var i = 0; i < count; i++) {
         final q = allQuestions[rng.nextInt(allQuestions.length)];
-        final isCorrect = rng.nextDouble() < 0.75;
-        await insertAnswerRecord(AnswerRecord(
-          questionId: q.id!,
-          sessionId: sessionId,
-          userAnswer: isCorrect ? q.correctAnswer : 'B',
-          isCorrect: isCorrect,
-          answeredAt: DateTime(d.year, d.month, d.day, 9, rng.nextInt(30))
+        // 薄弱知识点的题答对率更低，从而成为统计中的薄弱点
+        final isWeak =
+            q.knowledgePoint != null && weakKps.contains(q.knowledgePoint);
+        final isCorrect = rng.nextDouble() < (isWeak ? 0.4 : 0.75);
+        recordBatch.insert('answer_records', {
+          'question_id': q.id!,
+          'session_id': sessionId,
+          'user_answer': isCorrect ? q.correctAnswer : 'B',
+          'is_correct': isCorrect ? 1 : 0,
+          'answered_at': DateTime(d.year, d.month, d.day, 9, rng.nextInt(30))
               .toIso8601String(),
-        ));
+        });
+        recordCount++;
+        if (!isCorrect) {
+          // 答错的题自动进错题本并建复习卡
+          wrongQuestionIds.add(q.id!);
+          cardBatch.insert('fsrs_cards', {
+            ...FSRSService.initCard(q.id!, DateTime(d.year, d.month, d.day))
+                .toMap(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          cardCount++;
+        }
       }
+      await recordBatch.commit(noResult: true);
+      for (final qid in wrongQuestionIds) {
+        await addToErrorBook(qid);
+      }
+      await cardBatch.commit(noResult: true);
     }
+
+    if (dueToday) {
+      // 把所有复习卡设为今天到期，便于测试错题复习
+      await db.rawUpdate('''
+        UPDATE fsrs_cards SET next_review_at = ?
+        WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)
+      ''', [DateTime.now().toIso8601String(), bankId]);
+      final rows = await db.rawQuery('''
+        SELECT COUNT(*) as cnt FROM fsrs_cards
+        WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)
+      ''', [bankId]);
+      cardCount = (rows.first['cnt'] as int?) ?? 0;
+    }
+
     await setSetting('sim_done', '1');
+    return (recordCount, cardCount);
   }
 
   /// 校验备份文件：SQLite 魔数 + 核心表存在性。返回 null 表示合法，否则返回错误信息

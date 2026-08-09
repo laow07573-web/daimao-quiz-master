@@ -277,6 +277,83 @@ ${question.optionsWithLabels.join('\n')}
     return await _callAI(prompt);
   }
 
+  // ======================== v1.0.2 对齐里程碑：AI 打标签 / 生成建议 ========================
+
+  /// 为单道题打知识点标签（原版 prompt）。
+  /// 返回知识点名（≤10字）；失败时返回失败标记：
+  /// 'AI请求失败' / 'AI服务返回错误' / 'AI解析生成失败'（与里程碑分组口径一致）
+  Future<String> tagKnowledgePoint(Question question) async {
+    final prompt = '''按以下格式回复（直接说知识点名，不说题库名）：
+1. 只输出一个章节级知识点名称（如"细菌的形态结构""消毒灭菌""免疫应答"）
+2. 控制在10字以内，不要加引号、标点或解释
+3. 若无法判断，输出"其他"
+
+题目：${question.title}
+${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\n')}' : ''}
+正确答案：${question.correctAnswer}''';
+    try {
+      final response = await _client.post(
+        Uri.parse(_settings.apiEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_settings.apiKey}',
+        },
+        body: jsonEncode({
+          'model': _settings.model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': '按以下格式回复（直接说知识点名，不说题库名）：'
+                  '1. 只输出一个章节级知识点名称（如"细菌的形态结构""消毒灭菌""免疫应答"）'
+                  '2. 控制在10字以内，不要加引号、标点或解释'
+                  '3. 若无法判断，输出"其他"'
+            },
+            {'role': 'user', 'content': prompt},
+          ],
+          'temperature': 0.1,
+          'max_tokens': 64,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final content =
+            data['choices']?[0]?['message']?['content'] as String?;
+        _trackUsage(data);
+        final kp = _cleanTag(content ?? '');
+        if (kp.isEmpty) return 'AI解析生成失败';
+        return kp;
+      }
+      return 'AI服务返回错误 ($response.statusCode)';
+    } catch (_) {
+      return 'AI请求失败';
+    }
+  }
+
+  /// 清洗打标签输出：去引号/标点/前后缀，截断到 20 字
+  static String _cleanTag(String raw) {
+    var s = raw.trim();
+    s = s.replaceAll(RegExp(r'^[【\[\(（]+'), '');
+    s = s.replaceAll(RegExp(r'[】\]\)）]+$'), '');
+    s = s.replaceAll(RegExp(r'[。，、；：\s]+$'), '');
+    s = s.split('\n').first.trim();
+    if (s.length > 20) s = s.substring(0, 20);
+    return s.trim();
+  }
+
+  /// 基于错题知识点统计生成 AI 深度诊断（原版 prompt）。
+  /// [statsText]：本地精炼后的统计文本（知识点 + 错题数 + 正确率）
+  Future<String> generateKpAdvice(String statsText) async {
+    if (statsText.trim().isEmpty) return '暂无错题数据，无法精炼。';
+    final prompt = '''按优先级从高到低列出 1-3 个最需要复习的知识点，每个点用 **知识点名** 开头，附一句判断依据（如"正确率仅xx%、错题x道"）
+
+基于以下统计：
+$statsText
+
+控制在180字，用 ## 分标题，**粗体**突出知识点名和关键数据。''';
+    return await _callAI(prompt);
+  }
+
   /// 核心 AI 调用方法
   Future<String> _callAIForAnalysis(Question question) async {
     final prompt = '''# 角色

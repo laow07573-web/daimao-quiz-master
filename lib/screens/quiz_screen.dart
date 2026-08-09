@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
@@ -787,7 +787,7 @@ class _QuizScreenState extends State<QuizScreen> {
           if (!appState.settings.isConfigured) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text('请先在设置中配置 DeepSeek API Key'),
+                  content: Text('请先在设置中配置 API Key 后再查看解析。'),
                   backgroundColor: Colors.orange),
             );
             return;
@@ -809,7 +809,7 @@ class _QuizScreenState extends State<QuizScreen> {
           if (!appState.settings.isConfigured) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text('请先在设置中配置 DeepSeek API Key'),
+                  content: Text('请先在设置中配置 API Key 后再查看解析。'),
                   backgroundColor: Colors.orange),
             );
             return;
@@ -904,7 +904,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     if (!appState.settings.isConfigured) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('请先在设置中配置 DeepSeek API Key'),
+                            content: Text('请先在设置中配置 API Key 后再查看解析。'),
                             backgroundColor: Colors.orange),
                       );
                       return;
@@ -1043,3 +1043,4 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 }
+

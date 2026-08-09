@@ -11,7 +11,7 @@ class HitokotoService {
   static Future<String?> fetch() async {
     try {
       final resp = await http
-          .get(Uri.parse('https://v1.hitokoto.cn/'), headers: {
+          .get(Uri.parse('https://v1.hitokoto.cn/?c=k&c=i&c=d'), headers: {
         'User-Agent': 'daimao-flashcard/1.0',
       }).timeout(const Duration(seconds: 5));
       if (resp.statusCode != 200) return null;

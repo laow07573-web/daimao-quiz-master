@@ -57,12 +57,21 @@ class BankFileService {
           .replaceAll(RegExp(r'\.json$', caseSensitive: false), '');
       groups[baseName] = questions;
     } else if (data is Map) {
+      // v1.0.2 对齐里程碑：本软件导出的 .json（format 标记 + questions 数组）→ 单题库
+      if (data.containsKey('format') && data['questions'] is List) {
+        final questions = _parseQuestions(data['questions'] as List, now);
+        if (questions.isNotEmpty) {
+          groups[data['name']?.toString() ?? '错题导出'] = questions;
+        }
+      }
       // 分组：{ 组名: [...] }
-      for (final entry in data.entries) {
-        if (entry.value is! List) continue;
-        final questions = _parseQuestions(entry.value as List, now);
-        if (questions.isEmpty) continue;
-        groups['${entry.key}'] = questions;
+      if (groups.isEmpty) {
+        for (final entry in data.entries) {
+          if (entry.value is! List) continue;
+          final questions = _parseQuestions(entry.value as List, now);
+          if (questions.isEmpty) continue;
+          groups['${entry.key}'] = questions;
+        }
       }
       if (groups.isEmpty) {
         lastError = '文件中没有有效题目分组';

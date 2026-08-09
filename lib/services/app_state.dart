@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/question.dart';
@@ -523,7 +524,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   /// 模拟长期使用（开发者选项，幂等）
-  Future<void> simulateLongTermUse() => _db.simulateLongTermUse();
+  Future<(int, int)> simulateLongTermUse({
+    int days = 90,
+    bool randomWeakKp = false,
+    bool dueToday = false,
+  }) =>
+      _db.simulateLongTermUse(
+          days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
 
   /// 删除题库（同时清理答案记录）
   Future<void> deleteBank(int bankId) async {
@@ -805,6 +812,61 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _answerHistory.length = _quizQuestions.length;
 
     notifyListeners();
+  }
+
+  // ======================== v1.0.2 对齐里程碑：打标签 / 改判 / 隐藏今日 ========================
+
+  /// 未打知识标签的错题数（设置页入口角标）
+  Future<int> getUntaggedErrorCount() => _db.getUntaggedErrorCount();
+
+  /// 未打知识标签的错题列表（批处理上限）
+  Future<List<Question>> getUntaggedErrorQuestions({int limit = 200}) =>
+      _db.getUntaggedErrorQuestions(limit: limit);
+
+  /// 更新题目知识点标签
+  Future<void> updateQuestionKnowledgePoint(int questionId, String kp) =>
+      _db.updateQuestionKnowledgePoint(questionId, kp);
+
+  /// 改判一条作答记录（会话统计 + FSRS 同步修正）
+  Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) =>
+      _db.rejudgeAnswerRecord(recordId, isCorrect);
+
+  /// 隐藏今日全部作答记录
+  Future<int> hideTodayRecords() => _db.hideTodayRecords();
+
+  /// 恢复被隐藏的今日作答记录
+  Future<int> restoreTodayRecords() => _db.restoreTodayRecords();
+
+  /// 今日被隐藏记录条数
+  Future<int> getHiddenTodayRecordCount() => _db.getHiddenTodayRecordCount();
+
+  // ======================== v1.0.2 对齐里程碑：错题导出 JSON ========================
+
+  /// 导出当前筛选下的错题为 .json 题库文件（带 format 标记）。
+  /// 返回文件路径；失败返回 null。
+  Future<String?> exportErrorQuestionsJson(String mode,
+      {Set<int>? bankIds}) async {
+    final questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
+    if (questions.isEmpty) return null;
+    final list = questions.map((q) => {
+          'title': q.title,
+          'options': q.options,
+          'correct_answer': q.correctAnswer,
+          'analysis': q.analysis,
+          'question_type': q.questionType,
+          'knowledge_point': q.knowledgePoint,
+        }).toList();
+    final json = const JsonEncoder.withIndent('  ').convert({
+      'format': 'daimao-flashcard-questions',
+      'name': '错题导出_${DateTime.now().millisecondsSinceEpoch}',
+      'count': list.length,
+      'questions': list,
+    });
+    final dir = Directory.systemTemp.createTempSync('export');
+    final file = File(
+        '${dir.path}/错题导出_${DateTime.now().millisecondsSinceEpoch}.json');
+    await file.writeAsString(json);
+    return file.path;
   }
 
   // ======================== 统计 ========================

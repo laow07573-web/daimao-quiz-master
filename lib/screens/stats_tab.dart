@@ -32,6 +32,8 @@ class StatsTabState extends State<StatsTab> {
   List<Map<String, dynamic>> _kpAccuracy = [];
   List<Map<String, dynamic>> _errorStats = [];
   List<QuizSession> _recentSessions = [];
+  // v1.0.2 对齐里程碑：隐藏/恢复今日记录
+  int _hiddenTodayCount = 0;
 
   bool _loading = true;
   String? _error;
@@ -108,6 +110,7 @@ class StatsTabState extends State<StatsTab> {
     final kps = await appState.getAccuracyByKnowledgePoint();
     final errors = await appState.getErrorBookStats();
     final sessions = await appState.getRecentSessions(10);
+    final hidden = await appState.getHiddenTodayRecordCount();
     if (!mounted) return;
     setState(() {
       _bankAccuracy = banks
@@ -121,11 +124,36 @@ class StatsTabState extends State<StatsTab> {
       _kpAccuracy = kps;
       _errorStats = errors;
       _recentSessions = sessions;
+      _hiddenTodayCount = hidden;
     });
+  }
+
+  /// v1.0.2 对齐里程碑：隐藏今日答题记录
+  Future<void> _hideToday() async {
+    final appState = context.read<AppState>();
+    final hidden = await appState.hideTodayRecords();
+    if (!mounted) return;
+    await _loadAll();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(hidden > 0 ? '已隐藏 $hidden 条今日记录' : '今日暂无答题记录'),
+        backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  /// v1.0.2 对齐里程碑：恢复被隐藏的今日记录
+  Future<void> _restoreToday() async {
+    final appState = context.read<AppState>();
+    await appState.restoreTodayRecords();
+    if (!mounted) return;
+    await _loadAll();
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('统计')),
       body: _loading
@@ -169,8 +197,36 @@ class StatsTabState extends State<StatsTab> {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      // v1.0.2 对齐里程碑：恢复被隐藏的今日记录
+                      if (_hiddenTodayCount > 0)
+                        _SectionCard(
+                          title: '今日记录',
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '已隐藏 $_hiddenTodayCount 条今日记录，可通过下方按钮恢复',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurfaceVariant),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _restoreToday,
+                                child: const Text('恢复今日刷题记录',
+                                    style: TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 14),
                       _SectionCard(
                         title: '历史记录',
+                        trailing: TextButton(
+                          onPressed: _hideToday,
+                          child: const Text('隐藏今日记录',
+                              style: TextStyle(fontSize: 12)),
+                        ),
                         child: _HistorySection(sessions: _recentSessions),
                       ),
                       const SizedBox(height: 20),

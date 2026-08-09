@@ -16,6 +16,7 @@ class SessionDetailScreen extends StatefulWidget {
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
   List<Map<String, dynamic>>? _records;
   String? _error;
+  late QuizSession _session = widget.session;
 
   @override
   void initState() {
@@ -35,10 +36,36 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
   }
 
+  /// v1.0.2 对齐里程碑：改判（判错了？/ 已改判为正确·错误）
+  Future<void> _rejudge(int recordId, bool newCorrect) async {
+    await context.read<AppState>().rejudgeAnswerRecord(recordId, newCorrect);
+    if (!mounted) return;
+    // 刷新记录 + 会话概览数字
+    final records =
+        await context.read<AppState>().getSessionDetail(widget.session.id!);
+    final sessions = await context.read<AppState>().getRecentSessions(200);
+    final updated = sessions
+        .where((s) => s.id == widget.session.id)
+        .firstOrNull;
+    if (!mounted) return;
+    setState(() {
+      _records = records;
+      if (updated != null) _session = updated;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(newCorrect ? '已改判为正确' : '已改判为错误'),
+        backgroundColor: newCorrect
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final s = widget.session;
+    final s = _session;
     return Scaffold(
       appBar: AppBar(title: const Text('会话详情')),
       body: _records == null
@@ -70,7 +97,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   Text(_error!, style: TextStyle(color: cs.error))
                 else
                   for (final r in _records!)
-                    _RecordTile(record: r),
+                    _RecordTile(
+                      record: r,
+                      onRejudge: (newCorrect) =>
+                          _rejudge(r['id'] as int, newCorrect),
+                    ),
                 const SizedBox(height: 20),
               ],
             ),
@@ -110,9 +141,10 @@ class _Info extends StatelessWidget {
 }
 
 class _RecordTile extends StatelessWidget {
-  const _RecordTile({required this.record});
+  const _RecordTile({required this.record, required this.onRejudge});
 
   final Map<String, dynamic> record;
+  final ValueChanged<bool> onRejudge;
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +208,23 @@ class _RecordTile extends StatelessWidget {
                 color: isCorrect ? cs.onSurfaceVariant : cs.error,
               ),
             ),
+          // v1.0.2 对齐里程碑：改判
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                foregroundColor:
+                    isCorrect ? cs.onSurfaceVariant : cs.tertiary,
+              ),
+              onPressed: () => onRejudge(!isCorrect),
+              child: Text(
+                isCorrect ? '改判为错误' : '判错了？',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );

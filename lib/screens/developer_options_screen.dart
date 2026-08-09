@@ -37,13 +37,89 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
     setState(() => _accessibilityOn = on);
   }
 
+  /// v1.0.2 对齐里程碑：模拟对话框（天数 / 薄弱点 / 复习卡到期）
   Future<void> _simulate() async {
+    var days = 90;
+    var randomWeakKp = false;
+    var dueToday = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('模拟长期使用'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('基于当前题库生成过去 N 天的刷题记录、错题与复习卡',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 12),
+                Text('生成天数：$days 天', style: const TextStyle(fontSize: 13)),
+                Slider(
+                  value: days.toDouble(),
+                  min: 30,
+                  max: 180,
+                  divisions: 15,
+                  label: '$days 天',
+                  onChanged: (v) => setDialogState(() => days = v.round()),
+                ),
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('随机 1~2 个知识点作为薄弱点',
+                      style: TextStyle(fontSize: 13)),
+                  value: randomWeakKp,
+                  onChanged: (v) =>
+                      setDialogState(() => randomWeakKp = v ?? false),
+                ),
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('把所有复习卡设为今天到期，便于测试错题复习',
+                      style: TextStyle(fontSize: 13)),
+                  value: dueToday,
+                  onChanged: (v) => setDialogState(() => dueToday = v ?? false),
+                ),
+                const SizedBox(height: 4),
+                Text('· 答错的题自动进错题本并建复习卡',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                Text('· 重复执行会先清理上次模拟的数据，可放心多试。',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('开始模拟')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+
     setState(() => _simulating = true);
-    await context.read<AppState>().simulateLongTermUse();
+    final (records, cards) = await context.read<AppState>().simulateLongTermUse(
+        days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
     if (!mounted) return;
     setState(() {
       _simulating = false;
-      _status = '模拟数据已生成（幂等，重复调用不会新增）';
+      _status = dueToday
+          ? '已将 $cards 张复习卡设为到期'
+          : '已生成 $records 条记录，复习卡 $cards 张';
     });
   }
 
@@ -165,14 +241,30 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
         _DevCard(
           icon: Icons.science_outlined,
           title: '模拟长期使用',
-          subtitle: _simulating ? '生成中...' : '生成 90 天刷题数据（幂等）',
+          subtitle: _simulating ? '生成中...' : '生成过去 N 天的刷题记录、错题与复习卡',
           onTap: _simulating ? null : _simulate,
+        ),
+        const SizedBox(height: 8),
+        _DevCard(
+          icon: Icons.restore,
+          title: '恢复今日刷题记录',
+          subtitle: '把隐藏的今日答题记录恢复回来',
+          onTap: () async {
+            final restored =
+                await context.read<AppState>().restoreTodayRecords();
+            if (!mounted) return;
+            setState(() {
+              _status = restored > 0 ? '已恢复 $restored 条今日记录' : '今日没有被隐藏的记录';
+            });
+          },
         ),
         const SizedBox(height: 8),
         _DevCard(
           icon: Icons.health_and_safety_outlined,
           title: '保活（无障碍）状态',
-          subtitle: _accessibilityOn ? '已开启 ✅' : '未开启 ⚠️',
+          subtitle: _accessibilityOn
+              ? '无障碍保活已开启，提醒服务受系统守护'
+              : '未开启 ⚠️',
           onTap: () async {
             await KeepAliveService.instance.openAccessibilitySettings();
             await _checkAccessibility();
@@ -182,6 +274,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
         _DevCard(
           icon: Icons.backup_outlined,
           title: '导出数据库备份',
+          subtitle: '生成一致性快照并分享 .db 文件',
           onTap: _exportBackup,
         ),
         const SizedBox(height: 8),

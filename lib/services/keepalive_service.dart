@@ -31,4 +31,24 @@ class KeepAliveService {
       await _channel.invokeMethod('openAccessibilitySettings');
     } catch (_) {}
   }
+
+  /// 是否已忽略电池优化（v1.0.2：与里程碑一致，设置页可引导）
+  Future<bool> isIgnoringBatteryOptimizations() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
+      return result ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// 请求忽略电池优化（弹出系统授权页）
+  Future<void> requestIgnoreBatteryOptimizations() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('requestIgnoreBatteryOptimizations');
+    } catch (_) {}
+  }
 }

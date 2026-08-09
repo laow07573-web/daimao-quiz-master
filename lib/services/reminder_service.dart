@@ -251,6 +251,25 @@ class ReminderService {
     await _notifications.cancel(alarmId);
   }
 
+  /// 发送测试通知（设置页按钮，验证通知渠道可用）
+  Future<void> sendTestNotification() async {
+    if (!Platform.isAndroid || !_initialized) return;
+    await _notifications.show(
+      9999,
+      '呆猫刷题宝',
+      '这是一条测试通知，说明提醒渠道工作正常 ✅',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'flashcard_reminder',
+          '每日刷题提醒',
+          channelDescription: '每天定时提醒你刷题',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+    );
+  }
+
   // ======================== 文案 ========================
 
   /// 提醒文案：连击天数（含/不含今天两种口径）
