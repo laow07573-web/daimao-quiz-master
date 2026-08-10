@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
-import '../widgets/ai_response_widget.dart';
+import '../services/hitokoto_service.dart';
 import '../widgets/weekly_stats_board.dart';
 import 'bank_manage_screen.dart';
 import 'import_screen.dart';
@@ -24,15 +24,23 @@ class _HomeScreenState extends State<HomeScreen> {
   int _streakDays = 0;
   int _weekTotal = 0;
   bool _statsLoaded = false; // 防横幅首帧闪现
+  // v1.0.2 扩展：今日一言（开页面显示）
+  String _hitokoto = '正在加载一言...';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final appState = context.read<AppState>();
-      appState.refreshWeaknessAnalysis();
       _loadWeeklyData(appState);
     });
+    _loadHitokoto();
+  }
+
+  Future<void> _loadHitokoto() async {
+    final text = await HitokotoService.fetch();
+    if (!mounted) return;
+    setState(() => _hitokoto = text ?? HitokotoService.defaultText);
   }
 
   Future<void> _loadWeeklyData(AppState appState) async {
@@ -89,8 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               await appState.init();
-              await appState.refreshWeaknessAnalysis();
               await _loadWeeklyData(appState);
+              await _loadHitokoto();
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -98,6 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 顶部：问候语（第一行）+ 软件图标/名字 + 今日一言
+                  _buildHeroCard(appState, cs),
+                  const SizedBox(height: 16),
                   // 寒暑假模式横幅
                   if (appState.vacationModeEnabled)
                     _buildVacationBanner(cs),
@@ -108,17 +119,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       appState.aiService!.cachedBalance! > 0 &&
                       appState.aiService!.cachedBalance! < 1.0)
                     _buildBalanceWarning(cs),
-                  _buildStatsCards(appState, cs),
-                  const SizedBox(height: 16),
-                  // 本周战绩（v1.0.2）
+                  // 本周战绩（v1.0.2，放在刷题时长/刷题量/平均正确率上面）
                   WeeklyStatsBoard(
                     dailyTotals: _yearlyTotals,
                     streakDays: _streakDays,
                     weekTotal: _weekTotal,
                     vacationDays: _vacationDays,
                   ),
-                  const SizedBox(height: 24),
-                  _buildWeaknessSection(appState, cs),
+                  const SizedBox(height: 16),
+                  _buildStatsCards(appState, cs),
                   const SizedBox(height: 24),
                   _buildQuickActions(appState, cs),
                   const SizedBox(height: 24),
@@ -136,6 +145,101 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  /// 顶部问候语（第一行）+ 软件图标/名字 + 今日一言
+  Widget _buildHeroCard(AppState appState, ColorScheme cs) {
+    final nickname = appState.settings.nickname;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.primary, cs.primary.withOpacity(0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 第一行：问候语 + 昵称
+          Text(
+            _greeting,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: cs.onPrimary,
+            ),
+          ),
+          if (nickname.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              nickname,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onPrimary.withOpacity(0.85),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          // 软件图标 + 软件名字 + 今日一言
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/app_logo.png',
+                  width: 42,
+                  height: 42,
+                  errorBuilder: (_, __, ___) =>
+                      Icon(Icons.school, size: 36, color: cs.onPrimary),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '呆猫刷题宝',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _hitokoto,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onPrimary.withOpacity(0.9),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 5) return '夜深了，注意休息…';
+    if (h < 9) return '早上好！';
+    if (h < 12) return '上午好！';
+    if (h < 14) return '中午好！';
+    if (h < 18) return '下午好！';
+    if (h < 23) return '晚上好！';
+    return '夜深了，注意休息…';
   }
 
   Widget _buildVacationBanner(ColorScheme cs) {
@@ -199,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _StatCard(
                 icon: Icons.timer_outlined,
                 label: '累计刷题时长',
-                value: stats?.formattedDuration ?? '0分钟',
+                value: stats?.formattedDuration ?? '0 h 0 m',
                 color: cs.primary,
                 cs: cs,
               ),
@@ -232,48 +336,6 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
         ),
       ],
-    );
-  }
-
-  Widget _buildWeaknessSection(AppState appState, ColorScheme cs) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.lightbulb_outline, color: cs.secondary),
-              const SizedBox(width: 8),
-              Text('薄弱点分析',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
-              const Spacer(),
-              TextButton.icon(
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('刷新', style: TextStyle(fontSize: 12)),
-                onPressed: () => appState.refreshWeaknessAnalysis(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (appState.weaknessAnalysis == null)
-            Center(
-                child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: CircularProgressIndicator(color: cs.primary),
-            ))
-          else
-            AiResponseWidget(
-              text: appState.weaknessAnalysis!,
-              fontSize: 14,
-            ),
-        ],
-      ),
     );
   }
 

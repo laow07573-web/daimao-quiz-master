@@ -19,7 +19,11 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump();
 
-    expect(find.text('呆猫刷题宝'), findsOneWidget);
+    // AppBar 标题 + 顶部 hero 卡片软件名字（v1.0.2 扩展）
+    expect(find.text('呆猫刷题宝'), findsNWidgets(2));
+    // 顶部今日一言：测试环境网络不可用 → 回退默认文案
+    expect(find.text('刷题使我快乐，坚持就是胜利！'), findsOneWidget);
   });
 }

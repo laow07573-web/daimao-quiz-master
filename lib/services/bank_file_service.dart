@@ -199,9 +199,12 @@ class BankFileService {
     return (bankCount, questionCount);
   }
 
-  /// 导出题库为 JSON 文件
+  /// 导出题库为 JSON 文件（v1.0.2 扩展：带 format 标记 + 题库名，
+  /// 保留打标签后的 knowledge_point / analysis 等整理后字段，可被导入直接入库）。
+  /// 返回文件路径；失败返回 null。
   static Future<String?> exportBank(int bankId, String bankName, String destPath) async {
     final questions = await _db.getQuestionsByBank(bankId);
+    if (questions.isEmpty) return null;
     final list = questions.map((q) => {
           'title': q.title,
           'options': q.options,
@@ -210,8 +213,14 @@ class BankFileService {
           'question_type': q.questionType,
           'knowledge_point': q.knowledgePoint,
         }).toList();
+    final json = const JsonEncoder.withIndent('  ').convert({
+      'format': 'daimao-flashcard-questions',
+      'name': bankName,
+      'count': list.length,
+      'questions': list,
+    });
     final file = File(destPath);
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(list));
-    return null;
+    await file.writeAsString(json);
+    return file.path;
   }
 }

@@ -108,17 +108,11 @@ class HomeStats {
     required this.overallAccuracy,
   });
 
+  /// v1.0.2 扩展：刷题时长格式 xx h xx m（如 2 h 35 m）
   String get formattedDuration {
     final hours = totalDurationSeconds ~/ 3600;
     final minutes = (totalDurationSeconds % 3600) ~/ 60;
-    final seconds = totalDurationSeconds % 60;
-    if (hours > 0) {
-      return '${hours}小时${minutes}分钟';
-    }
-    if (minutes > 0) {
-      return seconds > 0 ? '${minutes}分${seconds}秒' : '${minutes}分钟';
-    }
-    return '${seconds}秒';
+    return '$hours h $minutes m';
   }
 
   String get formattedAccuracy => '${overallAccuracy.toStringAsFixed(1)}%';

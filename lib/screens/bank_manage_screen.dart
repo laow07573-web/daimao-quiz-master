@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
+import '../services/bank_file_service.dart';
 import '../models/question_bank.dart';
 import 'import_screen.dart';
 
@@ -74,6 +78,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
                       cs: cs,
                       onTap: () => appState.toggleBankSelection(bank.id!),
                       onDelete: () => _confirmDelete(context, appState, bank),
+                      onExport: () => _exportBank(context, bank),
                     );
                   },
                 ),
@@ -164,6 +169,31 @@ class _BankManageScreenState extends State<BankManageScreen> {
       ),
     );
   }
+
+  /// v1.0.2 扩展：导出题库（含打标签/解析的整理后字段）为 .json 并分享
+  Future<void> _exportBank(BuildContext context, QuestionBank bank) async {
+    final dir = Directory.systemTemp.createTempSync('bank_export');
+    final path =
+        '${dir.path}/${bank.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.json';
+    final result = await BankFileService.exportBank(bank.id!, bank.name, path);
+    if (!mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该题库没有题目，无法导出')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已导出 ${bank.questionCount} 道题目为 .json 文件'),
+        backgroundColor: Theme.of(context).colorScheme.tertiary,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    try {
+      await Share.shareXFiles([XFile(result)], subject: '呆猫刷题宝题库导出');
+    } catch (_) {}
+  }
 }
 
 class _BankCard extends StatelessWidget {
@@ -172,6 +202,7 @@ class _BankCard extends StatelessWidget {
   final ColorScheme cs;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onExport;
 
   const _BankCard({
     required this.bank,
@@ -179,6 +210,7 @@ class _BankCard extends StatelessWidget {
     required this.cs,
     required this.onTap,
     required this.onDelete,
+    required this.onExport,
   });
 
   @override
@@ -230,6 +262,12 @@ class _BankCard extends StatelessWidget {
                           fontSize: 12, color: cs.onSurfaceVariant)),
                 ],
               ),
+            ),
+            IconButton(
+              tooltip: '导出题库',
+              icon: Icon(Icons.file_download_outlined,
+                  color: cs.onSurfaceVariant, size: 20),
+              onPressed: onExport,
             ),
             IconButton(
               icon: Icon(Icons.delete_outline,

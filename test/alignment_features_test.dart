@@ -276,4 +276,68 @@ void main() {
     expect(groups.values.first.first.knowledgePoint, '血液');
     await file.delete();
   });
+
+  test('题库导出（整理后字段）→ 回读 → 导入入库闭环', () async {
+    final db = DatabaseService.instance;
+    final now = DateTime.now().toIso8601String();
+    final bankId =
+        await db.insertBank(QuestionBank(name: '导出测试题库', createdAt: now));
+    await db.insertQuestions([
+      Question(
+          bankId: bankId,
+          title: '单选题A',
+          options: const ['选项1', '选项2', '选项3', '选项4'],
+          correctAnswer: 'B',
+          analysis: '解析内容',
+          questionType: 'single_choice',
+          knowledgePoint: '细菌的形态结构',
+          createdAt: now),
+      Question(
+          bankId: bankId,
+          title: '填空题B',
+          correctAnswer: '白细胞',
+          questionType: 'fill_blank',
+          knowledgePoint: '血液学检验',
+          createdAt: now),
+    ]);
+    final bank = (await db.getAllBanks()).first;
+
+    // 导出：带 format 标记 + 题库名 + 整理后字段
+    final dest = '${Directory.systemTemp.path}/bank_export_${DateTime.now().millisecondsSinceEpoch}.json';
+    final exported = await BankFileService.exportBank(bankId, bank.name, dest);
+    expect(exported, isNotNull);
+    final raw = await File(exported!).readAsString();
+    expect(raw, contains('"format": "daimao-flashcard-questions"'));
+    expect(raw, contains('"name": "导出测试题库"'));
+    expect(raw, contains('"knowledge_point": "细菌的形态结构"'));
+    expect(raw, contains('"analysis": "解析内容"'));
+
+    // 回读解析：题目数量与字段一致
+    final groups = await BankFileService.parseJsonFile(exported);
+    expect(groups.length, 1);
+    expect(groups.keys.first, '导出测试题库');
+    final questions = groups.values.first;
+    expect(questions.length, 2);
+    final byTitle = {for (final q in questions) q.title: q};
+    expect(byTitle['单选题A']!.knowledgePoint, '细菌的形态结构');
+    expect(byTitle['单选题A']!.analysis, '解析内容');
+    expect(byTitle['填空题B']!.questionType, 'fill_blank');
+    expect(byTitle['填空题B']!.knowledgePoint, '血液学检验');
+
+    // 导入入库闭环：导出文件直接导入为可用题库
+    final (bankCount, questionCount) = await BankFileService.importJsonFile(exported);
+    expect(bankCount, 1);
+    expect(questionCount, 2);
+    final importedBanks = await db.getAllBanks();
+    final imported = importedBanks.firstWhere((b) => b.name == '导出测试题库');
+    final importedQs = await db.getQuestionsByBank(imported.id!);
+    expect(importedQs.length, 2);
+    expect(
+        importedQs.any((q) =>
+            q.title == '单选题A' &&
+            q.knowledgePoint == '细菌的形态结构' &&
+            q.analysis == '解析内容'),
+        isTrue);
+    await File(exported).delete();
+  });
 }
