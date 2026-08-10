@@ -108,10 +108,16 @@ class HomeStats {
     required this.overallAccuracy,
   });
 
-  /// v1.0.2 扩展：刷题时长格式 xx h xx m（如 2 h 35 m）
+  /// v1.0.2 扩展：刷题时长格式。
+  /// 24 小时内显示 xx h xx m（如 2 h 35 m）；超过 24 小时显示 xx 天 xx 小时
   String get formattedDuration {
     final hours = totalDurationSeconds ~/ 3600;
     final minutes = (totalDurationSeconds % 3600) ~/ 60;
+    if (hours >= 24) {
+      final days = hours ~/ 24;
+      final remainHours = hours % 24;
+      return '$days 天 $remainHours 小时';
+    }
     return '$hours h $minutes m';
   }
 
