@@ -136,23 +136,19 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
           // （PageView 无限翻页，初始页 = 当前月）
           _buildSwipeableMonth(context, now, todayKey),
           const SizedBox(height: 10),
-          // 底部：连续打卡（周）
+          // 底部：连续打卡（v1.0.2 修复：≥7 天折算 "X 周 Y 天"，不足一周显示天数）
           Row(
             children: [
               Icon(Icons.local_fire_department, size: 16, color: ac.accent),
               const SizedBox(width: 6),
               Text(
-                '连续打卡 ${streakDays ~/ 7} 周',
+                streakDays >= 7
+                    ? '连续打卡 ${streakDays ~/ 7} 周 ${streakDays % 7} 天'
+                    : '连续打卡 $streakDays 天',
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: cs.onSurface),
-              ),
-              const Spacer(),
-              Text(
-                streakDays > 0 ? '累计 $streakDays 天' : '',
-                style:
-                    TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
           ),

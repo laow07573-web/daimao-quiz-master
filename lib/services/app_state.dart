@@ -552,6 +552,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       _db.simulateLongTermUse(
           days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
 
+  /// 清除模拟长期使用产生的全部数据（会话/记录/复习卡/错题条目）
+  Future<int> clearSimulatedData() => _db.clearSimulatedData();
+
   /// 删除题库（同时清理答案记录）
   Future<void> deleteBank(int bankId) async {
     await _db.deleteBank(bankId);

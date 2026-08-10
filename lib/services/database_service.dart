@@ -1198,6 +1198,46 @@ class DatabaseService {
     return (error: null, records: recordCount, cards: cardCount);
   }
 
+  /// 清除模拟长期使用产生的全部数据（v1.0.2）：
+  /// 删除模拟会话与作答记录、模拟产生的复习卡与错题条目、设置锚点。
+  /// 只清理模拟自己产生/打标记的数据，不动用户真实复习进度与手动收藏。
+  /// 返回删除的会话数。
+  Future<int> clearSimulatedData() async {
+    final db = await database;
+    var removedSessions = 0;
+    final simSessionsRaw = await getSetting('sim_sessions');
+    if (simSessionsRaw != null) {
+      final ids = (jsonDecode(simSessionsRaw) as List)
+          .map((e) => e as int)
+          .toList();
+      for (final id in ids) {
+        await db.delete('answer_records',
+            where: 'session_id = ?', whereArgs: [id]);
+        await db.delete('quiz_sessions', where: 'id = ?', whereArgs: [id]);
+        removedSessions++;
+      }
+    }
+    final simQuestionsRaw = await getSetting('sim_questions');
+    if (simQuestionsRaw != null) {
+      final simQ = jsonDecode(simQuestionsRaw) as Map<String, dynamic>;
+      final cardIds = (simQ['cards'] as List? ?? []).cast<int>();
+      final bookmarkIds = (simQ['bookmarks'] as List? ?? []).cast<int>();
+      if (cardIds.isNotEmpty) {
+        await db.delete('fsrs_cards',
+            where: 'question_id IN (${List.filled(cardIds.length, '?').join(',')})',
+            whereArgs: cardIds);
+      }
+      if (bookmarkIds.isNotEmpty) {
+        await db.delete('error_book',
+            where: 'question_id IN (${List.filled(bookmarkIds.length, '?').join(',')})',
+            whereArgs: bookmarkIds);
+      }
+    }
+    await db.delete(
+        'settings', where: "key = 'sim_sessions' OR key = 'sim_questions'");
+    return removedSessions;
+  }
+
   /// 校验备份文件：SQLite 魔数 + user_version + 核心表存在性。返回 null 表示合法，否则返回错误信息
   Future<String?> validateBackupFile(String filePath) async {
     final file = File(filePath);

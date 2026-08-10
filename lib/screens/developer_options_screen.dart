@@ -51,6 +51,33 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   }
 
   /// v1.0.2 对齐里程碑：模拟对话框（基于当前题库 / 确认到期 / 说明）
+  /// v1.0.2：清除模拟数据（确认后执行，只清理模拟产生的数据）
+  Future<void> _clearSimulated() async {
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清除模拟数据'),
+        content: const Text('将删除全部模拟生成的刷题记录、复习卡与错题条目，且不可恢复。\n\n你的真实刷题数据不受影响。确定清除？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+    final removed = await context.read<AppState>().clearSimulatedData();
+    if (!mounted) return;
+    setState(() {
+      _status = '已清除 $removed 条模拟会话数据';
+    });
+  }
+
   Future<void> _simulate() async {
     var days = 90;
     var randomWeakKp = false;
@@ -315,6 +342,29 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           title: '模拟长期使用',
           subtitle: _simulating ? '生成中...' : '生成过去 N 天的刷题记录、错题与复习卡',
           onTap: _simulating ? null : _simulate,
+        ),
+        const SizedBox(height: 8),
+        // v1.0.2：清除模拟刷题数据（只清理模拟产生的数据，不动真实数据）
+        _DevCard(
+          icon: Icons.delete_sweep_outlined,
+          title: '清除模拟数据',
+          subtitle: '清除模拟生成的记录、复习卡与错题条目',
+          onTap: _clearSimulated,
+        ),
+        const SizedBox(height: 8),
+        // v1.0.2：隐藏当日刷题记录（与统计页同款，可恢复）
+        _DevCard(
+          icon: Icons.visibility_off_outlined,
+          title: '隐藏当日刷题记录',
+          subtitle: '将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题',
+          onTap: () async {
+            final hidden =
+                await context.read<AppState>().hideTodayRecords();
+            if (!mounted) return;
+            setState(() {
+              _status = hidden > 0 ? '已隐藏 $hidden 条今日记录' : '今日暂无答题记录';
+            });
+          },
         ),
         const SizedBox(height: 8),
         _DevCard(

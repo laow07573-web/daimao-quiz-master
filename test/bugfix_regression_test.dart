@@ -297,6 +297,32 @@ void main() {
     expect(await db.getTotalQuestionsAnswered(), 2);
   });
 
+  test('清除模拟数据：模拟数据归零且幂等，无模拟时不动真实数据', () async {
+    final db = DatabaseService.instance;
+    final bankId = await seedBank('C', 10);
+    final qs = await db.getQuestionsByBank(bankId);
+
+    // 场景1：模拟 → 清除
+    final r = await db.simulateLongTermUse(days: 30);
+    expect(r.error, isNull);
+    expect(await db.getTotalQuestionsAnswered(), greaterThan(0));
+    final removed = await db.clearSimulatedData();
+    expect(removed, greaterThan(0));
+    expect(await db.getTotalQuestionsAnswered(), 0);
+    expect(await db.countAllFsrsCards(), 0);
+    expect((await db.getAllSessions()).length, 0);
+    expect(await db.getErrorBookCount(), 0);
+    // 幂等：再次清除无操作
+    expect(await db.clearSimulatedData(), 0);
+
+    // 场景2：无模拟锚点时，用户真实收藏与复习卡不受影响
+    await db.addToErrorBook(qs[0].id!);
+    await db.upsertFSRSCard(FSRSService.initCard(qs[0].id!, DateTime.now()));
+    await db.clearSimulatedData();
+    expect(await db.isInErrorBook(qs[0].id!), isTrue);
+    expect(await db.getFSRSCard(qs[0].id!), isNotNull);
+  });
+
   test('主题切换持久化：重启（新实例）后保留', () async {
     SharedPreferences.setMockInitialValues({});
     final ts = ThemeService();
