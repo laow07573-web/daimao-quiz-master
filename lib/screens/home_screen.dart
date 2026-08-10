@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 import '../services/hitokoto_service.dart';
+import '../services/theme_service.dart';
 import '../widgets/weekly_stats_board.dart';
 import 'bank_manage_screen.dart';
 import 'import_screen.dart';
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<String> _vacationDays = {};
   int _streakDays = 0;
   int _weekTotal = 0;
+  double _weekAccuracy = 0;
   bool _statsLoaded = false; // 防横幅首帧闪现
   // v1.0.2 扩展：今日一言（开页面显示）
   String _hitokoto = '正在加载一言...';
@@ -57,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _yearlyTotals = yearly;
         _streakDays = streak;
         _weekTotal = weekStats.totalQuestions;
+        _weekAccuracy = weekStats.accuracy;
         _vacationDays = vacation;
         _statsLoaded = true;
       });
@@ -119,11 +122,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       appState.aiService!.cachedBalance! > 0 &&
                       appState.aiService!.cachedBalance! < 1.0)
                     _buildBalanceWarning(cs),
-                  // 本周战绩（v1.0.2，放在刷题时长/刷题量/平均正确率上面）
+                  // 本周战绩（v1.0.2 UI 设计稿：双数据块 + 单月打卡日历 + 连续打卡周）
                   WeeklyStatsBoard(
                     dailyTotals: _yearlyTotals,
                     streakDays: _streakDays,
                     weekTotal: _weekTotal,
+                    weekAccuracy: _weekAccuracy,
                     vacationDays: _vacationDays,
                     // v1.0.2 对齐原版：历史报告（近 7 天明细）
                     onHistoryReport: () => _showHistoryReport(appState),
@@ -363,23 +367,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBalanceWarning(ColorScheme cs) {
+    // v1.0.2 UI 设计稿：警告色走主题 tertiary（无硬编码色值）
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3CD),
+        color: cs.tertiaryContainer.withOpacity(0.5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFC107)),
+        border: Border.all(color: cs.tertiary.withOpacity(0.5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber, color: Color(0xFF856404)),
+          Icon(Icons.warning_amber, color: cs.tertiary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'API 余额不足 ¥1，建议尽快充值以免影响使用',
-              style: TextStyle(fontSize: 13, color: Colors.brown[800]),
+              style: TextStyle(fontSize: 13, color: cs.onTertiaryContainer),
             ),
           ),
         ],
@@ -389,6 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildStatsCards(AppState appState, ColorScheme cs) {
     final stats = appState.homeStats;
+    final ac = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -399,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.timer_outlined,
                 label: '累计刷题时长',
                 value: stats?.formattedDuration ?? '0 h 0 m',
-                color: cs.primary,
+                color: ac.accent,
                 cs: cs,
               ),
             ),
@@ -409,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.quiz_outlined,
                 label: '总刷题量',
                 value: '${stats?.totalQuestions ?? 0} 题',
-                color: const Color(0xFF5CB85C),
+                color: ac.accent.withOpacity(0.8),
                 cs: cs,
               ),
             ),
@@ -434,92 +440,93 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// 快速操作列表（v1.0.2 UI 设计稿：5 项，每项带状态文案与真实路由）
   Widget _buildQuickActions(AppState appState, ColorScheme cs) {
     final vacation = appState.vacationModeEnabled;
+    final ac = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('快速操作',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _ActionCard(
-                icon: Icons.rocket_launch_rounded,
-                customImage: 'assets/burst_icon.png',
-                label: '定向爆破',
-                subtitle: appState.selectedBankIds.isEmpty
-                    ? '请先在「管理题库」中选择要刷的题库'
-                    : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}',
-                color: cs.primary,
-                cs: cs,
-                greyed: vacation,
-                onTap: appState.selectedBankIds.isEmpty
-                    ? null
-                    : () {
-                        if (vacation) {
-                          _vacationBlocked(appState);
-                          return;
-                        }
-                        _showCountPicker(context, appState);
-                      },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ActionCard(
-                icon: Icons.library_add_outlined,
-                label: '管理题库',
-                subtitle: '${appState.banks.length} 个题库',
-                color: const Color(0xFF5CB85C),
-                cs: cs,
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const BankManageScreen()),
+        // 1. 定向爆破
+        _QuickActionTile(
+          icon: Icons.rocket_launch_rounded,
+          label: '定向爆破',
+          subtitle: appState.selectedBankIds.isEmpty
+              ? '请先选择题库'
+              : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}',
+          iconColor: ac.accent,
+          cs: cs,
+          onTap: appState.selectedBankIds.isEmpty
+              ? () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('请先在「管理题库」中选择要刷的题库')),
                   );
-                  await _loadWeeklyData(appState);
+                }
+              : () {
+                  if (vacation) {
+                    _vacationBlocked(appState);
+                    return;
+                  }
+                  _showCountPicker(context, appState);
                 },
-              ),
-            ),
-          ],
         ),
-        const SizedBox(height: 12),
-        _ActionCard(
+        // 2. 管理题库 → 题库管理页
+        _QuickActionTile(
+          icon: Icons.library_books_outlined,
+          label: '管理题库',
+          subtitle: '${appState.banks.length} 个题库',
+          iconColor: ac.accent.withOpacity(0.8),
+          cs: cs,
+          onTap: () => _navigateAndRefresh(
+              context, appState, const BankManageScreen()),
+        ),
+        // 3. 错题本 → 错题复习页
+        _QuickActionTile(
           icon: Icons.replay_rounded,
           label: '错题本',
-          subtitle: '使用FSRS算法全权生成',
-          color: cs.error,
+          subtitle: '使用 FSRS 算法全权生成',
+          iconColor: cs.error,
           cs: cs,
-          fullWidth: true,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ErrorBookScreen()),
-            );
-            await _loadWeeklyData(appState);
-          },
+          onTap: () =>
+              _navigateAndRefresh(context, appState, const ErrorBookScreen()),
         ),
-        const SizedBox(height: 12),
-        _ActionCard(
+        // 4. 导入 DOCX → 文件导入页
+        _QuickActionTile(
           icon: Icons.upload_file,
-          label: '导入题库',
-          subtitle: '支持 DOC/DOCX 格式批量上传',
-          color: cs.secondary,
+          label: '导入 DOCX',
+          subtitle: 'AI 解析题库文档',
+          iconColor: cs.tertiary,
           cs: cs,
-          fullWidth: true,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ImportScreen()),
-            );
-            await _loadWeeklyData(appState);
-          },
+          onTap: () =>
+              _navigateAndRefresh(context, appState, const ImportScreen()),
+        ),
+        // 5. 题库文件 → 文件导入页（JSON 直接入库）
+        _QuickActionTile(
+          icon: Icons.folder_open,
+          label: '题库文件',
+          subtitle: '导入 Json 题库',
+          iconColor: cs.secondary,
+          cs: cs,
+          onTap: () =>
+              _navigateAndRefresh(context, appState, const ImportScreen()),
         ),
       ],
     );
+  }
+
+  /// 路由占位：跳转页面并返回后刷新战绩
+  Future<void> _navigateAndRefresh(
+      BuildContext context, AppState appState, Widget page) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+    await _loadWeeklyData(appState);
   }
 
   void _showCountPicker(BuildContext context, AppState appState) {
@@ -768,71 +775,73 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
+/// 快速操作列表项（v1.0.2 UI 设计稿：图标 + 标题 + 状态副标题 + 跳转）
+class _QuickActionTile extends StatelessWidget {
   final IconData icon;
-  final String? customImage;
   final String label;
   final String subtitle;
-  final Color color;
+  final Color iconColor;
   final ColorScheme cs;
-  final VoidCallback? onTap;
-  final bool fullWidth;
-  final bool greyed; // v1.0.2: 寒暑假置灰
+  final VoidCallback onTap;
 
-  const _ActionCard({
+  const _QuickActionTile({
     required this.icon,
-    this.customImage,
     required this.label,
     required this.subtitle,
-    required this.color,
+    required this.iconColor,
     required this.cs,
-    this.onTap,
-    this.fullWidth = false,
-    this.greyed = false,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Opacity(
-        opacity: greyed ? 0.45 : 1.0,
-        child: Container(
-        width: fullWidth ? double.infinity : null,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
+    final ac = AppThemeColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: ac.card,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration:
-                  BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-              child: customImage != null
-                  ? Image.asset(customImage!, width: 36, height: 36, color: color)
-                  : Icon(icon, color: color, size: 24),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ac.cardBorder),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 15, color: cs.onSurface)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant)),
-                ],
-              ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: cs.onSurface)),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: TextStyle(
+                              fontSize: 12, color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+              ],
             ),
-            Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-          ],
+          ),
         ),
-      ),
       ),
     );
   }

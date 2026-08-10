@@ -98,12 +98,14 @@ class _TrendChartState extends State<TrendChart> {
   }
 
   double get _chartMax {
+    // v1.0.2 UI 设计稿：左侧 Y 轴固定 0-100 刻度（打卡线 50 恒在图内，
+    // 数据全为 0 时柱子贴合底边）；数据超过 100 时自适应上扩
     var maxTotal = 1.0;
     for (final d in widget.days) {
       final t = (d['total'] as int?) ?? 0;
       if (t > maxTotal) maxTotal = t.toDouble();
     }
-    return maxTotal * 1.15;
+    return math.max(100.0, maxTotal * 1.15);
   }
 
   @override
@@ -259,12 +261,11 @@ class _TrendPainter extends CustomPainter {
   }
 
   void _drawGrid(Canvas canvas) {
+    // v1.0.2 UI 设计稿：左侧刻度固定 0-100（每 25 一档）代表刷题量
     final gridPaint = Paint()
       ..color = colorScheme.outlineVariant.withOpacity(0.5)
       ..strokeWidth = 0.8;
-    final step = niceStep(math.max(chartMax, 1.0));
-    var v = 0.0;
-    while (v <= chartMax) {
+    for (final v in [0.0, 25.0, 50.0, 75.0, 100.0]) {
       final y = _yFor(v);
       canvas.drawLine(
           Offset(leftPad, y), Offset(_size.width - rightPad, y), gridPaint);
@@ -276,7 +277,6 @@ class _TrendPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftPad - tp.width - 4, y - tp.height / 2));
-      v += step;
     }
     // 右侧正确率轴 0/50/100%
     final accPaint = Paint()

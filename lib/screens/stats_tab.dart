@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
+import '../services/theme_service.dart';
+import '../widgets/monthly_calendar.dart';
 import '../widgets/trend_chart.dart';
-import '../widgets/year_heatmap.dart';
 import 'error_book_screen.dart';
 import 'session_detail_screen.dart';
 
-/// 统计页（v1.0.2）6 大板块：
-/// 总览 / 年度坚持 / 近30天趋势 / 正确率排行 / 错题统计 / 历史记录
+/// 统计页（v1.0.2 UI 设计稿）：
+/// 统计概览（本周/本月/全部 + 四指标）/ 年度坚持（3 月横排日历 + 图例）/
+/// 近30天趋势（双 Y 轴）/ 正确率排行 / 错题统计 / 历史记录
 class StatsTab extends StatefulWidget {
   const StatsTab({super.key});
 
@@ -182,7 +184,20 @@ class StatsTabState extends State<StatsTab> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('统计')),
+      appBar: AppBar(
+        title: const Text('统计'),
+        // v1.0.2 UI 设计稿：右侧刷新图标（预留刷新数据方法）
+        actions: [
+          IconButton(
+            tooltip: '刷新',
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _loadAll();
+              await _loadRankings();
+            },
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -196,10 +211,8 @@ class StatsTabState extends State<StatsTab> {
                       const SizedBox(height: 14),
                       _SectionCard(
                         title: '年度坚持',
-                        child: YearHeatmap(
-                          dailyTotals: _yearlyTotals,
-                          vacationDays: _vacationDays,
-                        ),
+                        // v1.0.2 UI 设计稿：横向展示 7/8/9 三个月（以当前月为中心）
+                        child: _buildQuarterCalendar(cs),
                       ),
                       const SizedBox(height: 14),
                       _SectionCard(
@@ -263,10 +276,77 @@ class StatsTabState extends State<StatsTab> {
     );
   }
 
+  /// v1.0.2 UI 设计稿：横向 3 个月网格日历（当前月-1 / 当前月 / 当前月+1）+ 热力图例
+  Widget _buildQuarterCalendar(ColorScheme cs) {
+    final ac = AppThemeColors.of(context);
+    final now = DateTime.now();
+    final todayKey = MonthCalendar.dateKeyOf(now);
+    final months = [
+      DateTime(now.year, now.month - 1, 1),
+      DateTime(now.year, now.month, 1),
+      DateTime(now.year, now.month + 1, 1),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final m in months)
+              Expanded(
+                child: MonthCalendar(
+                  year: m.year,
+                  month: m.month,
+                  dailyTotals: _yearlyTotals,
+                  vacationDays: _vacationDays,
+                  todayKey: todayKey,
+                  heatColors: [
+                    ac.cardBorder,
+                    ac.accent.withOpacity(0.18),
+                    ac.accent.withOpacity(0.4),
+                    ac.accent.withOpacity(0.65),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // 热力图例：少/达标/多/今天
+        Row(
+          children: [
+            _LegendItem(color: _heatColor(10, ac, cs), label: '少'),
+            _LegendItem(color: _heatColor(80, ac, cs), label: '达标'),
+            _LegendItem(color: _heatColor(250, ac, cs), label: '多'),
+            const SizedBox(width: 6),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                border: Border.all(color: ac.accent, width: 1.5),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Text('今天',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Color _heatColor(int total, AppThemeColors ac, ColorScheme cs) {
+    if (total <= 0) return ac.cardBorder;
+    if (total < 50) return ac.accent.withOpacity(0.18);
+    if (total < 200) return ac.accent.withOpacity(0.4);
+    return ac.accent.withOpacity(0.65);
+  }
+
   Widget _buildOverview(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // v1.0.2 UI 设计稿：统计概览（标签栏切换 本周/本月/全部 + 四指标）
     return _SectionCard(
-      title: '总览',
+      title: '统计概览',
       trailing: _PeriodChips(
         current: _period,
         onChanged: _switchPeriod,
@@ -398,6 +478,34 @@ class _OverviewStat extends StatelessWidget {
   }
 }
 
+/// 热力图例条目（少/达标/多）
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(label, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
@@ -497,7 +605,8 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
         if (data.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Text('暂无数据',
+            // v1.0.2 UI 设计稿：空状态提示
+            child: Text('暂无数据，刷几道题后再来看看',
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
           )
         else
@@ -629,7 +738,8 @@ class _ErrorStatsSection extends StatelessWidget {
         Text('按题库分布', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
         const SizedBox(height: 6),
         if (stats.isEmpty)
-          Text('暂无错题', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant))
+          // v1.0.2 UI 设计稿：空状态「0题错题总数」
+          Text('0题错题总数', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant))
         else
           for (final s in stats.take(5))
             Padding(
@@ -683,7 +793,8 @@ class _ErrorCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(value,
+            // v1.0.2 UI 设计稿：数值带单位（0题错题总数 / 0题待复习）
+            Text('$value 题',
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -733,7 +844,8 @@ class _HistorySection extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
-          child: Text('暂无刷题记录',
+          // v1.0.2 UI 设计稿：空状态提示
+          child: Text('暂无练习记录',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
         ),
       );

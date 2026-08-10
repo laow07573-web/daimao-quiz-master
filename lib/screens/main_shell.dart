@@ -43,20 +43,21 @@ class _MainShellState extends State<MainShell> {
             _statsKey.currentState?.refresh();
           }
         },
+        // v1.0.2 UI 设计稿：底部导航三 Tab（首页 🏠 / 统计 📊 / 我的 👤）
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            icon: Text('🏠', style: TextStyle(fontSize: 20)),
+            selectedIcon: Text('🏠', style: TextStyle(fontSize: 22)),
             label: '首页',
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
+            icon: Text('📊', style: TextStyle(fontSize: 20)),
+            selectedIcon: Text('📊', style: TextStyle(fontSize: 22)),
             label: '统计',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+            icon: Text('👤', style: TextStyle(fontSize: 20)),
+            selectedIcon: Text('👤', style: TextStyle(fontSize: 22)),
             label: '我的',
           ),
         ],
