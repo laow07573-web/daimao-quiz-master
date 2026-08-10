@@ -125,6 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     streakDays: _streakDays,
                     weekTotal: _weekTotal,
                     vacationDays: _vacationDays,
+                    // v1.0.2 对齐原版：历史报告（近 7 天明细）
+                    onHistoryReport: () => _showHistoryReport(appState),
                   ),
                   const SizedBox(height: 16),
                   _buildStatsCards(appState, cs),
@@ -240,6 +242,95 @@ class _HomeScreenState extends State<HomeScreen> {
     if (h < 18) return '下午好！';
     if (h < 23) return '晚上好！';
     return '夜深了，注意休息…';
+  }
+
+  /// v1.0.2 对齐原版：历史报告（近 7 天每日刷题明细）
+  Future<void> _showHistoryReport(AppState appState) async {
+    final daily = await appState.getDailyStats(7);
+    final acc = await appState.getDailyAccuracy(7);
+    final accByDay = <String, Map<String, dynamic>>{
+      for (final a in acc) (a['day'] as String): a,
+    };
+    if (!mounted) return;
+    final cs = Theme.of(context).colorScheme;
+    const week = ['一', '二', '三', '四', '五', '六', '日'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: cs.onSurfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('历史报告（近 7 天）',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface)),
+              const SizedBox(height: 12),
+              for (final d in daily)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 76,
+                        child: Text(
+                          '${(d['date'] as DateTime).month}月'
+                          '${(d['date'] as DateTime).day}日 周'
+                          '${week[(d['date'] as DateTime).weekday - 1]}',
+                          style: TextStyle(
+                              fontSize: 13, color: cs.onSurface),
+                        ),
+                      ),
+                      Text('${d['total']} 题',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: (d['total'] as int) > 0
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant)),
+                      const Spacer(),
+                      Text(
+                        _accuracyText(d, accByDay),
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _accuracyText(
+      Map<String, dynamic> d, Map<String, dynamic> accByDay) {
+    final key = '${(d['date'] as DateTime).year}-'
+        '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
+        '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}';
+    final row = accByDay[key];
+    final total = (row?['total'] as int?) ?? 0;
+    final correct = (row?['correct'] as int?) ?? 0;
+    if (total <= 0) return '—';
+    return '正确率 ${(correct / total * 100).toStringAsFixed(0)}%';
   }
 
   Widget _buildVacationBanner(ColorScheme cs) {

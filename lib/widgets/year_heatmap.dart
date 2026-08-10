@@ -14,11 +14,13 @@ class YearHeatmap extends StatefulWidget {
     required this.dailyTotals, // key: 'YYYY-MM-DD' -> 刷题数
     this.vacationDays = const {}, // 假期日期 key 集合
     this.onMonthPageChanged,
+    this.heatColors, // v1.0.2 对齐原版：自定义四级色阶（空/少/达标/多），默认主题色
   });
 
   final Map<String, int> dailyTotals;
   final Set<String> vacationDays;
   final ValueChanged<int>? onMonthPageChanged;
+  final List<Color>? heatColors;
 
   /// 热力色阶（首页/统计页统一口径）
   static Color heatColor(int total, ColorScheme cs) {
@@ -53,6 +55,25 @@ class _YearHeatmapState extends State<YearHeatmap> {
 
   String _dateKey(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// 取热力色（优先自定义色阶，否则主题色阶梯）
+  Color _heat(int total) {
+    final custom = widget.heatColors;
+    if (custom != null && custom.length >= 4) {
+      if (total <= 0) return custom[0];
+      if (total < 50) return custom[1];
+      if (total < 200) return custom[2];
+      return custom[3];
+    }
+    return YearHeatmap.heatColor(total, Theme.of(context).colorScheme);
+  }
+
+  /// 今天边框/文字色（深色看板下用自定义色阶最亮色）
+  Color _todayColor() {
+    final custom = widget.heatColors;
+    if (custom != null && custom.length >= 4) return custom[3];
+    return Theme.of(context).colorScheme.primary;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +113,7 @@ class _YearHeatmapState extends State<YearHeatmap> {
                             vacationDays: widget.vacationDays,
                             todayKey: todayKey,
                             colorScheme: cs,
+                            heatColors: widget.heatColors,
                           ),
                         ),
                     ],
@@ -116,15 +138,15 @@ class _YearHeatmapState extends State<YearHeatmap> {
                 ),
               ),
             const Spacer(),
-            _LegendItem(color: YearHeatmap.heatColor(25, cs), label: '少'),
-            _LegendItem(color: YearHeatmap.heatColor(100, cs), label: '达标'),
-            _LegendItem(color: YearHeatmap.heatColor(300, cs), label: '多'),
+            _LegendItem(color: _heat(25), label: '少'),
+            _LegendItem(color: _heat(100), label: '达标'),
+            _LegendItem(color: _heat(300), label: '多'),
             const SizedBox(width: 6),
             Container(
               width: 14,
               height: 14,
               decoration: BoxDecoration(
-                border: Border.all(color: cs.primary, width: 1.5),
+                border: Border.all(color: _todayColor(), width: 1.5),
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
@@ -175,6 +197,7 @@ class _MonthCalendar extends StatelessWidget {
     required this.vacationDays,
     required this.todayKey,
     required this.colorScheme,
+    this.heatColors,
   });
 
   final int month;
@@ -185,6 +208,7 @@ class _MonthCalendar extends StatelessWidget {
   final Set<String> vacationDays;
   final String todayKey;
   final ColorScheme colorScheme;
+  final List<Color>? heatColors;
 
   String _dateKey(int day) =>
       '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
@@ -227,6 +251,25 @@ class _MonthCalendar extends StatelessWidget {
     );
   }
 
+  /// 取热力色（优先自定义色阶，否则主题色阶梯）
+  Color _heat(int total) {
+    final custom = heatColors;
+    if (custom != null && custom.length >= 4) {
+      if (total <= 0) return custom[0];
+      if (total < 50) return custom[1];
+      if (total < 200) return custom[2];
+      return custom[3];
+    }
+    return YearHeatmap.heatColor(total, colorScheme);
+  }
+
+  /// 今天边框/文字色（深色看板下用自定义色阶最亮色）
+  Color _todayColor() {
+    final custom = heatColors;
+    if (custom != null && custom.length >= 4) return custom[3];
+    return colorScheme.primary;
+  }
+
   Widget _buildCell(int day, int daysInMonth, ColorScheme cs) {
     if (day < 1 || day > daysInMonth) {
       // 未来日期格保留 margin（防列错位）
@@ -238,23 +281,21 @@ class _MonthCalendar extends StatelessWidget {
     final isVacation = vacationDays.contains(key);
     final color = isVacation
         ? cs.error.withOpacity(0.55)
-        : YearHeatmap.heatColor(total, cs);
+        : _heat(total);
 
     return Container(
       margin: const EdgeInsets.all(1),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(3),
-        border: isToday
-            ? Border.all(color: cs.primary, width: 1.5)
-            : null,
+        border: isToday ? Border.all(color: _todayColor(), width: 1.5) : null,
       ),
       alignment: Alignment.center,
       child: Text(
         '$day',
         style: TextStyle(
           fontSize: 10,
-          color: isToday ? cs.primary : cs.onSurfaceVariant,
+          color: isToday ? _todayColor() : cs.onSurfaceVariant,
           fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
         ),
       ),

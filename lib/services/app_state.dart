@@ -349,6 +349,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Future<List<Map<String, dynamic>>> getDailyStats(int days) =>
       _db.getDailyStats(days);
 
+  /// 最近 N 天每日正确率（total/correct，与 getDailyStats 同日口径）
+  Future<List<Map<String, dynamic>>> getDailyAccuracy(int days) =>
+      _db.getDailyAccuracy(days);
+
   /// 年度每日刷题量映射（key: 'YYYY-MM-DD'）
   Future<Map<String, int>> getYearlyTotals() async {
     final list = await _db.getDailyStats(365);

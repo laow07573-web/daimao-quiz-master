@@ -129,6 +129,83 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     return false;
   }
 
+  /// v1.0.2 对齐原版：知识点标签点击 → 底部弹窗列出该知识点题目，可复习
+  Future<void> _showKpQuestions(String kp) async {
+    final appState = context.read<AppState>();
+    final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
+    final questions =
+        await appState.getFullQuestionsByKnowledgePoint(kp, _filter,
+            bankIds: bankIds);
+    if (!mounted) return;
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: cs.onSurfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('$kp · ${questions.length} 题',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface)),
+              const SizedBox(height: 10),
+              if (questions.isEmpty)
+                Text('该知识点暂无符合条件的题目',
+                    style: TextStyle(
+                        fontSize: 13, color: cs.onSurfaceVariant))
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: questions.length > 8 ? 8 : questions.length,
+                    itemBuilder: (context, i) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Text(
+                        '${i + 1}. ${questions[i].title}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            TextStyle(fontSize: 13, color: cs.onSurface),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              if (questions.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _startKpReview(kp);
+                    },
+                    child: const Text('复习该知识点'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// v1.0.2 对齐里程碑：AI 生成建议（薄弱知识点精炼 + 复习优先级）
   Future<void> _generateAdvice() async {
     final appState = context.read<AppState>();
@@ -326,18 +403,19 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                         ],
                       ),
                     ),
-                    // 知识点分组面板（v1.0.2，对齐里程碑：薄弱知识点 + 优先复习）
+                    // 知识点分组面板（v1.0.2 对齐原版：薄弱知识点标签云，点击弹题目列表）
                     if (_kpStats.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerHighest.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
@@ -366,43 +444,50 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                         fontSize: 11,
                                         color: cs.onSurfaceVariant)),
                               ),
-                              const SizedBox(height: 2),
-                              for (final kp in _kpStats.take(6))
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(6),
-                                  onTap: () => _startKpReview(
-                                      kp['kp'] as String),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 7),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.label_outline,
-                                            size: 14, color: cs.primary),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            '${kp['kp']}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: cs.onSurface),
-                                          ),
+                              const SizedBox(height: 10),
+                              // 标签云（圆角 8px 卡片）
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final kp in _kpStats.take(10))
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () =>
+                                          _showKpQuestions(kp['kp'] as String),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: cs.primary.withOpacity(0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: cs.primary
+                                                  .withOpacity(0.25)),
                                         ),
-                                        Text(
-                                          '${kp['cnt']} 题',
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: cs.onSurfaceVariant),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '${kp['kp']}',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: cs.onSurface),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${kp['cnt']} 题',
+                                              style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: cs.primary),
+                                            ),
+                                          ],
                                         ),
-                                        Icon(Icons.chevron_right,
-                                            size: 14,
-                                            color: cs.onSurfaceVariant),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ),
+                                ],
+                              ),
                             ],
                           ),
                         ),

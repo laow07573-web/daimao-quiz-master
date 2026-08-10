@@ -5,7 +5,7 @@ import 'services/app_state.dart';
 import 'services/theme_service.dart';
 import 'services/tamper_check.dart';
 import 'services/reminder_service.dart';
-import 'screens/main_shell.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,9 +75,10 @@ class FlashcardApp extends StatelessWidget {
       title: '呆猫刷题宝',
       debugShowCheckedModeBanner: false,
       theme: theme,
+      // v1.0.2 对齐原版设计：启动闪屏页（Logo + 标题 + 今日一言，2 秒进主界面）
       home: const AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark),
-        child: MainShell(),
+        child: SplashScreen(),
       ),
     );
   }
