@@ -1,9 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flashcard_app/models/question.dart';
+import 'package:flashcard_app/models/question_bank.dart';
 import 'package:flashcard_app/services/database_service.dart';
 
-/// 模拟长期使用：幂等性测试（LOCALAPPDATA 隔离环境下运行）
+/// 模拟长期使用（v1.0.2 对齐里程碑）：
+/// 基于当前题库生成过去 N 天的刷题记录、错题与复习卡；
+/// 重复执行会先清理上次模拟的数据（数据量不变）
 void main() {
   setUp(() async {
     // 每个用例独立数据库（多测试文件并行隔离）
@@ -21,36 +25,52 @@ void main() {
     DatabaseService.overrideDbPath = null;
   });
 
-  test('simulateLongTermUse 幂等：重复调用数据量不变', () async {
+  Future<int> seedBank() async {
     final db = DatabaseService.instance;
+    final now = DateTime.now().toIso8601String();
+    final bankId =
+        await db.insertBank(QuestionBank(name: '真实题库', createdAt: now));
+    await db.insertQuestions([
+      for (var i = 1; i <= 20; i++)
+        Question(
+            bankId: bankId,
+            title: '题$i',
+            correctAnswer: 'A',
+            options: const ['A', 'B', 'C'],
+            createdAt: now),
+    ]);
+    return bankId;
+  }
 
-    await db.simulateLongTermUse();
-    final banksAfter1 = (await db.getAllBanks()).length;
+  test('simulateLongTermUse 重复执行数据量不变', () async {
+    final db = DatabaseService.instance;
+    await seedBank();
+
+    final r1 = await db.simulateLongTermUse();
     final records1 = await db.getTotalQuestionsAnswered();
     final sessions1 = (await db.getAllSessions()).length;
 
-    await db.simulateLongTermUse();
-    final banksAfter2 = (await db.getAllBanks()).length;
+    final r2 = await db.simulateLongTermUse();
     final records2 = await db.getTotalQuestionsAnswered();
     final sessions2 = (await db.getAllSessions()).length;
 
-    expect(banksAfter2, banksAfter1);
+    expect(r1.error, isNull);
+    expect(r2.error, isNull);
     expect(records2, records1);
     expect(sessions2, sessions1);
     expect(records1, greaterThan(0));
-    expect(await db.getSetting('sim_done'), '1');
   });
 
-  test('deleteBank 显式清理 answer_records', () async {
+  test('deleteBank 显式清理 answer_records（模拟记录随题库级联清理）', () async {
     final db = DatabaseService.instance;
-    await db.simulateLongTermUse();
-    final banks = await db.getAllBanks();
-    final simBank = banks.firstWhere((b) => b.name == '模拟题库');
+    final bankId = await seedBank();
+    final r1 = await db.simulateLongTermUse();
+    expect(r1.records, greaterThan(0));
     final before = await db.getTotalQuestionsAnswered();
     expect(before, greaterThan(0));
-    await db.deleteBank(simBank.id!);
+    await db.deleteBank(bankId);
     final after = await db.getTotalQuestionsAnswered();
-    expect(after, 0); // 模拟数据外的记录也被级联清理
-    expect((await db.getAllBanks()).any((b) => b.name == '模拟题库'), isFalse);
+    expect(after, 0); // 外键级联清理
+    expect((await db.getAllBanks()).any((b) => b.name == '真实题库'), isFalse);
   });
 }

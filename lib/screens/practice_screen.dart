@@ -292,7 +292,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
   void _showSubmit() {
     final total = widget.questions.length, answered = _answers.length;
     _modalOpen = true;
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('提交练习'), content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('继续检查')), FilledButton(onPressed: () { Navigator.pop(ctx); _submit(); }, child: const Text('确认提交'))])).then((_) => _modalOpen = false);
+    // v1.0.2 对齐里程碑：确认提交 (已选 X 题)
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: Text('确认提交 (已选 $answered 题)'), content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('继续检查')), FilledButton(onPressed: () { Navigator.pop(ctx); _submit(); }, child: const Text('确认提交'))])).then((_) => _modalOpen = false);
   }
 }
 

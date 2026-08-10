@@ -145,19 +145,22 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     setState(() => _adviceLoading = true);
     // 统计文本：知识点 + 错题数 + 正确率（本地精炼已按错题统计排序）
     final accByKp = await appState.getAccuracyByKnowledgePoint();
-    final statsText = _kpStats
-        .map((s) {
-          final kp = s['kp'] as String;
-          final row = accByKp
-              .where((a) => (a['kp'] as String?) == kp)
-              .firstOrNull;
-          final total = (row?['total'] as int?) ?? 0;
-          final correct = (row?['correct'] as int?) ?? 0;
-          final acc =
-              total > 0 ? '${(correct / total * 100).toStringAsFixed(1)}%' : '无记录';
-          return '**$kp**：错题 ${s['cnt']} 道，正确率 $acc';
-        })
-        .join('\n');
+    // v1.0.2 对齐里程碑：各知识点数据：
+    final statsText = '各知识点数据：\n' +
+        _kpStats
+            .map((s) {
+              final kp = s['kp'] as String;
+              final row = accByKp
+                  .where((a) => (a['kp'] as String?) == kp)
+                  .firstOrNull;
+              final total = (row?['total'] as int?) ?? 0;
+              final correct = (row?['correct'] as int?) ?? 0;
+              final acc = total > 0
+                  ? '${(correct / total * 100).toStringAsFixed(1)}%'
+                  : '无记录';
+              return '**$kp**：错题 ${s['cnt']} 道，正确率 $acc';
+            })
+            .join('\n');
 
     final result = await ai.generateKpAdvice(statsText);
     if (!mounted) return;
@@ -214,7 +217,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       // 无匹配时清空残留旧题（防泄漏）
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前筛选下暂无错题')),
+        // v1.0.2 对齐里程碑：暂无符合条件的题目
+        const SnackBar(content: Text('暂无符合条件的题目')),
       );
       return;
     }
@@ -231,7 +235,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     if (appState.quizQuestions.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('该知识点下暂无错题')),
+        // v1.0.2 对齐里程碑：该知识点暂无符合条件的题目
+        const SnackBar(content: Text('该知识点暂无符合条件的题目')),
       );
       return;
     }
@@ -345,11 +350,21 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                           fontWeight: FontWeight.w600,
                                           color: cs.onSurface)),
                                   const Spacer(),
-                                  Text('点击优先复习',
+                                  // v1.0.2 对齐里程碑：按知识点分组
+                                  Text('按知识点分组',
                                       style: TextStyle(
                                           fontSize: 11,
                                           color: cs.onSurfaceVariant)),
                                 ],
+                              ),
+                              const SizedBox(height: 2),
+                              // v1.0.2 对齐里程碑：优先复习知识点
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text('优先复习知识点',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: cs.onSurfaceVariant)),
                               ),
                               const SizedBox(height: 2),
                               for (final kp in _kpStats.take(6))

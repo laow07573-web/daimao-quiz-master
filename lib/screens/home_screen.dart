@@ -1,4 +1,4 @@
-import 'practice_screen.dart';
+﻿import 'practice_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
@@ -293,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 customImage: 'assets/burst_icon.png',
                 label: '定向爆破',
                 subtitle: appState.selectedBankIds.isEmpty
-                    ? '请先选择题库'
+                    ? '请先在「管理题库」中选择要刷的题库'
                     : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}',
                 color: cs.primary,
                 cs: cs,
@@ -760,3 +760,4 @@ class _ModeOption extends StatelessWidget {
     );
   }
 }
+

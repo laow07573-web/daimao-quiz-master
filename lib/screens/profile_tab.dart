@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/app_state.dart';
 import 'developer_options_screen.dart';
 import 'settings_screen.dart';
 
-/// 我的页（v1.0.2）：问候语、名字、入口
+/// 我的页（v1.0.2 对齐里程碑）：问候语（昵称）、入口
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
 
@@ -71,7 +73,10 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '呆猫刷题宝',
+                            // v1.0.2 对齐里程碑：昵称（设置后首页显示专属问候）
+                            context.watch<AppState>().settings.nickname.isEmpty
+                                ? '呆猫刷题宝'
+                                : context.read<AppState>().settings.nickname,
                             style: TextStyle(
                               fontSize: 14,
                               color: cs.onPrimary.withOpacity(0.85),
@@ -115,7 +120,8 @@ class _ProfileTabState extends State<ProfileTab> {
           const SizedBox(height: 20),
           Center(
             child: Text(
-              '本软件由b站：笨蛋鱼坏蛋猫 开发',
+              // v1.0.2 对齐里程碑：页脚带版本号
+              '本软件由b站：笨蛋鱼坏蛋猫开发|v1.26.6.17',
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
           ),
@@ -130,7 +136,7 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (ctx) => AlertDialog(
         title: const Text('呆猫刷题宝'),
         content: const Text(
-          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：1.0.2',
+          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：1.26.6 (build 17)',
         ),
         actions: [
           TextButton(

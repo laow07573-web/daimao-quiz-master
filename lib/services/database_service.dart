@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:path/path.dart';
@@ -558,6 +559,23 @@ class DatabaseService {
     return (rows.first['cnt'] as int?) ?? 0;
   }
 
+  /// 全部复习卡数
+  Future<int> countAllFsrsCards() async {
+    final db = await database;
+    final rows = await db.rawQuery('SELECT COUNT(*) as cnt FROM fsrs_cards');
+    return (rows.first['cnt'] as int?) ?? 0;
+  }
+
+  /// 今天到期的复习卡总数
+  Future<int> countDueFsrsCards() async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT COUNT(*) as cnt FROM fsrs_cards
+      WHERE datetime(next_review_at) <= datetime('now', 'localtime')
+    ''');
+    return (rows.first['cnt'] as int?) ?? 0;
+  }
+
   /// 获取到期的 FSRS 错题（按题库分组）
   Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {
     final db = await database;
@@ -956,71 +974,54 @@ class DatabaseService {
   /// 基于当前题库生成过去 N 天的刷题记录、错题与复习卡；
   /// 重复执行会先清理上次模拟的数据，可放心多试。
   /// [randomWeakKp]：随机 1~2 个知识点作为薄弱点（打标签 + 降低答对率）
-  /// [dueToday]：把所有复习卡设为今天到期，便于测试错题复习
-  /// 返回 (作答记录条数, 复习卡数)
-  Future<(int, int)> simulateLongTermUse({
+  /// [dueToday]：把所有复习卡设为今天到期（错题本的「待复习」数量会全部增加）
+  /// 返回 (error, 记录条数, 复习卡数)；error 非空表示失败（如题库为空）
+  Future<({String? error, int records, int cards})> simulateLongTermUse({
     int days = 90,
     bool randomWeakKp = false,
     bool dueToday = false,
   }) async {
     final db = await database;
 
-    // 锚点持久化：重复执行仍以首次锚点为种子（确定性 → 数据量不变）
-    final anchorStr = await getSetting('sim_anchor');
-    final anchor = anchorStr != null
-        ? DateTime.parse(anchorStr)
-        : DateTime.now().subtract(Duration(days: days - 1));
-    if (anchorStr == null) {
-      await setSetting('sim_anchor', anchor.toIso8601String());
+    // 基于当前题库：空题库拦截
+    final allQuestions = await db.rawQuery(
+        'SELECT * FROM questions ORDER BY id LIMIT 500');
+    final pool = allQuestions.map((m) => Question.fromMap(m)).toList();
+    if (pool.isEmpty) {
+      return (error: '题库为空，请先导入题库再模拟', records: 0, cards: 0);
     }
 
-    // 重复执行会先清理上次模拟的数据，可放心多试
-    final oldBank = await db
-        .query('question_banks', where: 'name = ?', whereArgs: ['模拟题库']);
-    if (oldBank.isNotEmpty) {
-      final oldId = oldBank.first['id'] as int;
-      // quiz_sessions 无外键（bank_ids 为文本），需显式清理
-      await db.delete('quiz_sessions',
-          where: 'bank_ids = ?', whereArgs: ['$oldId']);
-      await db.delete('question_banks', where: 'id = ?', whereArgs: [oldId]);
+    // 重复执行会先清理上次模拟的数据（模拟会话 id 列表）
+    final simSessionsRaw = await getSetting('sim_sessions');
+    if (simSessionsRaw != null) {
+      final ids = (jsonDecode(simSessionsRaw) as List)
+          .map((e) => e as int)
+          .toList();
+      for (final id in ids) {
+        await db.delete('answer_records', where: 'session_id = ?', whereArgs: [id]);
+        await db.delete('quiz_sessions', where: 'id = ?', whereArgs: [id]);
+      }
     }
-    await db.delete('settings', where: "key = 'sim_done'");
+    await db.delete('settings', where: "key = 'sim_sessions'");
+    final simIds = <int>[];
 
-    final rng = Random(anchor.millisecondsSinceEpoch);
+    final anchor = DateTime.now().subtract(Duration(days: days - 1));
+    final rng = Random(20260808); // 固定种子 → 同一题库下重复执行数据量一致
 
-    // 模拟题库（40 题）
-    final bankId = await insertBank(QuestionBank(
-      name: '模拟题库',
-      fileSource: 'simulation',
-      questionCount: 40,
-      createdAt: anchor.toIso8601String(),
-    ));
-
-    // 随机 1~2 个知识点作为薄弱点（若启用）
+    // 随机 1~2 个知识点作为薄弱点（若启用）：给部分题打标签
     const kpPool = ['细菌的形态结构', '消毒灭菌', '免疫应答', '临床检验基础', '血液学检验'];
     final weakKps = randomWeakKp
         ? (kpPool.toList()..shuffle(rng)).take(rng.nextInt(2) + 1).toList()
         : <String>[];
-
-    final questions = <Question>[];
-    for (var i = 1; i <= 40; i++) {
-      // 前 24 题归入薄弱知识点，其余无标签
-      final kp = weakKps.isEmpty || i > 24 ? null : weakKps[(i - 1) % weakKps.length];
-      questions.add(Question(
-        bankId: bankId,
-        title: '模拟单选题 $i',
-        options: const ['选项A', '选项B', '选项C', '选项D'],
-        correctAnswer: 'A',
-        analysis: '模拟解析',
-        questionType: 'single_choice',
-        source: 'simulation',
-        knowledgePoint: kp,
-        createdAt: anchor.toIso8601String(),
-      ));
+    if (weakKps.isNotEmpty) {
+      for (var i = 0; i < pool.length; i++) {
+        if (i % 5 < 3) {
+          await db.update('questions',
+              {'knowledge_point': weakKps[i % weakKps.length]},
+              where: 'id = ?', whereArgs: [pool[i].id]);
+        }
+      }
     }
-    await insertQuestions(questions);
-    final allQuestions = await getQuestionsByBank(bankId);
-    if (allQuestions.isEmpty) return (0, 0);
 
     var recordCount = 0;
     var cardCount = 0;
@@ -1031,7 +1032,7 @@ class DatabaseService {
       final count = day == days - 1 ? 0 : rng.nextInt(80) + 10;
       if (count == 0) continue;
       final sessionId = await insertSession(QuizSession(
-        bankIds: '$bankId',
+        bankIds: 'simulation',
         mode: 'single',
         totalQuestions: count,
         correctCount: (count * 0.75).round(),
@@ -1040,12 +1041,13 @@ class DatabaseService {
         endTime: DateTime(d.year, d.month, d.day, 9, 40).toIso8601String(),
         durationSeconds: 2400,
       ));
+      simIds.add(sessionId);
       // 批处理插入，避免逐条 await 拖慢测试/模拟
       final recordBatch = db.batch();
       final cardBatch = db.batch();
       final wrongQuestionIds = <int>{};
       for (var i = 0; i < count; i++) {
-        final q = allQuestions[rng.nextInt(allQuestions.length)];
+        final q = pool[rng.nextInt(pool.length)];
         // 薄弱知识点的题答对率更低，从而成为统计中的薄弱点
         final isWeak =
             q.knowledgePoint != null && weakKps.contains(q.knowledgePoint);
@@ -1077,33 +1079,33 @@ class DatabaseService {
     }
 
     if (dueToday) {
-      // 把所有复习卡设为今天到期，便于测试错题复习
-      await db.rawUpdate('''
-        UPDATE fsrs_cards SET next_review_at = ?
-        WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)
-      ''', [DateTime.now().toIso8601String(), bankId]);
-      final rows = await db.rawQuery('''
-        SELECT COUNT(*) as cnt FROM fsrs_cards
-        WHERE question_id IN (SELECT id FROM questions WHERE bank_id = ?)
-      ''', [bankId]);
+      // 把所有复习卡设为今天到期，便于测试错题复习（「待复习」数量全部增加）
+      await db.rawUpdate('UPDATE fsrs_cards SET next_review_at = ?',
+          [DateTime.now().toIso8601String()]);
+      final rows = await db.rawQuery('SELECT COUNT(*) as cnt FROM fsrs_cards');
       cardCount = (rows.first['cnt'] as int?) ?? 0;
     }
 
-    await setSetting('sim_done', '1');
-    return (recordCount, cardCount);
+    await setSetting('sim_sessions', jsonEncode(simIds));
+    return (error: null, records: recordCount, cards: cardCount);
   }
 
   /// 校验备份文件：SQLite 魔数 + 核心表存在性。返回 null 表示合法，否则返回错误信息
   Future<String?> validateBackupFile(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) return '文件不存在';
+    if (await file.length() < 8192) {
+      // v1.0.2 对齐里程碑：文件不是有效的数据库备份（文件过小）
+      return '文件不是有效的数据库备份（文件过小）';
+    }
     final raf = await file.open();
     try {
       final header = await raf.read(16);
       // SQLite 魔数: "SQLite format 3\0"
       if (header.length < 16 ||
           String.fromCharCodes(header.sublist(0, 15)) != 'SQLite format 3') {
-        return '不是有效的 SQLite 数据库文件';
+        // v1.0.2 对齐里程碑：文件不是有效的 SQLite 数据库备份
+        return '文件不是有效的 SQLite 数据库备份';
       }
     } finally {
       await raf.close();

@@ -95,6 +95,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 const SizedBox(height: 14),
                 if (_error != null)
                   Text(_error!, style: TextStyle(color: cs.error))
+                else if (_records!.isEmpty)
+                  // v1.0.2 对齐里程碑：暂无该次作答记录
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Text('暂无该次作答记录',
+                          style: TextStyle(
+                              fontSize: 13, color: cs.onSurfaceVariant)),
+                    ),
+                  )
                 else
                   for (final r in _records!)
                     _RecordTile(
@@ -220,7 +230,8 @@ class _RecordTile extends StatelessWidget {
               ),
               onPressed: () => onRejudge(!isCorrect),
               child: Text(
-                isCorrect ? '改判为错误' : '判错了？',
+                // v1.0.2 对齐里程碑：判错了，改判正确
+                isCorrect ? '改判为错误' : '判错了，改判正确',
                 style: const TextStyle(fontSize: 12),
               ),
             ),

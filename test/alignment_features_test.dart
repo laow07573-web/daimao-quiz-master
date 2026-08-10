@@ -181,40 +181,58 @@ void main() {
     expect(await db.getHiddenTodayRecordCount(), 0);
   });
 
-  test('模拟：薄弱知识点随机打标签 + 复习卡今天到期', () async {
+  test('模拟：基于当前题库 + 薄弱知识点打标签 + 复习卡今天到期', () async {
     final db = DatabaseService.instance;
-    // 先建一个题库，模拟基于"当前题库"生成
+    // 基于"当前题库"生成（对齐里程碑：不再自建模拟题库）
     final now = DateTime.now().toIso8601String();
-    await db.insertBank(QuestionBank(name: '真实题库', createdAt: now));
+    final bankId =
+        await db.insertBank(QuestionBank(name: '真实题库', createdAt: now));
+    await db.insertQuestions([
+      for (var i = 1; i <= 20; i++)
+        Question(
+            bankId: bankId,
+            title: '题$i',
+            correctAnswer: 'A',
+            options: const ['A', 'B', 'C'],
+            createdAt: now),
+    ]);
 
-    final (records, cards) = await db.simulateLongTermUse(
+    final result = await db.simulateLongTermUse(
         days: 30, randomWeakKp: true, dueToday: true);
-    expect(records, greaterThan(0));
-    expect(cards, greaterThan(0));
+    expect(result.error, isNull);
+    expect(result.records, greaterThan(0));
+    expect(result.cards, greaterThan(0));
 
-    final simBank = (await db.getAllBanks())
-        .firstWhere((b) => b.name == '模拟题库');
-    final simQuestions = await db.getQuestionsByBank(simBank.id!);
-    final tagged = simQuestions
+    // 薄弱知识点标签已打到当前题库的题上
+    final questions = await db.getQuestionsByBank(bankId);
+    final tagged = questions
         .where((q) => q.knowledgePoint != null && q.knowledgePoint!.isNotEmpty)
         .length;
-    expect(tagged, greaterThan(0)); // 薄弱知识点标签已打
+    expect(tagged, greaterThan(0));
 
-    // 复习卡全部今天到期
-    final dueRows =
-        await DatabaseService.instance.countDueReviewCards(simBank.id!);
-    expect(dueRows, cards);
+    // 复习卡全部今天到期（dueToday 影响全部卡）
+    final allCards = await db.countAllFsrsCards();
+    expect(result.cards, allCards);
+    final dueRows = await db.countDueFsrsCards();
+    expect(dueRows, allCards);
 
     // 错题本里有模拟错题
     final errorStats = await db.getErrorStatsByBank();
-    final sim = errorStats.firstWhere((s) => s['bank_id'] == simBank.id);
+    final sim = errorStats.firstWhere((s) => s['bank_id'] == bankId);
     expect(sim['all_count'], greaterThan(0));
 
-    // 重复执行清理后重生成（记录数不变，锚点持久化）
-    final (records2, cards2) = await db.simulateLongTermUse(
+    // 重复执行先清理再重生成（固定种子 → 记录数不变）
+    final result2 = await db.simulateLongTermUse(
         days: 30, randomWeakKp: true, dueToday: true);
-    expect(records2, records);
-    expect(cards2, cards);
+    expect(result2.records, result.records);
+    expect(result2.cards, result.cards);
+  });
+
+  test('模拟：题库为空时拦截', () async {
+    final db = DatabaseService.instance;
+    final result = await db.simulateLongTermUse(days: 30);
+    expect(result.error, isNotNull);
+    expect(result.records, 0);
   });
 
   test('错题导出 JSON 带 format 标记，可被导入识别', () async {

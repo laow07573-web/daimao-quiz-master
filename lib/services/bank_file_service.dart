@@ -39,7 +39,8 @@ class BankFileService {
     try {
       data = jsonDecode(raw);
     } catch (e) {
-      lastError = 'JSON 解析失败: $e';
+      // v1.0.2 对齐里程碑：不是有效的 JSON 文件
+      lastError = '不是有效的 JSON 文件: $e';
       return {};
     }
 
@@ -57,11 +58,18 @@ class BankFileService {
           .replaceAll(RegExp(r'\.json$', caseSensitive: false), '');
       groups[baseName] = questions;
     } else if (data is Map) {
-      // v1.0.2 对齐里程碑：本软件导出的 .json（format 标记 + questions 数组）→ 单题库
-      if (data.containsKey('format') && data['questions'] is List) {
-        final questions = _parseQuestions(data['questions'] as List, now);
-        if (questions.isNotEmpty) {
-          groups[data['name']?.toString() ?? '错题导出'] = questions;
+      // v1.0.2 对齐里程碑：本软件导出的 .json（format 标记 + questions 数组）→ 单题库；
+      // 有 questions 键但缺 format 标记 → 提示缺少 format 标记
+      if (data.containsKey('questions')) {
+        if (!data.containsKey('format')) {
+          lastError = '不是呆猫刷题宝题库文件（缺少 format 标记）';
+          return {};
+        }
+        if (data['questions'] is List) {
+          final questions = _parseQuestions(data['questions'] as List, now);
+          if (questions.isNotEmpty) {
+            groups[data['name']?.toString() ?? '错题导出'] = questions;
+          }
         }
       }
       // 分组：{ 组名: [...] }

@@ -23,21 +23,26 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   bool _unlocked = false;
   bool _simulating = false;
   bool _accessibilityOn = false;
+  bool _batteryIgnored = true;
   String? _status;
 
   @override
   void initState() {
     super.initState();
-    _checkAccessibility();
+    _checkKeepalive();
   }
 
-  Future<void> _checkAccessibility() async {
-    final on = await KeepAliveService.instance.isAccessibilityEnabled();
+  Future<void> _checkKeepalive() async {
+    final acc = await KeepAliveService.instance.isAccessibilityEnabled();
+    final bat = await KeepAliveService.instance.isIgnoringBatteryOptimizations();
     if (!mounted) return;
-    setState(() => _accessibilityOn = on);
+    setState(() {
+      _accessibilityOn = acc;
+      _batteryIgnored = bat;
+    });
   }
 
-  /// v1.0.2 对齐里程碑：模拟对话框（天数 / 薄弱点 / 复习卡到期）
+  /// v1.0.2 对齐里程碑：模拟对话框（基于当前题库 / 确认到期 / 说明）
   Future<void> _simulate() async {
     var days = 90;
     var randomWeakKp = false;
@@ -53,7 +58,11 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('基于当前题库生成过去 N 天的刷题记录、错题与复习卡',
+                Text('基于当前题库生成过去若干天的使用数据：',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                Text('使用 FSRS 算法全权生成，用于测试每日提醒、连击、首页战绩。',
                     style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
@@ -95,6 +104,10 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                     style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                if (dueToday)
+                  Text('· 错题本的「待复习」数量会全部增加。',
+                      style: TextStyle(
+                          fontSize: 12, color: Theme.of(ctx).colorScheme.error)),
               ],
             ),
           ),
@@ -103,7 +116,28 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消')),
             FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
+                onPressed: () async {
+                  // 对齐里程碑：设为今天到期前二次确认
+                  if (dueToday) {
+                    final sure = await showDialog<bool>(
+                      context: ctx,
+                      builder: (c2) => AlertDialog(
+                        title: const Text('确认操作'),
+                        content: const Text('确定把所有复习卡设为今天到期吗？\n错题本的「待复习」数量会全部增加。'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(c2, false),
+                              child: const Text('取消')),
+                          FilledButton(
+                              onPressed: () => Navigator.pop(c2, true),
+                              child: const Text('确定')),
+                        ],
+                      ),
+                    );
+                    if (sure != true) return;
+                  }
+                  Navigator.pop(ctx, true);
+                },
                 child: const Text('开始模拟')),
           ],
         ),
@@ -112,14 +146,15 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
     if (ok != true || !mounted) return;
 
     setState(() => _simulating = true);
-    final (records, cards) = await context.read<AppState>().simulateLongTermUse(
+    final result = await context.read<AppState>().simulateLongTermUse(
         days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
     if (!mounted) return;
     setState(() {
       _simulating = false;
-      _status = dueToday
-          ? '已将 $cards 张复习卡设为到期'
-          : '已生成 $records 条记录，复习卡 $cards 张';
+      _status = result.error ??
+          (dueToday
+              ? '已将 ${result.cards} 张复习卡设为到期'
+              : '已生成 ${result.records} 条记录，复习卡 ${result.cards} 张');
     });
   }
 
@@ -143,11 +178,29 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
     if (result == null || result.files.isEmpty) return;
     final path = result.files.first.path;
     if (path == null) return;
+    // v1.0.2 对齐里程碑：导入前确认（覆盖当前所有数据）
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入数据库备份'),
+        content: const Text('导入将覆盖当前所有数据，且需要重启App才能生效。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('导入')),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
     final err = await DatabaseService.instance.importBackup(path);
     if (!mounted) return;
     setState(() {
+      // v1.0.2 对齐里程碑：数据库已替换，请重启App使数据生效。
       _status = err == null
-          ? '导入成功（数据已替换，重启应用后生效）'
+          ? '数据库已替换，请重启App使数据生效。'
           : '导入失败: $err';
     });
   }
@@ -156,7 +209,17 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('开发者选项')),
+      // v1.0.2 对齐里程碑：开发者模式（已开启）
+      appBar: AppBar(
+        title: Text(_unlocked ? '开发者模式（已开启）' : '开发者模式'),
+        actions: [
+          if (_unlocked)
+            TextButton(
+              onPressed: () => setState(() => _unlocked = false),
+              child: const Text('退出开发者模式'),
+            ),
+        ],
+      ),
       body: !_unlocked ? _buildLock(cs) : _buildPanel(cs),
     );
   }
@@ -175,7 +238,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
               controller: controller,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: '输入开发者密码',
+                // v1.0.2 对齐里程碑：输入密码开启，调试专用
+                labelText: '输入密码开启，调试专用',
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -263,11 +327,22 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           icon: Icons.health_and_safety_outlined,
           title: '保活（无障碍）状态',
           subtitle: _accessibilityOn
-              ? '无障碍保活已开启，提醒服务受系统守护'
-              : '未开启 ⚠️',
+              ? '无障碍保活：已开启'
+              : '无障碍保活：未开启',
           onTap: () async {
             await KeepAliveService.instance.openAccessibilitySettings();
-            await _checkAccessibility();
+            await _checkKeepalive();
+          },
+        ),
+        const SizedBox(height: 8),
+        _DevCard(
+          icon: Icons.battery_charging_full,
+          title: '电池优化',
+          subtitle: _batteryIgnored ? '电池优化：已豁免' : '电池优化：未豁免',
+          onTap: () async {
+            if (_batteryIgnored) return;
+            await KeepAliveService.instance.requestIgnoreBatteryOptimizations();
+            await _checkKeepalive();
           },
         ),
         const SizedBox(height: 8),

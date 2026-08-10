@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _apiKeyController = TextEditingController();
   final _endpointController = TextEditingController();
   final _modelController = TextEditingController();
+  final _nicknameController = TextEditingController();
   bool _obscureKey = true;
   bool _debugEnabled = false;
   double? _balance;
@@ -42,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _apiKeyController.text = settings.apiKey;
       _endpointController.text = settings.apiEndpoint;
       _modelController.text = settings.model;
+      _nicknameController.text = settings.nickname;
       _fetchBalance();
       _loadKeepaliveStatus();
       _loadUntaggedCount();
@@ -83,6 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _apiKeyController.dispose();
     _endpointController.dispose();
     _modelController.dispose();
+    _nicknameController.dispose();
     super.dispose();
   }
 
@@ -93,7 +96,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = context.watch<AppState>().settings;
     final dirty = _apiKeyController.text != settings.apiKey ||
         _endpointController.text != settings.apiEndpoint ||
-        _modelController.text != settings.model;
+        _modelController.text != settings.model ||
+        _nicknameController.text != settings.nickname;
     return PopScope(
       canPop: !dirty,
       onPopInvokedWithResult: (didPop, _) async {
@@ -101,8 +105,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final leave = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('有未保存的修改'),
-            content: const Text('API 配置修改尚未保存，确定离开？'),
+            title: const Text('有未保存的设置修改'),
+            // v1.0.2 对齐里程碑：退出后将丢失
+            content: const Text('有未保存的设置修改，退出后将丢失。'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
@@ -212,6 +217,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 14),
                   ],
 
+                  // v1.0.2 对齐里程碑：余额不足提示
+                  if (_balance != null && _balance! < 1) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: cs.error.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber, size: 16, color: Color(0xFFE53935)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('API 余额不足 ¥1，建议尽快充值以免影响使用',
+                                style: TextStyle(
+                                    fontSize: 12, color: cs.error)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
                   // API Endpoint
                   Text('API 地址',
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
@@ -243,6 +271,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           horizontal: 12, vertical: 12),
                     ),
                   ),
+                  const SizedBox(height: 14),
+
+                  // v1.0.2 对齐里程碑：昵称（首页专属问候）
+                  Text('你的昵称',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _nicknameController,
+                    decoration: InputDecoration(
+                      hintText: '设置后，首页会显示对你的专属问候。',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ],
               ),
             ),
@@ -262,6 +307,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     model: _modelController.text.trim().isEmpty
                         ? AppSettings.defaultModel
                         : _modelController.text.trim(),
+                    nickname: _nicknameController.text.trim(),
                   );
                   context.read<AppState>().updateSettings(newSettings);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -314,9 +360,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // v1.0.2 对齐里程碑：打标签用途说明
+                  Text(
+                    '用于：根据错题分析薄弱知识点、错题本按章节分组。按知识点统计错题分布，优先攻克薄弱类型',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     '部分错题未打知识点标签，可去设置页「为剩余题目打标签」补齐后精炼更准。',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -429,7 +481,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Expanded(
                             child: _DateField(
-                              label: '开始日期',
+                              // v1.0.2 对齐里程碑：选择假期开始日期
+                              label: '选择假期开始日期',
                               value: appState.vacationStartDate,
                               firstDate: DateTime(2000),
                               lastDate: appState.vacationEndDate ??
@@ -443,7 +496,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _DateField(
-                              label: '结束日期',
+                              // v1.0.2 对齐里程碑：选择假期结束日期
+                              label: '选择假期结束日期',
                               value: appState.vacationEndDate,
                               firstDate: appState.vacationStartDate ??
                                   DateTime(2000),
@@ -480,7 +534,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Icon(Icons.notifications_outlined,
                             color: cs.primary, size: 20),
                         const SizedBox(width: 8),
-                        Text('每日提醒',
+                        // v1.0.2 对齐里程碑：提醒与复习
+                        Text('提醒与复习',
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -488,7 +543,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('每天定时提醒刷题（前台服务 + 闹钟双保险）',
+                    // v1.0.2 对齐里程碑：到点会提醒你刷题打卡，保持连胜
+                    Text('到点会提醒你刷题打卡，保持连胜',
                         style: TextStyle(
                             fontSize: 12, color: cs.onSurfaceVariant)),
                     const SizedBox(height: 8),
@@ -590,9 +646,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _accessibilityOn
-                        ? '无障碍保活已开启，提醒服务受系统守护'
-                        : '未开启无障碍保活，提醒服务可能被系统清理',
+                    // v1.0.2 对齐里程碑：无障碍保活：已开启/未开启
+                    _accessibilityOn ? '无障碍保活：已开启' : '无障碍保活：未开启',
                     style: TextStyle(
                         fontSize: 12,
                         color: _accessibilityOn ? cs.primary : cs.error),
@@ -634,7 +689,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   : Icons.battery_charging_full,
                               size: 16),
                           label: Text(
-                              _batteryIgnored ? '忽略电池优化' : '已忽略电池优化',
+                              // v1.0.2 对齐里程碑：电池优化：已豁免
+                              _batteryIgnored ? '电池优化：已豁免' : '请求忽略电池优化',
                               style: const TextStyle(fontSize: 12)),
                           onPressed: _batteryIgnored
                               ? null
@@ -880,8 +936,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     if (applied != null && applied > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
+        // v1.0.2 对齐里程碑：全部题目已打标签完成
         SnackBar(
-          content: Text('已为 $applied 道题目打标签'),
+          content: const Text('全部题目已打标签完成'),
           backgroundColor: Theme.of(context).colorScheme.tertiary,
         ),
       );

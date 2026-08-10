@@ -8,12 +8,14 @@ class AppSettings {
   String apiEndpoint;
   String model;
   bool soundEnabled;
+  String nickname; // v1.0.2 对齐里程碑：昵称（首页专属问候）
 
   AppSettings({
     this.apiKey = '',
     this.apiEndpoint = defaultApiEndpoint,
     this.model = defaultModel,
     this.soundEnabled = true,
+    this.nickname = '',
   });
 
   bool get isConfigured => apiKey.isNotEmpty;
@@ -24,6 +26,7 @@ class AppSettings {
       'api_endpoint': apiEndpoint,
       'model': model,
       'sound_enabled': soundEnabled ? '1' : '0',
+      'nickname': nickname,
     };
   }
 
@@ -33,6 +36,7 @@ class AppSettings {
       apiEndpoint: map['api_endpoint'] ?? defaultApiEndpoint,
       model: map['model'] ?? defaultModel,
       soundEnabled: map['sound_enabled'] != '0',
+      nickname: map['nickname'] ?? '',
     );
   }
 
@@ -41,12 +45,14 @@ class AppSettings {
     String? apiEndpoint,
     String? model,
     bool? soundEnabled,
+    String? nickname,
   }) {
     return AppSettings(
       apiKey: apiKey ?? this.apiKey,
       apiEndpoint: apiEndpoint ?? this.apiEndpoint,
       model: model ?? this.model,
       soundEnabled: soundEnabled ?? this.soundEnabled,
+      nickname: nickname ?? this.nickname,
     );
   }
 }

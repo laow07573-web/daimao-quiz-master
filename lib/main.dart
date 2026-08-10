@@ -10,7 +10,7 @@ import 'screens/main_shell.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 签名校验
+  // 签名校验（v1.0.2 里程碑一致：原版含防篡改）
   final ok = await TamperCheck.verify();
   if (!ok) {
     runApp(const _TamperedApp());

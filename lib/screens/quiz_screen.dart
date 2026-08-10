@@ -536,7 +536,7 @@ class _QuizScreenState extends State<QuizScreen> {
     final texts = _fillBlankControllers.map((c) => c.text.trim()).toList();
     if (texts.any((t) => t.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请填写所有空后再提交')),
+        const SnackBar(content: Text('还有空未填写')),
       );
       return;
     }
@@ -900,11 +900,11 @@ class _QuizScreenState extends State<QuizScreen> {
                   icon: const Icon(Icons.send, size: 16),
                   label: const Text('追问', style: TextStyle(fontSize: 13)),
                   onPressed: () async {
-                    // v1.0.2: API 未配置拦截追问
+                    // v1.0.2: API 未配置拦截追问（对齐里程碑：后再追问）
                     if (!appState.settings.isConfigured) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('请先在设置中配置 API Key 后再查看解析。'),
+                            content: Text('请先在设置中配置 API Key 后再追问。'),
                             backgroundColor: Colors.orange),
                       );
                       return;
@@ -1043,4 +1043,5 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 }
+
 

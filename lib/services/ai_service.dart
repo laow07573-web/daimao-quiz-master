@@ -78,7 +78,8 @@ $chunk
       "options": ["选项A内容", "选项B内容", ...],
       "correct_answer": "A/B/C/D/对/错/填空答案",
       "question_type": "single_choice/multi_choice/true_false/fill_blank/ming_jie/jian_da/jie_da",
-      "analysis": "如果原文有解析则提取，否则留空"
+      "analysis": "如果原文有解析则提取，否则留空",
+      "knowledge_point": "该题所属的教材章节级知识点，如'细菌的形态结构'"
     }
   ]
 }
@@ -91,8 +92,9 @@ $chunk
 5. 名词解释：question_type="ming_jie"，options 为空 []，correct_answer 为完整释义段落
 6. 简答题：question_type="jian_da"，options 为空 []，correct_answer 为参考答案段落
 7. 问答题：question_type="jie_da"，options 为空 []，correct_answer 为参考答案段落
-5. 原文中的解析内容请保留到 analysis 字段
-6. 只返回 JSON，不要任何其他文字
+8. knowledge_point 命名规范：统一用教材章节式命名（如"细菌的形态结构""消毒灭菌""免疫应答"），不要用自由短语或长句，控制在10字以内
+9. 原文中的解析内容请保留到 analysis 字段
+10. 只返回 JSON，不要任何其他文字
 
 请直接返回 JSON：''';
 
@@ -148,6 +150,7 @@ $chunk
             correctAnswer: (q['correct_answer'] ?? '').toString().trim().toUpperCase(),
             analysis: _nullIfEmpty(q['analysis']?.toString().trim()),
             questionType: _detectType(q),
+            knowledgePoint: _nullIfEmpty(q['knowledge_point']?.toString().trim()),
             createdAt: now,
           );
         }).toList();
@@ -279,11 +282,12 @@ ${question.optionsWithLabels.join('\n')}
 
   // ======================== v1.0.2 对齐里程碑：AI 打标签 / 生成建议 ========================
 
-  /// 为单道题打知识点标签（原版 prompt）。
+  /// 为单道题打知识点标签（v1.0.2 对齐里程碑：教材章节分类助手）。
   /// 返回知识点名（≤10字）；失败时返回失败标记：
   /// 'AI请求失败' / 'AI服务返回错误' / 'AI解析生成失败'（与里程碑分组口径一致）
   Future<String> tagKnowledgePoint(Question question) async {
-    final prompt = '''按以下格式回复（直接说知识点名，不说题库名）：
+    final prompt = '''请判断下面这道题属于哪个教材章节级知识点。
+按以下格式回复（直接说知识点名，不说题库名）：
 1. 只输出一个章节级知识点名称（如"细菌的形态结构""消毒灭菌""免疫应答"）
 2. 控制在10字以内，不要加引号、标点或解释
 3. 若无法判断，输出"其他"
@@ -303,10 +307,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
           'messages': [
             {
               'role': 'system',
-              'content': '按以下格式回复（直接说知识点名，不说题库名）：'
-                  '1. 只输出一个章节级知识点名称（如"细菌的形态结构""消毒灭菌""免疫应答"）'
-                  '2. 控制在10字以内，不要加引号、标点或解释'
-                  '3. 若无法判断，输出"其他"'
+              'content': '你是医学教材章节分类助手。请判断下面这道题属于哪个教材章节级知识点。'
             },
             {'role': 'user', 'content': prompt},
           ],
@@ -341,7 +342,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     return s.trim();
   }
 
-  /// 基于错题知识点统计生成 AI 深度诊断（原版 prompt）。
+  /// 基于错题知识点统计生成 AI 深度诊断（v1.0.2 对齐里程碑）。
   /// [statsText]：本地精炼后的统计文本（知识点 + 错题数 + 正确率）
   Future<String> generateKpAdvice(String statsText) async {
     if (statsText.trim().isEmpty) return '暂无错题数据，无法精炼。';
@@ -351,7 +352,38 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
 $statsText
 
 控制在180字，用 ## 分标题，**粗体**突出知识点名和关键数据。''';
-    return await _callAI(prompt);
+    try {
+      final response = await _client.post(
+        Uri.parse(_settings.apiEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_settings.apiKey}',
+        },
+        body: jsonEncode({
+          'model': _settings.model,
+          'messages': [
+            {
+              'role': 'system',
+              // v1.0.2 对齐里程碑：根据错题本的知识点分布数据精炼
+              'content': '你是一个学习数据分析助手。根据错题本的知识点分布数据，精炼出最需要优先复习的知识点类型，并给出建议。'
+            },
+            {'role': 'user', 'content': prompt},
+          ],
+          'temperature': 0.3,
+          'max_tokens': 1024,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final content =
+            data['choices']?[0]?['message']?['content'] as String?;
+        _trackUsage(data);
+        return content ?? '解析生成失败，请检查网络或 API 配置后重试。';
+      }
+      return 'AI服务返回错误 (${response.statusCode})，请检查API配置。';
+    } catch (_) {
+      return 'AI请求失败';
+    }
   }
 
   /// 核心 AI 调用方法
@@ -428,7 +460,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
         final content = data['choices']?[0]?['message']?['content'] as String?;
         logger.log('PIPE:DECODE', 'contentLen=${content?.length ?? 0}  hasChoices=${data['choices'] != null}');
         _trackUsage(data);
-        return content ?? 'AI解析生成失败，请稍后重试。';
+        return content ?? '解析生成失败，请检查网络或 API 配置后重试。';
       } else {
         return 'AI服务返回错误 (${response.statusCode})，请检查API配置。';
       }

@@ -272,18 +272,19 @@ class ReminderService {
 
   // ======================== 文案 ========================
 
-  /// 提醒文案：连击天数（含/不含今天两种口径）
+  /// 提醒文案（v1.0.2 对齐里程碑）：
+  /// 有连击 → 「你已连续打卡 X 天，继续刷题积累吧！」
+  /// 无连击 → 「来几道题，开启新的连胜吧」
   /// [streakWithToday]：含今天（今天已刷时的连击）
   /// [streakWithoutToday]：不含今天（截止昨天）
   static String buildReminderText(int streakWithToday, int streakWithoutToday) {
-    final base = '今天还没刷题哦，快来打卡吧！';
-    if (streakWithToday > 0 || streakWithoutToday > 0) {
-      final cur = streakWithToday > streakWithoutToday
-          ? streakWithToday
-          : streakWithoutToday;
-      return '今天还没刷题哦，快来打卡吧！当前已连续打卡 $cur 天 💪';
+    final cur = streakWithToday > streakWithoutToday
+        ? streakWithToday
+        : streakWithoutToday;
+    if (cur > 0) {
+      return '你已连续打卡 $cur 天，继续刷题积累吧！';
     }
-    return base;
+    return '来几道题，开启新的连胜吧';
   }
 
   Future<String> _buildReminderText() async {

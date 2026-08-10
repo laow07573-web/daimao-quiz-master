@@ -128,9 +128,26 @@ class StatsTabState extends State<StatsTab> {
     });
   }
 
-  /// v1.0.2 对齐里程碑：隐藏今日答题记录
+  /// v1.0.2 对齐里程碑：隐藏今日答题记录（确认说明）
   Future<void> _hideToday() async {
     final appState = context.read<AppState>();
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('隐藏今日记录'),
+        // v1.0.2 对齐里程碑：将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。
+        content: const Text('将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。\n将同步更新本次统计、错题本和复习计划。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('隐藏')),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
     final hidden = await appState.hideTodayRecords();
     if (!mounted) return;
     await _loadAll();

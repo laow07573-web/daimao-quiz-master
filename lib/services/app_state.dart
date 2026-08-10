@@ -243,11 +243,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         await _db.getSetting('api_endpoint') ?? AppSettings.defaultApiEndpoint;
     final model = await _db.getSetting('model') ?? AppSettings.defaultModel;
     final soundEnabled = (await _db.getSetting('sound_enabled') ?? '1') == '1';
+    final nickname = await _db.getSetting('nickname') ?? '';
     _settings = AppSettings(
       apiKey: apiKey,
       apiEndpoint: apiEndpoint,
       model: model,
       soundEnabled: soundEnabled,
+      nickname: nickname,
     );
     // v1.0.2 新增设置
     _vacationModeEnabled = (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
@@ -268,6 +270,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _db.setSetting('api_endpoint', newSettings.apiEndpoint);
     await _db.setSetting('model', newSettings.model);
     await _db.setSetting('sound_enabled', newSettings.soundEnabled ? '1' : '0');
+    await _db.setSetting('nickname', newSettings.nickname);
     _initAIService();
     notifyListeners();
   }
@@ -524,7 +527,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   /// 模拟长期使用（开发者选项，幂等）
-  Future<(int, int)> simulateLongTermUse({
+  Future<({String? error, int records, int cards})> simulateLongTermUse({
     int days = 90,
     bool randomWeakKp = false,
     bool dueToday = false,
@@ -658,12 +661,14 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Future<String> askFollowUp(String question) async {
     if (_aiService == null || currentQuestion == null) return '';
     if (_currentAnalysis == null) return '';
-
-    return await _aiService!.askFollowUp(
+    final result = await _aiService!.askFollowUp(
       currentQuestion!,
       _currentAnalysis!,
       question,
     );
+    // v1.0.2 对齐里程碑：失败统一提示
+    if (_isAiError(result)) return '追问失败，请检查网络后重试。';
+    return result;
   }
 
   void nextQuestion() {
@@ -900,13 +905,22 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 生成刷题小结
   Future<String> generateSessionSummary(QuizSession session) async {
     if (_aiService == null) return '';
-    return await _aiService!.generateSessionSummary(
+    final result = await _aiService!.generateSessionSummary(
       session.totalQuestions,
       session.correctCount,
       session.wrongCount,
       session.durationSeconds,
     );
+    // v1.0.2 对齐里程碑：失败统一提示
+    if (_isAiError(result)) return '小结生成失败，请检查网络或 API 配置后重试。';
+    return result;
   }
+
+  /// AI 错误串判定（AI请求失败/AI服务返回错误/解析生成失败）
+  bool _isAiError(String s) =>
+      s.startsWith('AI请求失败') ||
+      s.startsWith('AI服务返回错误') ||
+      s.contains('解析生成失败');
 
   @override
   void dispose() {
