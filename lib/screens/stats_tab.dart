@@ -40,10 +40,20 @@ class StatsTabState extends State<StatsTab> {
   bool _loading = true;
   String? _error;
 
+  // v1.0.2 统一重构：年度坚持季度页滑动（初始页 = 当前季度）
+  late final PageController _quarterController;
+
   @override
   void initState() {
     super.initState();
+    _quarterController = PageController(initialPage: 4 * 200);
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _quarterController.dispose();
+    super.dispose();
   }
 
   /// 供 MainShell 切 Tab 时调用
@@ -276,39 +286,56 @@ class StatsTabState extends State<StatsTab> {
     );
   }
 
-  /// v1.0.2 UI 设计稿：横向 3 个月网格日历（当前月-1 / 当前月 / 当前月+1）+ 热力图例
+  /// v1.0.2 UI 设计稿：年度坚持 = 三个月一页左右滑动（季度页，初始当前季度）+ 热力图例
   Widget _buildQuarterCalendar(ColorScheme cs) {
     final ac = AppThemeColors.of(context);
     final now = DateTime.now();
     final todayKey = MonthCalendar.dateKeyOf(now);
-    final months = [
-      DateTime(now.year, now.month - 1, 1),
-      DateTime(now.year, now.month, 1),
-      DateTime(now.year, now.month + 1, 1),
-    ];
+    // 绝对季度索引 = year*4 + (month-1)~/3
+    final initialAbsQuarter = now.year * 4 + (now.month - 1) ~/ 3;
+    const initialPage = 4 * 200; // 大初始页：前后 200 年范围可翻
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final m in months)
-              Expanded(
-                child: MonthCalendar(
-                  year: m.year,
-                  month: m.month,
-                  dailyTotals: _yearlyTotals,
-                  vacationDays: _vacationDays,
-                  todayKey: todayKey,
-                  heatColors: [
-                    ac.cardBorder,
-                    ac.accent.withOpacity(0.18),
-                    ac.accent.withOpacity(0.4),
-                    ac.accent.withOpacity(0.65),
-                  ],
-                ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth / 3; // 单月宽
+            final cellH = (w / 7 / 0.95).clamp(0.0, 56.0);
+            final height = 6 * cellH + 30; // 30 = 月份标题 + 间距
+            return SizedBox(
+              height: height,
+              child: PageView.builder(
+                controller: _quarterController,
+                itemBuilder: (context, page) {
+                  final absQ = initialAbsQuarter + (page - initialPage);
+                  final year = absQ ~/ 4;
+                  final q = absQ % 4;
+                  final baseMonth = q * 3 + 1;
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var m = 0; m < 3; m++)
+                        Expanded(
+                          child: MonthCalendar(
+                            year: year,
+                            month: baseMonth + m,
+                            dailyTotals: _yearlyTotals,
+                            vacationDays: _vacationDays,
+                            todayKey: todayKey,
+                            heatColors: [
+                              ac.cardBorder,
+                              ac.accent.withOpacity(0.18),
+                              ac.accent.withOpacity(0.4),
+                              ac.accent.withOpacity(0.65),
+                            ],
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
-          ],
+            );
+          },
         ),
         const SizedBox(height: 10),
         // 热力图例：少/达标/多/今天

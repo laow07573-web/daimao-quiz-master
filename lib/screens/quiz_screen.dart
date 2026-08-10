@@ -1,20 +1,35 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
+import '../services/quiz_service.dart';
 import '../widgets/ai_response_widget.dart';
 import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
 import '../widgets/answer_sheet_widget.dart';
 import '../widgets/question_edit_dialog.dart';
+import 'practice_screen.dart';
 
 enum QuizMode { normal, memorize, practice }
 
+/// 统一答题页（v1.0.2 重构：三模式共用一套结构）
+/// - normal：答完即判 + 自动跳题 + 解析/收藏/重新作答；末题左滑结束会话回首页
+/// - memorize：背题模式，只看答案不落库；末题左滑直接回首页（不接入小结）
+/// - practice：练习模式，自由跳题 + 答题卡 + 计时（限时自动交卷）+ 批量提交
 class QuizScreen extends StatefulWidget {
   final QuizMode quizMode;
-  const QuizScreen({super.key, this.quizMode = QuizMode.normal});
+  final PracticeTiming? practiceTiming; // 练习：限时/不限时
+  final int practiceDurationMinutes; // 练习限时分钟数
+
+  const QuizScreen({
+    super.key,
+    this.quizMode = QuizMode.normal,
+    this.practiceTiming,
+    this.practiceDurationMinutes = 0,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -36,8 +51,14 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _showAnalysis = false;
   final Set<String> _selectedOptions = {};
   bool _isMemorizeMode = false;
-  // 练习模式状态
+  // 练习模式状态（v1.0.2 统一重构：练习能力内聚于本页）
   final List<PracticeAnswerState> _practiceAnswers = [];
+  final Map<int, String> _practiceAnswersMap = {};
+  int _elapsedSeconds = 0;
+  int _remainingSeconds = 0;
+  Timer? _practiceTimer;
+  bool _practiceSubmitted = false;
+  bool _modalOpen = false; // 挡路弹窗标记（答题卡/提交确认）
   // v1.0.2 修复：提交防重（双击不产生重复作答记录）
   bool _submitting = false;
 
@@ -50,6 +71,45 @@ class _QuizScreenState extends State<QuizScreen> {
         context.read<AppState>().skipFSRS = true;
       });
     }
+    if (widget.quizMode == QuizMode.practice) {
+      if (widget.practiceTiming == PracticeTiming.timed) {
+        _remainingSeconds = widget.practiceDurationMinutes * 60;
+      }
+      _startPracticeTimer();
+    }
+  }
+
+  void _startPracticeTimer() {
+    _practiceTimer?.cancel();
+    _practiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _practiceSubmitted) return;
+      setState(() {
+        _elapsedSeconds++;
+        if (widget.practiceTiming == PracticeTiming.timed) {
+          _remainingSeconds--;
+          if (_remainingSeconds <= 0) {
+            // 限时归零自动交卷：先关闭挡路弹窗
+            if (_modalOpen) {
+              Navigator.of(context).pop();
+              _modalOpen = false;
+            }
+            _submitPractice(context.read<AppState>());
+          }
+        }
+      });
+    });
+  }
+
+  String _fmtTime(int s) =>
+      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+
+  /// 限时练习剩余 10%（60~300s 下限）进入红色警告态
+  bool get _isPracticeTimeWarn {
+    if (widget.practiceTiming != PracticeTiming.timed) return false;
+    final total = widget.practiceDurationMinutes * 60;
+    if (total <= 0) return false;
+    final warnSec = (total * 0.1).ceil().clamp(60, 300);
+    return _remainingSeconds > 0 && _remainingSeconds <= warnSec;
   }
 
   void dispose() {
@@ -58,6 +118,7 @@ class _QuizScreenState extends State<QuizScreen> {
       final appState = context.read<AppState>();
       if (appState.skipFSRS) appState.skipFSRS = false;
     } catch (_) {}
+    _practiceTimer?.cancel();
     _followUpController.dispose();
     for (final c in _fillBlankControllers) { c.dispose(); }
     _fillBlankControllers.clear();
@@ -83,9 +144,12 @@ class _QuizScreenState extends State<QuizScreen> {
         }
 
         final lastRecord = appState.lastAnswerRecord;
-        final isAnswered = lastRecord != null;
-
+        // v1.0.2 统一重构：练习模式"已答"按练习答案表判断（可随时修改，不判定）
         final isPractice = widget.quizMode == QuizMode.practice;
+        final isAnswered = isPractice
+            ? _practiceAnswersMap.containsKey(appState.currentQuestionIndex)
+            : lastRecord != null;
+
         if (isPractice && _practiceAnswers.length != appState.quizQuestions.length) {
           _practiceAnswers.clear();
           for (int i = 0; i < appState.quizQuestions.length; i++) {
@@ -128,6 +192,35 @@ class _QuizScreenState extends State<QuizScreen> {
             title: Text(
                 '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
             actions: [
+              // v1.0.2 统一重构：练习模式计时徽标
+              if (isPractice)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (_isPracticeTimeWarn)
+                            ? cs.error
+                            : cs.primary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        widget.practiceTiming == PracticeTiming.timed
+                            ? '剩余 ${_fmtTime(_remainingSeconds)}'
+                            : '已用 ${_fmtTime(_elapsedSeconds)}',
+                        style: TextStyle(
+                          fontSize: _isPracticeTimeWarn ? 14 : 12,
+                          fontWeight: FontWeight.bold,
+                          color: _isPracticeTimeWarn
+                              ? Colors.white
+                              : cs.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (!isPractice)
                 IconButton(
                   icon: const Icon(Icons.edit, size: 18),
@@ -180,7 +273,8 @@ class _QuizScreenState extends State<QuizScreen> {
                   onHorizontalDragEnd: (details) {
                     if (details.primaryVelocity == null) return;
                     if (details.primaryVelocity! < -300) {
-                      if (_isMemorizeMode || isAnswered) {
+                      // 练习自由前进；刷题/背题需已作答才前进
+                      if (isPractice || _isMemorizeMode || isAnswered) {
                         _advanceQuestion(appState);
                       }
                     } else if (details.primaryVelocity! > 300) {
@@ -214,9 +308,10 @@ class _QuizScreenState extends State<QuizScreen> {
                       children: [
                         _buildQuestionCard(question, appState, cs),
                         const SizedBox(height: 16),
+                        // v1.0.2 统一重构：练习模式选项区恒可修改（不显示判定结果）
                         if (_isMemorizeMode)
                           _buildMemorizeOptions(question, cs, appState)
-                        else if (!isAnswered)
+                        else if (isPractice || !isAnswered)
                           ...[_buildOptionsArea(appState, question, cs)]
                         else ...[
                           _buildAnsweredResult(appState, question, cs),
@@ -224,7 +319,8 @@ class _QuizScreenState extends State<QuizScreen> {
                           _buildResultFeedback(appState, question, cs),
                           // v1.0.2 完善：已答题目可重新作答（更新原记录，不新增）
                           if (isAnswered &&
-                              widget.quizMode != QuizMode.memorize) ...[
+                              widget.quizMode != QuizMode.memorize &&
+                              !isPractice) ...[
                             const SizedBox(height: 4),
                             Align(
                               alignment: Alignment.centerRight,
@@ -398,18 +494,40 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     final options = question.options;
     final isMulti = question.questionType == 'multi_choice';
+    final isPractice = widget.quizMode == QuizMode.practice;
+    // 练习模式已选内容（可修改）
+    final practiceAnswer = _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
+    final practiceSel = isMulti
+        ? practiceAnswer.split(',').where((e) => e.isNotEmpty).toSet()
+        : {practiceAnswer};
 
     final optionWidgets = options.asMap().entries.map((entry) {
       final int idx = entry.key;
       final option = entry.value;
       final label = String.fromCharCode(65 + idx);
-      final selected = _selectedOptions.contains(label);
+      final selected =
+          isPractice ? practiceSel.contains(label) : _selectedOptions.contains(label);
 
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: GestureDetector(
           onTap: () {
             HapticFeedback.selectionClick();
+            if (isPractice) {
+              // v1.0.2 统一重构：练习只记录答案，不提交不判定
+              setState(() {
+                if (isMulti) {
+                  final x = practiceSel.toSet();
+                  x.contains(label) ? x.remove(label) : x.add(label);
+                  _practiceAnswersMap[appState.currentQuestionIndex] =
+                      (x.toList()..sort()).join(',');
+                } else {
+                  _practiceAnswersMap[appState.currentQuestionIndex] = label;
+                }
+                _syncPracticeSheet(appState);
+              });
+              return;
+            }
             if (isMulti) {
               setState(() {
                 if (selected) {
@@ -461,7 +579,8 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }).toList();
 
-    if (isMulti) {
+    // v1.0.2 统一重构：练习模式多选点击即存（无确认按钮），正常模式需确认提交
+    if (isMulti && !isPractice) {
       return Column(
         children: [
           ...optionWidgets,
@@ -546,6 +665,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildTextAnswerInput(AppState appState, ColorScheme cs, String type) {
     final label = type == 'ming_jie' ? '名解' : type == 'jian_da' ? '简答' : '问答';
+    final isPractice = widget.quizMode == QuizMode.practice;
     return Column(
       children: [
         TextField(
@@ -568,6 +688,14 @@ class _QuizScreenState extends State<QuizScreen> {
               final answer = _textAnswerController.text.trim();
               if (answer.isEmpty) return;
               _textAnswerController.clear();
+              if (isPractice) {
+                // v1.0.2 统一重构：练习只记录答案
+                setState(() {
+                  _practiceAnswersMap[appState.currentQuestionIndex] = answer;
+                  _syncPracticeSheet(appState);
+                });
+                return;
+              }
               _handleSubmitAnswer(appState, answer);
             },
           ),
@@ -577,17 +705,31 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildTrueFalseButtons(AppState appState, ColorScheme cs) {
+    final isPractice = widget.quizMode == QuizMode.practice;
+    final cur = _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => _handleSubmitAnswer(appState, '对'),
+            onTap: () {
+              if (isPractice) {
+                setState(() {
+                  _practiceAnswersMap[appState.currentQuestionIndex] = '对';
+                  _syncPracticeSheet(appState);
+                });
+                return;
+              }
+              _handleSubmitAnswer(appState, '对');
+            },
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
+                color: isPractice && cur == '对'
+                    ? cs.tertiary.withOpacity(0.15)
+                    : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.tertiary),
+                border: Border.all(
+                    color: isPractice && cur == '对' ? cs.tertiary : cs.tertiary),
               ),
               child: const Center(
                 child: Text('✓  正确',
@@ -602,11 +744,22 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: GestureDetector(
-            onTap: () => _handleSubmitAnswer(appState, '错'),
+            onTap: () {
+              if (isPractice) {
+                setState(() {
+                  _practiceAnswersMap[appState.currentQuestionIndex] = '错';
+                  _syncPracticeSheet(appState);
+                });
+                return;
+              }
+              _handleSubmitAnswer(appState, '错');
+            },
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
+                color: isPractice && cur == '错'
+                    ? cs.error.withOpacity(0.12)
+                    : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: cs.error),
               ),
@@ -635,6 +788,14 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     final answer = texts.join('；');
     for (final c in _fillBlankControllers) { c.clear(); }
+    if (widget.quizMode == QuizMode.practice) {
+      // v1.0.2 统一重构：练习只记录答案
+      setState(() {
+        _practiceAnswersMap[appState.currentQuestionIndex] = answer;
+        _syncPracticeSheet(appState);
+      });
+      return;
+    }
     _handleSubmitAnswer(appState, answer);
   }
 
@@ -696,11 +857,14 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _showAnswerSheet(BuildContext context, AppState appState, ColorScheme cs) {
+    _modalOpen = true;
     showModalBottomSheet(
       context: context,
       builder: (_) => AnswerSheetWidget(
         answers: _practiceAnswers,
         currentIndex: appState.currentQuestionIndex,
+        // v1.0.2 统一重构：练习模式答题卡只显示已答/未答（提交前不判定对错）
+        showResult: widget.quizMode != QuizMode.practice,
         onJumpTo: (i) {
           Navigator.pop(context);
           while (appState.currentQuestionIndex > i && appState.hasPrevious) {
@@ -711,10 +875,45 @@ class _QuizScreenState extends State<QuizScreen> {
           }
         },
       ),
-    );
+    ).then((_) => _modalOpen = false);
+  }
+
+  /// v1.0.2 统一重构：同步练习答题卡状态（已答/未答）
+  void _syncPracticeSheet(AppState appState) {
+    final i = appState.currentQuestionIndex;
+    if (i < _practiceAnswers.length) {
+      _practiceAnswers[i].answered =
+          _practiceAnswersMap.containsKey(i);
+    }
+  }
+
+  /// v1.0.2 统一重构：末题左滑处理
+  /// - normal：结束会话（落统计）直接回首页，不经过小结页
+  /// - memorize：背题零落库，直接回首页
+  /// - practice：触发提交确认
+  Future<void> _handleFinishSwipe(AppState appState) async {
+    if (widget.quizMode == QuizMode.memorize) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      return;
+    }
+    if (widget.quizMode == QuizMode.practice) {
+      _showSubmit(appState);
+      return;
+    }
+    try {
+      await appState.endSession();
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   void _advanceQuestion(AppState appState) {
+    if (appState.isLastQuestion) {
+      // v1.0.2 统一重构：最后一题继续左滑 = 完成
+      _handleFinishSwipe(appState);
+      return;
+    }
     _showAnalysis = false;
     _showManualAnalysis = false;
     _followUpController.clear();
@@ -1065,6 +1264,109 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildBottomBar(AppState appState, ColorScheme cs) {
+    // v1.0.2 统一重构：练习模式底部栏（自由跳题 + 提交练习）
+    if (widget.quizMode == QuizMode.practice) {
+      final answered = _practiceAnswersMap.length;
+      final total = appState.quizQuestions.length;
+      return Container(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          boxShadow: [
+            BoxShadow(
+                color: cs.shadow.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, -2)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios, size: 18),
+                  onPressed: appState.hasPrevious
+                      ? () {
+                          appState.previousQuestion();
+                          _scrollController.jumpTo(0);
+                        }
+                      : null,
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(total, (i) {
+                        final cur = i == appState.currentQuestionIndex;
+                        final ans = _practiceAnswersMap.containsKey(i);
+                        return GestureDetector(
+                          onTap: () {
+                            while (appState.currentQuestionIndex > i &&
+                                appState.hasPrevious) {
+                              appState.previousQuestion();
+                            }
+                            while (appState.currentQuestionIndex < i &&
+                                !appState.isLastQuestion) {
+                              appState.nextQuestion();
+                            }
+                          },
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: cur
+                                  ? cs.primary
+                                  : ans
+                                      ? cs.primary.withOpacity(0.35)
+                                      : cs.surfaceContainerHighest,
+                              border: cur
+                                  ? Border.all(color: cs.onPrimary, width: 2)
+                                  : null,
+                            ),
+                            child: Center(
+                              child: Text('${i + 1}',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: cur
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: cur
+                                          ? cs.onPrimary
+                                          : cs.onSurface)),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios, size: 18),
+                  onPressed: !appState.isLastQuestion
+                      ? () {
+                          appState.nextQuestion();
+                          _scrollController.jumpTo(0);
+                        }
+                      : null,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: const Icon(Icons.assignment_turned_in),
+                label: Text('提交练习 ($answered/$total)'),
+                onPressed: () => _showSubmit(appState),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1142,14 +1444,86 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  /// v1.0.2 统一重构：练习提交确认弹窗（对齐里程碑文案：确认提交 (已选 X 题)）
+  void _showSubmit(AppState appState) {
+    if (_practiceSubmitted) return;
+    final total = appState.quizQuestions.length;
+    final answered = _practiceAnswersMap.length;
+    _modalOpen = true;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('确认提交 (已选 $answered 题)'),
+        content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('继续检查')),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _submitPractice(appState);
+            },
+            child: const Text('确认提交'),
+          ),
+        ],
+      ),
+    ).then((_) => _modalOpen = false);
+  }
+
+  /// v1.0.2 统一重构：练习批量批改 → 结果页（零落库，纯判定）
+  void _submitPractice(AppState appState) {
+    if (_practiceSubmitted) return;
+    _practiceSubmitted = true;
+    _practiceTimer?.cancel();
+    final qs = appState.quizQuestions;
+    int correct = 0, wrong = 0, blank = 0;
+    final wrongList = <Map<String, dynamic>>[];
+    for (int i = 0; i < qs.length; i++) {
+      final ua = _practiceAnswersMap[i];
+      if (ua == null || ua.isEmpty) {
+        blank++;
+        continue;
+      }
+      if (QuizService.judgeAnswer(qs[i], ua)) {
+        correct++;
+      } else {
+        wrong++;
+        wrongList.add({'idx': i, 'q': qs[i], 'ua': ua});
+      }
+    }
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final acc =
+          qs.isNotEmpty ? (correct / qs.length * 100).toStringAsFixed(1) : '0';
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PracticeResultScreen(
+            correct: correct,
+            wrong: wrong,
+            blank: blank,
+            total: qs.length,
+            accuracy: acc,
+            elapsedSeconds: _elapsedSeconds,
+            timing: widget.practiceTiming ?? PracticeTiming.untimed,
+            durationMinutes: widget.practiceDurationMinutes,
+            wrongList: wrongList,
+            questions: qs,
+            answers: _practiceAnswersMap,
+          ),
+        ),
+      );
+    });
+  }
+
   Future<void> _handleEndSession(
       BuildContext context, AppState appState) async {
     final session = await appState.endSession();
     if (!mounted) return;
 
     Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
+      context,      MaterialPageRoute(
         builder: (_) => SessionSummaryScreen(session: session),
       ),
     );

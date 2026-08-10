@@ -9,12 +9,15 @@ class AnswerSheetWidget extends StatelessWidget {
   final List<PracticeAnswerState> answers;
   final int currentIndex;
   final void Function(int index) onJumpTo;
+  /// v1.0.2 统一重构：是否显示对错（练习模式提交前不判定，仅已答/未答）
+  final bool showResult;
 
   const AnswerSheetWidget({
     super.key,
     required this.answers,
     required this.currentIndex,
     required this.onJumpTo,
+    this.showResult = true,
   });
 
   @override
@@ -30,10 +33,12 @@ class AnswerSheetWidget extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              _legend(const Color(0xFF5CB85C), '答对'),
-              const SizedBox(width: 12),
-              _legend(const Color(0xFFD9534F), '答错'),
-              const SizedBox(width: 12),
+              if (showResult) ...[
+                _legend(cs.tertiary, '答对'),
+                const SizedBox(width: 12),
+                _legend(cs.error, '答错'),
+                const SizedBox(width: 12),
+              ],
               _legend(cs.onSurfaceVariant, '未答'),
             ],
           ),
@@ -48,12 +53,16 @@ class AnswerSheetWidget extends StatelessWidget {
               if (!a.answered) {
                 bg = cs.surfaceContainerHighest;
                 fg = cs.onSurfaceVariant;
-              } else if (a.correct) {
-                bg = const Color(0xFF5CB85C).withOpacity(0.2);
-                fg = const Color(0xFF5CB85C);
+              } else if (showResult && a.correct) {
+                bg = cs.tertiary.withOpacity(0.2);
+                fg = cs.tertiary;
+              } else if (showResult) {
+                bg = cs.error.withOpacity(0.2);
+                fg = cs.error;
               } else {
-                bg = const Color(0xFFD9534F).withOpacity(0.2);
-                fg = const Color(0xFFD9534F);
+                // 练习模式：已答用主题色（不判定对错）
+                bg = cs.primary.withOpacity(0.2);
+                fg = cs.primary;
               }
               if (i == currentIndex) {
                 bg = cs.primaryContainer;

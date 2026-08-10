@@ -6,11 +6,11 @@ import 'monthly_calendar.dart';
 ///
 /// - 标题「本周战绩」：强调色竖条 + 加粗标题
 /// - 双数据块：「本周刷题 X 道」/「平均正确率 X%」
-/// - 下方集成单月打卡日历（当前月，今天高亮，热力色阶按刷题量）
+/// - 下方集成单月打卡日历（左右滑动切换月份，今天高亮，热力色阶按刷题量）
 /// - 底部「连续打卡 X 周」
 /// - 「历史报告」入口保留（近 7 天每日刷题明细）
 /// 全部配色走主题 AppThemeColors / ColorScheme，无硬编码色值
-class WeeklyStatsBoard extends StatelessWidget {
+class WeeklyStatsBoard extends StatefulWidget {
   const WeeklyStatsBoard({
     super.key,
     required this.dailyTotals, // key: 'YYYY-MM-DD' -> 刷题数
@@ -29,11 +29,32 @@ class WeeklyStatsBoard extends StatelessWidget {
   final VoidCallback? onHistoryReport;
 
   @override
+  State<WeeklyStatsBoard> createState() => _WeeklyStatsBoardState();
+}
+
+class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
+  // v1.0.2 统一重构：单月日历左右滑动（初始页 = 当前月，前后 200 年可翻）
+  late final PageController _monthController;
+
+  @override
+  void initState() {
+    super.initState();
+    _monthController = PageController(initialPage: 12 * 200);
+  }
+
+  @override
+  void dispose() {
+    _monthController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     final cs = Theme.of(context).colorScheme;
     final now = DateTime.now();
     final todayKey = MonthCalendar.dateKeyOf(now);
+    final streakDays = widget.streakDays;
 
     return Container(
       width: double.infinity,
@@ -67,10 +88,10 @@ class WeeklyStatsBoard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (onHistoryReport != null)
+              if (widget.onHistoryReport != null)
                 InkWell(
                   borderRadius: BorderRadius.circular(6),
-                  onTap: onHistoryReport,
+                  onTap: widget.onHistoryReport,
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -95,7 +116,7 @@ class WeeklyStatsBoard extends StatelessWidget {
             children: [
               _StatBlock(
                 label: '本周刷题',
-                value: '$weekTotal',
+                value: '${widget.weekTotal}',
                 suffix: ' 道',
                 accent: ac.accent,
                 cs: cs,
@@ -103,7 +124,7 @@ class WeeklyStatsBoard extends StatelessWidget {
               const SizedBox(width: 12),
               _StatBlock(
                 label: '平均正确率',
-                value: weekAccuracy.toStringAsFixed(0),
+                value: widget.weekAccuracy.toStringAsFixed(0),
                 suffix: '%',
                 accent: ac.accent,
                 cs: cs,
@@ -111,20 +132,9 @@ class WeeklyStatsBoard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          // 单月打卡日历（当前月，今天高亮）
-          MonthCalendar(
-            year: now.year,
-            month: now.month,
-            dailyTotals: dailyTotals,
-            vacationDays: vacationDays,
-            todayKey: todayKey,
-            heatColors: [
-              ac.cardBorder, // 空
-              ac.accent.withOpacity(0.18), // 少 <50
-              ac.accent.withOpacity(0.4), // 达标 50~199
-              ac.accent.withOpacity(0.65), // 多 200+
-            ],
-          ),
+          // v1.0.2 统一重构：单月打卡日历支持左右滑动切换月份
+          // （PageView 无限翻页，初始页 = 当前月）
+          _buildSwipeableMonth(context, now, todayKey),
           const SizedBox(height: 10),
           // 底部：连续打卡（周）
           Row(
@@ -148,6 +158,44 @@ class WeeklyStatsBoard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// 左右滑动切换月份的单月日历（绝对月索引 = year*12 + month-1）
+  Widget _buildSwipeableMonth(BuildContext context, DateTime now, String todayKey) {
+    final ac = AppThemeColors.of(context);
+    final initialAbs = now.year * 12 + (now.month - 1);
+    const initialPage = 12 * 200; // 大初始页：前后 200 年范围可翻
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final cellH = (w / 7 / 0.95).clamp(0.0, 56.0);
+        final height = 6 * cellH + 30; // 30 = 月份标题 + 间距
+        return SizedBox(
+          height: height,
+          child: PageView.builder(
+            controller: _monthController,
+            itemBuilder: (context, page) {
+              final abs = initialAbs + (page - initialPage);
+              final year = abs ~/ 12;
+              final month = abs % 12 + 1;
+              return MonthCalendar(
+                year: year,
+                month: month,
+                dailyTotals: widget.dailyTotals,
+                vacationDays: widget.vacationDays,
+                todayKey: todayKey,
+                heatColors: [
+                  ac.cardBorder, // 空
+                  ac.accent.withOpacity(0.18), // 少 <50
+                  ac.accent.withOpacity(0.4), // 达标 50~199
+                  ac.accent.withOpacity(0.65), // 多 200+
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

@@ -1,11 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
-import '../services/quiz_service.dart';
+import 'quiz_screen.dart';
 
 enum PracticeTiming { timed, untimed }
 
-/// 练习模式入口：选择时间模式
+/// 练习模式入口：选择时间模式（v1.0.2 统一重构：选择后进入统一答题页）
 class PracticeEntryScreen extends StatelessWidget {
   final List<Question> questions;
   const PracticeEntryScreen({super.key, required this.questions});
@@ -90,247 +89,25 @@ class PracticeEntryScreen extends StatelessWidget {
           }, child: const Text('开始')),
         ],
       ),
-    );
+    ).then((_) => ctrl.dispose());
   }
 
+  /// v1.0.2 统一重构：进入统一答题页（练习模式）
   void _start(BuildContext context, PracticeTiming timing, int minutes) {
-    Navigator.pushReplacement(context, MaterialPageRoute(
-      builder: (_) => PracticeScreen(timing: timing, questions: questions, durationMinutes: minutes),
-    ));
-  }
-}
-
-/// 答题屏幕
-class PracticeScreen extends StatefulWidget {
-  final PracticeTiming timing;
-  final int durationMinutes;
-  final List<Question> questions;
-  const PracticeScreen({super.key, required this.timing, required this.questions, this.durationMinutes = 0});
-
-  @override
-  State<PracticeScreen> createState() => _PracticeScreenState();
-}
-
-class _PracticeScreenState extends State<PracticeScreen> {
-  final Map<int, String> _answers = {};
-  int _currentIndex = 0;
-  final ScrollController _scrollCtrl = ScrollController();
-  Timer? _timer;
-  int _elapsedSeconds = 0;
-  int _remainingSeconds = 0;
-  bool _submitted = false;
-  bool _modalOpen = false; // v1.0.2: 挡路弹窗标记（答题卡/退出确认）
-  // v1.0.2 修复：填空 controller（切题重建，dispose 释放）
-  TextEditingController? _fillCtrl;
-  int? _fillCtrlIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.timing == PracticeTiming.timed) _remainingSeconds = widget.durationMinutes * 60;
-    _startTimer();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _fillCtrl?.dispose();
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || _submitted) return;
-      setState(() {
-        _elapsedSeconds++;
-        if (widget.timing == PracticeTiming.timed) { _remainingSeconds--; if (_remainingSeconds <= 0) _submit(); }
-      });
-    });
-  }
-
-  String _fmt(int s) => '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
-
-  void _submit() {
-    if (_submitted) return;
-    _timer?.cancel();
-    // v1.0.2: 到点自动交卷先关闭挡路弹窗（答题卡/退出确认）
-    if (_modalOpen && mounted) {
-      Navigator.of(context).pop();
-      _modalOpen = false;
-    }
-    setState(() => _submitted = true);
-    final qs = widget.questions;
-    int correct = 0, wrong = 0, blank = 0;
-    final wrongList = <Map<String, dynamic>>[];
-    for (int i = 0; i < qs.length; i++) {
-      final ua = _answers[i];
-      if (ua == null || ua.isEmpty) { blank++; continue; }
-      if (_check(qs[i], ua)) { correct++; } else { wrong++; wrongList.add({'idx': i, 'q': qs[i], 'ua': ua}); }
-    }
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-      final acc = qs.isNotEmpty ? (correct / qs.length * 100).toStringAsFixed(1) : '0';
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PracticeResultScreen(correct: correct, wrong: wrong, blank: blank, total: qs.length, accuracy: acc, elapsedSeconds: _elapsedSeconds, timing: widget.timing, durationMinutes: widget.durationMinutes, wrongList: wrongList, questions: qs, answers: _answers)));
-    });
-  }
-
-  bool _check(Question q, String ua) {
-    // v1.0.2: 与刷题共用共享判定（多选集合/填空逐空/名解简答包含）
-    return QuizService.judgeAnswer(q, ua);
-  }
-
-  Future<bool> _onWillPop() async {
-    if (_submitted) return true;
-    _modalOpen = true;
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('退出练习'),
-      content: Text(widget.timing == PracticeTiming.timed ? '退出即放弃本次练习。倒计时不暂停，时间走完将自动提交。' : '退出后本次练习记录将不保存。'),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('继续练习')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定退出'), style: TextButton.styleFrom(foregroundColor: Colors.red))],
-    ));
-    _modalOpen = false;
-    return ok ?? false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final qs = widget.questions;
-    if (qs.isEmpty) return Scaffold(appBar: AppBar(title: const Text('练习')), body: const Center(child: Text('无题目')));
-    final q = qs[_currentIndex], answered = _answers.length;
-    final isTimed = widget.timing == PracticeTiming.timed;
-    final warnSec = isTimed ? (widget.durationMinutes * 60 * 0.1).ceil().clamp(60, 300) : 0;
-    final showWarn = isTimed && _remainingSeconds <= warnSec && _remainingSeconds > 0;
-
-    return PopScope(canPop: false, onPopInvokedWithResult: (didPop, _) async { if (!didPop) { final ok = await _onWillPop(); if (ok && mounted) Navigator.of(context).pop(); } },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('第 ${_currentIndex + 1}/${qs.length} 题'),
-          actions: [
-            Padding(padding: const EdgeInsets.only(right: 8), child: Center(child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: showWarn ? Colors.red : cs.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-              child: Text(isTimed ? '剩余 ${_fmt(_remainingSeconds)}' : '已用 ${_fmt(_elapsedSeconds)}', style: TextStyle(fontSize: showWarn ? 16 : 14, fontWeight: FontWeight.bold, color: showWarn ? Colors.white : cs.onSurface)),
-            ))),
-            IconButton(icon: const Icon(Icons.grid_view), tooltip: '答题卡', onPressed: () => _showAnswerCard(cs)),
-          ],
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuizScreen(
+          quizMode: QuizMode.practice,
+          practiceTiming: timing,
+          practiceDurationMinutes: minutes,
         ),
-        body: Column(children: [
-          if (showWarn) Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 6), color: Colors.red.shade700, child: const Center(child: Text('⚠ 时间即将耗尽', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)))),
-          Expanded(child: SingleChildScrollView(controller: _scrollCtrl, padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildQCard(q, cs), const SizedBox(height: 20), _buildOpts(q, cs)]))),
-          Container(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            decoration: BoxDecoration(color: cs.surface, boxShadow: [BoxShadow(color: cs.shadow.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, -2))]),
-            child: Row(children: [
-              IconButton(icon: const Icon(Icons.arrow_back_ios, size: 18), onPressed: _currentIndex > 0 ? () { setState(() => _currentIndex--); _scrollCtrl.jumpTo(0); } : null),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: List.generate(qs.length, (i) {
-                      final cur = i == _currentIndex;
-                      final ans = _answers.containsKey(i);
-                      return GestureDetector(
-                        onTap: () => setState(() => _currentIndex = i),
-                        child: Container(
-                          width: 26, height: 26, margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: cur ? cs.primary : ans ? cs.primary.withOpacity(0.35) : cs.surfaceContainerHighest,
-                            border: cur ? Border.all(color: cs.onPrimary, width: 2) : null,
-                          ),
-                          child: Center(child: Text('${i + 1}', style: TextStyle(fontSize: 10, fontWeight: cur ? FontWeight.bold : FontWeight.normal, color: cur ? cs.onPrimary : cs.onSurface))),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-              IconButton(icon: const Icon(Icons.arrow_forward_ios, size: 18), onPressed: _currentIndex < qs.length - 1 ? () { setState(() => _currentIndex++); _scrollCtrl.jumpTo(0); } : null),
-            ]),
-          ),
-          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 16), child: SizedBox(width: double.infinity, child: FilledButton.icon(icon: const Icon(Icons.assignment_turned_in), label: Text('提交练习 ($answered/${qs.length})'), onPressed: _showSubmit))),
-        ]),
       ),
     );
   }
-
-  Widget _buildQCard(Question q, ColorScheme cs) {
-    // v1.0.2 修复：补齐名解/简答/问答题型映射（此前显示为「单选」）
-    final t = {
-      'single_choice': '单选',
-      'multi_choice': '多选',
-      'true_false': '判断',
-      'fill_blank': '填空',
-      'ming_jie': '名解',
-      'jian_da': '简答',
-      'jie_da': '问答',
-    };
-    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: cs.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text(t[q.questionType] ?? '单选', style: TextStyle(fontSize: 11, color: cs.primary))), const SizedBox(width: 8), Expanded(child: Text(q.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cs.onSurface)))]),
-      ]));
-  }
-
-  Widget _buildOpts(Question q, ColorScheme cs) {
-    final opts = q.questionType == 'true_false' ? ['对', '错'] : q.options;
-    if (opts.isEmpty) {
-      // v1.0.2 修复：填空 controller 由 State 统一管理（切题重建、dispose 释放），
-      // 避免每次 build 新建泄漏；多空提示用分号分隔
-      if (_fillCtrlIndex != _currentIndex) {
-        _fillCtrl?.dispose();
-        _fillCtrl = TextEditingController(text: _answers[_currentIndex] ?? '');
-        _fillCtrlIndex = _currentIndex;
-      }
-      final ctrl = _fillCtrl!;
-      return Column(children: [
-        TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(
-              hintText: '输入答案（多个空用；分隔）', border: OutlineInputBorder()),
-          onChanged: (v) => _answers[_currentIndex] = v,
-        ),
-        const SizedBox(height: 8),
-        FilledButton(onPressed: () => setState(() {}), child: const Text('确认')),
-      ]);
-    }
-    final isMulti = q.questionType == 'multi_choice';
-    final ua = _answers[_currentIndex] ?? '';
-    final sel = isMulti ? ua.split(',').map((e) => e.trim().toUpperCase()).toSet() : {ua.toUpperCase().trim()};
-    return Column(children: List.generate(opts.length, (i) {
-      final label = q.questionType == 'true_false' ? (i == 0 ? '对' : '错') : String.fromCharCode(65 + i);
-      final s = sel.contains(label.toUpperCase());
-      return Padding(padding: const EdgeInsets.only(bottom: 8), child: InkWell(borderRadius: BorderRadius.circular(12), onTap: () => setState(() {
-        if (isMulti) { final x = (ua.isEmpty ? <String>{} : ua.split(',').map((e) => e.trim().toUpperCase()).toSet()); s ? x.remove(label.toUpperCase()) : x.add(label.toUpperCase()); _answers[_currentIndex] = (x.toList()..sort()).join(','); }
-        else _answers[_currentIndex] = label;
-      }), child: Container(width: double.infinity, padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: s ? cs.primary.withOpacity(0.08) : cs.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: s ? cs.primary : cs.outlineVariant)),
-        child: Row(children: [Container(width: 26, height: 26, decoration: BoxDecoration(shape: BoxShape.circle, color: s ? cs.primary : cs.surfaceContainerHighest), child: Center(child: s ? Icon(Icons.check, size: 14, color: cs.onPrimary) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: cs.onSurfaceVariant)))), const SizedBox(width: 12), Expanded(child: Text(opts[i], style: TextStyle(fontSize: 14, color: cs.onSurface)))]))));
-    }));
-  }
-
-  void _showAnswerCard(ColorScheme cs) {
-    final qs = widget.questions;
-    _modalOpen = true;
-    showModalBottomSheet(context: context, builder: (_) => Container(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Text('答题卡', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
-      Wrap(spacing: 10, runSpacing: 10, children: List.generate(qs.length, (i) => GestureDetector(onTap: () { Navigator.pop(context); setState(() => _currentIndex = i); }, child: Container(width: 40, height: 40, decoration: BoxDecoration(shape: BoxShape.circle, color: i == _currentIndex ? cs.primary : _answers.containsKey(i) ? cs.primary.withOpacity(0.35) : cs.surfaceContainerHighest, border: i == _currentIndex ? Border.all(color: cs.onPrimary, width: 2) : null), child: Center(child: Text('${i + 1}', style: TextStyle(color: i == _currentIndex ? cs.onPrimary : cs.onSurface))))))),
-      const SizedBox(height: 16),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [_dot(cs.primary, '当前'), const SizedBox(width: 16), _dot(cs.primary.withOpacity(0.35), '已答'), const SizedBox(width: 16), _dot(cs.surfaceContainerHighest, '未答')]),
-    ]))).then((_) => _modalOpen = false);
-  }
-
-  Widget _dot(Color c, String l) => Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.circle, color: c)), const SizedBox(width: 4), Text(l, style: const TextStyle(fontSize: 12))]);
-
-  void _showSubmit() {
-    final total = widget.questions.length, answered = _answers.length;
-    _modalOpen = true;
-    // v1.0.2 对齐里程碑：确认提交 (已选 X 题)
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: Text('确认提交 (已选 $answered 题)'), content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('继续检查')), FilledButton(onPressed: () { Navigator.pop(ctx); _submit(); }, child: const Text('确认提交'))])).then((_) => _modalOpen = false);
-  }
 }
 
-/// 结果页
+/// 练习结果页（v1.0.2 统一重构保留）：正确率大数字 + 错题回顾折叠卡
 class PracticeResultScreen extends StatelessWidget {
   final int correct, wrong, blank, total, elapsedSeconds, durationMinutes;
   final String accuracy;
@@ -355,7 +132,7 @@ class PracticeResultScreen extends StatelessWidget {
         if (wrongList.isNotEmpty) ...[Text('错题回顾 (${wrongList.length}题)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
           ...wrongList.map((w) { final q = w['q'] as Question, ua = w['ua'] as String;
             return Card(child: ExpansionTile(
-              leading: CircleAvatar(backgroundColor: Colors.red.shade100, radius: 16, child: Text('✗', style: TextStyle(color: Colors.red.shade700, fontSize: 14))),
+              leading: CircleAvatar(backgroundColor: cs.error.withOpacity(0.15), radius: 16, child: Icon(Icons.close, color: cs.error, size: 16)),
               title: Text(q.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
               subtitle: Text('你的答案: $ua  →  正确答案: ${q.correctAnswer}', style: const TextStyle(fontSize: 12)),
               children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Divider(), const Text('题目解析', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(height: 4), Text(q.analysis ?? '暂无解析', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.5))]))],
