@@ -110,5 +110,55 @@ void main() {
         isFalse,
       );
     });
+
+    test('判断题：输入归一（√/×/T/F/正确/错误）', () {
+      // v1.0.2 完善：√/正确/T/TRUE → 对；×/错误/F/FALSE → 错
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), '√'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), '正确'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), 'T'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), 'true'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '错'), '×'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '错'), '错误'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '错'), 'F'),
+        isTrue,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '错'), 'false'),
+        isTrue,
+      );
+      // 否定类不误判为「对」
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), '不正确'),
+        isFalse,
+      );
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), '不对'),
+        isFalse,
+      );
+      // 无法识别判错
+      expect(
+        QuizService.judgeAnswer(_q(type: 'true_false', answer: '对'), '是'),
+        isFalse,
+      );
+    });
   });
 }

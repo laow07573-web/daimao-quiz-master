@@ -23,6 +23,8 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> {
   final TextEditingController _followUpController = TextEditingController();
   final List<TextEditingController> _fillBlankControllers = [];
+  // v1.0.2 完善：填空逐空回车跳转下一空
+  final List<FocusNode> _fillBlankFocusNodes = [];
   final TextEditingController _textAnswerController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -59,6 +61,8 @@ class _QuizScreenState extends State<QuizScreen> {
     _followUpController.dispose();
     for (final c in _fillBlankControllers) { c.dispose(); }
     _fillBlankControllers.clear();
+    for (final f in _fillBlankFocusNodes) { f.dispose(); }
+    _fillBlankFocusNodes.clear();
     _textAnswerController.dispose();
     _scrollController.dispose();
     _audioPlayer.dispose();
@@ -218,6 +222,33 @@ class _QuizScreenState extends State<QuizScreen> {
                           _buildAnsweredResult(appState, question, cs),
                           const SizedBox(height: 12),
                           _buildResultFeedback(appState, question, cs),
+                          // v1.0.2 完善：已答题目可重新作答（更新原记录，不新增）
+                          if (isAnswered &&
+                              widget.quizMode != QuizMode.memorize) ...[
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.edit_outlined, size: 15),
+                                label: const Text('重新作答',
+                                    style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: cs.onSurfaceVariant,
+                                ),
+                                onPressed: () {
+                                  _selectedOptions.clear();
+                                  for (final c in _fillBlankControllers) {
+                                    c.clear();
+                                  }
+                                  _textAnswerController.clear();
+                                  _showAnalysis = false;
+                                  _showManualAnalysis = false;
+                                  appState.resetCurrentAnswer();
+                                },
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           if (_showAnalysis || appState.currentAnalysis != null)
                             _buildAnalysisArea(appState, question, cs)
@@ -463,12 +494,18 @@ class _QuizScreenState extends State<QuizScreen> {
     final blankCount = RegExp(r'_{2,}|（\s*）|\(\s*\)').allMatches(title).length;
     final n = blankCount > 0 ? blankCount : 1;
 
-    // 清理超过当前题目的旧控制器
+    // 清理超过当前题目的旧控制器/焦点
     while (_fillBlankControllers.length > n) {
       _fillBlankControllers.removeLast().dispose();
     }
     while (_fillBlankControllers.length < n) {
       _fillBlankControllers.add(TextEditingController());
+    }
+    while (_fillBlankFocusNodes.length > n) {
+      _fillBlankFocusNodes.removeLast().dispose();
+    }
+    while (_fillBlankFocusNodes.length < n) {
+      _fillBlankFocusNodes.add(FocusNode());
     }
 
     return Column(
@@ -476,13 +513,21 @@ class _QuizScreenState extends State<QuizScreen> {
         for (int i = 0; i < n; i++) ...[
           TextField(
             controller: _fillBlankControllers[i],
+            focusNode: _fillBlankFocusNodes[i],
             decoration: InputDecoration(
               hintText: n == 1 ? '请输入答案...' : '第 ${i + 1} 空',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               prefixIcon: const Icon(Icons.edit),
             ),
             style: TextStyle(fontSize: 15, color: cs.onSurface),
-            onSubmitted: (v) => _submitFillBlank(appState),
+            // v1.0.2 完善：回车跳到下一空，最后一空提交
+            onSubmitted: (v) {
+              if (i < n - 1) {
+                _fillBlankFocusNodes[i + 1].requestFocus();
+              } else {
+                _submitFillBlank(appState);
+              }
+            },
           ),
           const SizedBox(height: 8),
         ],
@@ -618,6 +663,12 @@ class _QuizScreenState extends State<QuizScreen> {
           _advanceQuestion(appState);
         }
       }
+    } catch (e) {
+      // v1.0.2 完善：提交异常（如数据库写入失败）不崩溃页面，提示后重试
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('提交失败：$e')),
+      );
     } finally {
       _submitting = false;
     }

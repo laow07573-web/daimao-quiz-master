@@ -248,6 +248,55 @@ void main() {
     expect(KeyCrypto.decrypt(v1Cipher), 'sk-legacy-key-123');
   });
 
+  test('重新作答：更新原记录不新增，会话统计差量修正', () async {
+    final db = DatabaseService.instance;
+    final bankId = await seedBank('R', 3);
+    final qs = await db.getQuestionsByBank(bankId);
+    // 手动构造会话并加载题目
+    final session = QuizSession(
+        bankIds: '$bankId', mode: 'single', totalQuestions: 3,
+        startTime: DateTime.now().toIso8601String());
+    final sessionWithId = QuizSession(
+        id: await db.insertSession(session),
+        bankIds: session.bankIds,
+        mode: session.mode,
+        totalQuestions: session.totalQuestions,
+        startTime: session.startTime);
+    final quizService = QuizService();
+    quizService.loadQuiz(questions: qs, session: sessionWithId);
+
+    // 首次答错（正确 A，选 B）
+    final r1 = await quizService.submitAnswer('B');
+    expect(r1.isCorrect, isFalse);
+    expect(await db.getTotalQuestionsAnswered(), 1);
+
+    // 重新作答答对 → 更新原记录（同一 id），不新增记录
+    final r2 = await quizService.resubmitAnswer('A');
+    expect(r2.isCorrect, isTrue);
+    expect(r2.id, r1.id);
+    expect(await db.getTotalQuestionsAnswered(), 1);
+    // 会话统计差量修正：0对1错 → 1对0错
+    final s1 = await db.getSessionById(sessionWithId.id!);
+    expect(s1!.correctCount, 1);
+    expect(s1.wrongCount, 0);
+
+    // 再改回答错 → 0对1错
+    final r3 = await quizService.resubmitAnswer('C');
+    expect(r3.isCorrect, isFalse);
+    expect(r3.id, r1.id);
+    expect(await db.getTotalQuestionsAnswered(), 1);
+    final s2 = await db.getSessionById(sessionWithId.id!);
+    expect(s2!.correctCount, 0);
+    expect(s2.wrongCount, 1);
+
+    // 首次未答的题走正常提交（新增记录）
+    final r4 = await quizService.nextQuestion();
+    expect(r4, isTrue);
+    final r5 = await quizService.submitAnswer('A');
+    expect(r5.isCorrect, isTrue);
+    expect(await db.getTotalQuestionsAnswered(), 2);
+  });
+
   test('主题切换持久化：重启（新实例）后保留', () async {
     SharedPreferences.setMockInitialValues({});
     final ts = ThemeService();

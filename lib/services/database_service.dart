@@ -386,6 +386,34 @@ class DatabaseService {
     return await db.insert('answer_records', record.toMap());
   }
 
+  /// 查某会话中某题的作答记录（重新作答用；同一会话同一题只应有一条）
+  Future<AnswerRecord?> getAnswerRecordBySessionQuestion(
+      int sessionId, int questionId) async {
+    final db = await database;
+    final maps = await db.query('answer_records',
+        where: 'session_id = ? AND question_id = ?',
+        whereArgs: [sessionId, questionId],
+        limit: 1);
+    if (maps.isEmpty) return null;
+    return AnswerRecord.fromMap(maps.first);
+  }
+
+  /// 更新一条作答记录的答案与判定结果（重新作答用）
+  Future<void> updateAnswerRecordAnswer(
+      int id, String userAnswer, bool isCorrect, DateTime answeredAt) async {
+    final db = await database;
+    await db.update(
+      'answer_records',
+      {
+        'user_answer': userAnswer,
+        'is_correct': isCorrect ? 1 : 0,
+        'answered_at': answeredAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   /// 获取单题统计：作答次数、正确次数（排除隐藏记录）
   Future<Map<String, int>> getQuestionStats(int questionId) async {
     final db = await database;

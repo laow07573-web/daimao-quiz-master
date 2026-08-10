@@ -83,7 +83,7 @@ class QuizService {
   }
 
   /// 共享答案判定（刷题与练习共用）
-  /// - 单选/判断：忽略大小写与首尾空白
+  /// - 单选/判断：忽略大小写与首尾空白；判断题归一（√/×/T/F/正确/错误 → 对/错）
   /// - 多选：集合比较（忽略顺序与分隔符）
   /// - 填空：逐空去标点比对，空数不一致判错
   /// - 名解/简答/问答：去标点后包含匹配，答案过短判错
@@ -93,6 +93,14 @@ class QuizService {
     final normalizedUser = userAnswer.trim();
     if (normalizedUser.isEmpty) return false;
     if (correctAnswer.isEmpty) return false;
+
+    if (question.questionType == 'true_false') {
+      // 判断题输入归一：对/√/正确/T/TRUE ↔ 错/×/错误/F/FALSE
+      final u = _normalizeTrueFalse(normalizedUser);
+      final c = _normalizeTrueFalse(correctAnswer);
+      if (u == null || c == null) return false;
+      return u == c;
+    }
 
     if (question.questionType == 'multi_choice') {
       // 多选集合比较：忽略顺序与分隔符（A,C / C、A / c a）
@@ -143,6 +151,21 @@ class QuizService {
         .map((e) => e.trim().toUpperCase())
         .where((e) => e.isNotEmpty && RegExp(r'^[A-Z]$').hasMatch(e))
         .toSet();
+  }
+
+  /// 判断题输入归一：返回 '对'/'错'，无法识别返回 null
+  static String? _normalizeTrueFalse(String s) {
+    final t = s.trim().toUpperCase();
+    // 否定类先行（"不正确"/"不对" 含 "正确"/"对" 子串）
+    if (t == '不正确' || t == '不对' || t == '错误' || t == '错' ||
+        t == '×' || t == 'X' || t == 'F' || t == 'FALSE') {
+      return '错';
+    }
+    if (t == '正确' || t == '对' || t == '√' ||
+        t == 'T' || t == 'TRUE') {
+      return '对';
+    }
+    return null;
   }
 
   static bool setEquals(Set<String> a, Set<String> b) {
@@ -212,6 +235,62 @@ class QuizService {
       isCorrect: record.isCorrect,
       aiAnalysis: record.aiAnalysis,
       answeredAt: record.answeredAt,
+    );
+  }
+
+  /// 重新作答当前题（v1.0.2 完善：返回上一题后允许修改答案）。
+  /// 已有记录则更新原记录（不新增，避免污染刷题量统计），
+  /// 会话统计与 FSRS 由改判逻辑按新旧结果差量修正。
+  Future<AnswerRecord> resubmitAnswer(String userAnswer) async {
+    final question = currentQuestion;
+    if (question == null || _currentSession == null) {
+      throw StateError('没有活跃的刷题会话');
+    }
+    final isCorrect = judgeAnswer(question, userAnswer);
+
+    // 首次作答走正常提交路径
+    final existing = await _db.getAnswerRecordBySessionQuestion(
+        _currentSession!.id!, question.id!);
+    if (existing == null) {
+      return await submitAnswer(userAnswer);
+    }
+
+    final now = DateTime.now();
+    final oldCorrect = existing.isCorrect;
+
+    // 先按新旧结果差量修正会话统计 + FSRS（rejudge 读取的是旧记录值；
+    // 若先更新记录再修正，oldCorrect 会读到新值导致差量修正被跳过）
+    if (oldCorrect != isCorrect) {
+      await _db.rejudgeAnswerRecord(existing.id!, isCorrect);
+    }
+    // 再更新答案内容（user_answer/answered_at）
+    await _db.updateAnswerRecordAnswer(
+        existing.id!, userAnswer, isCorrect, now);
+
+    // 同步内存会话统计（按新旧结果差量调整）
+    if (oldCorrect != isCorrect) {
+      _currentSession = QuizSession(
+        id: _currentSession!.id,
+        bankIds: _currentSession!.bankIds,
+        mode: _currentSession!.mode,
+        totalQuestions: _currentSession!.totalQuestions,
+        correctCount: (_currentSession!.correctCount + (isCorrect ? 1 : -1))
+            .clamp(0, 1 << 30),
+        wrongCount: (_currentSession!.wrongCount + (isCorrect ? -1 : 1))
+            .clamp(0, 1 << 30),
+        startTime: _currentSession!.startTime,
+        endTime: _currentSession!.endTime,
+        durationSeconds: _currentSession!.durationSeconds,
+      );
+    }
+
+    return AnswerRecord(
+      id: existing.id,
+      questionId: question.id!,
+      sessionId: _currentSession!.id,
+      userAnswer: userAnswer,
+      isCorrect: isCorrect,
+      answeredAt: now.toIso8601String(),
     );
   }
 

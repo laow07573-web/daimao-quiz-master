@@ -602,7 +602,15 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Future<void> submitAnswer(String userAnswer) async {
     if (_quizService.currentQuestion == null) return;
 
-    _lastAnswerRecord = await _quizService.submitAnswer(userAnswer);
+    // v1.0.2 完善：该题已有作答记录（返回上一题重新作答）→ 走更新路径，
+    // 不新增记录、不污染刷题量统计
+    final hasPrev = _currentQuestionIndex < _answerHistory.length &&
+        _answerHistory[_currentQuestionIndex] != null;
+    if (hasPrev) {
+      _lastAnswerRecord = await _quizService.resubmitAnswer(userAnswer);
+    } else {
+      _lastAnswerRecord = await _quizService.submitAnswer(userAnswer);
+    }
     _currentSession = _quizService.currentSession;
 
     // 存储答题历史
@@ -618,8 +626,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _currentAnalysis = null;
     _analysisLoading = false;
 
-    // 更新 FSRS 状态（如果这道题已有 FSRS 卡，则更新；如果答错且没有卡，则创建）
-    if (!_skipFSRS) {
+    // 更新 FSRS 状态（重答路径已由改判逻辑补记，不再重复更新）
+    if (!_skipFSRS && !hasPrev) {
       try {
         await _updateFSRSIfNeeded(qId);
       } catch (e) {
@@ -627,6 +635,18 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       }
     }
 
+    notifyListeners();
+  }
+
+  /// v1.0.2 完善：清空当前题作答状态，进入「重新作答」
+  void resetCurrentAnswer() {
+    if (_currentQuestionIndex < _answerHistory.length) {
+      _answerHistory[_currentQuestionIndex] = null;
+    }
+    _lastAnswerRecord = null;
+    _currentQuestionStats = {};
+    _currentAnalysis = null;
+    _analysisLoading = false;
     notifyListeners();
   }
 
