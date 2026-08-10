@@ -350,8 +350,8 @@ class DocParserService {
   }
 
   static String? _extractAnswer(String line) {
-    // 匹配 A、B、C、D（含分隔符，供多选归一）或 对/错 或 √/×
-    final match = RegExp(r'[答案参考正确][答案案确]?[：:\s]*([A-Da-d][A-Da-d、，,;；/\s]*)',
+    // 匹配 A-Z（含分隔符，供多选归一；支持 E/F 等五选以上）或 对/错 或 √/×
+    final match = RegExp(r'[答案参考正确][答案案确]?[：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)',
             caseSensitive: false)
         .firstMatch(line);
     if (match != null) {
@@ -359,16 +359,20 @@ class DocParserService {
     }
     // 尝试直接匹配字母
     final letterMatch =
-        RegExp(r'([A-Da-d][A-Da-d、，,;；/\s]*)').firstMatch(line);
+        RegExp(r'([A-Za-z][A-Za-z、，,;；/\s]*)').firstMatch(line);
     if (letterMatch != null) {
       return _normalizeMultiAnswer(letterMatch.group(1)!);
     }
-    // 判断题
-    if (line.contains('对') || line.contains('√') || line.contains('正确')) {
-      return '对';
-    }
-    if (line.contains('错') || line.contains('×') || line.contains('错误')) {
+    // 判断题（先检查否定/错误类，避免 "不对" 被 "对" 误判）
+    if (line.contains('不对') ||
+        line.contains('不正确') ||
+        line.contains('错误') ||
+        line.contains('错') ||
+        line.contains('×')) {
       return '错';
+    }
+    if (line.contains('正确') || line.contains('对') || line.contains('√')) {
+      return '对';
     }
     // 填空题：提取 "答案：" 后的全部文本
     final textMatch = RegExp(r'[答案参考正确][答案案确]?[：:\s]+(.+)',
@@ -376,7 +380,7 @@ class DocParserService {
         .firstMatch(line);
     if (textMatch != null) {
       final text = textMatch.group(1)!.trim();
-      if (text.isNotEmpty && !RegExp(r'^[A-Da-d]+$').hasMatch(text)) {
+      if (text.isNotEmpty && !RegExp(r'^[A-Za-z]+$').hasMatch(text)) {
         return text;
       }
     }
@@ -389,13 +393,14 @@ class DocParserService {
         line.startsWith('【答案】');
   }
 
-  /// 多选答案归一（v1.0.2）：A、C / A, C / AC → A,C
+  /// 多选答案归一（v1.0.2）：A、C / A, C / AC / A和C → A,C（支持 A-Z 五选以上）
   static String _normalizeMultiAnswer(String letters) {
     final normalized = letters
         .toUpperCase()
+        .replaceAll(RegExp(r'[和及]'), ',')
         .replaceAll(RegExp(r'[、，,;；/\s]+'), '')
         .split('')
-        .where((c) => RegExp(r'^[A-D]$').hasMatch(c))
+        .where((c) => RegExp(r'^[A-Z]$').hasMatch(c))
         .toSet()
         .toList()
       ..sort();
@@ -407,9 +412,9 @@ class DocParserService {
   static String? _tryExtractAnswerFromText(String text) {
     // 在全部文本中搜索"答案"关键词
     final patterns = [
-      RegExp(r'答案[：:\s]*([A-Da-d][A-Da-d、，,;；/\s]*)', caseSensitive: false),
-      RegExp(r'正确答案[：:\s]*([A-Da-d][A-Da-d、，,;；/\s]*)', caseSensitive: false),
-      RegExp(r'参考[答案][：:\s]*([A-Da-d][A-Da-d、，,;；/\s]*)', caseSensitive: false),
+      RegExp(r'答案[：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)', caseSensitive: false),
+      RegExp(r'正确答案[：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)', caseSensitive: false),
+      RegExp(r'参考[答案][：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)', caseSensitive: false),
       RegExp(r'正确[答案][：:\s]*([对错√×])', caseSensitive: false),
     ];
 

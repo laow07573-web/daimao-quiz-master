@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppTheme { eyeCare, brand, minimal, starVoyage, oceanGalaxy }
 
 class ThemeService extends ChangeNotifier {
+  static const _prefsKey = 'app_theme';
+
   AppTheme _current = AppTheme.brand;
   AppTheme get current => _current;
+
+  /// v1.0.2 修复：启动时恢复上次选择的主题
+  Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString(_prefsKey);
+      if (name != null) {
+        final saved = AppTheme.values.where((t) => t.name == name).firstOrNull;
+        if (saved != null) _current = saved;
+      }
+    } catch (_) {}
+  }
 
   ThemeData get themeData {
     switch (_current) {
@@ -16,7 +31,15 @@ class ThemeService extends ChangeNotifier {
     }
   }
 
-  void switchTo(AppTheme theme) { _current = theme; notifyListeners(); }
+  /// v1.0.2 修复：主题切换持久化，重启后保留
+  Future<void> switchTo(AppTheme theme) async {
+    _current = theme;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey, theme.name);
+    } catch (_) {}
+  }
 
   static String labelOf(AppTheme t) => switch (t) {
     AppTheme.eyeCare     => '护眼柔和',

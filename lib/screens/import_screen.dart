@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/app_state.dart';
+import '../services/bank_file_service.dart';
 import 'import_preview_screen.dart';
 
 class ImportScreen extends StatefulWidget {
@@ -237,29 +238,57 @@ class _ImportScreenState extends State<ImportScreen> {
                                 );
                                 return;
                               }
-                              // v1.0.2: JSON 题库直接分组建库（无需预览）
+                              // v1.0.2: JSON 题库直接分组建库（无需预览）；
+                              // 修复：解析失败展示真实错误，不再误报"导入完成 0 题"；
+                              // 修复：与 docx 混选时 JSON 先入库，docx 继续走 AI 解析
                               final jsonFiles = _selectedFiles
-                                  .where((f) => f
-                                      .toLowerCase()
-                                      .endsWith('.json'))
+                                  .where((f) =>
+                                      f.toLowerCase().endsWith('.json'))
                                   .toList();
                               if (jsonFiles.isNotEmpty) {
                                 final (banks, questions) =
                                     await appState.importJsonFiles(jsonFiles);
+                                final err = BankFileService.lastError;
+                                if (!mounted) return;
+                                if (err != null && banks == 0 && questions == 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(err),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'JSON 导入完成：$banks 个题库，$questions 道题'),
+                                      backgroundColor:
+                                          const Color(0xFF4CAF50),
+                                    ),
+                                  );
+                                }
+                              }
+                              final docxFiles = _selectedFiles
+                                  .where((f) =>
+                                      f.toLowerCase().endsWith('.docx') ||
+                                      f.toLowerCase().endsWith('.doc'))
+                                  .toList();
+                              if (docxFiles.isEmpty) {
+                                setState(() => _selectedFiles.clear());
+                                return;
+                              }
+                              if (docxFiles.length > 1) {
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                        'JSON 导入完成：$banks 个题库，$questions 道题'),
+                                        '已选择 ${docxFiles.length} 个文档，本次仅解析第一个'),
                                     backgroundColor:
-                                        const Color(0xFF4CAF50),
+                                        Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 );
-                                setState(() => _selectedFiles.clear());
-                                return;
                               }
-                              await appState
-                                  .parseForPreview(_selectedFiles);
+                              await appState.parseForPreview(docxFiles);
                               if (appState.previewQuestions.isEmpty) {
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(

@@ -31,7 +31,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _balanceLoading = false;
   // v1.0.2 对齐里程碑：保活状态 / 电池优化 / 未打标签数
   bool _accessibilityOn = false;
-  bool _batteryIgnored = true;
+  // v1.0.2 修复：初始为 false（未知状态），加载真实值前不误导"已豁免"
+  bool _batteryIgnored = false;
   int _untaggedCount = 0;
 
   @override
@@ -298,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   final newSettings = AppSettings(
                     apiKey: _apiKeyController.text.trim(),
                     apiEndpoint: _endpointController.text.trim().isEmpty
@@ -309,7 +310,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : _modelController.text.trim(),
                     nickname: _nicknameController.text.trim(),
                   );
-                  context.read<AppState>().updateSettings(newSettings);
+                  // v1.0.2 修复：等待保存完成再提示/返回（此前 fire-and-forget）
+                  await context.read<AppState>().updateSettings(newSettings);
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('设置已保存'),
@@ -456,6 +459,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                           fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
                     ),
+                    // v1.0.2 修复：提示默认区间为当前自然月，需按实际假期调整
+                    Text(
+                      '默认区间为当前自然月，请开启后按实际假期调整起止日期。',
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.8)),
+                    ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -555,6 +564,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               TextStyle(fontSize: 14, color: cs.onSurface)),
                       value: appState.reminderEnabled,
                       onChanged: (v) async {
+                        // v1.0.2 修复：开启提醒前请求 Android 13+ 通知运行时权限
+                        if (v) {
+                          await ReminderService.instance
+                              .requestNotificationPermission();
+                        }
                         await appState.setReminderSettings(
                             enabled: v,
                             time: appState.reminderTime ??
@@ -599,11 +613,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: const Icon(Icons.notifications_active, size: 16),
                         label: const Text('发送测试通知', style: TextStyle(fontSize: 13)),
                         onPressed: () async {
-                          await ReminderService.instance.sendTestNotification();
+                          // v1.0.2 修复：Android 13+ 先请求通知权限，再发测试通知
+                          await ReminderService.instance
+                              .requestNotificationPermission();
+                          final sent = await ReminderService.instance
+                              .sendTestNotification();
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('测试通知已发送，下拉通知栏查看')),
+                            SnackBar(
+                                content: Text(sent
+                                    ? '测试通知已发送，下拉通知栏查看'
+                                    : '当前平台不支持发送测试通知')),
                           );
                         },
                       ),
@@ -927,18 +947,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ai == null) return;
     final questions = await appState.getUntaggedErrorQuestions();
     if (!mounted || questions.isEmpty) return;
-    final applied = await showDialog<int>(
+    final applied = await showDialog<({int applied, int skipped})>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _TaggingDialog(
           questions: questions, ai: ai, appState: appState),
     );
     if (!mounted) return;
-    if (applied != null && applied > 0) {
+    if (applied != null && applied.applied > 0) {
+      final msg = applied.skipped > 0
+          // v1.0.2 修复：跳过 AI 失败标记，不把失败串当作知识点入库
+          ? '已应用 ${applied.applied} 道标签，跳过 ${applied.skipped} 道失败标记'
+          // v1.0.2 对齐里程碑：全部题目已打标签完成
+          : '全部题目已打标签完成';
       ScaffoldMessenger.of(context).showSnackBar(
-        // v1.0.2 对齐里程碑：全部题目已打标签完成
         SnackBar(
-          content: const Text('全部题目已打标签完成'),
+          content: Text(msg),
           backgroundColor: Theme.of(context).colorScheme.tertiary,
         ),
       );
@@ -1009,20 +1033,36 @@ class _TaggingDialogState extends State<_TaggingDialog> {
 
   Future<void> _apply() async {
     setState(() => _applying = true);
+    var skipped = 0;
     for (final (q, kp) in _labels) {
+      if (kp.startsWith('AI')) {
+        // v1.0.2 修复：失败标记（AI请求失败 等）不写入知识点，避免污染错题本统计
+        skipped++;
+        continue;
+      }
       if (q.id != null) {
         await widget.appState.updateQuestionKnowledgePoint(q.id!, kp);
       }
     }
     if (!mounted) return;
-    Navigator.pop(context, _labels.length);
+    Navigator.pop(
+        context, (applied: _labels.length - skipped, skipped: skipped));
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return AlertDialog(
-      title: Text(_finished
+    // v1.0.2 修复：系统返回键关闭对话框时终止打标签循环（不再后台白跑浪费额度）
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _cancelled = true;
+        _resumeCompleter?.complete();
+        Navigator.pop(context, (applied: 0, skipped: 0));
+      },
+      child: AlertDialog(
+        title: Text(_finished
           ? '预览确认'
           : _paused
               ? '打标签已暂停，可随时继续'
@@ -1073,7 +1113,8 @@ class _TaggingDialogState extends State<_TaggingDialog> {
       actions: _finished
           ? [
               TextButton(
-                onPressed: () => Navigator.pop(context, 0),
+                onPressed: () =>
+                    Navigator.pop(context, (applied: 0, skipped: 0)),
                 child: const Text('放弃'),
               ),
               TextButton(
@@ -1091,7 +1132,7 @@ class _TaggingDialogState extends State<_TaggingDialog> {
                 onPressed: () {
                   _cancelled = true;
                   _resumeCompleter?.complete();
-                  Navigator.pop(context, 0);
+                  Navigator.pop(context, (applied: 0, skipped: 0));
                 },
                 child: const Text('取消'),
               ),
@@ -1100,6 +1141,7 @@ class _TaggingDialogState extends State<_TaggingDialog> {
                 child: Text(_paused ? '继续' : '暂停'),
               ),
             ],
+      ),
     );
   }
 }

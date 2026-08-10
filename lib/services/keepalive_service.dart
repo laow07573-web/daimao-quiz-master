@@ -32,15 +32,16 @@ class KeepAliveService {
     } catch (_) {}
   }
 
-  /// 是否已忽略电池优化（v1.0.2：与里程碑一致，设置页可引导）
+  /// 是否已忽略电池优化（v1.0.2：与里程碑一致，设置页可引导）。
+  /// 查询失败返回 false（fail-closed），避免误导用户以为已豁免
   Future<bool> isIgnoringBatteryOptimizations() async {
-    if (!Platform.isAndroid) return true;
+    if (!Platform.isAndroid) return false;
     try {
       final result =
           await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
-      return result ?? true;
+      return result ?? false;
     } catch (_) {
-      return true;
+      return false;
     }
   }
 

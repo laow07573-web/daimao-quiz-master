@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/app_state.dart';
+import 'services/database_service.dart';
 import 'services/theme_service.dart';
 import 'services/tamper_check.dart';
 import 'services/reminder_service.dart';
@@ -18,13 +19,26 @@ void main() async {
   }
 
   final appState = AppState();
-  await appState.init();
+  try {
+    await appState.init();
+  } catch (e) {
+    // v1.0.2 修复：数据库损坏/半替换导致初始化失败时不再黑屏，
+    // 展示恢复页（可重置数据库或退出）
+    runApp(_DbErrorApp(error: '$e'));
+    return;
+  }
   final themeService = ThemeService();
+  await themeService.init(); // v1.0.2 修复：恢复上次选择的主题
 
-  // v1.0.2: 每日提醒（前台服务 + AlarmManager 双保险）
-  await ReminderService.instance.init();
-  await ReminderService.instance.syncSchedule();
-  ReminderService.instance.catchUpReminderIfMissed();
+  // v1.0.2: 每日提醒（前台服务 + AlarmManager 双保险）；
+  // 通知服务初始化异常不阻塞进入主界面
+  try {
+    await ReminderService.instance.init();
+    await ReminderService.instance.syncSchedule();
+  } catch (_) {}
+  try {
+    ReminderService.instance.catchUpReminderIfMissed();
+  } catch (_) {}
 
   runApp(
     MultiProvider(
@@ -57,6 +71,92 @@ class _TamperedApp extends StatelessWidget {
               const Text('检测到应用签名异常，可能是盗版或已被篡改。\n\n请从官方渠道重新下载安装，避免 API Key 泄露。', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: Color(0xFF666666), height: 1.6)),
               const SizedBox(height: 32),
               FilledButton.tonalIcon(onPressed: () => SystemNavigator.pop(), icon: const Icon(Icons.exit_to_app), label: const Text('退出应用')),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 数据库初始化失败时显示的恢复页（v1.0.2 修复：启动不再黑屏）
+class _DbErrorApp extends StatefulWidget {
+  const _DbErrorApp({required this.error});
+
+  final String error;
+
+  @override
+  State<_DbErrorApp> createState() => _DbErrorAppState();
+}
+
+class _DbErrorAppState extends State<_DbErrorApp> {
+  bool _resetting = false;
+
+  Future<void> _resetAndRetry() async {
+    setState(() => _resetting = true);
+    try {
+      await DatabaseService.instance.resetDatabase();
+      final appState = AppState();
+      await appState.init();
+      final themeService = ThemeService();
+      await themeService.init();
+      try {
+        await ReminderService.instance.init();
+        await ReminderService.instance.syncSchedule();
+      } catch (_) {}
+      if (!mounted) return;
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: appState),
+            ChangeNotifierProvider.value(value: themeService),
+          ],
+          child: const FlashcardApp(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _resetting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('重置失败：$e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.error_outline, size: 72, color: Color(0xFFE65100)),
+              const SizedBox(height: 24),
+              const Text('数据初始化失败', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Text(
+                '本地数据文件可能已损坏。可以重置数据后重新开始（将清空全部题库与记录），\n或退出应用。\n\n错误详情：${widget.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF666666), height: 1.6),
+              ),
+              const SizedBox(height: 32),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                FilledButton.icon(
+                  onPressed: _resetting ? null : _resetAndRetry,
+                  icon: _resetting
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.refresh),
+                  label: Text(_resetting ? '重置中...' : '重置数据并重试'),
+                ),
+                const SizedBox(width: 16),
+                OutlinedButton.icon(
+                  onPressed: () => SystemNavigator.pop(),
+                  icon: const Icon(Icons.exit_to_app),
+                  label: const Text('退出'),
+                ),
+              ]),
             ]),
           ),
         ),

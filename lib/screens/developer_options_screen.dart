@@ -25,11 +25,19 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   bool _accessibilityOn = false;
   bool _batteryIgnored = true;
   String? _status;
+  // v1.0.2 修复：密码输入 controller 由 State 管理，避免每次 build 新建泄漏
+  final TextEditingController _lockController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _checkKeepalive();
+  }
+
+  @override
+  void dispose() {
+    _lockController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkKeepalive() async {
@@ -225,7 +233,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   }
 
   Widget _buildLock(ColorScheme cs) {
-    final controller = TextEditingController();
+    final controller = _lockController;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),

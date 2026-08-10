@@ -114,7 +114,8 @@ class _ProfileTabState extends State<ProfileTab> {
           _EntryTile(
             icon: Icons.info_outline,
             title: '关于',
-            subtitle: 'v1.0.2',
+            // v1.0.2 修复：版本号统一 v1.26.6.17
+            subtitle: 'v1.26.6.17',
             onTap: () => _showAbout(context),
           ),
           const SizedBox(height: 20),
@@ -136,7 +137,7 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (ctx) => AlertDialog(
         title: const Text('呆猫刷题宝'),
         content: const Text(
-          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：1.26.6 (build 17)',
+          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：v1.26.6.17',
         ),
         actions: [
           TextButton(

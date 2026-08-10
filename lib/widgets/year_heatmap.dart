@@ -85,8 +85,10 @@ class _YearHeatmapState extends State<YearHeatmap> {
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
-            final monthWidth = (constraints.maxWidth - 8) / 3;
-            final cellWidth = (monthWidth - 2 * 6) / 7;
+            // v1.0.2 修复：月份网格实际宽度 = maxWidth/3（Row 内 Expanded 均分），
+            // 此前用 (maxWidth-8)/3 低估导致底部一行单元格被裁剪
+            final monthWidth = constraints.maxWidth / 3;
+            final cellWidth = monthWidth / 7;
             final cellHeight = cellWidth * 1.05;
             final height = 24 + 6 * cellHeight + 4;
             return SizedBox(

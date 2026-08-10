@@ -61,7 +61,7 @@ class BankFileService {
       // v1.0.2 对齐里程碑：本软件导出的 .json（format 标记 + questions 数组）→ 单题库；
       // 有 questions 键但缺 format 标记 → 提示缺少 format 标记
       if (data.containsKey('questions')) {
-        if (!data.containsKey('format')) {
+        if (data['format'] != 'daimao-flashcard-questions') {
           lastError = '不是呆猫刷题宝题库文件（缺少 format 标记）';
           return {};
         }
@@ -109,29 +109,35 @@ class BankFileService {
     final rawOptions = m['options'] ?? m['选项'] ?? m['choices'];
     var options = <String>[];
     if (rawOptions is List) {
-      options = rawOptions.map((e) => e.toString()).toList();
+      options =
+          rawOptions.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
     } else if (rawOptions is String && rawOptions.trim().isNotEmpty) {
-      // "A. xxx\nB. yyy" 或 "A.xxx B.yyy" 拆行
+      // "A. xxx\nB. yyy" 或 "A.xxx B.yyy"（同行）拆段：在前缀 "X." 前断开
       options = rawOptions
           .split(RegExp(r'\n'))
+          .expand((line) => line.split(RegExp(r'(?=[A-Z][\.、．]\s)')))
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
     }
-    // 带标签选项去标签
-    if (options.isNotEmpty && RegExp(r'^[A-Z][\.、．]\s*').hasMatch(options.first)) {
-      options = options
-          .map((o) => o.replaceFirst(RegExp(r'^[A-Z][\.、．]\s*'), '').trim())
-          .toList();
-    }
+    // 逐项剥选项前缀（"A. xxx" → "xxx"；首个无前缀、后续带前缀的情况也处理）
+    options = options
+        .map((o) => o.replaceFirst(RegExp(r'^[A-Z][\.、．]\s*'), '').trim())
+        .where((o) => o.isNotEmpty)
+        .toList();
 
-    final correctAnswer =
+    var correctAnswer =
         (_first(m, ['correct_answer', 'answer', 'correctAnswer', '答案']) ?? '')
             .toString()
             .trim()
             .toUpperCase()
         // 多选归一：A、C → A,C
         .replaceAll(RegExp(r'[、，,;；/\s]+'), ',');
+    // 连续字母串归一（外部导出的 "AC"）：仅当纯大写字母且长度>1 时拆为 A,C。
+    // 中文/数字答案（填空、判断）不受影响
+    if (RegExp(r'^[A-Z]{2,}$').hasMatch(correctAnswer)) {
+      correctAnswer = correctAnswer.split('').join(',');
+    }
 
     final typeRaw =
         (_first(m, ['question_type', 'type', '题型']) ?? '').toString().toLowerCase();

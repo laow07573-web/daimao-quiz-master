@@ -13,6 +13,7 @@ import 'reminder_service.dart';
 import 'ai_service.dart';
 import 'quiz_service.dart';
 import 'stats_service.dart';
+import 'debug_log_service.dart';
 import 'fsrs_service.dart';
 import 'key_crypto.dart';
 
@@ -170,6 +171,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
           correctAnswer: q.correctAnswer,
           analysis: q.analysis,
           questionType: q.questionType,
+          // v1.0.2 修复：预览阶段 AI 整理出的知识点不丢失
+          knowledgePoint: q.knowledgePoint,
           createdAt: now,
         )).toList();
 
@@ -387,13 +390,15 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     }).toList();
   }
 
-  /// 连续打卡天数（截止昨天，>=50 题/天，假期冻结）
+  /// 连续打卡天数（含今天，>=50 题/天，假期冻结）。
+  /// 今天未刷时与截止昨天结果一致；今天已刷则计入当天，首页/统计页口径统一
   Future<int> getStreakDays() async {
     final totals = await getYearlyTotals();
     return DatabaseService.countConsecutiveDays(
       totals,
       now: DateTime.now(),
       vacationDays: vacationDateRange,
+      upTo: DateTime.now(),
     );
   }
 
@@ -410,6 +415,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     final all = await _db.getAllSessions();
     return all.take(limit).toList();
   }
+
+  /// 按 id 查单个会话（改判后局部刷新用）
+  Future<QuizSession?> getSessionById(int id) => _db.getSessionById(id);
 
   /// 会话详情（answer_records JOIN questions）
   Future<List<Map<String, dynamic>>> getSessionDetail(int sessionId) =>
@@ -476,6 +484,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
         final rawText = await DocParserService.extractRawText(file.path);
         if (rawText.isEmpty) {
+          // 空文本：清理刚建的空题库，避免残留 0 题题库
+          await _db.deleteBank(bankId);
           processedFiles++;
           continue;
         }
@@ -502,6 +512,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         await _db.insertQuestions(questions);
         totalQuestions += questions.length;
         await _db.updateBankQuestionCount(bankId, questions.length);
+      } else {
+        // AI 解析失败/无可解析题目：清理空题库
+        await _db.deleteBank(bankId);
       }
 
       processedFiles++;
@@ -562,7 +575,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   // ======================== 刷题逻辑 ========================
 
-  Future<void> startQuiz() async {
+  Future<void> startQuiz({bool persistSession = true}) async {
     if (_selectedBankIds.isEmpty) return;
 
     await _quizService.startQuiz(
@@ -570,6 +583,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       mode: _selectedBankIds.length > 1 ? 'mixed' : 'single',
       questionCount: _selectedQuestionCount,
       noShuffle: _noShuffle,
+      persistSession: persistSession,
     );
 
     _currentSession = _quizService.currentSession;
@@ -605,7 +619,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _analysisLoading = false;
 
     // 更新 FSRS 状态（如果这道题已有 FSRS 卡，则更新；如果答错且没有卡，则创建）
-    if (!_skipFSRS) _updateFSRSIfNeeded(qId);
+    if (!_skipFSRS) {
+      try {
+        await _updateFSRSIfNeeded(qId);
+      } catch (e) {
+        DebugLogService.instance.log('FSRS', '更新 FSRS 失败: $e');
+      }
+    }
 
     notifyListeners();
   }
@@ -701,7 +721,32 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     } else {
       _lastAnswerRecord = null;
     }
+    // v1.0.2 修复：返回已答题时保留单题统计（异步加载，避免切题竞态覆盖）
+    final q = currentQuestion;
+    if (q?.id != null) {
+      final qid = q!.id!;
+      _quizService.getQuestionStats(qid).then((stats) {
+        if (_quizService.currentQuestion?.id == qid) {
+          _currentQuestionStats = stats;
+          notifyListeners();
+        }
+      });
+    } else {
+      _currentQuestionStats = {};
+    }
+  }
+
+  /// 当前会话是否已有作答记录
+  bool get hasSessionAnswers => _quizService.hasAnyAnswers;
+
+  /// 放弃当前会话（练习退出/未作答退出）：不保存记录、不产生幽灵会话
+  Future<void> abortSession() async {
+    await _quizService.abortSession();
+    _currentSession = null;
+    _quizQuestions = [];
     _currentQuestionStats = {};
+    _lastAnswerRecord = null;
+    notifyListeners();
   }
 
   Future<void> updateCurrentQuestion(String title, String answer, String? type) async {
@@ -791,10 +836,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     if (questions.isEmpty) return;
 
     questions.shuffle();
-    final count = questions.length > _selectedQuestionCount
-        ? _selectedQuestionCount
-        : questions.length;
-    final selectedQuestions = questions.take(count).toList();
+    // v1.0.2 修复：错题复习不再被 selectedQuestionCount（默认 50）静默截断，
+    // 复习范围与错题本展示口径一致
+    final selectedQuestions = questions;
 
     final session = QuizSession(
       bankIds: bankIds?.join(',') ?? 'all',
@@ -871,9 +915,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       'count': list.length,
       'questions': list,
     });
-    final dir = Directory.systemTemp.createTempSync('export');
+    // v1.0.2 修复：复用系统临时目录单文件（此前每次新建 createTempSync('export')
+    // 目录且从不清理，累积垃圾）
+    final tmp = Directory.systemTemp;
     final file = File(
-        '${dir.path}/错题导出_${DateTime.now().millisecondsSinceEpoch}.json');
+        '${tmp.path}/错题导出_${DateTime.now().millisecondsSinceEpoch}.json');
     await file.writeAsString(json);
     return file.path;
   }

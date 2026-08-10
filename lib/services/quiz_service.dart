@@ -34,15 +34,19 @@ class QuizService {
   void markAnswerStart() => _answerStartTime = DateTime.now();
 
   /// 开始新的刷题会话
+  /// [persistSession] 为 false 时不落库（练习/背题模式不产生会话行，
+  /// 避免「退出后本次练习记录将不保存」的幽灵会话）
   Future<void> startQuiz({
     required List<int> bankIds,
     required String mode,
     required int questionCount,
     List<QuestionBank>? allBanks,
     bool noShuffle = false,
+    bool persistSession = true,
   }) async {
-    // 从指定题库中随机抽取题目
-    final allQuestions = await _db.getQuestionsByBanks(bankIds);
+    // 从指定题库中随机抽取题目（noShuffle 时保持题库原始顺序）
+    final allQuestions =
+        await _db.getQuestionsByBanks(bankIds, random: !noShuffle);
 
     if (allQuestions.isEmpty) {
       _questions = [];
@@ -63,13 +67,15 @@ class QuizService {
       startTime: DateTime.now().toIso8601String(),
     );
 
-    _currentSession = QuizSession(
-      id: await _db.insertSession(_currentSession!),
-      bankIds: _currentSession!.bankIds,
-      mode: _currentSession!.mode,
-      totalQuestions: _currentSession!.totalQuestions,
-      startTime: _currentSession!.startTime,
-    );
+    if (persistSession) {
+      _currentSession = QuizSession(
+        id: await _db.insertSession(_currentSession!),
+        bankIds: _currentSession!.bankIds,
+        mode: _currentSession!.mode,
+        totalQuestions: _currentSession!.totalQuestions,
+        startTime: _currentSession!.startTime,
+      );
+    }
 
     DebugLogService.instance.log('SESSION', '新会话 id=${_currentSession!.id} start=${_currentSession!.startTime} questions=${_currentSession!.totalQuestions}');
     _currentIndex = 0;
@@ -118,9 +124,11 @@ class QuizService {
     if (question.questionType == 'ming_jie' ||
         question.questionType == 'jian_da' ||
         question.questionType == 'jie_da') {
-      // 名解/简答/问答：去除标点后做包含匹配
+      // 名解/简答/问答：去除标点后做包含匹配；
+      // 恰好 3 字（如"细胞壁"）精确相等时豁免"过短判错"限制
       final userClean = stripPunct(normalizedUser);
       final correctClean = stripPunct(correctAnswer);
+      if (userClean.isNotEmpty && userClean == correctClean) return true;
       return userClean.length > 3 &&
           (correctClean.contains(userClean) || userClean.contains(correctClean));
     }
@@ -227,6 +235,23 @@ class QuizService {
     return false;
   }
 
+  /// 当前会话是否已有作答记录（退出时用于区分"正常结束"与"放弃"）
+  bool get hasAnyAnswers =>
+      (_currentSession?.correctCount ?? 0) + (_currentSession?.wrongCount ?? 0) >
+      0;
+
+  /// 放弃当前会话：删除会话行与作答记录（练习模式退出/未作答退出），
+  /// 兑现「退出后本次练习记录将不保存」的承诺，不产生 0 题幽灵会话
+  Future<void> abortSession() async {
+    final s = _currentSession;
+    _questions = [];
+    _currentSession = null;
+    _currentIndex = 0;
+    if (s?.id != null) {
+      await _db.deleteSessionWithRecords(s!.id!);
+    }
+  }
+
   /// 结束当前会话
   Future<QuizSession> endSession() async {
     if (_currentSession == null) {
@@ -235,7 +260,9 @@ class QuizService {
 
     final endTime = DateTime.now();
     final startTime = DateTime.parse(_currentSession!.startTime);
-    final durationSeconds = endTime.difference(startTime).inSeconds;
+    // 时钟回拨保护：时长不允许为负
+    final durationSeconds =
+        endTime.difference(startTime).inSeconds < 0 ? 0 : endTime.difference(startTime).inSeconds;
 
     DebugLogService.instance.log('SESSION',
         '结束会话 id=${_currentSession!.id} start=$startTime end=$endTime duration=${durationSeconds}s');

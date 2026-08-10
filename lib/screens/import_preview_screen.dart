@@ -28,7 +28,11 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
             foregroundColor: Colors.white,
             actions: [
               TextButton(
-                onPressed: () => appState.clearPreview(),
+                // v1.0.2 修复：取消后返回上一页（此前只清数据，停留在死页面）
+                onPressed: () {
+                  appState.clearPreview();
+                  Navigator.pop(context);
+                },
                 child: const Text('取消', style: TextStyle(color: Colors.white70)),
               ),
             ],

@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 签名校验：首次运行锁定签名，后续检测变化则弹窗告警
+///
+/// v1.0.2 说明：异常路径保持 fail-safe 放行（MethodChannel 未注册/返回 null 时
+/// 不阻塞启动），避免原生环境异常导致用户无法进入 App；签名锁定/比对逻辑
+/// 在 Android release 下正常生效（MainActivity TAMPER_CHANNEL 提供 getSignatureHash）
 class TamperCheck {
   static const _prefKey = 'tamper_sig';
 

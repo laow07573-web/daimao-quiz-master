@@ -120,6 +120,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
   int _remainingSeconds = 0;
   bool _submitted = false;
   bool _modalOpen = false; // v1.0.2: 挡路弹窗标记（答题卡/退出确认）
+  // v1.0.2 修复：填空 controller（切题重建，dispose 释放）
+  TextEditingController? _fillCtrl;
+  int? _fillCtrlIndex;
 
   @override
   void initState() {
@@ -129,7 +132,12 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   @override
-  void dispose() { _timer?.cancel(); _scrollCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _timer?.cancel();
+    _fillCtrl?.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   void _startTimer() {
     _timer?.cancel();
@@ -249,7 +257,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   Widget _buildQCard(Question q, ColorScheme cs) {
-    final t = {'single_choice':'单选','multi_choice':'多选','true_false':'判断','fill_blank':'填空'};
+    // v1.0.2 修复：补齐名解/简答/问答题型映射（此前显示为「单选」）
+    final t = {
+      'single_choice': '单选',
+      'multi_choice': '多选',
+      'true_false': '判断',
+      'fill_blank': '填空',
+      'ming_jie': '名解',
+      'jian_da': '简答',
+      'jie_da': '问答',
+    };
     return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: cs.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text(t[q.questionType] ?? '单选', style: TextStyle(fontSize: 11, color: cs.primary))), const SizedBox(width: 8), Expanded(child: Text(q.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cs.onSurface)))]),
@@ -259,8 +276,24 @@ class _PracticeScreenState extends State<PracticeScreen> {
   Widget _buildOpts(Question q, ColorScheme cs) {
     final opts = q.questionType == 'true_false' ? ['对', '错'] : q.options;
     if (opts.isEmpty) {
-      final ctrl = TextEditingController(text: _answers[_currentIndex] ?? '');
-      return Column(children: [TextField(controller: ctrl, decoration: const InputDecoration(hintText: '输入答案...', border: OutlineInputBorder()), onChanged: (v) => _answers[_currentIndex] = v), const SizedBox(height: 8), FilledButton(onPressed: () => setState(() {}), child: const Text('确认'))]);
+      // v1.0.2 修复：填空 controller 由 State 统一管理（切题重建、dispose 释放），
+      // 避免每次 build 新建泄漏；多空提示用分号分隔
+      if (_fillCtrlIndex != _currentIndex) {
+        _fillCtrl?.dispose();
+        _fillCtrl = TextEditingController(text: _answers[_currentIndex] ?? '');
+        _fillCtrlIndex = _currentIndex;
+      }
+      final ctrl = _fillCtrl!;
+      return Column(children: [
+        TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+              hintText: '输入答案（多个空用；分隔）', border: OutlineInputBorder()),
+          onChanged: (v) => _answers[_currentIndex] = v,
+        ),
+        const SizedBox(height: 8),
+        FilledButton(onPressed: () => setState(() {}), child: const Text('确认')),
+      ]);
     }
     final isMulti = q.questionType == 'multi_choice';
     final ua = _answers[_currentIndex] ?? '';

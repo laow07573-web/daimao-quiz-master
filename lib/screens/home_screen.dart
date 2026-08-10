@@ -136,7 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
-                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.0.2',
+                      // v1.0.2 修复：版本号统一 v1.26.6.17（与我的页/关于弹窗一致）
+                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.26.6.17',
                       style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.4)),
                     ),
                   ),
@@ -262,6 +263,8 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
+          // v1.0.2 修复：小屏/大字体下可滚动，避免溢出
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,6 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               const SizedBox(height: 8),
             ],
+          ),
           ),
         ),
       ),
@@ -550,6 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showCustomCountDialog(BuildContext context, AppState appState) {
     final ctrl = TextEditingController();
+    // v1.0.2 修复：弹窗关闭后释放 controller
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -563,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }, child: const Text('确定')),
         ],
       ),
-    );
+    ).then((_) => ctrl.dispose());
   }
 
   void _showQuizModePicker(BuildContext context, AppState appState) {
@@ -644,14 +649,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _startQuiz(BuildContext context, AppState appState) async {
     if (_vacationBlocked(appState)) return;
-    if (!appState.settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('请先在设置中配置 DeepSeek API Key'),
-            backgroundColor: Colors.orange),
-      );
-      return;
-    }
+    // v1.0.2 修复：刷题不再强制要求 API Key（AI 解析/追问内部单独提示）
 
     await appState.startQuiz();
 
@@ -674,19 +672,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _startPractice(BuildContext context, AppState appState) async {
     if (_vacationBlocked(appState)) return;
-    if (!appState.settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
     if (appState.selectedBankIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先在首页选择题库')),
       );
       return;
     }
-    await appState.startQuiz();
+    // v1.0.2 修复：练习不落会话行（退出后练习记录不保存的承诺），无需 API Key
+    await appState.startQuiz(persistSession: false);
     if (appState.quizQuestions.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -703,13 +696,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _startMemorize(BuildContext context, AppState appState) async {
     if (_vacationBlocked(appState)) return;
-    if (!appState.settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在设置中配置 API Key'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-    // v1.0.2: 背题需先选题库
+    // v1.0.2 修复：背题无需 API Key；不落会话行（背题不计统计）
     if (appState.selectedBankIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先在首页选择题库')),
@@ -717,8 +704,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     appState.noShuffle = true;
-    await appState.startQuiz();
-    appState.noShuffle = false;
+    try {
+      await appState.startQuiz(persistSession: false);
+    } finally {
+      appState.noShuffle = false; // v1.0.2 修复：异常时也复位，防泄漏到后续会话
+    }
     if (appState.quizQuestions.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

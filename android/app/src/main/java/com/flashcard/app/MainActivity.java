@@ -1,8 +1,11 @@
 package com.flashcard.app;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -16,6 +19,8 @@ import java.util.Set;
 public class MainActivity extends FlutterActivity {
     private static final String TAMPER_CHANNEL = "com.flashcard.app/tamper";
     private static final String KEEPALIVE_CHANNEL = "com.flashcard.app/keepalive";
+    private static final String NOTIFICATION_CHANNEL = "com.flashcard.app/notification";
+    private static final int REQ_NOTIFICATION_PERMISSION = 2001;
 
     /** 无障碍服务完整组件名（ComponentName.flattenToString 形式） */
     private static final String ACCESSIBILITY_COMPONENT =
@@ -76,6 +81,35 @@ public class MainActivity extends FlutterActivity {
                         result.success(true);
                     } catch (Exception e) {
                         result.error("INTENT_ERROR", e.getMessage(), null);
+                    }
+                } else {
+                    result.notImplemented();
+                }
+            });
+
+        // v1.0.2 修复: Android 13+ 通知运行时权限（提醒/测试通知前请求）
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), NOTIFICATION_CHANNEL)
+            .setMethodCallHandler((call, result) -> {
+                if (call.method.equals("requestNotificationPermission")) {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                                == PackageManager.PERMISSION_GRANTED) {
+                            result.success(true);
+                        } else {
+                            requestPermissions(
+                                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                                    REQ_NOTIFICATION_PERMISSION);
+                            result.success(false);
+                        }
+                    } else {
+                        result.success(true);
+                    }
+                } else if (call.method.equals("hasNotificationPermission")) {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        result.success(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                                == PackageManager.PERMISSION_GRANTED);
+                    } else {
+                        result.success(true);
                     }
                 } else {
                     result.notImplemented();

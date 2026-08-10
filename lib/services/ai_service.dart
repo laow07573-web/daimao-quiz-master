@@ -132,8 +132,8 @@ $chunk
         logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
         _trackUsage(data);
 
-        // 解析 JSON 响应
-        final parsed = jsonDecode(content);
+        // 解析 JSON 响应（容忍 ```json 围栏等常见模型输出格式）
+        final parsed = _extractJson(content);
         final questionsList = parsed['questions'] as List?;
         if (questionsList == null) return [];
 
@@ -167,6 +167,27 @@ $chunk
     return s;
   }
 
+  /// 解析模型返回的 JSON：剥离 ```json ... ``` 围栏与前后噪音再 decode
+  static Map<String, dynamic> _extractJson(String content) {
+    var s = content.trim();
+    // 剥 ```json ``` / ``` ``` 围栏
+    final fence = RegExp(r'^```(?:json)?\s*([\s\S]*?)\s*```$', caseSensitive: false);
+    final fenceMatch = fence.firstMatch(s);
+    if (fenceMatch != null) {
+      s = fenceMatch.group(1)!.trim();
+    }
+    // 剥前后花括号外的散落文本
+    final first = s.indexOf('{');
+    final last = s.lastIndexOf('}');
+    if (first >= 0 && last > first) {
+      s = s.substring(first, last + 1);
+    }
+    final decoded = jsonDecode(s);
+    return decoded is Map<String, dynamic>
+        ? decoded
+        : (decoded is Map ? Map<String, dynamic>.from(decoded) : <String, dynamic>{});
+  }
+
   String _detectType(Map q) {
     // 优先使用 AI 返回的 question_type
     final aiType = q['question_type']?.toString() ?? '';
@@ -193,12 +214,21 @@ $chunk
     // 调用 AI 生成解析
     final analysis = await _callAIForAnalysis(question);
 
-    // 缓存结果
-    if (question.id != null && analysis.isNotEmpty) {
+    // 缓存结果（失败串不入缓存：断网/401 等错误不会被永久当成解析展示，
+    // 下次点击可重新请求）
+    if (question.id != null && analysis.isNotEmpty && !isAiError(analysis)) {
       await _db.cacheAnalysis(question.id!, analysis);
     }
 
     return analysis;
+  }
+
+  /// 判断是否为 AI 失败/错误串（非真实解析内容）
+  static bool isAiError(String s) {
+    return s.startsWith('AI请求失败') ||
+        s.startsWith('AI服务返回错误') ||
+        s.startsWith('AI解析生成失败') ||
+        s.startsWith('解析生成失败');
   }
 
   /// 追问功能：基于原题和解析进行追问
@@ -476,7 +506,8 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     }
   }
 
-  /// 查询 DeepSeek API 余额（元）
+  /// 查询 API 余额（元）：base 从可配置 apiEndpoint 推导（换供应商后余额接口跟随），
+  /// 仅当主机为 deepseek.com 时请求其专用余额接口，其余主机按通用 /user/balance 尝试
   Future<double?> fetchBalance() async {
     if (_settings.apiKey.isEmpty) return null;
     if (_cachedBalance != null && _balanceCacheTime != null &&
@@ -484,8 +515,12 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
       return _cachedBalance;
     }
     try {
+      final base = Uri.parse(_settings.apiEndpoint);
+      // 余额接口为 DeepSeek 专用；换供应商时按配置端点尝试，失败则返回 null
+      final balanceUri =
+          Uri(scheme: base.scheme, host: base.host, path: '/user/balance');
       final response = await _client.get(
-        Uri.parse('https://api.deepseek.com/user/balance'),
+        balanceUri,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer ${_settings.apiKey}',

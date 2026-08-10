@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -31,10 +32,39 @@ class ReminderService {
       FlutterLocalNotificationsPlugin();
   final DatabaseService _db = DatabaseService.instance;
 
+  static const _permissionChannel = MethodChannel('com.flashcard.app/notification');
+
   bool _initialized = false;
   String _notifiedKeyPrefix = 'reminder_notified_';
 
   bool get initialized => _initialized;
+
+  // ======================== Android 13+ 通知权限 ========================
+
+  /// 请求通知运行时权限（弹系统授权框）。
+  /// 已授权或 Android < 13 直接返回 true；发起请求时返回 false（需用户确认后
+  /// 通过 [hasNotificationPermission] 复查）
+  Future<bool> requestNotificationPermission() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      return await _permissionChannel
+              .invokeMethod<bool>('requestNotificationPermission') ??
+          true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// 是否已有通知权限
+  Future<bool> hasNotificationPermission() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      return await _permissionChannel.invokeMethod<bool>('hasNotificationPermission') ??
+          true;
+    } catch (_) {
+      return true;
+    }
+  }
 
   // ======================== 初始化 ========================
 
@@ -73,7 +103,8 @@ class ReminderService {
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
         interval: 30000,
-        autoRunOnBoot: false,
+        // v1.0.2 修复：开机自启，配合 boot 恢复排程减少"重启后提醒失效"窗口
+        autoRunOnBoot: true,
       ),
     );
 
@@ -89,7 +120,7 @@ class ReminderService {
     if (start) {
       await _startForegroundService();
       _startPolling();
-      await _scheduleAlarm(rescheduleIfPassed: true);
+      await _scheduleAlarm();
     } else {
       _stopPolling();
       await _stopAll();
@@ -121,11 +152,12 @@ class ReminderService {
     return DateTime(now.year, now.month, now.day, t.hour, t.minute);
   }
 
-  /// 排程单次 AlarmManager（zonedSchedule；当天时间已过则排明天）
-  Future<void> _scheduleAlarm({bool rescheduleIfPassed = false}) async {
+  /// 排程单次 AlarmManager（zonedSchedule；当天时间已过则排明天；
+  /// [forceTomorrow] 为 true 时无条件排明天——答题后续排用，避免"已刷当天仍弹"）
+  Future<void> _scheduleAlarm({bool forceTomorrow = false}) async {
     final now = DateTime.now();
     var target = await _reminderTimeToday();
-    if (target.isBefore(now)) {
+    if (forceTomorrow || target.isBefore(now)) {
       target = target.add(const Duration(days: 1));
     }
     final details = const NotificationDetails(
@@ -147,12 +179,12 @@ class ReminderService {
     );
   }
 
-  /// 答题/启动后续排明天
+  /// 答题/启动后续排明天（今天已刷，不再重复提醒）
   Future<void> rescheduleNextDay() async {
     if (!Platform.isAndroid || !_initialized) return;
     final enabled = (await _db.getSetting('reminder_enabled') ?? '0') == '1';
     if (!enabled) return;
-    await _scheduleAlarm();
+    await _scheduleAlarm(forceTomorrow: true);
   }
 
   // ======================== 前台服务 ========================
@@ -194,8 +226,9 @@ class ReminderService {
     if (await _practicedToday(now)) return;
 
     await _notify(now);
-    // 弹通知后取消当天 alarm 防双弹
+    // 弹通知后取消当天 alarm 防双弹，并接力排明天（保证次日提醒不中断）
     await _notifications.cancel(alarmId);
+    await _scheduleAlarm(forceTomorrow: true);
   }
 
   Future<bool> _practicedToday(DateTime now) async {
@@ -210,6 +243,9 @@ class ReminderService {
   }
 
   Future<void> _notify(DateTime now) async {
+    // 先记录已弹，再弹通知：进程在 show 与记录之间被杀也不会重复弹
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_notifiedKeyPrefix${_dateKey(now)}', true);
     await _notifications.show(
       notifyId,
       '呆猫刷题宝',
@@ -224,9 +260,6 @@ class ReminderService {
         ),
       ),
     );
-    // 先弹后记录
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_notifiedKeyPrefix${_dateKey(now)}', true);
   }
 
   /// 补弹：App 打开时调用。已过时间 + 未刷 + 未弹过 → 补弹（防双弹：先查通知栏活跃通知）
@@ -249,11 +282,14 @@ class ReminderService {
 
     await _notify(now);
     await _notifications.cancel(alarmId);
+    // 补弹后同样接力排明天
+    await _scheduleAlarm(forceTomorrow: true);
   }
 
-  /// 发送测试通知（设置页按钮，验证通知渠道可用）
-  Future<void> sendTestNotification() async {
-    if (!Platform.isAndroid || !_initialized) return;
+  /// 发送测试通知（设置页按钮，验证通知渠道可用）。
+  /// 返回是否实际发出（非 Android 或未初始化返回 false）
+  Future<bool> sendTestNotification() async {
+    if (!Platform.isAndroid || !_initialized) return false;
     await _notifications.show(
       9999,
       '呆猫刷题宝',
@@ -268,6 +304,7 @@ class ReminderService {
         ),
       ),
     );
+    return true;
   }
 
   // ======================== 文案 ========================
@@ -348,7 +385,9 @@ class ReminderService {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
 
-/// 前台服务后台任务处理器（保活；轮询检查由主 isolate Timer 承担）
+/// 前台服务后台任务处理器（保活；轮询检查由主 isolate Timer 承担。
+/// 注：后台 isolate 无法访问 sqflite 插件，重启后提醒恢复依赖
+/// autoRunOnBoot 启动服务 + boot 恢复 pending alarm + 用户下次打开 App 时 syncSchedule）
 class _ReminderTaskHandler extends TaskHandler {
   @override
   void onStart(DateTime timestamp, SendPort? sendPort) {}

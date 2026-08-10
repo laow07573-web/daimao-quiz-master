@@ -36,6 +36,8 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isMemorizeMode = false;
   // 练习模式状态
   final List<PracticeAnswerState> _practiceAnswers = [];
+  // v1.0.2 修复：提交防重（双击不产生重复作答记录）
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -69,14 +71,6 @@ class _QuizScreenState extends State<QuizScreen> {
       builder: (context, appState, _) {
         final cs = Theme.of(context).colorScheme;
         final question = appState.currentQuestion;
-        if (question?.id != null) {
-          appState.isInErrorBook(question!.id!).then((inBook) {
-            if (mounted && _inErrorBook != inBook) {
-              setState(() => _inErrorBook = inBook);
-            }
-          });
-        }
-
         if (question == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('刷题中')),
@@ -107,10 +101,25 @@ class _QuizScreenState extends State<QuizScreen> {
           _followUpResponse = null;
           _followUpLoading = false;
           _lastQuestionId = appState.currentQuestion?.id;
+          // v1.0.2 修复：错题本状态移出 build，改在切题时一次性查询
+          final qid = appState.currentQuestion?.id;
+          if (qid != null) {
+            appState.isInErrorBook(qid).then((inBook) {
+              if (mounted && _inErrorBook != inBook) {
+                setState(() => _inErrorBook = inBook);
+              }
+            });
+          }
         }
 
-        return Scaffold(
-          backgroundColor: cs.surface,
+        return PopScope(
+          // v1.0.2 修复：系统返回键不再产生未结束的幽灵会话
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _handleExit(appState);
+          },
+          child: Scaffold(
+            backgroundColor: cs.surface,
           appBar: AppBar(
             title: Text(
                 '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
@@ -135,7 +144,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
               if (widget.quizMode == QuizMode.memorize)
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => _handleExit(appState),
                   child: const Text('结束', style: TextStyle(color: Colors.white70)),
                 ),
             ],
@@ -230,9 +239,48 @@ class _QuizScreenState extends State<QuizScreen> {
               if (isAnswered || widget.quizMode == QuizMode.memorize) _buildBottomBar(appState, cs),
             ],
           ),
-        );
+        ),
+      );
       },
     );
+  }
+
+  /// v1.0.2 修复：统一退出路径（系统返回键/结束按钮）。
+  /// 有作答 → 正常结束会话；无作答（练习/背题未作答）→ 放弃会话不落库
+  Future<void> _handleExit(AppState appState) async {
+    final isPractice = widget.quizMode == QuizMode.practice;
+    final hint = isPractice
+        ? '退出后本次练习记录将不保存。'
+        : (appState.hasSessionAnswers
+            ? '本次刷题进度将结束并计入统计。'
+            : '尚未作答任何题目，退出后不产生记录。');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('退出刷题'),
+        content: Text(hint),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('继续刷题'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      if (isPractice || !appState.hasSessionAnswers) {
+        await appState.abortSession();
+      } else {
+        await appState.endSession();
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   /// 背题模式：选项中高亮正确选项
@@ -546,23 +594,32 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _handleSubmitAnswer(AppState appState, String answer) async {
-    await appState.submitAnswer(answer);
-    if (!mounted) return;
-    final record = appState.lastAnswerRecord;
-    if (record != null) {
-      if (record.isCorrect) {
-        HapticFeedback.lightImpact();
-        _playSound('correct.wav', appState);
-      } else {
-        HapticFeedback.mediumImpact();
-        _playSound('wrong.wav', appState);
+    if (_submitting) return; // v1.0.2 修复：双击防重
+    _submitting = true;
+    try {
+      await appState.submitAnswer(answer);
+      if (!mounted) return;
+      final record = appState.lastAnswerRecord;
+      if (record != null) {
+        if (record.isCorrect) {
+          HapticFeedback.lightImpact();
+          _playSound('correct.wav', appState);
+        } else {
+          HapticFeedback.mediumImpact();
+          _playSound('wrong.wav', appState);
+        }
       }
-    }
-    if (record != null && record.isCorrect && !appState.isLastQuestion) {
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (mounted) {
-        _advanceQuestion(appState);
+      if (record != null && record.isCorrect && !appState.isLastQuestion) {
+        // v1.0.2 修复：600ms 延迟自动跳题前比对题号，
+        // 用户在窗口内手动跳题时不重复跳转（避免跳过中间题）
+        final answeredIndex = appState.currentQuestionIndex;
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted && appState.currentQuestionIndex == answeredIndex) {
+          _advanceQuestion(appState);
+        }
       }
+    } finally {
+      _submitting = false;
     }
   }
 
@@ -917,6 +974,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       _followUpResponse = null;
                     });
                     final resp = await appState.askFollowUp(q);
+                    if (!mounted) return; // v1.0.2 修复：页面已退出不再 setState
                     setState(() {
                       _followUpLoading = false;
                       _followUpResponse = resp;
@@ -972,8 +1030,11 @@ class _QuizScreenState extends State<QuizScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  if (widget.quizMode == QuizMode.memorize) { Navigator.pop(context); }
-                  else { _handleEndSession(context, appState); }
+                  if (widget.quizMode == QuizMode.memorize) {
+                    _handleExit(appState);
+                  } else {
+                    _handleEndSession(context, appState);
+                  }
                 },
                 child: Text(
                     widget.quizMode == QuizMode.memorize ? '回到首页' : '完成刷题，查看小结',

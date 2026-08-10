@@ -45,8 +45,10 @@ class StatsTabState extends State<StatsTab> {
   }
 
   /// 供 MainShell 切 Tab 时调用
+  /// v1.0.2 修复：排行/历史/错题统计一并重载（此前只加载一次永不刷新）
   Future<void> refresh() async {
     await _loadAll();
+    await _loadRankings();
   }
 
   Future<void> _loadAll() async {
@@ -105,27 +107,31 @@ class StatsTabState extends State<StatsTab> {
   }
 
   Future<void> _loadRankings() async {
-    final appState = context.read<AppState>();
-    final banks = await appState.getBankAccuracies();
-    final kps = await appState.getAccuracyByKnowledgePoint();
-    final errors = await appState.getErrorBookStats();
-    final sessions = await appState.getRecentSessions(10);
-    final hidden = await appState.getHiddenTodayRecordCount();
-    if (!mounted) return;
-    setState(() {
-      _bankAccuracy = banks
-          .map((b) => {
-                'name': b.bankName,
-                'total': b.total,
-                'correct': b.correct,
-                'accuracy': b.accuracy,
-              })
-          .toList();
-      _kpAccuracy = kps;
-      _errorStats = errors;
-      _recentSessions = sessions;
-      _hiddenTodayCount = hidden;
-    });
+    try {
+      final appState = context.read<AppState>();
+      final banks = await appState.getBankAccuracies();
+      final kps = await appState.getAccuracyByKnowledgePoint();
+      final errors = await appState.getErrorBookStats();
+      final sessions = await appState.getRecentSessions(10);
+      final hidden = await appState.getHiddenTodayRecordCount();
+      if (!mounted) return;
+      setState(() {
+        _bankAccuracy = banks
+            .map((b) => {
+                  'name': b.bankName,
+                  'total': b.total,
+                  'correct': b.correct,
+                  'accuracy': b.accuracy,
+                })
+            .toList();
+        _kpAccuracy = kps;
+        _errorStats = errors;
+        _recentSessions = sessions;
+        _hiddenTodayCount = hidden;
+      });
+    } catch (_) {
+      // 排行加载失败不影响主统计展示
+    }
   }
 
   /// v1.0.2 对齐里程碑：隐藏今日答题记录（确认说明）
@@ -151,6 +157,8 @@ class StatsTabState extends State<StatsTab> {
     final hidden = await appState.hideTodayRecords();
     if (!mounted) return;
     await _loadAll();
+    // v1.0.2 修复：隐藏后同步刷新排行与恢复卡片（此前恢复入口不可达）
+    await _loadRankings();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -166,6 +174,8 @@ class StatsTabState extends State<StatsTab> {
     await appState.restoreTodayRecords();
     if (!mounted) return;
     await _loadAll();
+    // v1.0.2 修复：恢复后同步刷新（恢复卡片消失、排行回填）
+    await _loadRankings();
   }
 
   @override
@@ -703,11 +713,14 @@ class _HistorySection extends StatelessWidget {
       case 'mixed':
         return '混合题库';
       case 'single':
-        return '全部题库';
+        // v1.0.2 修复：单题库模式不再误标为「全部题库」
+        return '单题库';
       case 'practice':
         return '练习模式';
       case 'memorize':
         return '背题模式';
+      case 'simulation':
+        return '模拟数据';
       default:
         return '全部题库';
     }
@@ -752,7 +765,10 @@ class _HistorySection extends StatelessWidget {
                               color: cs.onSurface),
                         ),
                         Text(
-                          _formatTime(s.startTime),
+                          // v1.0.2 修复：未完成会话（异常退出遗留）加标识
+                          s.endTime == null || s.endTime!.isEmpty
+                              ? '${_formatTime(s.startTime)} · 未完成'
+                              : _formatTime(s.startTime),
                           style: TextStyle(
                               fontSize: 11, color: cs.onSurfaceVariant),
                         ),

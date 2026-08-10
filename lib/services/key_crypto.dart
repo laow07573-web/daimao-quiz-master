@@ -103,7 +103,10 @@ class KeyCrypto {
         for (var i = 0; i < encrypted.length; i++) {
           decrypted.add(encrypted[i] ^ key[i]);
         }
-        return String.fromCharCodes(decrypted);
+        final result = String.fromCharCodes(decrypted);
+        // 可读性校验：v1 密文解出的必是真实 key（sk- 开头 ASCII）；
+        // 乱码（含大量控制字符）说明是"恰好符合 base64 字符集的明文"被误解 → 按明文返回
+        if (_isReadable(result)) return result;
       } catch (_) {
         // 落入下方明文回退
       }
@@ -111,6 +114,16 @@ class KeyCrypto {
 
     // 旧版明文 Key，直接返回
     return encoded;
+  }
+
+  /// 可读性校验：控制字符/替换符比例低（用于区分 v1 XOR 解出的真实 key 与乱码）
+  static bool _isReadable(String s) {
+    if (s.isEmpty) return false;
+    var bad = 0;
+    for (final c in s.codeUnits) {
+      if (c < 32 || c == 0xFFFD) bad++;
+    }
+    return bad / s.length < 0.1;
   }
 
   static Uint8List _randomBytes(int len) {

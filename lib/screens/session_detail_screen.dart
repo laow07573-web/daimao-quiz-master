@@ -17,6 +17,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   List<Map<String, dynamic>>? _records;
   String? _error;
   late QuizSession _session = widget.session;
+  // v1.0.2 修复：改判防双击
+  bool _rejudging = false;
 
   @override
   void initState() {
@@ -38,28 +40,31 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   /// v1.0.2 对齐里程碑：改判（判错了？/ 已改判为正确·错误）
   Future<void> _rejudge(int recordId, bool newCorrect) async {
-    await context.read<AppState>().rejudgeAnswerRecord(recordId, newCorrect);
-    if (!mounted) return;
-    // 刷新记录 + 会话概览数字
-    final records =
-        await context.read<AppState>().getSessionDetail(widget.session.id!);
-    final sessions = await context.read<AppState>().getRecentSessions(200);
-    final updated = sessions
-        .where((s) => s.id == widget.session.id)
-        .firstOrNull;
-    if (!mounted) return;
-    setState(() {
-      _records = records;
-      if (updated != null) _session = updated;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(newCorrect ? '已改判为正确' : '已改判为错误'),
-        backgroundColor: newCorrect
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.error,
-      ),
-    );
+    if (_rejudging) return;
+    _rejudging = true;
+    try {
+      await context.read<AppState>().rejudgeAnswerRecord(recordId, newCorrect);
+      if (!mounted) return;
+      // v1.0.2 修复：按 sessionId 局部刷新概览，不再受 getRecentSessions(200) 限制
+      final records =
+          await context.read<AppState>().getSessionDetail(widget.session.id!);
+      final updated = await context.read<AppState>().getSessionById(widget.session.id!);
+      if (!mounted) return;
+      setState(() {
+        _records = records;
+        if (updated != null) _session = updated;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newCorrect ? '已改判为正确' : '已改判为错误'),
+          backgroundColor: newCorrect
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      _rejudging = false;
+    }
   }
 
   @override
@@ -109,6 +114,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   for (final r in _records!)
                     _RecordTile(
                       record: r,
+                      disabled: _rejudging,
                       onRejudge: (newCorrect) =>
                           _rejudge(r['id'] as int, newCorrect),
                     ),
@@ -151,10 +157,12 @@ class _Info extends StatelessWidget {
 }
 
 class _RecordTile extends StatelessWidget {
-  const _RecordTile({required this.record, required this.onRejudge});
+  const _RecordTile(
+      {required this.record, required this.onRejudge, this.disabled = false});
 
   final Map<String, dynamic> record;
   final ValueChanged<bool> onRejudge;
+  final bool disabled;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +236,7 @@ class _RecordTile extends StatelessWidget {
                 foregroundColor:
                     isCorrect ? cs.onSurfaceVariant : cs.tertiary,
               ),
-              onPressed: () => onRejudge(!isCorrect),
+              onPressed: disabled ? null : () => onRejudge(!isCorrect),
               child: Text(
                 // v1.0.2 对齐里程碑：判错了，改判正确
                 isCorrect ? '改判为错误' : '判错了，改判正确',

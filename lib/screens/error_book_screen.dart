@@ -52,21 +52,37 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       };
 
   Future<void> _loadStats() async {
-    final appState = context.read<AppState>();
-    final stats = await appState.getErrorBookStats();
-    if (!mounted) return;
-    setState(() {
-      _stats = stats;
-      _loading = false;
-    });
-    await _loadKpStats(appState);
+    // v1.0.2 修复：加载异常不卡在转圈态，提示错误并回到空态
+    try {
+      final appState = context.read<AppState>();
+      final stats = await appState.getErrorBookStats();
+      if (!mounted) return;
+      setState(() {
+        _stats = stats;
+        _loading = false;
+      });
+      await _loadKpStats(appState);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _stats = [];
+        _loading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('加载错题本失败：$e')),
+      );
+    }
   }
 
   Future<void> _loadKpStats(AppState appState) async {
-    final filter = _filter;
-    final kps = await appState.getKnowledgePointStats(filter);
-    if (!mounted || _filter != filter) return; // 防竞态：筛选已切换则丢弃
-    setState(() => _kpStats = kps);
+    try {
+      final filter = _filter;
+      final kps = await appState.getKnowledgePointStats(filter);
+      if (!mounted || _filter != filter) return; // 防竞态：筛选已切换则丢弃
+      setState(() => _kpStats = kps);
+    } catch (_) {
+      // 知识点分组失败不影响主列表
+    }
   }
 
   Future<void> _switchFilter(String filter) async {
@@ -118,14 +134,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       );
       return true;
     }
-    if (!appState.settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('请先填写 API Key 再使用此功能'),
-            backgroundColor: Colors.orange),
-      );
-      return true;
-    }
+    // v1.0.2 修复：错题复习不依赖 AI，不再要求 API Key
     return false;
   }
 
@@ -220,42 +229,51 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     if (ai == null) return;
 
     setState(() => _adviceLoading = true);
-    // 统计文本：知识点 + 错题数 + 正确率（本地精炼已按错题统计排序）
-    final accByKp = await appState.getAccuracyByKnowledgePoint();
-    // v1.0.2 对齐里程碑：各知识点数据：
-    final statsText = '各知识点数据：\n' +
-        _kpStats
-            .map((s) {
-              final kp = s['kp'] as String;
-              final row = accByKp
-                  .where((a) => (a['kp'] as String?) == kp)
-                  .firstOrNull;
-              final total = (row?['total'] as int?) ?? 0;
-              final correct = (row?['correct'] as int?) ?? 0;
-              final acc = total > 0
-                  ? '${(correct / total * 100).toStringAsFixed(1)}%'
-                  : '无记录';
-              return '**$kp**：错题 ${s['cnt']} 道，正确率 $acc';
-            })
-            .join('\n');
+    // v1.0.2 修复：生成建议异常时复位 loading 并提示，不再永久禁用按钮
+    try {
+      // 统计文本：知识点 + 错题数 + 正确率（本地精炼已按错题统计排序）
+      final accByKp = await appState.getAccuracyByKnowledgePoint();
+      // v1.0.2 对齐里程碑：各知识点数据：
+      final statsText = '各知识点数据：\n' +
+          _kpStats
+              .map((s) {
+                final kp = s['kp'] as String;
+                final row = accByKp
+                    .where((a) => (a['kp'] as String?) == kp)
+                    .firstOrNull;
+                final total = (row?['total'] as int?) ?? 0;
+                final correct = (row?['correct'] as int?) ?? 0;
+                final acc = total > 0
+                    ? '${(correct / total * 100).toStringAsFixed(1)}%'
+                    : '无记录';
+                return '**$kp**：错题 ${s['cnt']} 道，正确率 $acc';
+              })
+              .join('\n');
 
-    final result = await ai.generateKpAdvice(statsText);
-    if (!mounted) return;
-    setState(() => _adviceLoading = false);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('薄弱知识点建议'),
-        content: SingleChildScrollView(
-          child: SelectableText(result,
-              style: const TextStyle(fontSize: 13, height: 1.5)),
+      final result = await ai.generateKpAdvice(statsText);
+      if (!mounted) return;
+      setState(() => _adviceLoading = false);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('薄弱知识点建议'),
+          content: SingleChildScrollView(
+            child: SelectableText(result,
+                style: const TextStyle(fontSize: 13, height: 1.5)),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('好的')),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('好的')),
-        ],
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _adviceLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('生成建议失败：$e')),
+      );
+    }
   }
 
   /// v1.0.2 对齐里程碑：导出当前筛选错题为 .json 题库文件
@@ -289,6 +307,34 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     if (_guard(appState)) return;
 
     final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
+    // v1.0.2 修复：复习前确认数量（对齐首页「定向爆破」的选择行为）
+    final count = await appState.getFullErrorCount(_filter, bankIds: bankIds);
+    if (!mounted) return;
+    if (count <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        // v1.0.2 对齐里程碑：暂无符合条件的题目
+        const SnackBar(content: Text('暂无符合条件的题目')),
+      );
+      return;
+    }
+    final label = _filters.firstWhere((f) => f.$1 == _filter).$2;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('错题复习'),
+        content: Text('本次复习「$label」共 $count 题，确定开始？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('开始复习')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
     await appState.startErrorReview(mode: _filter, bankIds: bankIds);
     if (appState.quizQuestions.isEmpty) {
       // 无匹配时清空残留旧题（防泄漏）
@@ -300,7 +346,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       return;
     }
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+    // v1.0.2 修复：复习返回后刷新统计（FSRS 已更新）
+    await _loadStats();
   }
 
   Future<void> _startKpReview(String kp) async {
@@ -318,7 +367,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       return;
     }
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+    // v1.0.2 修复：复习返回后刷新统计
+    await _loadStats();
   }
 
   @override
