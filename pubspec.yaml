@@ -51,6 +51,10 @@ dependencies:
 
   # 哈希（v1.0.2 设计审查：开发者选项密码哈希比对）
   crypto: ^3.0.0
+
+  # 安全存储（v1.0.2 七项改进：Android 上 API Key 走 Keystore 加密，
+  # 其他平台回退 KeyCrypto 混淆存储）
+  flutter_secure_storage: ^9.2.0
   
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,7 @@
 ﻿import 'practice_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
@@ -30,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _statsLoaded = false; // 防横幅首帧闪现
   // v1.0.2 扩展：今日一言（开页面显示）
   String _hitokoto = '正在加载一言...';
+  // v1.0.2 七项改进：断点续刷（最新未完成会话 + 已答题数）
+  (QuizSession, int)? _unfinished;
 
   @override
   void initState() {
@@ -55,6 +58,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final vacation = {
         for (final d in appState.vacationDateRange) dateKeyOf(d)
       };
+      // v1.0.2 七项改进：断点续刷卡片数据
+      final unfinished = await appState.getUnfinishedSessionInfo();
       if (!mounted) return;
       setState(() {
         _yearlyTotals = yearly;
@@ -62,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _weekTotal = weekStats.totalQuestions;
         _weekAccuracy = weekStats.accuracy;
         _vacationDays = vacation;
+        _unfinished = unfinished;
         _statsLoaded = true;
       });
     } catch (_) {
@@ -113,6 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 顶部：问候语（第一行）+ 软件图标/名字 + 今日一言
                   _buildHeroCard(appState, cs),
                   const SizedBox(height: 16),
+                  // v1.0.2 七项改进：断点续刷入口（有未完成会话时显示）
+                  if (_unfinished != null)
+                    _buildResumeCard(appState, cs),
                   // 寒暑假模式横幅
                   if (appState.vacationModeEnabled)
                     _buildVacationBanner(cs),
@@ -331,6 +340,72 @@ class _HomeScreenState extends State<HomeScreen> {
     return '正确率 ${(correct / total * 100).toStringAsFixed(0)}%';
   }
 
+  /// v1.0.2 七项改进：断点续刷卡片（最新未完成会话）
+  Widget _buildResumeCard(AppState appState, ColorScheme cs) {
+    final u = _unfinished;
+    if (u == null) return const SizedBox.shrink();
+    final (session, answered) = u;
+    final ac = AppThemeColors.of(context);
+    final modeLabel = switch (session.mode) {
+      'error_review' => '错题复习',
+      'kp_review' => '知识点复习',
+      _ => '刷题',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Material(
+        color: ac.card,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () async {
+            final ok = await appState.resumeUnfinishedSession();
+            if (!ok || !mounted) return;
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const QuizScreen()),
+            );
+            await _loadWeeklyData(appState);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: ac.accent.withOpacity(0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.play_circle_fill, color: ac.accent, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('继续上次刷题',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: cs.onSurface)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '已答 $answered/${session.totalQuestions} 题 · $modeLabel',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right,
+                    size: 20, color: cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 寒暑假模式横幅
   Widget _buildVacationBanner(ColorScheme cs) {
     return Container(
       width: double.infinity,

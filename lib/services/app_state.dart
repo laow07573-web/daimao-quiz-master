@@ -16,6 +16,7 @@ import 'stats_service.dart';
 import 'debug_log_service.dart';
 import 'fsrs_service.dart';
 import 'key_crypto.dart';
+import 'secure_key_storage.dart';
 
 class AppState extends ChangeNotifier {
   final DatabaseService _db = DatabaseService.instance;
@@ -167,13 +168,27 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
   }
 
+  /// v1.0.2 七项改进：同名题库自动改名（导入防重复）。
+  /// 返回 (最终名字, 是否改名)
+  Future<(String, bool)> ensureUniqueBankName(String base) async {
+    final names = (await _db.getAllBanks()).map((b) => b.name).toSet();
+    if (!names.contains(base)) return (base, false);
+    var i = 2;
+    while (names.contains('$base($i)')) {
+      i++;
+    }
+    return ('$base($i)', true);
+  }
+
   /// 确认导入：将预览题目保存到数据库
   Future<void> confirmImport() async {
     if (_previewQuestions.isEmpty) return;
 
     final now = DateTime.now().toIso8601String();
+    // v1.0.2 七项改进：重名自动加后缀，杜绝同一文档重复导入产生重复题库
+    final (uniqueName, renamed) = await ensureUniqueBankName(_previewBankName);
     final bankId = await _db.insertBank(QuestionBank(
-      name: _previewBankName,
+      name: uniqueName,
       createdAt: now,
     ));
 
@@ -192,7 +207,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _db.insertQuestions(questions);
     await _db.updateBankQuestionCount(bankId, questions.length);
 
-    _importStatus = '导入完成！共 ${questions.length} 道题目';
+    _importStatus = '导入完成！共 ${questions.length} 道题目'
+        '${renamed ? '（检测到同名题库，已自动命名为「$uniqueName」）' : ''}';
     _previewQuestions = [];
     await _loadBanks();
     notifyListeners();
@@ -256,8 +272,16 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   // ======================== 设置 ========================
 
   Future<void> _loadSettings() async {
-    final storedKey = await _db.getSetting('api_key') ?? '';
-    final apiKey = KeyCrypto.decrypt(storedKey);
+    // v1.0.2 七项改进：API Key 优先读 Android 安全存储（Keystore 加密），
+    // 读不到时从 DB 旧密文迁移（一次性）
+    var apiKey = await SecureKeyStorage.readApiKey();
+    if (apiKey == null || apiKey.isEmpty) {
+      final storedKey = await _db.getSetting('api_key') ?? '';
+      apiKey = KeyCrypto.decrypt(storedKey);
+      if (apiKey.isNotEmpty) {
+        await SecureKeyStorage.writeApiKey(apiKey);
+      }
+    }
     final apiEndpoint =
         await _db.getSetting('api_endpoint') ?? AppSettings.defaultApiEndpoint;
     final model = await _db.getSetting('model') ?? AppSettings.defaultModel;
@@ -285,7 +309,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   Future<void> updateSettings(AppSettings newSettings) async {
     _settings = newSettings;
+    // v1.0.2 七项改进：双写——DB 加密副本（备份可移植）+ Android 安全存储
     await _db.setSetting('api_key', KeyCrypto.encrypt(newSettings.apiKey));
+    await SecureKeyStorage.writeApiKey(newSettings.apiKey);
     await _db.setSetting('api_endpoint', newSettings.apiEndpoint);
     await _db.setSetting('model', newSettings.model);
     await _db.setSetting('sound_enabled', newSettings.soundEnabled ? '1' : '0');
@@ -549,20 +575,26 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   /// JSON 题库导入（v1.0.2：分组建库，无需预览）
-  /// 返回 (题库数, 题目数, 错误信息)——错误随返回值传递
-  Future<(int, int, String?)> importJsonFiles(List<String> filePaths) async {
+  /// 返回 (题库数, 题目数, 错误信息, 改名组数)——错误随返回值传递；
+  /// v1.0.2 七项改进：同名题库自动加后缀，杜绝重复题库
+  Future<(int, int, String?, int)> importJsonFiles(List<String> filePaths) async {
     var banks = 0;
     var questions = 0;
+    var renamed = 0;
     String? firstError;
+    final existingNames =
+        (await _db.getAllBanks()).map((b) => b.name).toSet();
     for (final p in filePaths) {
-      final (b, q, err) = await BankFileService.importJsonFile(p);
+      final (b, q, err, r) =
+          await BankFileService.importJsonFile(p, existingNames: existingNames);
       banks += b;
       questions += q;
+      renamed += r;
       firstError ??= err;
     }
     await _loadBanks();
     notifyListeners();
-    return (banks, questions, firstError);
+    return (banks, questions, firstError, renamed);
   }
 
   /// 模拟长期使用（开发者选项，幂等）
@@ -827,6 +859,73 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
   }
 
+  /// 暂停当前会话（v1.0.2 七项改进：断点续刷）。
+  /// 保留 DB 会话行（end_time 为空，历史列表显示「未完成」），
+  /// 作答记录已逐题落库，下次继续时不丢进度
+  Future<void> pauseSession() async {
+    _skipFSRS = false;
+    _quizService.pauseSession();
+    _quizService.reset();
+    _currentSession = null;
+    _quizQuestions = [];
+    _currentQuestionStats = {};
+    _lastAnswerRecord = null;
+    // 已答题 → 今天已刷，续排明天提醒
+    try {
+      await ReminderService.instance.rescheduleNextDay();
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  /// 断点续刷：恢复最新未完成会话（题目顺序 + 作答历史 + 跳到第一个未答题）。
+  /// 返回 true 表示恢复成功，调用方应进入 QuizScreen
+  Future<bool> resumeUnfinishedSession() async {
+    final unfinished = await _db.getLatestUnfinishedSession();
+    if (unfinished == null) return false;
+    final (session, _) = unfinished;
+    if (session.id == null) return false;
+    final questions = await _db.getSessionQuestions(session.id!);
+    if (questions.isEmpty) return false;
+    final records = await _db.getAnswerRecordsBySession(session.id!);
+
+    _skipFSRS = false;
+    _quizService.loadQuiz(questions: questions, session: session);
+    _quizQuestions = questions;
+    _currentSession = session;
+    _currentAnalysis = null;
+    _currentQuestionStats = {};
+    _analysisLoading = false;
+    _answerHistory.clear();
+    _answerHistory.length = questions.length;
+    for (var i = 0; i < questions.length; i++) {
+      final q = questions[i];
+      if (q.id != null && records.containsKey(q.id)) {
+        _answerHistory[i] = records[q.id];
+      }
+    }
+    // 跳到第一个未答题（全部答完则停在最后一题，走完成路径）
+    var target = questions.length - 1;
+    for (var i = 0; i < _answerHistory.length; i++) {
+      if (_answerHistory[i] == null) {
+        target = i;
+        break;
+      }
+    }
+    _quizService.jumpToIndex(target);
+    _currentQuestionIndex = target;
+    _lastAnswerRecord = _answerHistory[target];
+    notifyListeners();
+    return true;
+  }
+
+  /// 首页续刷卡片数据：最新未完成会话（含已答题数）
+  Future<(QuizSession, int)?> getUnfinishedSessionInfo() =>
+      _db.getLatestUnfinishedSession();
+
+  /// 会话关联的题库名（统计页历史副标题用）
+  Future<List<String>> getSessionBankNames(int sessionId) =>
+      _db.getSessionBankNames(sessionId);
+
   Future<void> updateCurrentQuestion(String title, String answer, String? type) async {
     final q = currentQuestion;
     if (q == null) return;
@@ -949,6 +1048,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     );
 
     _quizService.loadQuiz(questions: selectedQuestions, session: sessionWithId);
+    // v1.0.2 七项改进：会话题目顺序 + 题库关联（断点续刷/历史副标题用）
+    final questionBankIds =
+        selectedQuestions.map((q) => q.bankId).toSet().toList();
+    await _db.insertSessionBanks(sessionWithId.id!, questionBankIds);
+    await _db.insertSessionQuestions(sessionWithId.id!, selectedQuestions);
     _quizQuestions = _quizService.questions;
     _currentSession = _quizService.currentSession;
     _currentQuestionIndex = 0;

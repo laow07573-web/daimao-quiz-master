@@ -760,6 +760,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 16),
 
+            // v1.0.2 七项改进：深色模式（跟随系统/浅色/深色）
+            Text('深色模式', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.onSurface)),
+            const SizedBox(height: 8),
+            Consumer<ThemeService>(
+              builder: (context, themeService, _) => Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(children: [
+                    for (final (mode, label) in [
+                      (ThemeMode.system, '跟随系统'),
+                      (ThemeMode.light, '浅色'),
+                      (ThemeMode.dark, '深色'),
+                    ])
+                      RadioListTile<ThemeMode>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(label, style: const TextStyle(fontSize: 14)),
+                        value: mode,
+                        groupValue: themeService.themeMode,
+                        onChanged: (v) => themeService.switchThemeMode(v!),
+                      ),
+                  ]),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // 调试日志
             Container(
               padding: const EdgeInsets.all(16),

@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 
 class PracticeAnswerState {
   bool answered = false;
+  // v1.0.2 七项改进：练习结果页复盘用（提交后回填判定结果）
+  bool correct = false;
 }
 
 class AnswerSheetWidget extends StatelessWidget {
   final List<PracticeAnswerState> answers;
   final int currentIndex;
   final void Function(int index) onJumpTo;
+  /// v1.0.2 七项改进：是否显示对错（结果页复盘 = true；练习作答中 = false）
+  final bool showResult;
 
   const AnswerSheetWidget({
     super.key,
     required this.answers,
     required this.currentIndex,
     required this.onJumpTo,
+    this.showResult = false,
   });
 
   @override
@@ -29,9 +34,17 @@ class AnswerSheetWidget extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              _legend(cs.primary, '已答'),
-              const SizedBox(width: 12),
-              _legend(cs.onSurfaceVariant, '未答'),
+              if (showResult) ...[
+                _legend(cs.tertiary, '答对'),
+                const SizedBox(width: 12),
+                _legend(cs.error, '答错'),
+                const SizedBox(width: 12),
+                _legend(cs.onSurfaceVariant, '未答'),
+              ] else ...[
+                _legend(cs.primary, '已答'),
+                const SizedBox(width: 12),
+                _legend(cs.onSurfaceVariant, '未答'),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -45,8 +58,14 @@ class AnswerSheetWidget extends StatelessWidget {
               if (!a.answered) {
                 bg = cs.surfaceContainerHighest;
                 fg = cs.onSurfaceVariant;
+              } else if (showResult && a.correct) {
+                bg = cs.tertiary.withOpacity(0.2);
+                fg = cs.tertiary;
+              } else if (showResult) {
+                bg = cs.error.withOpacity(0.2);
+                fg = cs.error;
               } else {
-                // 练习模式：已答用主题色（提交前不判定对错）
+                // 练习模式：已答用主题色（不判定对错）
                 bg = cs.primary.withOpacity(0.2);
                 fg = cs.primary;
               }

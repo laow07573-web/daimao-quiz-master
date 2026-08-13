@@ -78,6 +78,9 @@ class QuizService {
         totalQuestions: _currentSession!.totalQuestions,
         startTime: _currentSession!.startTime,
       );
+      // v1.0.2 七项改进：会话题目顺序 + 题库关联（断点续刷/历史副标题用）
+      await _db.insertSessionBanks(_currentSession!.id!, bankIds);
+      await _db.insertSessionQuestions(_currentSession!.id!, _questions);
     }
 
     DebugLogService.instance.log('SESSION', '新会话 id=${_currentSession!.id} start=${_currentSession!.startTime} questions=${_currentSession!.totalQuestions}');
@@ -356,6 +359,14 @@ class QuizService {
     if (s?.id != null) {
       await _db.deleteSessionWithRecords(s!.id!);
     }
+  }
+
+  /// 暂停会话（v1.0.2 七项改进：断点续刷）。
+  /// 不写 end_time、不重置 DB 行——作答记录已逐题落库，
+  /// 下次通过 getLatestUnfinishedSession + session_questions 恢复继续
+  void pauseSession() {
+    DebugLogService.instance.log('SESSION',
+        '暂停会话 id=${_currentSession?.id}（保留进度，可断点续刷）');
   }
 
   /// 结束当前会话

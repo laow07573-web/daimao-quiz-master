@@ -406,13 +406,14 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   /// v1.0.2 修复：统一退出路径（系统返回键/结束按钮）。
-  /// 有作答 → 正常结束会话；无作答（练习/背题未作答）→ 放弃会话不落库
+  /// 有作答 → 暂停会话（断点续刷，进度保留）；无作答（练习/背题未作答）→ 放弃不落库
   Future<void> _handleExit(AppState appState) async {
     final isPractice = widget.quizMode == QuizMode.practice;
     final hint = isPractice
         ? '退出后本次练习记录将不保存。'
         : (appState.hasSessionAnswers
-            ? '本次刷题进度将结束并计入统计。'
+            // v1.0.2 七项改进：退出改为暂停，进度保留可下次继续
+            ? '本次进度将保留，可下次从首页继续。'
             : '尚未作答任何题目，退出后不产生记录。');
     final confirmed = await showDialog<bool>(
       context: context,
@@ -436,7 +437,8 @@ class _QuizScreenState extends State<QuizScreen> {
       if (isPractice || !appState.hasSessionAnswers) {
         await appState.abortSession();
       } else {
-        await appState.endSession();
+        // v1.0.2 七项改进：断点续刷——暂停保留进度，而非直接结束
+        await appState.pauseSession();
       }
     } catch (e) {
       // v1.0.2 设计审查修复：保存失败不再静默，留在页面提示重试
@@ -1532,6 +1534,14 @@ class _QuizScreenState extends State<QuizScreen> {
     final qs = appState.quizQuestions;
     int correct = 0, wrong = 0, blank = 0;
     final wrongList = <Map<String, dynamic>>[];
+    // v1.0.2 七项改进：复盘答题卡状态（已答 + 判定结果）
+    final answerStates = List<PracticeAnswerState>.generate(qs.length, (i) {
+      final ua = _practiceAnswersMap[i];
+      final st = PracticeAnswerState();
+      st.answered = ua != null && ua.isNotEmpty;
+      if (st.answered) st.correct = QuizService.judgeAnswer(qs[i], ua!);
+      return st;
+    });
     for (int i = 0; i < qs.length; i++) {
       final ua = _practiceAnswersMap[i];
       if (ua == null || ua.isEmpty) {
@@ -1564,6 +1574,8 @@ class _QuizScreenState extends State<QuizScreen> {
             wrongList: wrongList,
             questions: qs,
             answers: _practiceAnswersMap,
+            // v1.0.2 七项改进：复盘答题卡
+            answerStates: answerStates,
           ),
         ),
       );

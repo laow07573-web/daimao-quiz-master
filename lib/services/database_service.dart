@@ -50,7 +50,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 7,
+      version: 8,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -188,6 +188,29 @@ class DatabaseService {
       }
       await _createIndexes(db);
     }
+    if (oldVersion < 8) {
+      // v1.0.2 七项改进：断点续刷（会话题目顺序）+ 会话-题库关联表。
+      // IF NOT EXISTS：兼容 user_version 被外部重置但表已物理存在的库
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS session_questions (
+          session_id INTEGER NOT NULL,
+          position INTEGER NOT NULL,
+          question_id INTEGER NOT NULL,
+          PRIMARY KEY (session_id, position),
+          FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS session_banks (
+          session_id INTEGER NOT NULL,
+          bank_id INTEGER NOT NULL,
+          PRIMARY KEY (session_id, bank_id),
+          FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_session_questions_session '
+          'ON session_questions(session_id)');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -287,6 +310,29 @@ class DatabaseService {
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
     ''');
+
+    // v1.0.2 七项改进：断点续刷（会话题目顺序）+ 会话-题库关联表
+    await db.execute('''
+      CREATE TABLE session_questions (
+        session_id INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        question_id INTEGER NOT NULL,
+        PRIMARY KEY (session_id, position),
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE session_banks (
+        session_id INTEGER NOT NULL,
+        bank_id INTEGER NOT NULL,
+        PRIMARY KEY (session_id, bank_id),
+        FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('CREATE INDEX idx_session_questions_session '
+        'ON session_questions(session_id)');
   }
 
   // ======================== QuestionBank CRUD ========================
@@ -385,12 +431,119 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [session.id]);
   }
 
-  /// 删除会话及其作答记录（放弃会话用：练习模式退出/未作答退出）
+  /// 删除会话及其作答记录（放弃会话用：练习模式退出/未作答退出）。
+  /// v1.0.2 七项改进：级联清理 session_questions / session_banks
   Future<void> deleteSessionWithRecords(int sessionId) async {
     final db = await database;
     await db.delete('answer_records',
         where: 'session_id = ?', whereArgs: [sessionId]);
+    await db.delete('session_questions',
+        where: 'session_id = ?', whereArgs: [sessionId]);
+    await db.delete('session_banks',
+        where: 'session_id = ?', whereArgs: [sessionId]);
     await db.delete('quiz_sessions', where: 'id = ?', whereArgs: [sessionId]);
+  }
+
+  // ======================== v1.0.2 七项改进：会话题目/题库关联 ========================
+
+  /// 写入会话-题库关联（startQuiz / 错题复习建会话后调用）
+  Future<void> insertSessionBanks(int sessionId, List<int> bankIds) async {
+    if (bankIds.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final id in bankIds) {
+      batch.insert('session_banks', {
+        'session_id': sessionId,
+        'bank_id': id,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// 写入会话题目顺序（断点续刷恢复用）
+  Future<void> insertSessionQuestions(
+      int sessionId, List<Question> questions) async {
+    if (questions.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (var i = 0; i < questions.length; i++) {
+      final q = questions[i];
+      if (q.id == null) continue;
+      batch.insert('session_questions', {
+        'session_id': sessionId,
+        'position': i,
+        'question_id': q.id!,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// 按记录顺序取会话题目（断点续刷恢复用）
+  Future<List<Question>> getSessionQuestions(int sessionId) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT q.* FROM session_questions sq
+      JOIN questions q ON q.id = sq.question_id
+      WHERE sq.session_id = ?
+      ORDER BY sq.position
+    ''', [sessionId]);
+    return rows.map((m) => Question.fromMap(m)).toList();
+  }
+
+  /// 某会话的全部作答记录（question_id → 记录，断点续刷恢复历史用）
+  Future<Map<int, AnswerRecord>> getAnswerRecordsBySession(
+      int sessionId) async {
+    final db = await database;
+    final maps = await db.query('answer_records',
+        where: 'session_id = ?', whereArgs: [sessionId]);
+    return {
+      for (final m in maps) (m['question_id'] as int): AnswerRecord.fromMap(m),
+    };
+  }
+
+  /// 最新一条未完成会话（end_time 为空且会话题目顺序仍在）。
+  /// 返回 null 表示无可继续的会话
+  Future<(QuizSession, int)?> getLatestUnfinishedSession() async {
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT s.*,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_correct,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_wrong,
+        (SELECT COUNT(*) FROM session_questions sq WHERE sq.session_id = s.id) as q_count
+      FROM quiz_sessions s
+      LEFT JOIN answer_records ar ON ar.session_id = s.id
+      WHERE s.source = 'real' AND (s.end_time IS NULL OR s.end_time = '')
+      GROUP BY s.id
+      HAVING q_count > 0
+      ORDER BY s.start_time DESC
+      LIMIT 1
+    ''');
+    if (maps.isEmpty) return null;
+    final session = _sessionFromRow(maps.first);
+    final answered = session.correctCount + session.wrongCount;
+    return (session, answered);
+  }
+
+  /// 会话关联的题库 id（按 session_banks）
+  Future<List<int>> getSessionBankIds(int sessionId) async {
+    final db = await database;
+    final rows = await db.query('session_banks',
+        columns: ['bank_id'], where: 'session_id = ?', whereArgs: [sessionId]);
+    return rows.map((r) => r['bank_id'] as int).toList();
+  }
+
+  /// 会话关联的题库名（历史列表副标题用）
+  Future<List<String>> getSessionBankNames(int sessionId) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT qb.name FROM session_banks sb
+      JOIN question_banks qb ON qb.id = sb.bank_id
+      WHERE sb.session_id = ?
+      ORDER BY qb.name
+    ''', [sessionId]);
+    return rows.map((r) => r['name'] as String).toList();
   }
 
   /// 全部真实会话（按开始时间倒序）。correct/wrong 为派生值
@@ -1403,9 +1556,9 @@ class DatabaseService {
       tmpDb = await databaseFactory.openDatabase(filePath);
       final versionRows = await tmpDb.rawQuery('PRAGMA user_version');
       final version = versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
-      if (version < 1 || version > 7) {
+      if (version < 1 || version > 8) {
         // user_version 0/非法：非本 App 生成或版本被外部重置，导入后会触发
-        // onUpgrade(0→7) 破坏性重建清空题目，拒绝导入
+        // onUpgrade(0→8) 破坏性重建清空题目，拒绝导入
         return '文件不是有效的数据库备份（版本信息缺失或非法）';
       }
       final tables = await tmpDb.rawQuery(
@@ -1414,6 +1567,16 @@ class DatabaseService {
       final names = tables.map((r) => r['name']).toSet();
       for (final t in ['question_banks', 'questions', 'answer_records', 'settings']) {
         if (!names.contains(t)) return '备份缺少核心表: $t';
+      }
+      // v8 新增表存在性（旧版本备份导入后由 onUpgrade 建表，故只校验 v8 备份）
+      if (version >= 8) {
+        final extraTables = await tmpDb.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
+            "('session_banks','session_questions')");
+        final extraNames = extraTables.map((r) => r['name']).toSet();
+        for (final t in ['session_banks', 'session_questions']) {
+          if (!extraNames.contains(t)) return '备份缺少核心表: $t';
+        }
       }
       // v1.0.2 设计审查修复：关键列存在性校验（防 user_version 伪造但缺列的库）。
       // 旧版本备份导入后由 onUpgrade 补列，故只校验该版本应当已存在的列

@@ -173,16 +173,31 @@ class BankFileService {
     return null;
   }
 
-  /// 导入 JSON 文件（分组建库）：返回 (成功组数, 导入题目数, 错误信息)
-  static Future<(int, int, String?)> importJsonFile(String filePath) async {
+  /// 导入 JSON 文件（分组建库）：返回 (成功组数, 导入题目数, 错误信息, 改名组数)。
+  /// [existingNames] 非空时同名组自动加后缀（防重复导入建重复题库）
+  static Future<(int, int, String?, int)> importJsonFile(String filePath,
+      {Set<String>? existingNames}) async {
     final (groups, err) = await parseJsonFile(filePath);
-    if (groups.isEmpty) return (0, 0, err);
+    if (groups.isEmpty) return (0, 0, err, 0);
     final now = DateTime.now().toIso8601String();
+    final taken = existingNames ?? <String>{};
     var bankCount = 0;
     var questionCount = 0;
+    var renamedCount = 0;
     for (final entry in groups.entries) {
+      var name = entry.key;
+      // v1.0.2 七项改进：同名自动改名（X(2)/X(3)...）
+      if (taken.contains(name)) {
+        var i = 2;
+        while (taken.contains('$name($i)')) {
+          i++;
+        }
+        name = '$name($i)';
+        renamedCount++;
+      }
+      taken.add(name);
       final bankId = await _db.insertBank(QuestionBank(
-        name: entry.key,
+        name: name,
         fileSource: 'json',
         createdAt: now,
       ));
@@ -194,7 +209,7 @@ class BankFileService {
       bankCount++;
       questionCount += questions.length;
     }
-    return (bankCount, questionCount, null);
+    return (bankCount, questionCount, null, renamedCount);
   }
 
   /// 导出题库为 JSON 文件（v1.0.2 扩展：带 format 标记 + 题库名，

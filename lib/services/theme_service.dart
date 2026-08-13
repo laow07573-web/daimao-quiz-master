@@ -10,11 +10,16 @@ enum AppTheme { eyeCare, brand, minimal, starVoyage, oceanGalaxy }
 /// 取用方式：`Theme.of(context).extension<AppThemeColors>()!`
 class ThemeService extends ChangeNotifier {
   static const _prefsKey = 'app_theme';
+  static const _modePrefsKey = 'app_theme_mode';
 
   AppTheme _current = AppTheme.brand;
   AppTheme get current => _current;
 
-  /// v1.0.2 修复：启动时恢复上次选择的主题
+  // v1.0.2 七项改进：深色模式（light / dark / system）
+  ThemeMode _mode = ThemeMode.light;
+  ThemeMode get themeMode => _mode;
+
+  /// v1.0.2 修复：启动时恢复上次选择的主题与深色模式
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -23,22 +28,33 @@ class ThemeService extends ChangeNotifier {
         final saved = AppTheme.values.where((t) => t.name == name).firstOrNull;
         if (saved != null) _current = saved;
       }
+      final modeName = prefs.getString(_modePrefsKey);
+      if (modeName != null) {
+        _mode = ThemeMode.values.firstWhere((m) => m.name == modeName,
+            orElse: () => ThemeMode.light);
+      }
     } catch (_) {}
   }
 
-  ThemeData get themeData {
-    final colors = _colorsOf(_current);
+  /// 浅色主题数据（MaterialApp.theme）
+  ThemeData get themeData => _buildFor(dark: false);
+
+  /// 深色主题数据（MaterialApp.darkTheme）
+  ThemeData get darkThemeData => _buildFor(dark: true);
+
+  ThemeData _buildFor({required bool dark}) {
+    final colors = dark ? _darkColorsOf(_current) : _colorsOf(_current);
     switch (_current) {
       case AppTheme.eyeCare:
-        return _buildTheme(_eyeCare, colors);
+        return _buildTheme(_eyeCare, colors, dark: dark);
       case AppTheme.brand:
-        return _buildTheme(_brand, colors);
+        return _buildTheme(_brand, colors, dark: dark);
       case AppTheme.minimal:
-        return _buildTheme(_minimal, colors);
+        return _buildTheme(_minimal, colors, dark: dark);
       case AppTheme.starVoyage:
-        return _buildTheme(_starVoyage, colors);
+        return _buildTheme(_starVoyage, colors, dark: dark);
       case AppTheme.oceanGalaxy:
-        return _buildTheme(_oceanGalaxy, colors);
+        return _buildTheme(_oceanGalaxy, colors, dark: dark);
     }
   }
 
@@ -49,6 +65,16 @@ class ThemeService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsKey, theme.name);
+    } catch (_) {}
+  }
+
+  /// v1.0.2 七项改进：深色模式切换持久化
+  Future<void> switchThemeMode(ThemeMode mode) async {
+    _mode = mode;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_modePrefsKey, mode.name);
     } catch (_) {}
   }
 
@@ -110,11 +136,68 @@ class ThemeService extends ChangeNotifier {
           ),
       };
 
+  // ======================== 5 套深色配色（v1.0.2 七项改进：深色模式） ========================
+
+  /// 深色变体：深底浅强调色，保证对比度（onAccent 用深色适配浅色强调）
+  static AppThemeColors _darkColorsOf(AppTheme t) => switch (t) {
+        // 品牌鲜明-dark：靛蓝强调，深墨蓝底
+        AppTheme.brand => const AppThemeColors(
+            navBar: Color(0xFF4344B8),
+            background: Color(0xFF14151F),
+            accent: Color(0xFF8B8CF8),
+            onAccent: Color(0xFF14151F),
+            card: Color(0xFF1F2030),
+            cardBorder: Color(0xFF2C2D42),
+          ),
+        // 护眼柔和-dark：暗绿底，柔和绿强调
+        AppTheme.eyeCare => const AppThemeColors(
+            navBar: Color(0xFF2C3A31),
+            background: Color(0xFF131713),
+            accent: Color(0xFF7BA98A),
+            onAccent: Color(0xFF131713),
+            card: Color(0xFF1B201C),
+            cardBorder: Color(0xFF2E362F),
+          ),
+        // 极简-dark：深青底，青色强调
+        AppTheme.minimal => const AppThemeColors(
+            navBar: Color(0xFF17464A),
+            background: Color(0xFF0F1517),
+            accent: Color(0xFF57CBC4),
+            onAccent: Color(0xFF0F1517),
+            card: Color(0xFF172023),
+            cardBorder: Color(0xFF243034),
+          ),
+        // 星际穿越-dark：深棕底，暖橙强调
+        AppTheme.starVoyage => const AppThemeColors(
+            navBar: Color(0xFF33241B),
+            background: Color(0xFF1A1410),
+            accent: Color(0xFFF08A52),
+            onAccent: Color(0xFF1A1410),
+            card: Color(0xFF251C14),
+            cardBorder: Color(0xFF3A2C1F),
+          ),
+        // 碧海银河-dark：深蓝底，亮蓝强调
+        AppTheme.oceanGalaxy => const AppThemeColors(
+            navBar: Color(0xFF1D2A4A),
+            background: Color(0xFF101624),
+            accent: Color(0xFF7CA3E8),
+            onAccent: Color(0xFF101624),
+            card: Color(0xFF182136),
+            cardBorder: Color(0xFF26334F),
+          ),
+      };
+
   /// 由配色生成完整 ThemeData：ColorScheme 以强调色为种子，
   /// AppBar 用导航栏色，背景用主题背景色，并挂载 AppThemeColors 扩展
-  static ThemeData _buildTheme(ThemeData base, AppThemeColors colors) {
-    final scheme = ColorScheme.fromSeed(seedColor: colors.accent).copyWith(
+  static ThemeData _buildTheme(ThemeData base, AppThemeColors colors,
+      {required bool dark}) {
+    final brightness = dark ? Brightness.dark : Brightness.light;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: colors.accent,
+      brightness: brightness,
+    ).copyWith(
       primary: colors.accent,
+      onPrimary: colors.onAccent,
       surface: colors.background,
     );
     // 导航栏文字对比色：浅色导航栏用深字，深色导航栏用白字
@@ -123,6 +206,7 @@ class ThemeService extends ChangeNotifier {
             ? Colors.white
             : const Color(0xFF1F2933);
     return base.copyWith(
+      brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: colors.background,
       appBarTheme: AppBarTheme(

@@ -124,9 +124,10 @@ void main() {
           {'title': '血糖正常值', 'correct_answer': '3.9-6.1', 'type': 'fill_blank'},
         ],
       }));
-      final (banks, questions, err) =
+      final (banks, questions, err, renamed) =
           await BankFileService.importJsonFile(path);
       expect(err, isNull);
+      expect(renamed, 0);
       expect(banks, 2);
       expect(questions, 3);
       final all = await DatabaseService.instance.getAllBanks();
@@ -146,9 +147,10 @@ void main() {
         {'title': '题一', 'correct_answer': 'A'},
         {'title': '题二', 'correct_answer': 'B'},
       ]));
-      final (banks, questions, err) =
+      final (banks, questions, err, renamed) =
           await BankFileService.importJsonFile(path);
       expect(err, isNull);
+      expect(renamed, 0);
       expect(banks, 1);
       expect(questions, 2);
       final all = await DatabaseService.instance.getAllBanks();

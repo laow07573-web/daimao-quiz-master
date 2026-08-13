@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/question.dart';
+import '../widgets/answer_sheet_widget.dart';
 import 'quiz_screen.dart';
 
 enum PracticeTiming { timed, untimed }
@@ -106,38 +107,79 @@ class PracticeEntryScreen extends StatelessWidget {
   }
 }
 
-/// 练习结果页（v1.0.2 统一重构保留）：正确率大数字 + 错题回顾折叠卡
-class PracticeResultScreen extends StatelessWidget {
+/// 练习结果页（v1.0.2 统一重构保留）：正确率大数字 + 复盘答题卡 + 错题回顾折叠卡
+class PracticeResultScreen extends StatefulWidget {
   final int correct, wrong, blank, total, elapsedSeconds, durationMinutes;
   final String accuracy;
   final PracticeTiming timing;
   final List<Map<String, dynamic>> wrongList;
   final List<Question> questions;
   final Map<int, String> answers;
+  /// v1.0.2 七项改进：复盘答题卡状态（已答 + 判定结果）
+  final List<PracticeAnswerState> answerStates;
 
-  const PracticeResultScreen({super.key, required this.correct, required this.wrong, required this.blank, required this.total, required this.accuracy, required this.elapsedSeconds, required this.timing, required this.durationMinutes, required this.wrongList, required this.questions, required this.answers});
+  const PracticeResultScreen({super.key, required this.correct, required this.wrong, required this.blank, required this.total, required this.accuracy, required this.elapsedSeconds, required this.timing, required this.durationMinutes, required this.wrongList, required this.questions, required this.answers, this.answerStates = const []});
+
+  @override
+  State<PracticeResultScreen> createState() => _PracticeResultScreenState();
+}
+
+class _PracticeResultScreenState extends State<PracticeResultScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final Map<int, GlobalKey> _tileKeys = {};
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   String _fmt(int s) { final m = s ~/ 60; return '$m分${s % 60}秒'; }
+
+  /// v1.0.2 七项改进：答题卡点格子滚动定位到对应错题卡
+  void _jumpTo(int index) {
+    final key = _tileKeys[index];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('练习结果'), leading: IconButton(icon: const Icon(Icons.home), onPressed: () => Navigator.popUntil(context, (r) => r.isFirst))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
+      body: ListView(controller: _scrollController, padding: const EdgeInsets.all(20), children: [
         Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16)),
-          child: Column(children: [Text('$accuracy%', style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 8), Text('正确$correct · 错误$wrong · 未答$blank', style: const TextStyle(fontSize: 16, color: Colors.white70)), const SizedBox(height: 4), Text(timing == PracticeTiming.timed ? '限时${durationMinutes}分钟 · 实际${_fmt(elapsedSeconds)}' : '不限时 · 用时${_fmt(elapsedSeconds)}', style: const TextStyle(fontSize: 13, color: Colors.white54))])),
+          child: Column(children: [Text('${widget.accuracy}%', style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 8), Text('正确${widget.correct} · 错误${widget.wrong} · 未答${widget.blank}', style: const TextStyle(fontSize: 16, color: Colors.white70)), const SizedBox(height: 4), Text(widget.timing == PracticeTiming.timed ? '限时${widget.durationMinutes}分钟 · 实际${_fmt(widget.elapsedSeconds)}' : '不限时 · 用时${_fmt(widget.elapsedSeconds)}', style: const TextStyle(fontSize: 13, color: Colors.white54))])),
         const SizedBox(height: 20),
-        if (wrongList.isNotEmpty) ...[Text('错题回顾 (${wrongList.length}题)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
-          ...wrongList.map((w) { final q = w['q'] as Question, ua = w['ua'] as String;
-            return Card(child: ExpansionTile(
+        // v1.0.2 七项改进：复盘答题卡（答对绿/答错红/未答灰，点格子定位错题）
+        if (widget.answerStates.isNotEmpty) ...[
+          Card(
+            child: AnswerSheetWidget(
+              answers: widget.answerStates,
+              currentIndex: -1,
+              showResult: true,
+              onJumpTo: _jumpTo,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (widget.wrongList.isNotEmpty) ...[Text('错题回顾 (${widget.wrongList.length}题)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
+          ...widget.wrongList.map((w) { final q = w['q'] as Question, ua = w['ua'] as String;
+            final idx = (w['idx'] as int?) ?? -1;
+            return Card(key: idx >= 0 ? (_tileKeys[idx] ??= GlobalKey()) : null, child: ExpansionTile(
               leading: CircleAvatar(backgroundColor: cs.error.withOpacity(0.15), radius: 16, child: Icon(Icons.close, color: cs.error, size: 16)),
               title: Text(q.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
               subtitle: Text('你的答案: $ua  →  正确答案: ${q.correctAnswer}', style: const TextStyle(fontSize: 12)),
               children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Divider(), const Text('题目解析', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(height: 4), Text(q.analysis ?? '暂无解析', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.5))]))],
             ));
           })],
-        if (wrongList.isEmpty) ...[const SizedBox(height: 40), Icon(Icons.celebration, size: 64, color: cs.primary), const SizedBox(height: 12), const Text('全部正确！', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center)],
+        if (widget.wrongList.isEmpty) ...[const SizedBox(height: 40), Icon(Icons.celebration, size: 64, color: cs.primary), const SizedBox(height: 12), const Text('全部正确！', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center)],
       ]),
     );
   }

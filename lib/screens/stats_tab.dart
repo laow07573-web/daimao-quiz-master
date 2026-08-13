@@ -36,6 +36,8 @@ class StatsTabState extends State<StatsTab> {
   List<Map<String, dynamic>> _kpAccuracy = [];
   List<Map<String, dynamic>> _errorStats = [];
   List<QuizSession> _recentSessions = [];
+  // v1.0.2 七项改进：历史会话关联的题库名（session_banks）
+  Map<int, List<String>> _sessionBankNames = {};
   // v1.0.2 对齐里程碑：隐藏/恢复今日记录
   int _hiddenTodayCount = 0;
 
@@ -128,6 +130,13 @@ class StatsTabState extends State<StatsTab> {
       final errors = await appState.getErrorBookStats();
       final sessions = await appState.getRecentSessions(10);
       final hidden = await appState.getHiddenTodayRecordCount();
+      // v1.0.2 七项改进：会话关联题库名（历史副标题）
+      final bankNames = <int, List<String>>{};
+      for (final s in sessions) {
+        if (s.id != null) {
+          bankNames[s.id!] = await appState.getSessionBankNames(s.id!);
+        }
+      }
       if (!mounted) return;
       setState(() {
         _bankAccuracy = banks
@@ -141,6 +150,7 @@ class StatsTabState extends State<StatsTab> {
         _kpAccuracy = kps;
         _errorStats = errors;
         _recentSessions = sessions;
+        _sessionBankNames = bankNames;
         _hiddenTodayCount = hidden;
       });
     } catch (_) {
@@ -281,7 +291,9 @@ class StatsTabState extends State<StatsTab> {
                           child: const Text('隐藏今日记录',
                               style: TextStyle(fontSize: 12)),
                         ),
-                        child: _HistorySection(sessions: _recentSessions),
+                        child: _HistorySection(
+                            sessions: _recentSessions,
+                            bankNames: _sessionBankNames),
                       ),
                       const SizedBox(height: 20),
                     ],
@@ -842,9 +854,11 @@ class _ErrorCard extends StatelessWidget {
 
 /// 历史记录：最近 10 次会话
 class _HistorySection extends StatelessWidget {
-  const _HistorySection({required this.sessions});
+  const _HistorySection({required this.sessions, required this.bankNames});
 
   final List<QuizSession> sessions;
+  // v1.0.2 七项改进：session_id → 关联题库名
+  final Map<int, List<String>> bankNames;
 
   String _modeLabel(String mode) {
     switch (mode) {
@@ -907,6 +921,18 @@ class _HistorySection extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               color: cs.onSurface),
                         ),
+                        // v1.0.2 七项改进：会话关联题库名副标题
+                        if (s.id != null &&
+                            (bankNames[s.id]?.isNotEmpty ?? false))
+                          Text(
+                            (() {
+                              final names = bankNames[s.id]!;
+                              return names.take(2).join('、') +
+                                  (names.length > 2 ? ' 等${names.length}个' : '');
+                            })(),
+                            style: TextStyle(
+                                fontSize: 11, color: cs.onSurfaceVariant),
+                          ),
                         Text(
                           // v1.0.2 修复：未完成会话（异常退出遗留）加标识
                           s.endTime == null || s.endTime!.isEmpty

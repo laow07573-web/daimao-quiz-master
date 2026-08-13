@@ -327,9 +327,10 @@ void main() {
     expect(byTitle['填空题B']!.knowledgePoint, '血液学检验');
 
     // 导入入库闭环：导出文件直接导入为可用题库
-    final (bankCount, questionCount, importErr) =
+    final (bankCount, questionCount, importErr, renamed) =
         await BankFileService.importJsonFile(exported);
     expect(importErr, isNull);
+    expect(renamed, 0);
     expect(bankCount, 1);
     expect(questionCount, 2);
     final importedBanks = await db.getAllBanks();

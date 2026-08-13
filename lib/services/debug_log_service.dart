@@ -82,10 +82,12 @@ class DebugLogService {
     buffer.writeln('=== 呆猫刷题宝 调试日志 ===');
     buffer.writeln('导出时间: ${DateTime.now().toIso8601String()}');
     buffer.writeln('条目数: ${_entries.length}');
+    // v1.0.2 七项改进：导出脱敏（作答内容与 AI 响应原文已隐藏）
+    buffer.writeln('已脱敏：作答内容与 AI 响应已隐藏');
     buffer.writeln('');
 
     for (final entry in _entries) {
-      buffer.writeln(entry.toString());
+      buffer.writeln(_redact(entry.toString()));
     }
 
     await file.writeAsString(buffer.toString(), encoding: utf8);
@@ -98,12 +100,24 @@ class DebugLogService {
     buffer.writeln('=== 呆猫刷题宝 调试日志 ===');
     buffer.writeln('导出时间: ${DateTime.now().toIso8601String()}');
     buffer.writeln('条目数: ${_entries.length}');
+    // v1.0.2 七项改进：导出脱敏（作答内容与 AI 响应原文已隐藏）
+    buffer.writeln('已脱敏：作答内容与 AI 响应已隐藏');
     buffer.writeln('');
 
     for (final entry in _entries) {
-      buffer.writeln(entry.toString());
+      buffer.writeln(_redact(entry.toString()));
     }
     return buffer.toString();
+  }
+
+  /// v1.0.2 七项改进：导出脱敏——隐藏作答内容与 AI 响应原文
+  static String _redact(String line) {
+    return line
+        .replaceAll(RegExp(r'userAnswer="[^"]*"'), 'userAnswer="***"')
+        .replaceAll(RegExp(r'correctAnswer="[^"]*"'), 'correctAnswer="***"')
+        .replaceAll(RegExp(r'userDisplay="[^"]*"'), 'userDisplay="***"')
+        .replaceAll(RegExp(r'correctDisplay="[^"]*"'), 'correctDisplay="***"')
+        .replaceAll(RegExp(r'preview=[^ ]+'), 'preview=***');
   }
 
   void clear() {

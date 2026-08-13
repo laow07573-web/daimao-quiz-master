@@ -175,10 +175,18 @@ class FlashcardApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeService>().themeData;
-    // v1.0.2 设计审查修复：状态栏图标亮度跟随导航栏色
+    final themeService = context.watch<ThemeService>();
+    final theme = themeService.themeData;
+    // v1.0.2 七项改进：深色模式（light/dark/system）
+    final effectiveDark = themeService.themeMode == ThemeMode.dark ||
+        (themeService.themeMode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+    // 状态栏图标亮度跟随当前生效主题的导航栏色
     // （星际穿越/碧海银河深色导航栏下此前深色图标不可见）
-    final navBar = theme.extension<AppThemeColors>()?.navBar;
+    final activeColors = effectiveDark
+        ? themeService.darkThemeData.extension<AppThemeColors>()
+        : theme.extension<AppThemeColors>();
+    final navBar = activeColors?.navBar;
     final statusBarIconBrightness =
         ThemeData.estimateBrightnessForColor(navBar ?? Colors.black) ==
                 Brightness.dark
@@ -188,6 +196,8 @@ class FlashcardApp extends StatelessWidget {
       title: '呆猫刷题宝',
       debugShowCheckedModeBanner: false,
       theme: theme,
+      darkTheme: themeService.darkThemeData,
+      themeMode: themeService.themeMode,
       // v1.0.2 对齐原版设计：启动闪屏页（Logo + 标题 + 今日一言，2 秒进主界面）
       home: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(

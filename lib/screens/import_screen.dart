@@ -258,7 +258,7 @@ class _ImportScreenState extends State<ImportScreen> {
                                       f.toLowerCase().endsWith('.json'))
                                   .toList();
                               if (jsonFiles.isNotEmpty) {
-                                final (banks, questions, err) =
+                                final (banks, questions, err, renamed) =
                                     await appState.importJsonFiles(jsonFiles);
                                 if (!mounted) return;
                                 if (err != null && banks == 0 && questions == 0) {
@@ -272,7 +272,8 @@ class _ImportScreenState extends State<ImportScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                          'JSON 导入完成：$banks 个题库，$questions 道题'),
+                                          'JSON 导入完成：$banks 个题库，$questions 道题'
+                                          '${renamed > 0 ? '（$renamed 个同名题库已自动改名）' : ''}'),
                                       backgroundColor: ac.success,
                                     ),
                                   );
