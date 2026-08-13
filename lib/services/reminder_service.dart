@@ -11,7 +11,9 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'database_service.dart';
+import 'debug_log_service.dart';
 import 'hitokoto_service.dart';
+import '../utils/format_utils.dart';
 
 /// 每日提醒（v1.0.2）双保险：
 /// - 前台服务（主力）：flutter_foreground_task 每 30 秒轮询，
@@ -43,26 +45,27 @@ class ReminderService {
 
   /// 请求通知运行时权限（弹系统授权框）。
   /// 已授权或 Android < 13 直接返回 true；发起请求时返回 false（需用户确认后
-  /// 通过 [hasNotificationPermission] 复查）
+  /// 通过 [hasNotificationPermission] 复查）。
+  /// v1.0.2 设计审查修复：通道异常 fail-closed（此前 fail-open 会把失败当已授权）
   Future<bool> requestNotificationPermission() async {
     if (!Platform.isAndroid) return true;
     try {
       return await _permissionChannel
               .invokeMethod<bool>('requestNotificationPermission') ??
-          true;
+          false;
     } catch (_) {
-      return true;
+      return false;
     }
   }
 
-  /// 是否已有通知权限
+  /// 是否已有通知权限（v1.0.2 设计审查修复：通道异常 fail-closed）
   Future<bool> hasNotificationPermission() async {
     if (!Platform.isAndroid) return true;
     try {
       return await _permissionChannel.invokeMethod<bool>('hasNotificationPermission') ??
-          true;
+          false;
     } catch (_) {
-      return true;
+      return false;
     }
   }
 
@@ -77,8 +80,11 @@ class ReminderService {
     try {
       final tzName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(tzName));
-    } catch (_) {
-      tz.setLocalLocation(tz.getLocation('Asia/Shanghai'));
+    } catch (e) {
+      // v1.0.2 设计审查修复：兜底不再硬编码上海时区
+      // （非中国用户提醒时间会偏移数小时且无感知），改用 UTC 并记录日志
+      tz.setLocalLocation(tz.UTC);
+      DebugLogService.instance.log('REMINDER', '本地时区获取失败，兜底 UTC: $e');
     }
 
     // 通知
@@ -103,8 +109,10 @@ class ReminderService {
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
         interval: 30000,
-        // v1.0.2 修复：开机自启，配合 boot 恢复排程减少"重启后提醒失效"窗口
-        autoRunOnBoot: true,
+        // v1.0.2 设计审查修复（简化保活）：去开机自启。
+        // 重启后提醒恢复依赖 ScheduledNotificationBootReceiver 恢复 pending alarm
+        // + 用户打开 App 时 syncSchedule
+        autoRunOnBoot: false,
       ),
     );
 
@@ -239,13 +247,13 @@ class ReminderService {
 
   Future<bool> _alreadyNotified(DateTime now) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('$_notifiedKeyPrefix${_dateKey(now)}') ?? false;
+    return prefs.getBool('$_notifiedKeyPrefix${dateKeyOf(now)}') ?? false;
   }
 
   Future<void> _notify(DateTime now) async {
     // 先记录已弹，再弹通知：进程在 show 与记录之间被杀也不会重复弹
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_notifiedKeyPrefix${_dateKey(now)}', true);
+    await prefs.setBool('$_notifiedKeyPrefix${dateKeyOf(now)}', true);
     await _notifications.show(
       notifyId,
       '呆猫刷题宝',
@@ -287,9 +295,11 @@ class ReminderService {
   }
 
   /// 发送测试通知（设置页按钮，验证通知渠道可用）。
-  /// 返回是否实际发出（非 Android 或未初始化返回 false）
+  /// 返回是否实际发出（非 Android 或未初始化返回 false）。
+  /// v1.0.2 设计审查修复：权限被拒时如实返回 false（此前无条件报「已发送」）
   Future<bool> sendTestNotification() async {
     if (!Platform.isAndroid || !_initialized) return false;
+    if (!await hasNotificationPermission()) return false;
     await _notifications.show(
       9999,
       '呆猫刷题宝',
@@ -327,45 +337,35 @@ class ReminderService {
   Future<String> _buildReminderText() async {
     final daily = await _db.getDailyStats(365);
     final totals = <String, int>{
-      for (final d in daily)
-        '${(d['date'] as DateTime).year}-'
-            '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
-            '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}':
-            d['total'] as int,
+      for (final d in daily) dateKeyOf(d['date'] as DateTime): d['total'] as int,
     };
     final now = DateTime.now();
-    final vacation = await _vacationDates();
+    final (start, end) = await _vacationRange();
     final withoutToday = DatabaseService.countConsecutiveDays(
       totals,
       now: now,
-      vacationDays: vacation,
+      vacationStart: start,
+      vacationEnd: end,
     );
     // 含今天：把今天当作截止日重新计算
     final upToToday = DatabaseService.countConsecutiveDays(
       totals,
       now: now,
-      vacationDays: vacation,
+      vacationStart: start,
+      vacationEnd: end,
       upTo: now,
     );
     return buildReminderText(upToToday, withoutToday);
   }
 
-  Future<List<DateTime>> _vacationDates() async {
+  /// 假期区间（起止日期）。v1.0.2 设计审查修复：区间判断，
+  /// 不再逐日展开列表
+  Future<(DateTime?, DateTime?)> _vacationRange() async {
     final startRaw = await _db.getSetting('vacation_start_date');
     final endRaw = await _db.getSetting('vacation_end_date');
     final enabled = (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
-    if (!enabled || startRaw == null || endRaw == null) return const [];
-    final start = DateTime.tryParse(startRaw);
-    final end = DateTime.tryParse(endRaw);
-    if (start == null || end == null) return const [];
-    final result = <DateTime>[];
-    var cursor = DateTime(start.year, start.month, start.day);
-    final last = DateTime(end.year, end.month, end.day);
-    while (!cursor.isAfter(last)) {
-      result.add(cursor);
-      cursor = cursor.add(const Duration(days: 1));
-    }
-    return result;
+    if (!enabled || startRaw == null || endRaw == null) return (null, null);
+    return (DateTime.tryParse(startRaw), DateTime.tryParse(endRaw));
   }
 
   // ======================== 停止 ========================
@@ -380,14 +380,11 @@ class ReminderService {
     _stopPolling();
     await _stopAll();
   }
-
-  static String _dateKey(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
 
-/// 前台服务后台任务处理器（保活；轮询检查由主 isolate Timer 承担。
-/// 注：后台 isolate 无法访问 sqflite 插件，重启后提醒恢复依赖
-/// autoRunOnBoot 启动服务 + boot 恢复 pending alarm + 用户下次打开 App 时 syncSchedule）
+/// 前台服务后台任务处理器（v1.0.2 设计审查修复：仅保 Flutter 引擎存活，
+/// 提醒检查由主 isolate Timer 承担；后台 isolate 无法访问 sqflite 插件。
+/// 重启后提醒恢复依赖 boot 恢复 pending alarm + 用户下次打开 App 时 syncSchedule）
 class _ReminderTaskHandler extends TaskHandler {
   @override
   void onStart(DateTime timestamp, SendPort? sendPort) {}

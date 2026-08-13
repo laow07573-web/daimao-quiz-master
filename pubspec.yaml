@@ -48,6 +48,9 @@ dependencies:
 
   # 密钥加密（v1.0.2 新增：AES-256-GCM）
   pointycastle: ^3.9.1
+
+  # 哈希（v1.0.2 设计审查：开发者选项密码哈希比对）
+  crypto: ^3.0.0
   
 dev_dependencies:
   flutter_test:

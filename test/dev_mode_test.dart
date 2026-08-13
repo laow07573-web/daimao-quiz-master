@@ -45,11 +45,17 @@ void main() {
     await seedBank();
     final r1 = await db.simulateLongTermUse();
     expect(r1.error, isNull);
-    final total1 = await db.getTotalQuestionsAnswered();
+    // v1.0.2 设计审查修复：模拟数据带 source='simulation'，不进真实统计口径，
+    // 本测试用原始表直查验证数据量
+    final raw = await db.database;
+    Future<int> rawCount(String table) async =>
+        (await raw.rawQuery('SELECT COUNT(*) as c FROM $table')).first['c']
+            as int;
+    final total1 = await rawCount('answer_records');
     expect(total1, greaterThan(0));
     final r2 = await db.simulateLongTermUse();
     expect(r2.error, isNull);
-    final total2 = await db.getTotalQuestionsAnswered();
+    final total2 = await rawCount('answer_records');
     expect(total2, total1);
   });
 
@@ -79,8 +85,10 @@ void main() {
     // 导入合法备份
     final importErr = await db.importBackup(backupPath);
     expect(importErr, isNull);
-    // 导入后数据仍在
-    final r = await db.getTotalQuestionsAnswered();
-    expect(r, greaterThan(0));
+    // 导入后数据仍在（模拟数据带 source='simulation'，用原始表直查验证）
+    final rawDb = await db.database;
+    final rawAfterImport =
+        await rawDb.rawQuery('SELECT COUNT(*) as c FROM answer_records');
+    expect(rawAfterImport.first['c'], greaterThan(0));
   });
 }

@@ -95,10 +95,14 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   List<Question> get previewQuestions => _previewQuestions;
   String _previewBankName = '';
   String get previewBankName => _previewBankName;
+  // v1.0.2 设计审查修复：分块解析失败原因（预览页显性提示，不再伪装 0 题成功）
+  List<String> _previewParseErrors = [];
+  List<String> get previewParseErrors => _previewParseErrors;
 
   /// 解析文件并在预览中展示（不保存到数据库）
   Future<void> parseForPreview(List<String> filePaths) async {
     _previewQuestions = [];
+    _previewParseErrors = [];
     _importProgress = 0;
     _importStatus = '正在解析...';
     notifyListeners();
@@ -143,14 +147,23 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       _importStatus = 'AI 解析中...';
       notifyListeners();
       final rawText = await DocParserService.extractRawText(file.path);
-      _previewQuestions = await _aiService!.parseQuestionsFromRawText(
+      final result = await _aiService!.parseQuestionsFromRawText(
           rawText, 0, (d, t) {
         _importStatus = 'AI 解析中 ($d/$t 块)';
         notifyListeners();
       });
+      _previewQuestions = result.questions;
+      _previewParseErrors = result.errors;
     }
 
-    _importStatus = '解析完成，共 ${_previewQuestions.length} 道题目，请预览确认';
+    // v1.0.2 设计审查修复：失败块显性提示，不再「解析完成，共 0 道题目」假成功
+    if (_previewQuestions.isEmpty && _previewParseErrors.isNotEmpty) {
+      _importStatus = '解析失败：${_previewParseErrors.first}';
+      notifyListeners();
+      return;
+    }
+    _importStatus = '解析完成，共 ${_previewQuestions.length} 道题目，请预览确认'
+        '${_previewParseErrors.isNotEmpty ? '（${_previewParseErrors.length} 个分块失败，已跳过）' : ''}';
     notifyListeners();
   }
 
@@ -224,6 +237,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   void _initAIService() {
+    // v1.0.2 设计审查修复：重建前关闭旧实例的 http.Client，
+    // 避免每次保存设置/启动都泄漏一个 socket 连接
+    _aiService?.dispose();
     _aiService = AIService(_settings);
   }
 
@@ -397,7 +413,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     return DatabaseService.countConsecutiveDays(
       totals,
       now: DateTime.now(),
-      vacationDays: vacationDateRange,
+      vacationStart: _vacationModeEnabled ? _vacationStartDate : null,
+      vacationEnd: _vacationModeEnabled ? _vacationEndDate : null,
       upTo: DateTime.now(),
     );
   }
@@ -410,10 +427,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Future<int> getPeriodLongestStreak(String period) =>
       _statsService.getPeriodLongestStreak(period);
 
-  /// 最近会话记录
+  /// 最近会话记录（LIMIT 下推数据库，不再全量加载后内存截断）
   Future<List<QuizSession>> getRecentSessions(int limit) async {
-    final all = await _db.getAllSessions();
-    return all.take(limit).toList();
+    return await _db.getAllSessions(limit: limit);
   }
 
   /// 按 id 查单个会话（改判后局部刷新用）
@@ -463,6 +479,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
     int totalQuestions = 0;
     int processedFiles = 0;
+    int failedChunksTotal = 0;
 
     for (final file in files) {
       final fileName = file.path.split('/').last.split('\\').last;
@@ -493,7 +510,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         _importStatus = 'AI 正在解析题目: $fileName';
         notifyListeners();
 
-        questions = await _aiService!.parseQuestionsFromRawText(
+        final result = await _aiService!.parseQuestionsFromRawText(
           rawText,
           bankId,
           (done, total) {
@@ -501,6 +518,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
             notifyListeners();
           },
         );
+        questions = result.questions;
+        failedChunksTotal += result.failedChunks;
       } else {
         // ===== 正则解析模式（原有逻辑）=====
         _importStatus = '正在解析: $fileName';
@@ -523,24 +542,27 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     }
 
     final mode = _useAiImport ? '（AI 整理）' : '';
-    _importStatus = '导入完成$mode！共 $totalQuestions 道题目，${files.length} 个题库';
+    _importStatus = '导入完成$mode！共 $totalQuestions 道题目，${files.length} 个题库'
+        '${failedChunksTotal > 0 ? '；其中 $failedChunksTotal 个分块解析失败（已跳过）' : ''}';
     await _loadBanks();
     notifyListeners();
   }
 
   /// JSON 题库导入（v1.0.2：分组建库，无需预览）
-  /// 返回 (题库数, 题目数)
-  Future<(int, int)> importJsonFiles(List<String> filePaths) async {
+  /// 返回 (题库数, 题目数, 错误信息)——错误随返回值传递
+  Future<(int, int, String?)> importJsonFiles(List<String> filePaths) async {
     var banks = 0;
     var questions = 0;
+    String? firstError;
     for (final p in filePaths) {
-      final r = await BankFileService.importJsonFile(p);
-      banks += r.$1;
-      questions += r.$2;
+      final (b, q, err) = await BankFileService.importJsonFile(p);
+      banks += b;
+      questions += q;
+      firstError ??= err;
     }
     await _loadBanks();
     notifyListeners();
-    return (banks, questions);
+    return (banks, questions, firstError);
   }
 
   /// 模拟长期使用（开发者选项，幂等）
@@ -581,6 +603,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Future<void> startQuiz({bool persistSession = true}) async {
     if (_selectedBankIds.isEmpty) return;
 
+    // v1.0.2 设计审查修复：skipFSRS 复位收口到会话生命周期
+    // （startQuiz/abortSession/endSession），不再依赖 QuizScreen.dispose 的
+    // context.read 复位（Element 存活时机脆弱）
+    _skipFSRS = false;
+
     await _quizService.startQuiz(
       bankIds: _selectedBankIds.toList(),
       mode: _selectedBankIds.length > 1 ? 'mixed' : 'single',
@@ -603,12 +630,18 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   Future<void> submitAnswer(String userAnswer) async {
-    if (_quizService.currentQuestion == null) return;
+    final question = _quizService.currentQuestion;
+    if (question == null) return;
+
+    // v1.0.2 设计审查修复（async gap 竞态）：await DB 写入期间用户可能切题，
+    // 必须用提交时刻的题号/题目 id 写历史槽位与统计，否则记录会写入错误槽
+    final submitIndex = _currentQuestionIndex;
+    final submitQid = question.id!;
 
     // v1.0.2 完善：该题已有作答记录（返回上一题重新作答）→ 走更新路径，
     // 不新增记录、不污染刷题量统计
-    final hasPrev = _currentQuestionIndex < _answerHistory.length &&
-        _answerHistory[_currentQuestionIndex] != null;
+    final hasPrev = submitIndex < _answerHistory.length &&
+        _answerHistory[submitIndex] != null;
     if (hasPrev) {
       _lastAnswerRecord = await _quizService.resubmitAnswer(userAnswer);
     } else {
@@ -616,23 +649,27 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     }
     _currentSession = _quizService.currentSession;
 
-    // 存储答题历史
-    if (_currentQuestionIndex < _answerHistory.length) {
-      _answerHistory[_currentQuestionIndex] = _lastAnswerRecord;
+    // 存储答题历史（按提交时刻的槽位）
+    if (submitIndex < _answerHistory.length) {
+      _answerHistory[submitIndex] = _lastAnswerRecord;
     }
 
-    // 加载单题统计
-    final qId = _quizService.currentQuestion!.id!;
-    _currentQuestionStats = await _quizService.getQuestionStats(qId);
+    // 加载单题统计（按提交时刻的题目；切题后由 _restoreAnswerState 覆盖）
+    final stats = await _quizService.getQuestionStats(submitQid);
+    if (_currentQuestionIndex == submitIndex) {
+      _currentQuestionStats = stats;
+    }
 
-    // 不再自动加载解析，由用户手动触发
-    _currentAnalysis = null;
-    _analysisLoading = false;
+    // 不再自动加载解析，由用户手动触发（仅当前题未变时才复位展示状态）
+    if (_currentQuestionIndex == submitIndex) {
+      _currentAnalysis = null;
+      _analysisLoading = false;
+    }
 
     // 更新 FSRS 状态（重答路径已由改判逻辑补记，不再重复更新）
     if (!_skipFSRS && !hasPrev) {
       try {
-        await _updateFSRSIfNeeded(qId);
+        await _updateFSRSIfNeeded(submitQid);
       } catch (e) {
         DebugLogService.instance.log('FSRS', '更新 FSRS 失败: $e');
       }
@@ -641,11 +678,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
   }
 
-  /// v1.0.2 完善：清空当前题作答状态，进入「重新作答」
+  /// v1.0.2 设计审查修复：进入「重新作答」只清 UI 展示状态。
+  /// 保留 _answerHistory 记录 → 再提交时 hasPrev 为 true，走 resubmitAnswer
+  /// 更新路径（不新增记录、不双计会话统计）；此前置 null 会走新增路径
   void resetCurrentAnswer() {
-    if (_currentQuestionIndex < _answerHistory.length) {
-      _answerHistory[_currentQuestionIndex] = null;
-    }
     _lastAnswerRecord = null;
     _currentQuestionStats = {};
     _currentAnalysis = null;
@@ -678,14 +714,21 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   Future<void> _loadAnalysis() async {
     if (_aiService == null || currentQuestion == null) return;
+    final q = currentQuestion!;
 
     _analysisLoading = true;
     notifyListeners();
 
-    _currentAnalysis = await _aiService!.getAnalysis(currentQuestion!);
-
-    _analysisLoading = false;
-    notifyListeners();
+    // v1.0.2 设计审查修复：异常兜底 + finally 复位，防止加载圈永久卡死
+    try {
+      _currentAnalysis = await _aiService!.getAnalysis(q);
+    } catch (e) {
+      DebugLogService.instance.log('AI', '解析加载失败: $e');
+      _currentAnalysis = null;
+    } finally {
+      _analysisLoading = false;
+      notifyListeners();
+    }
   }
 
   /// 手动查看解析
@@ -737,6 +780,17 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     }
   }
 
+  /// 直接跳转到指定题号（答题卡/底部圆点）。
+  /// v1.0.2 设计审查修复：单次变更替代 while 逐题循环
+  /// （每次 previous/next 都触发 notifyListeners + 逐题 DB 统计查询）
+  void jumpToQuestion(int index) {
+    if (_quizService.jumpToIndex(index)) {
+      _currentQuestionIndex = _quizService.currentIndex;
+      _restoreAnswerState();
+      notifyListeners();
+    }
+  }
+
   void _restoreAnswerState() {
     _currentAnalysis = null;
     if (_currentQuestionIndex < _answerHistory.length) {
@@ -764,6 +818,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   /// 放弃当前会话（练习退出/未作答退出）：不保存记录、不产生幽灵会话
   Future<void> abortSession() async {
+    _skipFSRS = false;
     await _quizService.abortSession();
     _currentSession = null;
     _quizQuestions = [];
@@ -784,7 +839,27 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
   }
 
+  /// v1.0.2 设计审查修复：编辑题目后，若当前题已作答，按新正确答案重判该记录，
+  /// 使判定显示与落库记录一致（会话统计/FSRS 由 rejudge 差量修正）
+  Future<void> rejudgeCurrentAnswerAfterEdit() async {
+    final record = _lastAnswerRecord;
+    final q = currentQuestion;
+    if (record == null || record.id == null || q == null) return;
+    final isCorrect = QuizService.judgeAnswer(q, record.userAnswer ?? '');
+    if (isCorrect == record.isCorrect) return;
+    await _db.rejudgeAnswerRecord(record.id!, isCorrect);
+    _quizService.adjustSessionCounts(toCorrect: isCorrect);
+    _currentSession = _quizService.currentSession;
+    final updated = record.copyWith(isCorrect: isCorrect);
+    _lastAnswerRecord = updated;
+    if (_currentQuestionIndex < _answerHistory.length) {
+      _answerHistory[_currentQuestionIndex] = updated;
+    }
+    notifyListeners();
+  }
+
   Future<QuizSession> endSession() async {
+    _skipFSRS = false;
     _currentSession = await _quizService.endSession();
     _quizService.reset();
     await _loadHomeStats();
@@ -814,10 +889,6 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 获取错题本统计（按题库分组）：到期题数 + 收藏题数 + 全部去重
   Future<List<Map<String, dynamic>>> getErrorBookStats() async {
     return await _db.getErrorStatsByBank();
-  }
-
-  Future<int> getErrorBookCount() async {
-    return await _db.getErrorBookCount();
   }
 
   // ======================== v1.0.2: 错题本筛选/知识点 ========================

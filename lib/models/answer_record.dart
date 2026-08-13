@@ -6,6 +6,10 @@ class AnswerRecord {
   final bool isCorrect;
   final String? aiAnalysis;
   final String answeredAt;
+  /// 隐藏标记（v1.0.2 模型与表结构同步：隐藏今日记录，统计查询排除 hidden=1）
+  final int hidden;
+  /// 数据来源（v1.0.2 模型与表结构同步：real / simulation）
+  final String source;
 
   AnswerRecord({
     this.id,
@@ -15,6 +19,8 @@ class AnswerRecord {
     required this.isCorrect,
     this.aiAnalysis,
     required this.answeredAt,
+    this.hidden = 0,
+    this.source = 'real',
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +32,8 @@ class AnswerRecord {
       'is_correct': isCorrect ? 1 : 0,
       'ai_analysis': aiAnalysis,
       'answered_at': answeredAt,
+      'hidden': hidden,
+      'source': source,
     };
   }
 
@@ -38,6 +46,23 @@ class AnswerRecord {
       isCorrect: (map['is_correct'] as int) == 1,
       aiAnalysis: map['ai_analysis'] as String?,
       answeredAt: map['answered_at'] as String,
+      hidden: (map['hidden'] as int?) ?? 0,
+      source: (map['source'] as String?) ?? 'real',
+    );
+  }
+
+  /// 浅拷贝（改判后刷新内存记录用）
+  AnswerRecord copyWith({bool? isCorrect}) {
+    return AnswerRecord(
+      id: id,
+      questionId: questionId,
+      sessionId: sessionId,
+      userAnswer: userAnswer,
+      isCorrect: isCorrect ?? this.isCorrect,
+      aiAnalysis: aiAnalysis,
+      answeredAt: answeredAt,
+      hidden: hidden,
+      source: source,
     );
   }
 }

@@ -25,6 +25,17 @@ class Question {
     required this.createdAt,
   });
 
+  /// 题型中文标签（v1.0.2 设计审查修复：页面中两套映射收敛到此）
+  String get typeLabel => switch (questionType) {
+        'multi_choice' => '多选',
+        'fill_blank' => '填空',
+        'true_false' => '判断',
+        'ming_jie' => '名解',
+        'jian_da' => '简答',
+        'jie_da' => '问答',
+        _ => '单选',
+      };
+
   /// 带前缀的选项文本列表：["A. 热带假丝酵母菌", "B. 新型隐球菌", ...]
   List<String> get optionsWithLabels {
     return options.asMap().entries.map((e) {

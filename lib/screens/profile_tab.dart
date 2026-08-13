@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
+import '../utils/app_constants.dart';
+import '../utils/format_utils.dart';
 import 'developer_options_screen.dart';
 import 'settings_screen.dart';
 
@@ -13,16 +15,8 @@ class ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<ProfileTab> {
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 5) return '夜深了，注意休息…';
-    if (h < 9) return '早上好！';
-    if (h < 12) return '上午好！';
-    if (h < 14) return '中午好！';
-    if (h < 18) return '下午好！';
-    if (h < 23) return '晚上好！';
-    return '夜深了，注意休息…';
-  }
+  // v1.0.2 设计审查修复：问候语逻辑收敛到 format_utils.greetingNow
+  String get _greeting => greetingNow();
 
   @override
   Widget build(BuildContext context) {
@@ -114,15 +108,15 @@ class _ProfileTabState extends State<ProfileTab> {
           _EntryTile(
             icon: Icons.info_outline,
             title: '关于',
-            // v1.0.2 修复：版本号统一 v1.26.6.17
-            subtitle: 'v1.26.6.17',
+            // v1.0.2 修复：版本号统一（常量 kAppVersion）
+            subtitle: kAppVersion,
             onTap: () => _showAbout(context),
           ),
           const SizedBox(height: 20),
           Center(
             child: Text(
               // v1.0.2 对齐里程碑：页脚带版本号
-              '本软件由b站：笨蛋鱼坏蛋猫开发|v1.26.6.17',
+              '本软件由b站：笨蛋鱼坏蛋猫开发|$kAppVersion',
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
           ),
@@ -136,8 +130,8 @@ class _ProfileTabState extends State<ProfileTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('呆猫刷题宝'),
-        content: const Text(
-          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：v1.26.6.17',
+        content: Text(
+          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：$kAppVersion',
         ),
         actions: [
           TextButton(

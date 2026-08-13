@@ -7,7 +7,11 @@ import 'package:flashcard_app/services/database_service.dart';
 
 /// 模拟长期使用（v1.0.2 对齐里程碑）：
 /// 基于当前题库生成过去 N 天的刷题记录、错题与复习卡；
-/// 重复执行会先清理上次模拟的数据（数据量不变）
+/// 重复执行会先清理上次模拟的数据（数据量不变）。
+///
+/// v1.0.2 设计审查修复：模拟数据带 source='simulation'，不再进入真实
+/// 统计口径（getTotalQuestionsAnswered/getAllSessions 等），
+/// 本测试改用原始表直查验证生成与清理。
 void main() {
   setUp(() async {
     // 每个用例独立数据库（多测试文件并行隔离）
@@ -42,17 +46,32 @@ void main() {
     return bankId;
   }
 
+  /// 原始表直查（不区分 source，验证模拟数据的物理存在/清理）
+  Future<int> rawAnswerCount() async {
+    final raw = await DatabaseService.instance.database;
+    final r = await raw.rawQuery('SELECT COUNT(*) as c FROM answer_records');
+    return r.first['c'] as int;
+  }
+
+  Future<int> rawSessionCount() async {
+    final raw = await DatabaseService.instance.database;
+    final r = await raw.rawQuery('SELECT COUNT(*) as c FROM quiz_sessions');
+    return r.first['c'] as int;
+  }
+
   test('simulateLongTermUse 重复执行数据量不变', () async {
     final db = DatabaseService.instance;
     await seedBank();
 
     final r1 = await db.simulateLongTermUse();
-    final records1 = await db.getTotalQuestionsAnswered();
-    final sessions1 = (await db.getAllSessions()).length;
+    final records1 = await rawAnswerCount();
+    final sessions1 = await rawSessionCount();
+    // 模拟数据不进入真实统计口径（source 隔离）
+    expect(await db.getTotalQuestionsAnswered(), 0);
 
     final r2 = await db.simulateLongTermUse();
-    final records2 = await db.getTotalQuestionsAnswered();
-    final sessions2 = (await db.getAllSessions()).length;
+    final records2 = await rawAnswerCount();
+    final sessions2 = await rawSessionCount();
 
     expect(r1.error, isNull);
     expect(r2.error, isNull);
@@ -66,10 +85,10 @@ void main() {
     final bankId = await seedBank();
     final r1 = await db.simulateLongTermUse();
     expect(r1.records, greaterThan(0));
-    final before = await db.getTotalQuestionsAnswered();
+    final before = await rawAnswerCount();
     expect(before, greaterThan(0));
     await db.deleteBank(bankId);
-    final after = await db.getTotalQuestionsAnswered();
+    final after = await rawAnswerCount();
     expect(after, 0); // 外键级联清理
     expect((await db.getAllBanks()).any((b) => b.name == '真实题库'), isFalse);
   });

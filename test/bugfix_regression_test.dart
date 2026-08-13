@@ -145,8 +145,8 @@ void main() {
      "correct_answer": "A, C"}
   ]
 }''');
-    final groups = await BankFileService.parseJsonFile(file.path);
-    expect(BankFileService.lastError, isNull);
+    final (groups, err) = await BankFileService.parseJsonFile(file.path);
+    expect(err, isNull);
     final qs = groups.values.first;
     expect(qs.length, 2);
     // "AC" → A,C
@@ -202,12 +202,12 @@ void main() {
     final r1 = await db.simulateLongTermUse(days: 30);
     expect(r1.error, isNull);
     final cards1 = await db.countAllFsrsCards();
-    final errors1 = await db.getErrorBookCount();
+    final errors1 = await db.getFullErrorCount('all');
 
     final r2 = await db.simulateLongTermUse(days: 30);
     expect(r2.error, isNull);
     expect(await db.countAllFsrsCards(), cards1); // 卡片数不随重复执行漂移
-    expect(await db.getErrorBookCount(), errors1); // 错题数不漂移
+    expect(await db.getFullErrorCount('all'), errors1); // 错题数不漂移
     expect(cards1, greaterThan(0));
     // 用户真实数据未被模拟清理（卡片可能被 replace，但必须仍在）
     expect(await db.getFSRSCard(qs[9].id!), isNotNull);
@@ -302,16 +302,25 @@ void main() {
     final bankId = await seedBank('C', 10);
     final qs = await db.getQuestionsByBank(bankId);
 
-    // 场景1：模拟 → 清除
+    // 场景1：模拟 → 清除（v1.0.2 设计审查：模拟数据带 source='simulation'，
+    // 不进入真实统计口径；清理验证用原始表直查）
     final r = await db.simulateLongTermUse(days: 30);
     expect(r.error, isNull);
-    expect(await db.getTotalQuestionsAnswered(), greaterThan(0));
+    final rawDb = await db.database;
+    final rawRecords = await rawDb.rawQuery(
+        "SELECT COUNT(*) as c FROM answer_records WHERE source = 'simulation'");
+    expect(rawRecords.first['c'], greaterThan(0));
+    // 真实统计口径不包含模拟数据
+    expect(await db.getTotalQuestionsAnswered(), 0);
     final removed = await db.clearSimulatedData();
     expect(removed, greaterThan(0));
     expect(await db.getTotalQuestionsAnswered(), 0);
     expect(await db.countAllFsrsCards(), 0);
     expect((await db.getAllSessions()).length, 0);
-    expect(await db.getErrorBookCount(), 0);
+    expect(await db.getFullErrorCount('all'), 0);
+    final rawAfter = await rawDb.rawQuery(
+        "SELECT COUNT(*) as c FROM answer_records WHERE source = 'simulation'");
+    expect(rawAfter.first['c'], 0);
     // 幂等：再次清除无操作
     expect(await db.clearSimulatedData(), 0);
 
@@ -332,6 +341,103 @@ void main() {
     final ts2 = ThemeService();
     await ts2.init();
     expect(ts2.current, AppTheme.minimal);
+  });
+
+  test('空题库 startQuiz 不产生 0 题幽灵会话', () async {
+    final db = DatabaseService.instance;
+    final bankId = await seedBank('E', 0); // 空题库
+    final quizService = QuizService();
+    await quizService.startQuiz(
+      bankIds: [bankId],
+      mode: 'single',
+      questionCount: 50,
+    );
+    expect(quizService.currentSession, isNull);
+    expect(quizService.questions, isEmpty);
+    expect((await db.getAllSessions()).length, 0);
+    // 非空题库正常建会话
+    final bankId2 = await seedBank('E2', 3);
+    await quizService.startQuiz(
+      bankIds: [bankId2],
+      mode: 'single',
+      questionCount: 50,
+    );
+    expect(quizService.currentSession, isNotNull);
+    expect(quizService.questions.length, 3);
+  });
+
+  test('getQuestionsByBanks limit 下推：随机抽取不超过 limit 且不重复', () async {
+    final db = DatabaseService.instance;
+    final bankId = await seedBank('L', 50);
+    final qs = await db.getQuestionsByBanks([bankId], limit: 10);
+    expect(qs.length, 10);
+    final ids = qs.map((q) => q.id).toSet();
+    expect(ids.length, 10); // 无重复
+    // limit 大于题库量 → 全量返回
+    final all = await db.getQuestionsByBanks([bankId], limit: 999);
+    expect(all.length, 50);
+  });
+
+  test('隐藏今日：会话历史/详情派生计数与统计口径一致', () async {
+    final db = DatabaseService.instance;
+    final bankId = await seedBank('HD', 2);
+    final qs = await db.getQuestionsByBank(bankId);
+    final now = DateTime.now().toIso8601String();
+    final sessionId = await db.insertSession(QuizSession(
+      bankIds: '$bankId',
+      mode: 'single',
+      totalQuestions: 2,
+      correctCount: 1,
+      wrongCount: 1,
+      startTime: now,
+    ));
+    await db.insertAnswerRecord(AnswerRecord(
+        questionId: qs[0].id!, sessionId: sessionId, userAnswer: 'A',
+        isCorrect: true, answeredAt: now));
+    await db.insertAnswerRecord(AnswerRecord(
+        questionId: qs[1].id!, sessionId: sessionId, userAnswer: 'B',
+        isCorrect: false, answeredAt: now));
+
+    // 隐藏前：历史会话派生 1对1错
+    final s1 = await db.getSessionById(sessionId);
+    expect(s1!.correctCount, 1);
+    expect(s1.wrongCount, 1);
+    expect((await db.getSessionDetail(sessionId)).length, 2);
+
+    // 隐藏今日后：派生计数归零（存储快照不直接展示）
+    await db.hideTodayRecords();
+    final s2 = await db.getSessionById(sessionId);
+    expect(s2!.correctCount, 0);
+    expect(s2.wrongCount, 0);
+    expect((await db.getSessionDetail(sessionId)).length, 0);
+
+    // 恢复后还原
+    await db.restoreTodayRecords();
+    final s3 = await db.getSessionById(sessionId);
+    expect(s3!.correctCount, 1);
+    expect(s3.wrongCount, 1);
+  });
+
+  test('未完成会话（计数快照为 0）历史列表展示派生真实计数', () async {
+    final db = DatabaseService.instance;
+    final bankId = await seedBank('UF', 3);
+    final qs = await db.getQuestionsByBank(bankId);
+    final now = DateTime.now().toIso8601String();
+    // 进程被杀场景：会话计数未写回（0），但已有作答记录
+    final sessionId = await db.insertSession(QuizSession(
+      bankIds: '$bankId', mode: 'single', totalQuestions: 3,
+      startTime: now));
+    await db.insertAnswerRecord(AnswerRecord(
+        questionId: qs[0].id!, sessionId: sessionId, userAnswer: 'A',
+        isCorrect: true, answeredAt: now));
+    await db.insertAnswerRecord(AnswerRecord(
+        questionId: qs[1].id!, sessionId: sessionId, userAnswer: 'B',
+        isCorrect: false, answeredAt: now));
+    final s = await db.getSessionById(sessionId);
+    expect(s!.correctCount, 1); // 派生自 answer_records，而非存储的 0
+    expect(s.wrongCount, 1);
+    final sessions = await db.getAllSessions(limit: 5);
+    expect(sessions.single.correctCount, 1);
   });
 }
 

@@ -233,6 +233,23 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
   /// 卡片描边
   final Color cardBorder;
 
+  // ===== v1.0.2 设计审查修复：语义色（判定对错/背题高亮等跨主题一致） =====
+
+  /// 成功/正确语义色（判题对、背题高亮等）
+  final Color success;
+
+  /// 成功语义浅底色
+  final Color successContainer;
+
+  /// 危险/错误语义色（判题错等）
+  final Color danger;
+
+  /// 危险语义浅底色
+  final Color dangerContainer;
+
+  /// 警告语义色（余额不足、未配置提示等）
+  final Color warning;
+
   const AppThemeColors({
     required this.navBar,
     required this.background,
@@ -240,6 +257,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     required this.onAccent,
     required this.card,
     required this.cardBorder,
+    this.success = const Color(0xFF5CB85C),
+    this.successContainer = const Color(0xFFE8F5E9),
+    this.danger = const Color(0xFFD9534F),
+    this.dangerContainer = const Color(0xFFFDECEA),
+    this.warning = const Color(0xFFF0AD4E),
   });
 
   @override
@@ -250,6 +272,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     Color? onAccent,
     Color? card,
     Color? cardBorder,
+    Color? success,
+    Color? successContainer,
+    Color? danger,
+    Color? dangerContainer,
+    Color? warning,
   }) {
     return AppThemeColors(
       navBar: navBar ?? this.navBar,
@@ -258,6 +285,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       onAccent: onAccent ?? this.onAccent,
       card: card ?? this.card,
       cardBorder: cardBorder ?? this.cardBorder,
+      success: success ?? this.success,
+      successContainer: successContainer ?? this.successContainer,
+      danger: danger ?? this.danger,
+      dangerContainer: dangerContainer ?? this.dangerContainer,
+      warning: warning ?? this.warning,
     );
   }
 
@@ -271,6 +303,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       onAccent: Color.lerp(onAccent, other.onAccent, t)!,
       card: Color.lerp(card, other.card, t)!,
       cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
+      success: Color.lerp(success, other.success, t)!,
+      successContainer: Color.lerp(successContainer, other.successContainer, t)!,
+      danger: Color.lerp(danger, other.danger, t)!,
+      dangerContainer: Color.lerp(dangerContainer, other.dangerContainer, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
     );
   }
 

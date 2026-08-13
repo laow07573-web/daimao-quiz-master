@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/theme_service.dart';
+import '../utils/app_constants.dart';
 import 'monthly_calendar.dart';
 
 /// 首页本周战绩卡片（v1.0.2 UI 设计稿）
@@ -39,7 +40,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
   @override
   void initState() {
     super.initState();
-    _monthController = PageController(initialPage: 12 * 200);
+    _monthController = PageController(initialPage: 12 * kYearPageSpan);
   }
 
   @override
@@ -161,7 +162,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
   Widget _buildSwipeableMonth(BuildContext context, DateTime now, String todayKey) {
     final ac = AppThemeColors.of(context);
     final initialAbs = now.year * 12 + (now.month - 1);
-    const initialPage = 12 * 200; // 大初始页：前后 200 年范围可翻
+    const initialPage = 12 * kYearPageSpan; // 大初始页：前后 200 年范围可翻
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = constraints.maxWidth;

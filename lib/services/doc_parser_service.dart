@@ -38,36 +38,6 @@ class DocParserService {
     }
   }
 
-  /// 批量并行解析多个 DOCX 文件
-  /// 返回 {文件名: 解析出的题目列表}
-  static Future<Map<String, List<Question>>> parseMultipleFiles(
-    List<File> files,
-    int bankId,
-    void Function(String fileName, int current, int total) onProgress,
-  ) async {
-    final result = <String, List<Question>>{};
-    final total = files.length;
-
-    // 使用 Isolate 并行处理多个文件
-    final futures = <Future<void>>[];
-    final receivePort = ReceivePort();
-
-    for (int i = 0; i < files.length; i++) {
-      final file = files[i];
-      final index = i;
-
-      futures.add(parseFileInIsolate(file.path, bankId).then((questions) {
-        result[file.path] = questions;
-        onProgress(file.path, index + 1, total);
-      }));
-    }
-
-    await Future.wait(futures);
-    receivePort.close();
-
-    return result;
-  }
-
   /// 检测文件格式：'docx' / 'doc' / 'unknown'
   static String detectFormat(String filePath) {
     try {

@@ -39,20 +39,7 @@
             android:name="flutterEmbedding"
             android:value="2"/>
 
-        <!-- v1.0.2: 无障碍保活服务 -->
-        <service
-            android:name=".KeepAliveAccessibilityService"
-            android:exported="false"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config"/>
-        </service>
-
-        <!-- v1.0.2: 每日提醒前台服务（flutter_foreground_task 需宿主声明；
+        <!-- v1.0.2 每日提醒前台服务（flutter_foreground_task 需宿主声明；
              原版里程碑与本声明一致：specialUse + 该子类型文案） -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -29,8 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double? _balance;
   int _estimated = -1;
   bool _balanceLoading = false;
-  // v1.0.2 对齐里程碑：保活状态 / 电池优化 / 未打标签数
-  bool _accessibilityOn = false;
+  // v1.0.2 设计审查修复（简化保活）：移除无障碍状态，仅保留电池优化
   // v1.0.2 修复：初始为 false（未知状态），加载真实值前不误导"已豁免"
   bool _batteryIgnored = false;
   int _untaggedCount = 0;
@@ -52,11 +52,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadKeepaliveStatus() async {
-    final acc = await KeepAliveService.instance.isAccessibilityEnabled();
     final bat = await KeepAliveService.instance.isIgnoringBatteryOptimizations();
     if (!mounted) return;
     setState(() {
-      _accessibilityOn = acc;
       _batteryIgnored = bat;
     });
   }
@@ -194,7 +192,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.account_balance_wallet, size: 18, color: Color(0xFFF0AD4E)),
+                          // v1.0.2 设计审查修复：硬编码色 → 主题语义色
+                          Icon(Icons.account_balance_wallet, size: 18,
+                              color: AppThemeColors.of(context).warning),
                           const SizedBox(width: 8),
                           Text('剩余 ¥${_balance!.toStringAsFixed(2)}',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onPrimaryContainer)),
@@ -228,7 +228,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber, size: 16, color: Color(0xFFE53935)),
+                          // v1.0.2 设计审查修复：硬编码色 → 主题错误色
+                          Icon(Icons.warning_amber, size: 16, color: cs.error),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text('API 余额不足 ¥1，建议尽快充值以免影响使用',
@@ -432,7 +433,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // 假期模式（v1.0.2）
             Consumer<AppState>(
-              builder: (context, appState, _) => Container(
+              builder: (context, appState, _) {
+                final now = DateTime.now();
+                return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest,
@@ -485,7 +488,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     if (appState.vacationModeEnabled) ...[
-                      // 起止日期联动：选开始上限=结束日，选结束下限=开始日
+                      // 起止日期联动：选开始上限=结束日，选结束下限=开始日。
+                      // v1.0.2 设计审查修复：选择范围收窄为前后 1 年
+                      // （此前 2000~2100 可产生 3.6 万个假期日期）
                       Row(
                         children: [
                           Expanded(
@@ -493,9 +498,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               // v1.0.2 对齐里程碑：选择假期开始日期
                               label: '选择假期开始日期',
                               value: appState.vacationStartDate,
-                              firstDate: DateTime(2000),
+                              firstDate:
+                                  DateTime(now.year - 1, now.month, now.day),
                               lastDate: appState.vacationEndDate ??
-                                  DateTime(2100),
+                                  DateTime(now.year + 1, now.month, now.day),
                               onChanged: (d) => appState.setVacationMode(
                                   enabled: true,
                                   start: d,
@@ -509,8 +515,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               label: '选择假期结束日期',
                               value: appState.vacationEndDate,
                               firstDate: appState.vacationStartDate ??
-                                  DateTime(2000),
-                              lastDate: DateTime(2100),
+                                  DateTime(now.year - 1, now.month, now.day),
+                              lastDate: DateTime(now.year + 1, now.month, now.day),
                               onChanged: (d) => appState.setVacationMode(
                                   enabled: true,
                                   start: appState.vacationStartDate,
@@ -522,7 +528,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ],
                 ),
-              ),
+              );
+              },
             ),
 
             const SizedBox(height: 16),
@@ -568,6 +575,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (v) {
                           await ReminderService.instance
                               .requestNotificationPermission();
+                          // v1.0.2 设计审查修复：被拒后如实提示，
+                          // 不再无提示静默开启一个"看不到的提醒"
+                          final granted = await ReminderService.instance
+                              .hasNotificationPermission();
+                          if (!mounted) return;
+                          if (!granted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('通知权限未开启：提醒将不可见。'
+                                      '请到系统设置中允许本应用的通知权限。')),
+                            );
+                          }
                         }
                         await appState.setReminderSettings(
                             enabled: v,
@@ -623,7 +642,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             SnackBar(
                                 content: Text(sent
                                     ? '测试通知已发送，下拉通知栏查看'
-                                    : '当前平台不支持发送测试通知')),
+                                    // v1.0.2 设计审查修复：按真实原因提示
+                                    : (Platform.isAndroid
+                                        ? '通知权限未开启，请到系统设置允许通知权限'
+                                        : '当前平台不支持发送测试通知'))),
                           );
                         },
                       ),
@@ -635,7 +657,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 16),
 
-            // v1.0.2 对齐里程碑：保活（无障碍 + 电池优化）
+            // v1.0.2 设计审查修复（简化保活）：移除无障碍保活
+            // （过度保活 + 商店合规风险），保留电池优化豁免
+            // （前台提醒服务不被系统激进清理）
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -647,40 +671,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.shield_outlined, color: cs.primary, size: 20),
+                      Icon(Icons.battery_charging_full,
+                          color: cs.primary, size: 20),
                       const SizedBox(width: 8),
-                      Text('保活（无障碍）',
+                      Text('电池优化',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                               color: cs.onSurface)),
                       const Spacer(),
                       Icon(
-                        _accessibilityOn
+                        _batteryIgnored
                             ? Icons.check_circle
                             : Icons.error_outline,
                         size: 18,
-                        color: _accessibilityOn ? cs.primary : cs.error,
+                        color: _batteryIgnored ? cs.primary : cs.error,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    // v1.0.2 对齐里程碑：无障碍保活：已开启/未开启
-                    _accessibilityOn ? '无障碍保活：已开启' : '无障碍保活：未开启',
+                    _batteryIgnored ? '电池优化：已豁免' : '电池优化：未豁免',
                     style: TextStyle(
                         fontSize: 12,
-                        color: _accessibilityOn ? cs.primary : cs.error),
+                        color: _batteryIgnored ? cs.primary : cs.error),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '在无障碍设置中找到「呆猫刷题宝」并开启，系统将守护提醒服务不被强杀',
+                    '允许忽略电池优化，防止系统在后台清理每日提醒服务',
                     style:
                         TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '若仍被清理：最近任务中长按本应用并锁定',
+                    '若仍收不到提醒：最近任务中长按本应用并锁定',
                     style:
                         TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
                   ),
@@ -689,27 +713,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.accessibility_new, size: 16),
+                          icon: const Icon(Icons.battery_alert, size: 16),
                           label: Text(
-                              _accessibilityOn ? '已开启保活' : '开启无障碍保活',
-                              style: const TextStyle(fontSize: 12)),
-                          onPressed: () async {
-                            await KeepAliveService.instance
-                                .openAccessibilitySettings();
-                            await _loadKeepaliveStatus();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: Icon(
-                              _batteryIgnored
-                                  ? Icons.battery_alert
-                                  : Icons.battery_charging_full,
-                              size: 16),
-                          label: Text(
-                              // v1.0.2 对齐里程碑：电池优化：已豁免
                               _batteryIgnored ? '电池优化：已豁免' : '请求忽略电池优化',
                               style: const TextStyle(fontSize: 12)),
                           onPressed: _batteryIgnored
@@ -908,6 +913,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _HelpItem(
                     icon: Icons.lock_outline,
                     text: 'API Key 仅保存在本地，不会上传到任何服务器',
+                    cs: cs,
+                  ),
+                  _HelpItem(
+                    icon: Icons.shield_outlined,
+                    // v1.0.2 设计审查修复：如实说明保护强度（本地混淆存储，非强加密）
+                    text: 'API Key 本地混淆存储（防随手翻看，非强加密保护）',
                     cs: cs,
                   ),
                   _HelpItem(

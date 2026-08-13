@@ -72,9 +72,10 @@ android {
 
     buildTypes {
         release {
-            // 历史安装包均为 debug 证书(540320cd...)签名, 保持同一把钥匙可实现无缝覆盖升级。
-            // 正式发布时改回: signingConfig signingConfigs.release (正式签名, 见 key.properties)
-            signingConfig signingConfigs.debug
+            // v1.0.2 设计审查修复：正式构建改用正式签名（防篡改校验真实生效）。
+            // 注意：与历史 debug 证书(540320cd)不是同一把钥匙，
+            // 旧版本安装的设备需卸载后重装一次。
+            signingConfig signingConfigs.release
         }
     }
 }

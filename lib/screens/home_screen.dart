@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
+import '../utils/app_constants.dart';
+import '../utils/format_utils.dart';
 import '../widgets/weekly_stats_board.dart';
 import 'bank_manage_screen.dart';
 import 'import_screen.dart';
@@ -51,8 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final streak = await appState.getStreakDays();
       final weekStats = await appState.getPeriodStats('week');
       final vacation = {
-        for (final d in appState.vacationDateRange)
-          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'
+        for (final d in appState.vacationDateRange) dateKeyOf(d)
       };
       if (!mounted) return;
       setState(() {
@@ -141,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     alignment: Alignment.bottomRight,
                     child: Text(
                       // v1.0.2 修复：版本号统一 v1.26.6.17（与我的页/关于弹窗一致）
-                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | v1.26.6.17',
+                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
                       style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.4)),
                     ),
                   ),
@@ -238,16 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 5) return '夜深了，注意休息…';
-    if (h < 9) return '早上好！';
-    if (h < 12) return '上午好！';
-    if (h < 14) return '中午好！';
-    if (h < 18) return '下午好！';
-    if (h < 23) return '晚上好！';
-    return '夜深了，注意休息…';
-  }
+  String get _greeting => greetingNow();
 
   /// v1.0.2 对齐原版：历史报告（近 7 天每日刷题明细）
   Future<void> _showHistoryReport(AppState appState) async {
@@ -331,9 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _accuracyText(
       Map<String, dynamic> d, Map<String, dynamic> accByDay) {
-    final key = '${(d['date'] as DateTime).year}-'
-        '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
-        '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}';
+    final key = dateKeyOf(d['date'] as DateTime);
     final row = accByDay[key];
     final total = (row?['total'] as int?) ?? 0;
     final correct = (row?['correct'] as int?) ?? 0;
@@ -457,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
           label: '定向爆破',
           subtitle: appState.selectedBankIds.isEmpty
               ? '请先选择题库'
-              : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount}题'}',
+              : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
           iconColor: ac.accent,
           cs: cs,
           onTap: appState.selectedBankIds.isEmpty
@@ -548,11 +538,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text('$n 题'), selected: appState.selectedQuestionCount == n,
                 onSelected: (_) { appState.setQuestionCount(n); Navigator.pop(ctx); _showQuizModePicker(context, appState); },
               )),
-              ChoiceChip(label: const Text('全部'), selected: false, onSelected: (_) { appState.setQuestionCount(9999); Navigator.pop(ctx); _showQuizModePicker(context, appState); }),
+              // v1.0.2 设计审查修复：全部/自定义的选中态反馈
+              ChoiceChip(label: const Text('全部'), selected: appState.selectedQuestionCount >= kQuestionCountAll, onSelected: (_) { appState.setQuestionCount(kQuestionCountAll); Navigator.pop(ctx); _showQuizModePicker(context, appState); }),
               ChoiceChip(label: const Text('自定义'), selected: false, onSelected: (_) { Navigator.pop(ctx); _showCustomCountDialog(context, appState); }),
             ]),
             const SizedBox(height: 12),
-            Text('当前: ${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
           ]),
         ),
       ),
@@ -571,7 +562,16 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           FilledButton(onPressed: () {
             final n = int.tryParse(ctrl.text);
-            if (n != null && n > 0) { appState.setQuestionCount(n); Navigator.pop(ctx); _showQuizModePicker(context, appState); }
+            // v1.0.2 设计审查修复：非法输入给出反馈，不再静默无响应
+            if (n == null || n <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('请输入大于 0 的有效题数')),
+              );
+              return;
+            }
+            appState.setQuestionCount(n);
+            Navigator.pop(ctx);
+            _showQuizModePicker(context, appState);
           }, child: const Text('确定')),
         ],
       ),
@@ -607,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface),
                   textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= 9999 ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
+              Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
                   style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center),
               const SizedBox(height: 20),
@@ -696,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (!mounted) return;
     await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => PracticeEntryScreen(questions: appState.quizQuestions),
+      builder: (_) => const PracticeEntryScreen(),
     ));
     await _loadWeeklyData(appState);
   }

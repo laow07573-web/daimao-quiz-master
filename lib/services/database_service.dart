@@ -50,7 +50,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 6,
+      version: 7,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -60,6 +60,23 @@ class DatabaseService {
   /// 外键级联删除生效（v1.0.2：PRAGMA foreign_keys = ON）
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  /// 索引统一创建（onCreate / onUpgrade 共用，幂等）。
+  /// v1.0.2 设计审查修复：补 answered_at / start_time 高频过滤索引，
+  /// 并让升级库与全新安装库的索引集保持一致。
+  Future<void> _createIndexes(Database db) async {
+    const indexes = [
+      'CREATE INDEX IF NOT EXISTS idx_questions_bank_id ON questions(bank_id)',
+      'CREATE INDEX IF NOT EXISTS idx_answer_records_question_id ON answer_records(question_id)',
+      'CREATE INDEX IF NOT EXISTS idx_answer_records_session_id ON answer_records(session_id)',
+      'CREATE INDEX IF NOT EXISTS idx_answer_records_answered_at ON answer_records(answered_at)',
+      'CREATE INDEX IF NOT EXISTS idx_quiz_sessions_start_time ON quiz_sessions(start_time)',
+      'CREATE INDEX IF NOT EXISTS idx_ai_cache_question_id ON ai_cache(question_id)',
+    ];
+    for (final s in indexes) {
+      await db.execute(s);
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -151,6 +168,26 @@ class DatabaseService {
       await db.execute(
           'ALTER TABLE answer_records ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
     }
+    if (oldVersion < 7) {
+      // v1.0.2 设计审查修复：数据来源标记（模拟数据与真实数据隔离）+ 索引补齐。
+      // 加列前先查列存在性：user_version 被外部重置（如备份文件把版本改回 6）
+      // 时库文件可能已物理含 source 列，直接 ALTER 会报 duplicate column
+      final arCols = (await db.rawQuery('PRAGMA table_info(answer_records)'))
+          .map((r) => r['name'] as String)
+          .toList();
+      final qsCols = (await db.rawQuery('PRAGMA table_info(quiz_sessions)'))
+          .map((r) => r['name'] as String)
+          .toList();
+      if (!arCols.contains('source')) {
+        await db.execute(
+            "ALTER TABLE answer_records ADD COLUMN source TEXT NOT NULL DEFAULT 'real'");
+      }
+      if (!qsCols.contains('source')) {
+        await db.execute(
+            "ALTER TABLE quiz_sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'real'");
+      }
+      await _createIndexes(db);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -190,7 +227,8 @@ class DatabaseService {
         wrong_count INTEGER DEFAULT 0,
         start_time TEXT NOT NULL,
         end_time TEXT,
-        duration_seconds INTEGER DEFAULT 0
+        duration_seconds INTEGER DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'real'
       )
     ''');
 
@@ -204,6 +242,7 @@ class DatabaseService {
         ai_analysis TEXT,
         answered_at TEXT NOT NULL,
         hidden INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'real',
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
     ''');
@@ -225,15 +264,8 @@ class DatabaseService {
       )
     ''');
 
-    // 创建索引加速查询
-    await db.execute(
-        'CREATE INDEX idx_questions_bank_id ON questions(bank_id)');
-    await db.execute(
-        'CREATE INDEX idx_answer_records_question_id ON answer_records(question_id)');
-    await db.execute(
-        'CREATE INDEX idx_answer_records_session_id ON answer_records(session_id)');
-    await db.execute(
-        'CREATE INDEX idx_ai_cache_question_id ON ai_cache(question_id)');
+    // 统一创建索引（幂等，onUpgrade 复用同一份）
+    await _createIndexes(db);
 
     await db.execute('''
       CREATE TABLE error_book (
@@ -278,15 +310,17 @@ class DatabaseService {
 
   Future<void> deleteBank(int bankId) async {
     final db = await database;
-    // 显式清理 answer_records（外键级联兜底）
-    final qs = await db.query('questions',
-        columns: ['id'], where: 'bank_id = ?', whereArgs: [bankId]);
-    for (final q in qs) {
-      await db.delete('answer_records',
-          where: 'question_id = ?', whereArgs: [q['id']]);
-    }
-    await db.delete('questions', where: 'bank_id = ?', whereArgs: [bankId]);
-    await db.delete('question_banks', where: 'id = ?', whereArgs: [bankId]);
+    // v1.0.2 设计审查修复：单条 IN 删除 + 事务，替代逐题循环（N+1 且无事务）
+    await db.transaction((txn) async {
+      // 显式清理 answer_records（外键级联兜底）
+      await txn.delete('answer_records',
+          where: 'question_id IN (SELECT id FROM questions WHERE bank_id = ?)',
+          whereArgs: [bankId]);
+      await txn.delete('questions',
+          where: 'bank_id = ?', whereArgs: [bankId]);
+      await txn.delete('question_banks',
+          where: 'id = ?', whereArgs: [bankId]);
+    });
   }
 
   // ======================== Question CRUD ========================
@@ -316,15 +350,18 @@ class DatabaseService {
     return maps.map((m) => Question.fromMap(m)).toList();
   }
 
+  /// 按题库取题。[limit] 下推 SQL LIMIT（随机抽取时避免全量加载进内存），
+  /// 调用方不再需要二次 shuffle/take
   Future<List<Question>> getQuestionsByBanks(List<int> bankIds,
-      {bool random = true}) async {
+      {bool random = true, int? limit}) async {
     final db = await database;
     if (bankIds.isEmpty) return <Question>[]; // 防御：空集合不生成 IN () 语法错误
     final placeholders = bankIds.map((_) => '?').join(',');
     final maps = await db.query('questions',
         where: 'bank_id IN ($placeholders)',
         whereArgs: bankIds,
-        orderBy: random ? 'RANDOM()' : null);
+        orderBy: random ? 'RANDOM()' : null,
+        limit: limit);
     return maps.map((m) => Question.fromMap(m)).toList();
   }
 
@@ -356,27 +393,81 @@ class DatabaseService {
     await db.delete('quiz_sessions', where: 'id = ?', whereArgs: [sessionId]);
   }
 
-  Future<List<QuizSession>> getAllSessions() async {
+  /// 全部真实会话（按开始时间倒序）。correct/wrong 为派生值
+  /// （LEFT JOIN 汇总未隐藏的真实作答），与统计口径一致：
+  /// 进程被杀后的未完成会话也能显示真实正确率，隐藏今日后同步剔除。
+  /// [limit] 非空时下推 LIMIT（getRecentSessions 不再全量加载）
+  Future<List<QuizSession>> getAllSessions({int? limit}) async {
     final db = await database;
-    final maps = await db.query('quiz_sessions', orderBy: 'start_time DESC');
-    return maps.map((m) => QuizSession.fromMap(m)).toList();
+    final maps = await db.rawQuery('''
+      SELECT s.*,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_correct,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_wrong
+      FROM quiz_sessions s
+      LEFT JOIN answer_records ar ON ar.session_id = s.id
+      WHERE s.source = 'real'
+      GROUP BY s.id
+      ORDER BY s.start_time DESC
+      ${limit != null ? 'LIMIT ?' : ''}
+    ''', limit != null ? [limit] : []);
+    return maps.map(_sessionFromRow).toList();
   }
 
   Future<QuizSession?> getLastSession() async {
     final db = await database;
-    final maps = await db.query('quiz_sessions',
-        orderBy: 'start_time DESC', limit: 1);
+    final maps = await db.rawQuery('''
+      SELECT s.*,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_correct,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_wrong
+      FROM quiz_sessions s
+      LEFT JOIN answer_records ar ON ar.session_id = s.id
+      WHERE s.source = 'real'
+      GROUP BY s.id
+      ORDER BY s.start_time DESC
+      LIMIT 1
+    ''');
     if (maps.isEmpty) return null;
-    return QuizSession.fromMap(maps.first);
+    return _sessionFromRow(maps.first);
   }
 
-  /// 按 id 查单个会话（改判后局部刷新用，不受 getRecentSessions 条数限制）
+  /// 按 id 查单个会话（改判后局部刷新用，不受 getRecentSessions 条数限制）。
+  /// correct/wrong 同样为派生值
   Future<QuizSession?> getSessionById(int id) async {
     final db = await database;
-    final maps = await db.query('quiz_sessions',
-        where: 'id = ?', whereArgs: [id], limit: 1);
+    final maps = await db.rawQuery('''
+      SELECT s.*,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_correct,
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+                          THEN 1 ELSE 0 END), 0) as d_wrong
+      FROM quiz_sessions s
+      LEFT JOIN answer_records ar ON ar.session_id = s.id
+      WHERE s.id = ?
+      GROUP BY s.id
+    ''', [id]);
     if (maps.isEmpty) return null;
-    return QuizSession.fromMap(maps.first);
+    return _sessionFromRow(maps.first);
+  }
+
+  /// 会话行 → QuizSession：correct/wrong 优先取派生值（d_correct/d_wrong），
+  /// 无派生列的查询（如 insertSession 回读）回退存储值
+  static QuizSession _sessionFromRow(Map<String, dynamic> m) {
+    final s = QuizSession.fromMap(m);
+    return QuizSession(
+      id: s.id,
+      bankIds: s.bankIds,
+      mode: s.mode,
+      totalQuestions: s.totalQuestions,
+      correctCount: (m['d_correct'] as int?) ?? s.correctCount,
+      wrongCount: (m['d_wrong'] as int?) ?? s.wrongCount,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      durationSeconds: s.durationSeconds,
+    );
   }
 
   // ======================== AnswerRecord CRUD ========================
@@ -414,14 +505,14 @@ class DatabaseService {
     );
   }
 
-  /// 获取单题统计：作答次数、正确次数（排除隐藏记录）
+  /// 获取单题统计：作答次数、正确次数（排除隐藏记录与模拟数据）
   Future<Map<String, int>> getQuestionStats(int questionId) async {
     final db = await database;
     final total = await db.rawQuery(
-        'SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND hidden = 0',
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND hidden = 0 AND source = 'real'",
         [questionId]);
     final correct = await db.rawQuery(
-        'SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND is_correct = 1 AND hidden = 0',
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND is_correct = 1 AND hidden = 0 AND source = 'real'",
         [questionId]);
     return {
       'total': total.first['cnt'] as int,
@@ -472,29 +563,37 @@ class DatabaseService {
 
   // ======================== 统计查询 ========================
 
-  /// 累计刷题总时长（秒）
+  /// 累计刷题总时长（秒）。
+  /// 口径与 getPeriodStats 的 duration 一致：只计真实会话，且会话至少
+  /// 有一条未隐藏作答记录（隐藏今日后时长同步剔除）
   Future<int> getTotalPracticeDuration() async {
     final db = await database;
-    final result = await db.rawQuery(
-        'SELECT COALESCE(SUM(duration_seconds), 0) as total FROM quiz_sessions');
+    final result = await db.rawQuery('''
+      SELECT COALESCE(SUM(s.duration_seconds), 0) as total
+      FROM quiz_sessions s
+      WHERE s.source = 'real'
+        AND EXISTS (SELECT 1 FROM answer_records ar2
+                    WHERE ar2.session_id = s.id AND ar2.hidden = 0
+                      AND ar2.source = 'real')
+    ''');
     return result.first['total'] as int;
   }
 
-  /// 累计总刷题量（排除隐藏记录）
+  /// 累计总刷题量（排除隐藏记录与模拟数据）
   Future<int> getTotalQuestionsAnswered() async {
     final db = await database;
     final result = await db.rawQuery(
-        'SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0');
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source = 'real'");
     return result.first['cnt'] as int;
   }
 
-  /// 整体平均正确率（排除隐藏记录）
+  /// 整体平均正确率（排除隐藏记录与模拟数据）
   Future<double> getOverallAccuracy() async {
     final db = await database;
     final total = await db
-        .rawQuery('SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0');
+        .rawQuery("SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source = 'real'");
     final correct = await db.rawQuery(
-        'SELECT COUNT(*) as cnt FROM answer_records WHERE is_correct = 1 AND hidden = 0');
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE is_correct = 1 AND hidden = 0 AND source = 'real'");
     final t = total.first['cnt'] as int;
     final c = correct.first['cnt'] as int;
     return t > 0 ? (c / t) * 100 : 0;
@@ -512,7 +611,7 @@ class DatabaseService {
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
       JOIN question_banks qb ON q.bank_id = qb.id
-      WHERE ar.hidden = 0
+      WHERE ar.hidden = 0 AND ar.source = 'real'
       GROUP BY qb.id
     ''');
   }
@@ -557,45 +656,6 @@ class DatabaseService {
     final result = await db.query('error_book',
         where: 'question_id = ?', whereArgs: [questionId]);
     return result.isNotEmpty;
-  }
-
-  /// 获取错题重刷题目：错3次以上 + 手动加入错题本（错误阈值排除隐藏记录）
-  Future<List<Question>> getErrorReviewQuestions() async {
-    final db = await database;
-    final results = await db.rawQuery('''
-      SELECT DISTINCT q.* FROM questions q
-      WHERE q.id IN (
-        SELECT question_id FROM error_book
-        UNION
-        SELECT question_id FROM (
-          SELECT question_id, COUNT(*) as cnt
-          FROM answer_records
-          WHERE is_correct = 0 AND hidden = 0
-          GROUP BY question_id
-          HAVING cnt >= 3
-        )
-      )
-      ORDER BY RANDOM()
-    ''');
-    return results.map((m) => Question.fromMap(m)).toList();
-  }
-
-  /// 获取错题本数量（错误阈值排除隐藏记录）
-  Future<int> getErrorBookCount() async {
-    final db = await database;
-    final result = await db.rawQuery('''
-      SELECT COUNT(DISTINCT q.id) as cnt FROM questions q
-      WHERE q.id IN (
-        SELECT question_id FROM error_book
-        UNION
-        SELECT question_id FROM (
-          SELECT question_id, COUNT(*) as cnt
-          FROM answer_records WHERE is_correct = 0 AND hidden = 0
-          GROUP BY question_id HAVING cnt >= 3
-        )
-      )
-    ''');
-    return result.first['cnt'] as int;
   }
 
   // ======================== FSRS 间隔重复 ========================
@@ -743,7 +803,9 @@ class DatabaseService {
   }
 
   /// 知识点分组统计（与 getFullErrorQuestions 同口径）。
-  /// 与里程碑一致：空知识点并入「未打标签」分组；AI 失败标记按前缀分组。
+  /// 与里程碑一致：空知识点并入「未打标签」分组。
+  /// v1.0.2 设计审查修复：AI 失败标记（AI请求失败/AI服务返回错误/AI解析生成失败）
+  /// 与正确率排行同口径排除，不再出现伪分组
   Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode,
       {Set<int>? bankIds}) async {
     final db = await database;
@@ -760,6 +822,10 @@ class DatabaseService {
         COUNT(DISTINCT q.id) as cnt
       FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
+        AND (q.knowledge_point IS NULL OR q.knowledge_point = ''
+             OR (q.knowledge_point NOT LIKE 'AI请求失败%'
+                 AND q.knowledge_point NOT LIKE 'AI服务返回错误%'
+                 AND q.knowledge_point NOT LIKE 'AI解析生成失败%'))
       GROUP BY
         CASE
           WHEN q.knowledge_point IS NULL OR q.knowledge_point = '' THEN '未打标签'
@@ -827,45 +893,54 @@ class DatabaseService {
 
   // ======================== v1.0.2 对齐里程碑：改判 / 隐藏今日记录 ========================
 
-  /// 改判一条作答记录（会话统计同步修正；FSRS 卡片按新结果补一次复习）
+  /// 改判一条作答记录（会话统计同步修正；FSRS 卡片按新结果补一次复习）。
+  /// v1.0.2 设计审查修复：三条写操作包进事务，中途失败整体回滚，
+  /// 不再出现记录已改而会话计数未改的永久失同步
   Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) async {
     final db = await database;
-    final rows = await db.query('answer_records',
-        where: 'id = ?', whereArgs: [recordId]);
-    if (rows.isEmpty) return;
-    final record = rows.first;
-    final oldCorrect = (record['is_correct'] as int) == 1;
-    if (oldCorrect == isCorrect) return;
+    await db.transaction((txn) async {
+      final rows = await txn.query('answer_records',
+          where: 'id = ?', whereArgs: [recordId]);
+      if (rows.isEmpty) return;
+      final record = rows.first;
+      final oldCorrect = (record['is_correct'] as int) == 1;
+      if (oldCorrect == isCorrect) return;
 
-    await db.update('answer_records', {'is_correct': isCorrect ? 1 : 0},
-        where: 'id = ?', whereArgs: [recordId]);
+      await txn.update('answer_records', {'is_correct': isCorrect ? 1 : 0},
+          where: 'id = ?', whereArgs: [recordId]);
 
-    // 会话统计修正
-    final sessionId = record['session_id'];
-    if (sessionId != null) {
-      final sessions = await db.query('quiz_sessions',
-          where: 'id = ?', whereArgs: [sessionId]);
-      if (sessions.isNotEmpty) {
-        final s = sessions.first;
-        final correct = (s['correct_count'] as int? ?? 0) + (isCorrect ? 1 : -1);
-        final wrong = (s['wrong_count'] as int? ?? 0) + (isCorrect ? -1 : 1);
-        await db.update('quiz_sessions',
-            {'correct_count': correct < 0 ? 0 : correct,
-             'wrong_count': wrong < 0 ? 0 : wrong},
+      // 会话统计修正
+      final sessionId = record['session_id'];
+      if (sessionId != null) {
+        final sessions = await txn.query('quiz_sessions',
             where: 'id = ?', whereArgs: [sessionId]);
+        if (sessions.isNotEmpty) {
+          final s = sessions.first;
+          final correct = (s['correct_count'] as int? ?? 0) + (isCorrect ? 1 : -1);
+          final wrong = (s['wrong_count'] as int? ?? 0) + (isCorrect ? -1 : 1);
+          await txn.update('quiz_sessions',
+              {'correct_count': correct < 0 ? 0 : correct,
+               'wrong_count': wrong < 0 ? 0 : wrong},
+              where: 'id = ?', whereArgs: [sessionId]);
+        }
       }
-    }
 
-    // FSRS：以改判后的结果补记一次
-    final questionId = record['question_id'] as int;
-    final now = DateTime.now();
-    final existing = await getFSRSCard(questionId);
-    if (existing != null) {
-      await upsertFSRSCard(
-          FSRSService.schedule(existing, isCorrect ? 3 : 1, now));
-    } else {
-      await upsertFSRSCard(FSRSService.initCard(questionId, now));
-    }
+      // FSRS：以改判后的结果补记一次（事务内直读直写，保证原子性）
+      final questionId = record['question_id'] as int;
+      final now = DateTime.now();
+      final existingRows = await txn.query('fsrs_cards',
+          where: 'question_id = ?', whereArgs: [questionId]);
+      if (existingRows.isNotEmpty) {
+        final existing = FSRSCardState.fromMap(existingRows.first);
+        await txn.insert(
+            'fsrs_cards',
+            FSRSService.schedule(existing, isCorrect ? 3 : 1, now).toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      } else {
+        await txn.insert('fsrs_cards',
+            FSRSService.initCard(questionId, now).toMap());
+      }
+    });
   }
 
   /// 隐藏今日全部作答记录（统计口径：今日从打卡/统计中剔除）
@@ -911,7 +986,7 @@ class DatabaseService {
     final rows = await db.rawQuery('''
       SELECT date(answered_at) as day, COUNT(*) as total
       FROM answer_records
-      WHERE hidden = 0 AND date(answered_at) >= date(?)
+      WHERE hidden = 0 AND source = 'real' AND date(answered_at) >= date(?)
       GROUP BY date(answered_at)
     ''', [start.toIso8601String()]);
     final byDay = <String, int>{};
@@ -932,10 +1007,14 @@ class DatabaseService {
 
   /// 连续打卡天数（纯函数）：从 upTo（默认昨天）往前数，
   /// 每日刷题量 >= threshold 记 1 天；假期日期跳过（不中断也不计入）。
+  /// [vacationDays] 精确日期列表；[vacationStart]/[vacationEnd] 区间判断
+  /// （v1.0.2 设计审查修复：区间不再逐日展开，长假期也不会生成大列表）
   static int countConsecutiveDays(
     Map<String, int> dailyTotals, {
     required DateTime now,
     List<DateTime>? vacationDays,
+    DateTime? vacationStart,
+    DateTime? vacationEnd,
     int threshold = 50,
     DateTime? upTo,
   }) {
@@ -944,17 +1023,32 @@ class DatabaseService {
     final vacationSet = <String>{
       ...?vacationDays?.map((d) => _dateKey(d)),
     };
+    final hasRange = vacationStart != null && vacationEnd != null;
+    final rangeStart = vacationStart != null
+        ? DateTime(vacationStart.year, vacationStart.month, vacationStart.day)
+        : null;
+    final rangeEnd = vacationEnd != null
+        ? DateTime(vacationEnd.year, vacationEnd.month, vacationEnd.day)
+        : null;
+    bool inVacation(DateTime d) {
+      if (vacationSet.contains(_dateKey(d))) return true;
+      if (hasRange) {
+        final k = DateTime(d.year, d.month, d.day);
+        if (!k.isBefore(rangeStart!) && !k.isAfter(rangeEnd!)) return true;
+      }
+      return false;
+    }
+
     final end = upTo ?? DateTime(now.year, now.month, now.day)
         .subtract(const Duration(days: 1));
     var streak = 0;
     var cursor = DateTime(end.year, end.month, end.day);
     while (true) {
-      final key = _dateKey(cursor);
-      if (vacationSet.contains(key)) {
+      if (inVacation(cursor)) {
         cursor = cursor.subtract(const Duration(days: 1));
         continue;
       }
-      if ((dailyTotals[key] ?? 0) >= threshold) {
+      if ((dailyTotals[_dateKey(cursor)] ?? 0) >= threshold) {
         streak++;
         cursor = cursor.subtract(const Duration(days: 1));
       } else {
@@ -964,7 +1058,9 @@ class DatabaseService {
     return streak;
   }
 
-  /// 最近 N 天每日正确率（total/correct，与 getDailyStats 同日口径）
+  /// 最近 N 天每日正确率（total/correct，与 getDailyStats 同日口径）。
+  /// v1.0.2 设计审查修复：无记录天补 0，与 getDailyStats 结构对齐，
+  /// 避免调用方依赖外层合并才能得到完整数组
   Future<List<Map<String, dynamic>>> getDailyAccuracy(int days) async {
     final db = await database;
     final now = DateTime.now();
@@ -974,10 +1070,24 @@ class DatabaseService {
       SELECT date(answered_at) as day, COUNT(*) as total,
              SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
       FROM answer_records
-      WHERE hidden = 0 AND date(answered_at) >= date(?)
+      WHERE hidden = 0 AND source = 'real' AND date(answered_at) >= date(?)
       GROUP BY date(answered_at)
     ''', [start.toIso8601String()]);
-    return rows;
+    final byDay = <String, Map<String, dynamic>>{
+      for (final r in rows) r['day'] as String: r,
+    };
+    final result = <Map<String, dynamic>>[];
+    for (var i = 0; i < days; i++) {
+      final d = start.add(Duration(days: i));
+      final key = _dateKey(d);
+      final r = byDay[key];
+      result.add({
+        'day': key,
+        'total': (r?['total'] as int?) ?? 0,
+        'correct': (r?['correct'] as int?) ?? 0,
+      });
+    }
+    return result;
   }
 
   /// 按知识点的正确率排行（排除隐藏记录；AI 失败标记不入排行）
@@ -988,7 +1098,7 @@ class DatabaseService {
              SUM(CASE WHEN ar.is_correct = 1 THEN 1 ELSE 0 END) as correct
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
-      WHERE ar.hidden = 0 AND q.knowledge_point IS NOT NULL
+      WHERE ar.hidden = 0 AND ar.source = 'real' AND q.knowledge_point IS NOT NULL
         AND q.knowledge_point != ''
         AND q.knowledge_point NOT LIKE 'AI请求失败%'
         AND q.knowledge_point NOT LIKE 'AI服务返回错误%'
@@ -1019,11 +1129,14 @@ class DatabaseService {
         COUNT(*) as questions,
         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
         COALESCE((SELECT SUM(s.duration_seconds) FROM quiz_sessions s
-          ${start != null ? 'WHERE s.start_time >= ? AND' : 'WHERE'}
-          EXISTS (SELECT 1 FROM answer_records ar2
-                  WHERE ar2.session_id = s.id AND ar2.hidden = 0)), 0) as duration
+          WHERE s.source = 'real'
+            ${start != null ? 'AND s.start_time >= ?' : ''}
+            AND EXISTS (SELECT 1 FROM answer_records ar2
+                    WHERE ar2.session_id = s.id AND ar2.hidden = 0
+                      AND ar2.source = 'real')), 0) as duration
       FROM answer_records
-      WHERE hidden = 0 ${start != null ? 'AND answered_at >= ?' : ''}
+      WHERE hidden = 0 AND source = 'real'
+        ${start != null ? 'AND answered_at >= ?' : ''}
     ''', start != null ? [start.toIso8601String(), start.toIso8601String()] : []);
     final r = rows.first;
     return {
@@ -1033,7 +1146,8 @@ class DatabaseService {
     };
   }
 
-  /// 会话详情：answer_records JOIN questions 逐题展示
+  /// 会话详情：answer_records JOIN questions 逐题展示。
+  /// 与统计口径一致：隐藏记录与模拟记录不展示
   Future<List<Map<String, dynamic>>> getSessionDetail(int sessionId) async {
     final db = await database;
     return await db.rawQuery('''
@@ -1042,7 +1156,7 @@ class DatabaseService {
              q.title as question_title, q.correct_answer, q.question_type
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
-      WHERE ar.session_id = ?
+      WHERE ar.session_id = ? AND ar.hidden = 0 AND ar.source = 'real'
       ORDER BY ar.id
     ''', [sessionId]);
   }
@@ -1141,7 +1255,7 @@ class DatabaseService {
           startTime: DateTime(d.year, d.month, d.day, 9).toIso8601String(),
           endTime: DateTime(d.year, d.month, d.day, 9, 40).toIso8601String(),
           durationSeconds: 2400,
-        ).toMap());
+        ).toMap()..['source'] = 'simulation');
         simIds.add(sessionId);
         for (var i = 0; i < count; i++) {
           final q = pool[rng.nextInt(pool.length)];
@@ -1156,6 +1270,9 @@ class DatabaseService {
             'is_correct': isCorrect ? 1 : 0,
             'answered_at': DateTime(d.year, d.month, d.day, 9, rng.nextInt(30))
                 .toIso8601String(),
+            // v1.0.2 设计审查修复：source 标记模拟数据，统计 SQL 统一排除，
+            // 模拟不再污染真实刷题量/正确率/连击/热力图
+            'source': 'simulation',
           });
           recordCount++;
           if (!isCorrect) {
@@ -1264,9 +1381,9 @@ class DatabaseService {
       tmpDb = await databaseFactory.openDatabase(filePath);
       final versionRows = await tmpDb.rawQuery('PRAGMA user_version');
       final version = versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
-      if (version < 1 || version > 6) {
+      if (version < 1 || version > 7) {
         // user_version 0/非法：非本 App 生成或版本被外部重置，导入后会触发
-        // onUpgrade(0→6) 破坏性重建清空题目，拒绝导入
+        // onUpgrade(0→7) 破坏性重建清空题目，拒绝导入
         return '文件不是有效的数据库备份（版本信息缺失或非法）';
       }
       final tables = await tmpDb.rawQuery(
@@ -1276,6 +1393,23 @@ class DatabaseService {
       for (final t in ['question_banks', 'questions', 'answer_records', 'settings']) {
         if (!names.contains(t)) return '备份缺少核心表: $t';
       }
+      // v1.0.2 设计审查修复：关键列存在性校验（防 user_version 伪造但缺列的库）。
+      // 旧版本备份导入后由 onUpgrade 补列，故只校验该版本应当已存在的列
+      final colChecks = <int, Map<String, List<String>>>{
+        6: {'answer_records': ['hidden']},
+        7: {'answer_records': ['hidden', 'source'], 'quiz_sessions': ['source']},
+      };
+      for (var v = 6; v <= version; v++) {
+        final checks = colChecks[v];
+        if (checks == null) continue;
+        for (final entry in checks.entries) {
+          final cols = await tmpDb.rawQuery('PRAGMA table_info(${entry.key})');
+          final colNames = cols.map((r) => r['name']).toSet();
+          for (final c in entry.value) {
+            if (!colNames.contains(c)) return '备份缺少必要字段: ${entry.key}.$c';
+          }
+        }
+      }
     } catch (e) {
       return '文件不是有效的数据库备份（无法打开: ${e.toString().split('\n').first}）';
     } finally {
@@ -1284,33 +1418,63 @@ class DatabaseService {
     return null;
   }
 
-  /// 导入备份：校验后关闭当前库，用备份文件原子替换，下次访问自动重开
+  /// 导入备份：校验后关闭当前库，用备份文件替换，下次访问自动重开。
+  /// v1.0.2 设计审查修复：全程 try/catch、旧库先改名留底（失败可还原）、
+  /// 清理 wal/shm 残留，异常不再冒泡为未捕获错误
   Future<String?> importBackup(String filePath) async {
-    final err = await validateBackupFile(filePath);
-    if (err != null) return err;
-    final db = await database;
-    await db.close();
-    _database = null;
-    final target = db.path;
-    // 先复制到临时文件，成功后再原子替换，避免复制中断产生半写入库
-    final tmpPath = '$target.importing';
-    await File(filePath).copy(tmpPath);
-    final tmpErr = await validateBackupFile(tmpPath);
-    if (tmpErr != null) {
-      try { await File(tmpPath).delete(); } catch (_) {}
-      return '导入失败：临时文件校验未通过（$tmpErr）';
+    try {
+      final err = await validateBackupFile(filePath);
+      if (err != null) return err;
+      final db = await database;
+      await db.close();
+      _database = null;
+      final target = db.path;
+      // 先复制到临时文件，成功后再替换，避免复制中断产生半写入库
+      final tmpPath = '$target.importing';
+      await File(filePath).copy(tmpPath);
+      final tmpErr = await validateBackupFile(tmpPath);
+      if (tmpErr != null) {
+        try { await File(tmpPath).delete(); } catch (_) {}
+        return '导入失败：临时文件校验未通过（$tmpErr）';
+      }
+      final backupOld = '$target.pre-import';
+      if (File(target).existsSync()) {
+        try { await File(backupOld).delete(); } catch (_) {}
+        await File(target).rename(backupOld);
+      }
+      try {
+        await File(tmpPath).rename(target);
+      } catch (e) {
+        // 替换失败：还原旧库，数据不丢
+        try { await File(backupOld).rename(target); } catch (_) {}
+        try { await File(tmpPath).delete(); } catch (_) {}
+        return '导入失败：替换数据库失败（已还原原库）';
+      }
+      // 清理旧库残留的 wal/shm（防下次打开读取旧事务日志）
+      for (final p in ['$target-wal', '$target-shm']) {
+        final f = File(p);
+        if (f.existsSync()) {
+          try { await f.delete(); } catch (_) {}
+        }
+      }
+      try { await File(backupOld).delete(); } catch (_) {}
+      return null;
+    } catch (e) {
+      return '导入失败：${e.toString().split('\n').first}';
     }
-    if (File(target).existsSync()) {
-      await File(target).delete();
-    }
-    await File(tmpPath).rename(target);
-    return null;
   }
 
   /// 导出当前数据库备份到指定路径
   Future<String?> exportBackup(String destPath) async {
-    final db = await database;
-    await File(db.path).copy(destPath);
-    return null;
+    try {
+      final db = await database;
+      // v1.0.2 设计审查修复：WAL 检查点先把未落盘的页写回主文件，
+      // 保证直接 copy 得到的是完整快照（不再是名不副实的一致性快照）
+      await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
+      await File(db.path).copy(destPath);
+      return null;
+    } catch (e) {
+      return '导出失败：${e.toString().split('\n').first}';
+    }
   }
 }

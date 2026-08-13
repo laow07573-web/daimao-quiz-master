@@ -2,11 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
-/// 调试日志服务 — 单例，内存中累积，可导出为文件
+/// 调试日志服务 — 单例，内存中累积，可导出为文件。
+/// v1.0.2 设计审查修复：环形缓冲 500 条上限（此前无限追加，
+/// 长时间开启内存持续增长；导出文件含作答内容，分享前请知悉）
 class DebugLogService {
   DebugLogService._();
   static final DebugLogService _instance = DebugLogService._();
   static DebugLogService get instance => _instance;
+
+  /// 环形缓冲上限：保留最近 500 条，超出丢弃最旧
+  static const int _maxEntries = 500;
 
   final List<_LogEntry> _entries = [];
   bool _enabled = false;
@@ -108,6 +113,10 @@ class DebugLogService {
 
   void _log(String tag, String message) {
     _entries.add(_LogEntry(DateTime.now(), tag, message));
+    // v1.0.2 设计审查修复：环形缓冲，超出上限丢弃最旧条目
+    if (_entries.length > _maxEntries) {
+      _entries.removeRange(0, _entries.length - _maxEntries);
+    }
   }
 }
 

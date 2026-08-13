@@ -87,4 +87,39 @@ void main() {
       1,
     );
   });
+
+  test('假期区间判断：不逐日展开（v1.0.2 设计审查）', () {
+    final now = DateTime.now();
+    final stats = totals([day(-1), day(-2), day(-3), day(-4)]);
+    // 昨天与前天在假期区间内（不展开列表），之前 2 天达标 → 连击 2
+    expect(
+      DatabaseService.countConsecutiveDays(
+        stats,
+        now: now,
+        vacationStart: day(-2),
+        vacationEnd: day(-1),
+      ),
+      2,
+    );
+    // 区间包含 day(-3)：连击只剩 day(-4) → 1
+    expect(
+      DatabaseService.countConsecutiveDays(
+        stats,
+        now: now,
+        vacationStart: day(-3),
+        vacationEnd: day(-1),
+      ),
+      1,
+    );
+    // 区间只含很久以前 → 不影响 → 4
+    expect(
+      DatabaseService.countConsecutiveDays(
+        stats,
+        now: now,
+        vacationStart: day(-30),
+        vacationEnd: day(-20),
+      ),
+      4,
+    );
+  });
 }

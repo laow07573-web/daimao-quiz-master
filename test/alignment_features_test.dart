@@ -84,7 +84,7 @@ void main() {
     expect(await db.getUntaggedErrorCount(), 1);
   });
 
-  test('AI 失败标记独立分组；打标签后从未打标签移除', () async {
+  test('AI 失败标记不进入知识点分组（与正确率排行同口径）', () async {
     final db = DatabaseService.instance;
     final id = await seedBank();
     await db.addToErrorBook(id);
@@ -92,8 +92,8 @@ void main() {
     await db.updateQuestionKnowledgePoint(id, 'AI请求失败');
     final kps = await db.getKnowledgePointStats('all');
     final byKp = {for (final k in kps) k['kp'] as String: k['cnt'] as int};
-    expect(byKp.containsKey('AI请求失败'), isTrue);
-    expect(byKp.containsKey('未打标签'), isFalse);
+    // v1.0.2 设计审查修复：AI 失败标记不再产生伪分组
+    expect(byKp.containsKey('AI请求失败'), isFalse);
     expect(await db.getUntaggedErrorCount(), 0);
     // 打标签成功
     await db.updateQuestionKnowledgePoint(id, '免疫应答');
@@ -268,7 +268,8 @@ void main() {
     await file.writeAsString(
         '{"format":"daimao-flashcard-questions","name":"错题导出_1","count":1,"questions":[{"title":"q1","options":[],"correct_answer":"A","analysis":null,"question_type":"single_choice","knowledge_point":"血液"}]}');
 
-    final groups = await BankFileService.parseJsonFile(file.path);
+    final (groups, err) = await BankFileService.parseJsonFile(file.path);
+    expect(err, isNull);
     expect(groups.length, 1);
     expect(groups.keys.first, '错题导出_1');
     expect(groups.values.first.length, 1);
@@ -313,7 +314,8 @@ void main() {
     expect(raw, contains('"analysis": "解析内容"'));
 
     // 回读解析：题目数量与字段一致
-    final groups = await BankFileService.parseJsonFile(exported);
+    final (groups, err2) = await BankFileService.parseJsonFile(exported);
+    expect(err2, isNull);
     expect(groups.length, 1);
     expect(groups.keys.first, '导出测试题库');
     final questions = groups.values.first;
@@ -325,7 +327,9 @@ void main() {
     expect(byTitle['填空题B']!.knowledgePoint, '血液学检验');
 
     // 导入入库闭环：导出文件直接导入为可用题库
-    final (bankCount, questionCount) = await BankFileService.importJsonFile(exported);
+    final (bankCount, questionCount, importErr) =
+        await BankFileService.importJsonFile(exported);
+    expect(importErr, isNull);
     expect(bankCount, 1);
     expect(questionCount, 2);
     final importedBanks = await db.getAllBanks();

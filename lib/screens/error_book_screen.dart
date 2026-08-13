@@ -299,7 +299,13 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     );
     try {
       await Share.shareXFiles([XFile(path)], subject: '呆猫刷题宝错题导出');
-    } catch (_) {}
+    } catch (e) {
+      // v1.0.2 设计审查修复：分享失败不再静默
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('分享失败：$e')),
+      );
+    }
   }
 
   Future<void> _startReview() async {

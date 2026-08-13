@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
+import '../services/theme_service.dart';
 
 class ImportPreviewScreen extends StatefulWidget {
   const ImportPreviewScreen({super.key});
@@ -18,14 +19,17 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
     return Consumer<AppState>(
       builder: (context, appState, _) {
         final questions = appState.previewQuestions;
+        // v1.0.2 设计审查修复：整页蓝白硬编码 → 主题色
+        final cs = Theme.of(context).colorScheme;
+        final ac = AppThemeColors.of(context);
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
+          backgroundColor: cs.surface,
           appBar: AppBar(
             title: Text('预览: ${appState.previewBankName}'),
             elevation: 0,
-            backgroundColor: const Color(0xFF4A90D9),
-            foregroundColor: Colors.white,
+            backgroundColor: ac.navBar,
+            foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
             actions: [
               TextButton(
                 // v1.0.2 修复：取消后返回上一页（此前只清数据，停留在死页面）
@@ -33,27 +37,56 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                   appState.clearPreview();
                   Navigator.pop(context);
                 },
-                child: const Text('取消', style: TextStyle(color: Colors.white70)),
+                child: Text('取消',
+                    style: TextStyle(
+                        color: Theme.of(context).appBarTheme.foregroundColor
+                            ?.withOpacity(0.8))),
               ),
             ],
           ),
           body: questions.isEmpty
-              ? const Center(child: Text('解析完成，共 0 道题目'))
+              ? Center(
+                  child: Text(appState.previewParseErrors.isNotEmpty
+                      // v1.0.2 设计审查修复：0 题时展示真实失败原因
+                      ? '解析失败\n${appState.previewParseErrors.first}'
+                      : '解析完成，共 0 道题目',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 14, color: cs.onSurfaceVariant)))
               : Column(
                   children: [
                     // 统计栏
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      color: Colors.white,
+                      color: ac.card,
                       child: Row(
                         children: [
                           _buildStatusBadge(questions),
                           const Spacer(),
                           Text('共 ${questions.length} 题',
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF666666))),
+                              style: TextStyle(
+                                  fontSize: 13, color: cs.onSurfaceVariant)),
                         ],
                       ),
                     ),
+
+                    // v1.0.2 设计审查修复：分块解析失败横幅（显性提示，不再伪装成功）
+                    if (appState.previewParseErrors.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: ac.warning.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: ac.warning.withOpacity(0.5)),
+                        ),
+                        child: Text(
+                          '${appState.previewParseErrors.length} 个分块解析失败（已跳过）：'
+                          '${appState.previewParseErrors.join('；')}',
+                          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                        ),
+                      ),
 
                     // 题目列表
                     Expanded(
@@ -99,7 +132,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF5CB85C),
+                          backgroundColor: ac.success,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -111,7 +144,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(appState.importStatus),
-                              backgroundColor: Colors.green,
+                              backgroundColor: ac.success,
                             ),
                           );
                           Navigator.of(context).popUntil((route) => route.isFirst);
@@ -140,19 +173,21 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
       }
     }
     final errorCount = questions.length - valid - warn;
+    // v1.0.2 设计审查修复：硬编码色 → 主题语义色
+    final ac = AppThemeColors.of(context);
 
     return Row(
       children: [
         if (valid > 0) ...[
-          _Badge(text: '$valid 正常', color: const Color(0xFF5CB85C)),
+          _Badge(text: '$valid 正常', color: ac.success),
           const SizedBox(width: 8),
         ],
         if (warn > 0) ...[
-          _Badge(text: '$warn 需检查', color: const Color(0xFFF0AD4E)),
+          _Badge(text: '$warn 需检查', color: ac.warning),
           const SizedBox(width: 8),
         ],
         if (errorCount > 0)
-          _Badge(text: '$errorCount 有问题', color: const Color(0xFFD9534F)),
+          _Badge(text: '$errorCount 有问题', color: ac.danger),
       ],
     );
   }
@@ -237,18 +272,21 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // v1.0.2 设计审查修复：硬编码色 → 主题色/语义色
+    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     final hasError = errors.any((e) => e.isError);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.card,
         borderRadius: BorderRadius.circular(10),
         border: hasError
-            ? Border.all(color: const Color(0xFFD9534F).withOpacity(0.4))
+            ? Border.all(color: ac.danger.withOpacity(0.4))
             : null,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: cs.shadow.withOpacity(0.03),
               blurRadius: 6,
               offset: const Offset(0, 1)),
         ],
@@ -264,17 +302,17 @@ class _QuestionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A90D9).withOpacity(0.1),
+                    color: cs.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text('第 ${index + 1} 题',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF4A90D9))),
+                      style: TextStyle(fontSize: 11, color: cs.primary)),
                 ),
                 const SizedBox(width: 8),
                 if (question.questionType == 'multi_choice')
-                  _Tag('多选', const Color(0xFFF0AD4E)),
+                  _Tag('多选', ac.warning),
                 if (question.questionType == 'true_false')
-                  _Tag('判断', const Color(0xFF5CB85C)),
+                  _Tag('判断', ac.success),
                 const Spacer(),
                 IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 18),
@@ -283,7 +321,8 @@ class _QuestionCard extends StatelessWidget {
                     onPressed: onEdit),
                 const SizedBox(width: 8),
                 IconButton(
-                    icon: Icon(Icons.delete_outline, size: 18, color: Colors.red[300]),
+                    icon: Icon(Icons.delete_outline,
+                        size: 18, color: ac.danger.withOpacity(0.6)),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     onPressed: onDelete),
@@ -299,7 +338,7 @@ class _QuestionCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: question.title.isEmpty ? const Color(0xFFD9534F) : const Color(0xFF333333),
+                color: question.title.isEmpty ? ac.danger : cs.onSurface,
               ),
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
@@ -315,7 +354,8 @@ class _QuestionCard extends StatelessWidget {
                 runSpacing: 2,
                 children: question.optionsWithLabels.map((o) => Text(
                       o,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant),
                     )).toList(),
               ),
             ),
@@ -328,8 +368,8 @@ class _QuestionCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 color: question.correctAnswer.isEmpty
-                    ? const Color(0xFFD9534F)
-                    : const Color(0xFF5CB85C),
+                    ? ac.danger
+                    : ac.success,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -347,15 +387,13 @@ class _QuestionCard extends StatelessWidget {
                         Icon(
                           e.isError ? Icons.error : Icons.warning_amber,
                           size: 14,
-                          color: e.isError ? const Color(0xFFD9534F) : const Color(0xFFF0AD4E),
+                          color: e.isError ? ac.danger : ac.warning,
                         ),
                         const SizedBox(width: 4),
                         Text(e.message,
                             style: TextStyle(
                                 fontSize: 11,
-                                color: e.isError
-                                    ? const Color(0xFFD9534F)
-                                    : const Color(0xFFF0AD4E))),
+                                color: e.isError ? ac.danger : ac.warning)),
                       ],
                     )).toList(),
               ),
@@ -434,13 +472,16 @@ class _EditCardState extends State<_EditCard> {
 
   @override
   Widget build(BuildContext context) {
+    // v1.0.2 设计审查修复：硬编码色 → 主题色
+    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ac.card,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF4A90D9)),
+        border: Border.all(color: cs.primary),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

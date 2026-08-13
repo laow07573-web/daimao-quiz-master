@@ -192,7 +192,13 @@ class _BankManageScreenState extends State<BankManageScreen> {
     );
     try {
       await Share.shareXFiles([XFile(result)], subject: '呆猫刷题宝题库导出');
-    } catch (_) {}
+    } catch (e) {
+      // v1.0.2 设计审查修复：分享失败不再静默
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('分享失败：$e')),
+      );
+    }
   }
 }
 

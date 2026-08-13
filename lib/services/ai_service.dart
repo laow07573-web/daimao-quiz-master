@@ -2,8 +2,19 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/app_settings.dart';
+import '../utils/app_constants.dart';
 import 'database_service.dart';
 import 'debug_log_service.dart';
+
+/// v1.0.2 设计审查修复：分块解析结果显性化。
+/// 断网/401/超时/格式错误不再伪装成「解析完成，共 0 道题目」
+class AIParseResult {
+  final List<Question> questions;
+  final int failedChunks;
+  final List<String> errors; // 每个失败块一行原因（如「第 3 块：AI服务返回错误 (401)」）
+
+  AIParseResult(this.questions, this.failedChunks, this.errors);
+}
 
 class AIService {
   final AppSettings _settings;
@@ -20,26 +31,28 @@ class AIService {
 
   AIService(this._settings);
 
-  /// 使用 AI 从原始文本中批量解析题目
-  /// 返回结构化的 Question 列表
-  Future<List<Question>> parseQuestionsFromRawText(
+  /// 使用 AI 从原始文本中批量解析题目。
+  /// 返回 [AIParseResult]（成功题目 + 失败分块原因），调用方据此显性提示
+  Future<AIParseResult> parseQuestionsFromRawText(
     String rawText,
     int bankId,
-    void Function(int done, int total) onProgress,
+    void Function(int done, int total)? onProgress,
   ) async {
     // 将文本按段落分块，每块控制在合理大小
     final chunks = _splitTextIntoChunks(rawText, maxChars: 3000);
     final allQuestions = <Question>[];
+    final errors = <String>[];
     final now = DateTime.now().toIso8601String();
 
     for (int i = 0; i < chunks.length; i++) {
-      onProgress(i, chunks.length);
-      final questions = await _parseChunkWithAI(chunks[i], bankId, now);
-      allQuestions.addAll(questions);
+      onProgress?.call(i, chunks.length);
+      final r = await _parseChunkWithAI(chunks[i], bankId, now);
+      allQuestions.addAll(r.$1);
+      if (r.$2 != null) errors.add('第 ${i + 1} 块：${r.$2}');
     }
 
-    onProgress(chunks.length, chunks.length);
-    return allQuestions;
+    onProgress?.call(chunks.length, chunks.length);
+    return AIParseResult(allQuestions, errors.length, errors);
   }
 
   /// 将文本按大小分块
@@ -62,9 +75,22 @@ class AIService {
     return chunks;
   }
 
-  /// 用 AI 解析一个文本块中的题目
-  Future<List<Question>> _parseChunkWithAI(
-    String chunk, int bankId, String now) async {
+  /// 用 AI 解析一个文本块中的题目（失败自动重试 1 次）。
+  /// 返回 (题目列表, 失败原因)；失败原因非空表示该块解析失败
+  Future<(List<Question>, String?)> _parseChunkWithAI(
+      String chunk, int bankId, String now) async {
+    var result = await _parseChunkOnce(chunk, bankId, now);
+    if (result.$2 != null) {
+      // v1.0.2 设计审查修复：失败块自动重试 1 次（退避 1s），仍失败才上报
+      await Future.delayed(const Duration(seconds: 1));
+      result = await _parseChunkOnce(chunk, bankId, now);
+    }
+    return result;
+  }
+
+  /// 单次解析一个文本块。失败返回带原因的错误串，不再静默吞掉
+  Future<(List<Question>, String?)> _parseChunkOnce(
+      String chunk, int bankId, String now) async {
     final prompt = '''你是一个专业的题目解析器。请从以下文本中提取所有题目，返回严格的 JSON 格式。
 
 文本内容：
@@ -128,16 +154,23 @@ $chunk
         logger.logUtf8Decode(rawBytes.length, decoded.length, decoded);
         final data = jsonDecode(decoded);
         final content = data['choices']?[0]?['message']?['content'] as String?;
-        if (content == null) return [];
+        if (content == null) return (<Question>[], 'AI 响应缺少内容');
         logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
         _trackUsage(data);
 
         // 解析 JSON 响应（容忍 ```json 围栏等常见模型输出格式）
-        final parsed = _extractJson(content);
+        Map<String, dynamic> parsed;
+        try {
+          parsed = _extractJson(content);
+        } catch (e) {
+          return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON（$e）');
+        }
         final questionsList = parsed['questions'] as List?;
-        if (questionsList == null) return [];
+        if (questionsList == null) {
+          return (<Question>[], 'AI 解析生成失败：响应缺少 questions 字段');
+        }
 
-        return questionsList.map((q) {
+        final questions = questionsList.map((q) {
           final opts = (q['options'] as List?)
                   ?.map((o) => o.toString().trim())
                   .where((o) => o.isNotEmpty)
@@ -154,11 +187,12 @@ $chunk
             createdAt: now,
           );
         }).toList();
+        return (questions, null);
       } else {
-        return [];
+        return (<Question>[], 'AI服务返回错误 ($response.statusCode)');
       }
     } catch (e) {
-      return [];
+      return (<Question>[], 'AI请求失败: $e');
     }
   }
 
@@ -203,11 +237,16 @@ $chunk
 
   /// 获取题目解析（优先使用缓存）
   Future<String> getAnalysis(Question question) async {
-    // 先查缓存
+    // 先查缓存。v1.0.2 设计审查修复：缓存读取失败降级直连 AI，
+    // 不再让异常冒泡卡死 loading
     if (question.id != null) {
-      final cached = await _db.getCachedAnalysis(question.id!);
-      if (cached != null && cached.isNotEmpty) {
-        return cached;
+      try {
+        final cached = await _db.getCachedAnalysis(question.id!);
+        if (cached != null && cached.isNotEmpty) {
+          return cached;
+        }
+      } catch (e) {
+        DebugLogService.instance.log('AI', '解析缓存读取失败，直连 AI: $e');
       }
     }
 
@@ -544,7 +583,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
   int getEstimatedRemainingQuestions() {
     final balance = _cachedBalance;
     if (balance == null || _totalTokensUsed == 0) return -1;
-    final avgPrice = (_totalTokensUsed / 1000000.0) * 0.002; // ~0.002元/题
+    final avgPrice = (_totalTokensUsed / 1000000.0) * kAiCostPerQuestionYuan;
     if (avgPrice <= 0) return -1;
     return (balance / avgPrice).round();
   }

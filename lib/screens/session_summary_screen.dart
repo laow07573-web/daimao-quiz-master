@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
+import '../services/theme_service.dart';
 import '../widgets/ai_response_widget.dart';
 import 'quiz_screen.dart';
 
@@ -107,7 +108,8 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.check_circle_outline,
                     label: '正确',
                     value: '${session.correctCount}',
-                    color: const Color(0xFF5CB85C),
+                    // v1.0.2 设计审查修复：硬编码绿色 → 主题语义色
+                    color: AppThemeColors.of(context).success,
                     surfaceColor: cs.surface,
                     onSurfaceVariant: cs.onSurfaceVariant,
                   ),

@@ -1,4 +1,3 @@
-import 'dart:math';
 import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
@@ -8,6 +7,9 @@ import 'debug_log_service.dart';
 
 class QuizService {
   final DatabaseService _db = DatabaseService.instance;
+
+  /// v1.0.2 设计审查修复：会话计数夹取上限提为命名常量
+  static const int maxSessionCount = 1 << 30;
 
   // 当前会话状态
   QuizSession? _currentSession;
@@ -44,19 +46,20 @@ class QuizService {
     bool noShuffle = false,
     bool persistSession = true,
   }) async {
-    // 从指定题库中随机抽取题目（noShuffle 时保持题库原始顺序）
-    final allQuestions =
-        await _db.getQuestionsByBanks(bankIds, random: !noShuffle);
+    // 从指定题库抽取题目（noShuffle 时保持题库原始顺序）。
+    // v1.0.2 设计审查修复：LIMIT 下推数据库，不再全量加载后内存截断，
+    // 也不再二次 shuffle（SQL RANDOM() 已随机）
+    _questions = await _db.getQuestionsByBanks(bankIds,
+        random: !noShuffle, limit: questionCount);
 
-    if (allQuestions.isEmpty) {
-      _questions = [];
-    } else if (allQuestions.length <= questionCount) {
-      _questions = allQuestions;
-      if (!noShuffle) _questions.shuffle();
-    } else {
-      _questions = allQuestions;
-      if (!noShuffle) _questions.shuffle(Random());
-      _questions = _questions.take(questionCount).toList();
+    // v1.0.2 设计审查修复：空题库不创建会话（避免 0 题幽灵会话
+    // 污染最近会话/历史列表与统计）
+    if (_questions.isEmpty) {
+      _currentSession = null;
+      _currentIndex = 0;
+      _answerStartTime = DateTime.now();
+      DebugLogService.instance.log('SESSION', '所选题库无题目，未创建会话');
+      return;
     }
 
     // 创建会话
@@ -263,25 +266,19 @@ class QuizService {
     if (oldCorrect != isCorrect) {
       await _db.rejudgeAnswerRecord(existing.id!, isCorrect);
     }
-    // 再更新答案内容（user_answer/answered_at）
-    await _db.updateAnswerRecordAnswer(
-        existing.id!, userAnswer, isCorrect, now);
+    // 再更新答案内容。v1.0.2 设计审查修复：同判定时保留原 answered_at，
+    // 避免 23:59 作答、次日重答同一答案导致记录跨天漂移
+    if (oldCorrect == isCorrect) {
+      await _db.updateAnswerRecordAnswer(existing.id!, userAnswer, isCorrect,
+          DateTime.tryParse(existing.answeredAt) ?? now);
+    } else {
+      await _db.updateAnswerRecordAnswer(
+          existing.id!, userAnswer, isCorrect, now);
+    }
 
     // 同步内存会话统计（按新旧结果差量调整）
     if (oldCorrect != isCorrect) {
-      _currentSession = QuizSession(
-        id: _currentSession!.id,
-        bankIds: _currentSession!.bankIds,
-        mode: _currentSession!.mode,
-        totalQuestions: _currentSession!.totalQuestions,
-        correctCount: (_currentSession!.correctCount + (isCorrect ? 1 : -1))
-            .clamp(0, 1 << 30),
-        wrongCount: (_currentSession!.wrongCount + (isCorrect ? -1 : 1))
-            .clamp(0, 1 << 30),
-        startTime: _currentSession!.startTime,
-        endTime: _currentSession!.endTime,
-        durationSeconds: _currentSession!.durationSeconds,
-      );
+      adjustSessionCounts(toCorrect: isCorrect);
     }
 
     return AnswerRecord(
@@ -312,6 +309,36 @@ class QuizService {
       return true;
     }
     return false;
+  }
+
+  /// 直接跳转到指定题号（答题卡/底部圆点跳题用）。
+  /// v1.0.2 设计审查修复：单次变更替代 UI 层 while 逐题循环
+  /// （O(n) 次 notify + O(n) 次单题统计查询）
+  bool jumpToIndex(int index) {
+    if (index < 0 || index >= _questions.length || index == _currentIndex) {
+      return false;
+    }
+    _currentIndex = index;
+    _answerStartTime = DateTime.now();
+    return true;
+  }
+
+  /// 改判后同步内存会话计数（DB 已由 rejudgeAnswerRecord 差量修正；
+  /// 内存会话需同步调整，否则 endSession 会用陈旧值覆盖 DB）
+  void adjustSessionCounts({required bool toCorrect}) {
+    final s = _currentSession;
+    if (s == null) return;
+    _currentSession = QuizSession(
+      id: s.id,
+      bankIds: s.bankIds,
+      mode: s.mode,
+      totalQuestions: s.totalQuestions,
+      correctCount: (s.correctCount + (toCorrect ? 1 : -1)).clamp(0, maxSessionCount),
+      wrongCount: (s.wrongCount + (toCorrect ? -1 : 1)).clamp(0, maxSessionCount),
+      startTime: s.startTime,
+      endTime: s.endTime,
+      durationSeconds: s.durationSeconds,
+    );
   }
 
   /// 当前会话是否已有作答记录（退出时用于区分"正常结束"与"放弃"）

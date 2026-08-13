@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
 import '../services/quiz_service.dart';
+import '../services/theme_service.dart';
 import '../widgets/ai_response_widget.dart';
 import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
@@ -54,13 +55,19 @@ class _QuizScreenState extends State<QuizScreen> {
   // 练习模式状态（v1.0.2 统一重构：练习能力内聚于本页）
   final List<PracticeAnswerState> _practiceAnswers = [];
   final Map<int, String> _practiceAnswersMap = {};
-  int _elapsedSeconds = 0;
-  int _remainingSeconds = 0;
+  // v1.0.2 设计审查修复：计时改 ValueNotifier + 墙钟
+  // （每秒 setState 重建整页 → 只重建计时徽标；墙钟保证切后台倒计时依旧准确）
+  final ValueNotifier<int> _elapsedSeconds = ValueNotifier(0);
+  final ValueNotifier<int> _remainingSeconds = ValueNotifier(0);
+  DateTime? _practiceStartAt; // 练习开始墙钟
+  DateTime? _practiceDeadline; // 限时截止墙钟
   Timer? _practiceTimer;
   bool _practiceSubmitted = false;
   bool _modalOpen = false; // 挡路弹窗标记（答题卡/提交确认）
   // v1.0.2 修复：提交防重（双击不产生重复作答记录）
   bool _submitting = false;
+  // v1.0.2 设计审查修复：结束会话防重（双击"完成刷题"不再抛未捕获 StateError）
+  bool _ending = false;
 
   @override
   void initState() {
@@ -72,53 +79,63 @@ class _QuizScreenState extends State<QuizScreen> {
       });
     }
     if (widget.quizMode == QuizMode.practice) {
-      if (widget.practiceTiming == PracticeTiming.timed) {
-        _remainingSeconds = widget.practiceDurationMinutes * 60;
-      }
       _startPracticeTimer();
     }
   }
 
   void _startPracticeTimer() {
     _practiceTimer?.cancel();
+    _practiceStartAt = DateTime.now();
+    _practiceDeadline = widget.practiceTiming == PracticeTiming.timed
+        ? _practiceStartAt!.add(Duration(minutes: widget.practiceDurationMinutes))
+        : null;
+    _elapsedSeconds.value = 0;
+    _remainingSeconds.value = widget.practiceTiming == PracticeTiming.timed
+        ? widget.practiceDurationMinutes * 60
+        : 0;
     _practiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _practiceSubmitted) return;
-      setState(() {
-        _elapsedSeconds++;
-        if (widget.practiceTiming == PracticeTiming.timed) {
-          _remainingSeconds--;
-          if (_remainingSeconds <= 0) {
-            // 限时归零自动交卷：先关闭挡路弹窗
-            if (_modalOpen) {
-              Navigator.of(context).pop();
-              _modalOpen = false;
-            }
-            _submitPractice(context.read<AppState>());
-          }
-        }
-      });
+      _tickPracticeClock();
     });
+  }
+
+  void _tickPracticeClock() {
+    // v1.0.2 设计审查修复：墙钟计时（App 切后台期间 Timer 暂停，
+    // 恢复后按真实时间修正；限时归零照常自动交卷）
+    final now = DateTime.now();
+    final elapsed = now.difference(_practiceStartAt!).inSeconds;
+    _elapsedSeconds.value = elapsed < 0 ? 0 : elapsed;
+    if (_practiceDeadline != null) {
+      final remaining = _practiceDeadline!.difference(now).inSeconds;
+      _remainingSeconds.value = remaining < 0 ? 0 : remaining;
+      if (remaining <= 0) {
+        _practiceTimer?.cancel();
+        // 限时归零自动交卷：先关闭挡路弹窗
+        if (_modalOpen) {
+          Navigator.of(context).pop();
+          _modalOpen = false;
+        }
+        _submitPractice(context.read<AppState>());
+      }
+    }
   }
 
   String _fmtTime(int s) =>
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
   /// 限时练习剩余 10%（60~300s 下限）进入红色警告态
-  bool get _isPracticeTimeWarn {
+  bool _isPracticeTimeWarn(int remaining) {
     if (widget.practiceTiming != PracticeTiming.timed) return false;
     final total = widget.practiceDurationMinutes * 60;
     if (total <= 0) return false;
     final warnSec = (total * 0.1).ceil().clamp(60, 300);
-    return _remainingSeconds > 0 && _remainingSeconds <= warnSec;
+    return remaining > 0 && remaining <= warnSec;
   }
 
   void dispose() {
-    // v1.0.2: 背题模式 dispose 复位 skipFSRS（防泄漏到后续会话）
-    try {
-      final appState = context.read<AppState>();
-      if (appState.skipFSRS) appState.skipFSRS = false;
-    } catch (_) {}
     _practiceTimer?.cancel();
+    _elapsedSeconds.dispose();
+    _remainingSeconds.dispose();
     _followUpController.dispose();
     for (final c in _fillBlankControllers) { c.dispose(); }
     _fillBlankControllers.clear();
@@ -193,32 +210,39 @@ class _QuizScreenState extends State<QuizScreen> {
                 '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
             actions: [
               // v1.0.2 统一重构：练习模式计时徽标
+              // v1.0.2 设计审查修复：ValueListenableBuilder 只重建徽标，不重建整页
               if (isPractice)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (_isPracticeTimeWarn)
-                            ? cs.error
-                            : cs.primary.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        widget.practiceTiming == PracticeTiming.timed
-                            ? '剩余 ${_fmtTime(_remainingSeconds)}'
-                            : '已用 ${_fmtTime(_elapsedSeconds)}',
-                        style: TextStyle(
-                          fontSize: _isPracticeTimeWarn ? 14 : 12,
-                          fontWeight: FontWeight.bold,
-                          color: _isPracticeTimeWarn
-                              ? Colors.white
-                              : cs.onSurface,
+                ValueListenableBuilder<int>(
+                  valueListenable: _elapsedSeconds,
+                  builder: (context, elapsed, _) =>
+                      ValueListenableBuilder<int>(
+                    valueListenable: _remainingSeconds,
+                    builder: (context, remaining, _) {
+                      final warn = _isPracticeTimeWarn(remaining);
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: warn ? cs.error : cs.primary.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              widget.practiceTiming == PracticeTiming.timed
+                                  ? '剩余 ${_fmtTime(remaining)}'
+                                  : '已用 ${_fmtTime(elapsed)}',
+                              style: TextStyle(
+                                fontSize: warn ? 14 : 12,
+                                fontWeight: FontWeight.bold,
+                                color: warn ? Colors.white : cs.onSurface,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               if (!isPractice)
@@ -233,7 +257,9 @@ class _QuizScreenState extends State<QuizScreen> {
                   tooltip: '答题卡',
                   onPressed: () => _showAnswerSheet(context, appState, cs),
                 ),
-              if (widget.quizMode != QuizMode.memorize)
+              // v1.0.2 设计审查修复：仅正常刷题可切背题
+              // （练习模式切背题高亮答案属作弊路径）
+              if (widget.quizMode == QuizMode.normal)
                 IconButton(
                   icon: Icon(_isMemorizeMode ? Icons.visibility_off : Icons.visibility, size: 20),
                   tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
@@ -242,7 +268,10 @@ class _QuizScreenState extends State<QuizScreen> {
               if (widget.quizMode == QuizMode.memorize)
                 TextButton(
                   onPressed: () => _handleExit(appState),
-                  child: const Text('结束', style: TextStyle(color: Colors.white70)),
+                  // v1.0.2 设计审查修复：跟随导航栏前景色（浅色导航栏主题下
+                  // 白字不可见）
+                  child: Text('结束',
+                      style: TextStyle(color: Theme.of(context).appBarTheme.foregroundColor)),
                 ),
             ],
           ),
@@ -272,6 +301,9 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: GestureDetector(
                   onHorizontalDragEnd: (details) {
                     if (details.primaryVelocity == null) return;
+                    // v1.0.2 设计审查修复：提交期间禁止切题
+                    // （async gap 竞态：否则 await 后的历史槽位写入会错位）
+                    if (_submitting) return;
                     if (details.primaryVelocity! < -300) {
                       // 练习自由前进；刷题/背题需已作答才前进
                       if (isPractice || _isMemorizeMode || isAnswered) {
@@ -333,6 +365,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                   foregroundColor: cs.onSurfaceVariant,
                                 ),
                                 onPressed: () {
+                                  if (_submitting) return; // 提交期间禁重做
                                   _selectedOptions.clear();
                                   for (final c in _fillBlankControllers) {
                                     c.clear();
@@ -405,19 +438,28 @@ class _QuizScreenState extends State<QuizScreen> {
       } else {
         await appState.endSession();
       }
-    } catch (_) {}
+    } catch (e) {
+      // v1.0.2 设计审查修复：保存失败不再静默，留在页面提示重试
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存失败：$e')),
+      );
+      return;
+    }
     if (!mounted) return;
     Navigator.pop(context);
   }
 
   /// 背题模式：选项中高亮正确选项
   Widget _buildMemorizeOptions(Question question, ColorScheme cs, AppState appState) {
+    // v1.0.2 设计审查修复：硬编码绿色 → 主题语义色（success 系列）
+    final ac = AppThemeColors.of(context);
     final options = question.questionType == 'true_false' ? ['对', '错'] : question.options;
     if (options.isEmpty) {
       return Container(
         width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF4CAF50))),
-        child: Text('正确答案: ${question.correctAnswer}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+        decoration: BoxDecoration(color: ac.successContainer, borderRadius: BorderRadius.circular(10), border: Border.all(color: ac.success)),
+        child: Text('正确答案: ${question.correctAnswer}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: ac.success)),
       );
     }
     final correctSet = question.questionType == 'multi_choice' ? question.correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {question.correctAnswer.toUpperCase().trim()};
@@ -426,11 +468,11 @@ class _QuizScreenState extends State<QuizScreen> {
       final isCorrect = correctSet.contains(question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : label);
       return Padding(padding: const EdgeInsets.only(bottom: 8), child: Container(
         width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: isCorrect ? const Color(0xFFE8F5E9) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? const Color(0xFF4CAF50) : cs.outlineVariant)),
+        decoration: BoxDecoration(color: isCorrect ? ac.successContainer : cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? ac.success : cs.outlineVariant)),
         child: Row(children: [
-          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? const Color(0xFF4CAF50) : cs.surfaceContainerHighest, shape: BoxShape.circle), child: Center(child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white) : Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF999999))))),
+          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : cs.surfaceContainerHighest, shape: BoxShape.circle), child: Center(child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: cs.onSurfaceVariant)))),
           const SizedBox(width: 12),
-          Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? const Color(0xFF2E7D32) : cs.onSurface, height: 1.4))),
+          Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : cs.onSurface, height: 1.4))),
         ]),
       ));
     }));
@@ -456,12 +498,8 @@ class _QuizScreenState extends State<QuizScreen> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  question.questionType == 'multi_choice' ? '多选' :
-                  question.questionType == 'fill_blank' ? '填空' :
-                  question.questionType == 'true_false' ? '判断' :
-                  question.questionType == 'ming_jie' ? '名解' :
-                  question.questionType == 'jian_da' ? '简答' :
-                  question.questionType == 'jie_da' ? '问答' : '单选',
+                  // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
+                  question.typeLabel,
                   style: TextStyle(fontSize: 12, color: cs.primary),
                 ),
               ),
@@ -515,17 +553,13 @@ class _QuizScreenState extends State<QuizScreen> {
             HapticFeedback.selectionClick();
             if (isPractice) {
               // v1.0.2 统一重构：练习只记录答案，不提交不判定
-              setState(() {
-                if (isMulti) {
-                  final x = practiceSel.toSet();
-                  x.contains(label) ? x.remove(label) : x.add(label);
-                  _practiceAnswersMap[appState.currentQuestionIndex] =
-                      (x.toList()..sort()).join(',');
-                } else {
-                  _practiceAnswersMap[appState.currentQuestionIndex] = label;
-                }
-                _syncPracticeSheet(appState);
-              });
+              if (isMulti) {
+                final x = practiceSel.toSet();
+                x.contains(label) ? x.remove(label) : x.add(label);
+                _recordPracticeAnswer(appState, (x.toList()..sort()).join(','));
+              } else {
+                _recordPracticeAnswer(appState, label);
+              }
               return;
             }
             if (isMulti) {
@@ -610,21 +644,28 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildFillBlankInput(AppState appState, ColorScheme cs) {
     final title = appState.currentQuestion?.title ?? '';
-    final blankCount = RegExp(r'_{2,}|（\s*）|\(\s*\)').allMatches(title).length;
+    // v1.0.2 设计审查修复：识别单个下划线（此前 _{2,} 漏掉 "_"）
+    final blankCount = RegExp(r'_{1,}|（\s*）|\(\s*\)').allMatches(title).length;
     final n = blankCount > 0 ? blankCount : 1;
 
-    // 清理超过当前题目的旧控制器/焦点
-    while (_fillBlankControllers.length > n) {
-      _fillBlankControllers.removeLast().dispose();
-    }
+    // v1.0.2 设计审查修复：build 中只增不删；多余控制器待帧后销毁，
+    // 避免在构建阶段 dispose 尚挂在树上的 controller
     while (_fillBlankControllers.length < n) {
       _fillBlankControllers.add(TextEditingController());
     }
-    while (_fillBlankFocusNodes.length > n) {
-      _fillBlankFocusNodes.removeLast().dispose();
-    }
     while (_fillBlankFocusNodes.length < n) {
       _fillBlankFocusNodes.add(FocusNode());
+    }
+    if (_fillBlankControllers.length > n || _fillBlankFocusNodes.length > n) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        while (_fillBlankControllers.length > n) {
+          _fillBlankControllers.removeLast().dispose();
+        }
+        while (_fillBlankFocusNodes.length > n) {
+          _fillBlankFocusNodes.removeLast().dispose();
+        }
+      });
     }
 
     return Column(
@@ -664,7 +705,8 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildTextAnswerInput(AppState appState, ColorScheme cs, String type) {
-    final label = type == 'ming_jie' ? '名解' : type == 'jian_da' ? '简答' : '问答';
+    // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
+    final label = appState.currentQuestion?.typeLabel ?? '题目';
     final isPractice = widget.quizMode == QuizMode.practice;
     return Column(
       children: [
@@ -690,10 +732,7 @@ class _QuizScreenState extends State<QuizScreen> {
               _textAnswerController.clear();
               if (isPractice) {
                 // v1.0.2 统一重构：练习只记录答案
-                setState(() {
-                  _practiceAnswersMap[appState.currentQuestionIndex] = answer;
-                  _syncPracticeSheet(appState);
-                });
+                _recordPracticeAnswer(appState, answer);
                 return;
               }
               _handleSubmitAnswer(appState, answer);
@@ -706,6 +745,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildTrueFalseButtons(AppState appState, ColorScheme cs) {
     final isPractice = widget.quizMode == QuizMode.practice;
+    final ac = AppThemeColors.of(context);
     final cur = _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
     return Row(
       children: [
@@ -713,10 +753,7 @@ class _QuizScreenState extends State<QuizScreen> {
           child: GestureDetector(
             onTap: () {
               if (isPractice) {
-                setState(() {
-                  _practiceAnswersMap[appState.currentQuestionIndex] = '对';
-                  _syncPracticeSheet(appState);
-                });
+                _recordPracticeAnswer(appState, '对');
                 return;
               }
               _handleSubmitAnswer(appState, '对');
@@ -725,18 +762,19 @@ class _QuizScreenState extends State<QuizScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: isPractice && cur == '对'
-                    ? cs.tertiary.withOpacity(0.15)
+                    ? ac.successContainer
                     : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: isPractice && cur == '对' ? cs.tertiary : cs.tertiary),
+                    color: isPractice && cur == '对' ? ac.success : ac.success),
               ),
-              child: const Center(
+              child: Center(
+                // v1.0.2 设计审查修复：硬编码绿色 → 语义色
                 child: Text('✓  正确',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF5CB85C))),
+                        color: ac.success)),
               ),
             ),
           ),
@@ -746,10 +784,7 @@ class _QuizScreenState extends State<QuizScreen> {
           child: GestureDetector(
             onTap: () {
               if (isPractice) {
-                setState(() {
-                  _practiceAnswersMap[appState.currentQuestionIndex] = '错';
-                  _syncPracticeSheet(appState);
-                });
+                _recordPracticeAnswer(appState, '错');
                 return;
               }
               _handleSubmitAnswer(appState, '错');
@@ -758,17 +793,17 @@ class _QuizScreenState extends State<QuizScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: isPractice && cur == '错'
-                    ? cs.error.withOpacity(0.12)
+                    ? ac.dangerContainer
                     : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.error),
+                border: Border.all(color: ac.danger),
               ),
-              child: const Center(
+              child: Center(
                 child: Text('✗  错误',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFD9534F))),
+                        color: ac.danger)),
               ),
             ),
           ),
@@ -790,13 +825,18 @@ class _QuizScreenState extends State<QuizScreen> {
     for (final c in _fillBlankControllers) { c.clear(); }
     if (widget.quizMode == QuizMode.practice) {
       // v1.0.2 统一重构：练习只记录答案
-      setState(() {
-        _practiceAnswersMap[appState.currentQuestionIndex] = answer;
-        _syncPracticeSheet(appState);
-      });
+      _recordPracticeAnswer(appState, answer);
       return;
     }
     _handleSubmitAnswer(appState, answer);
+  }
+
+  /// v1.0.2 设计审查修复：练习答案记录 5 处复制粘贴收敛为单方法
+  void _recordPracticeAnswer(AppState appState, String answer) {
+    setState(() {
+      _practiceAnswersMap[appState.currentQuestionIndex] = answer;
+      _syncPracticeSheet(appState);
+    });
   }
 
   Future<void> _handleSubmitAnswer(AppState appState, String answer) async {
@@ -849,8 +889,11 @@ class _QuizScreenState extends State<QuizScreen> {
       context: context,
       builder: (ctx) => QuestionEditDialog(
         question: q,
-        onSave: (title, answer, type) {
-          appState.updateCurrentQuestion(title, answer, type);
+        onSave: (title, answer, type) async {
+          await appState.updateCurrentQuestion(title, answer, type);
+          // v1.0.2 设计审查修复：已作答题目修改答案后按新答案重判，
+          // 否则判定显示与落库记录脱节
+          await appState.rejudgeCurrentAnswerAfterEdit();
         },
       ),
     );
@@ -863,16 +906,11 @@ class _QuizScreenState extends State<QuizScreen> {
       builder: (_) => AnswerSheetWidget(
         answers: _practiceAnswers,
         currentIndex: appState.currentQuestionIndex,
-        // v1.0.2 统一重构：练习模式答题卡只显示已答/未答（提交前不判定对错）
-        showResult: widget.quizMode != QuizMode.practice,
         onJumpTo: (i) {
           Navigator.pop(context);
-          while (appState.currentQuestionIndex > i && appState.hasPrevious) {
-            appState.previousQuestion();
-          }
-          while (appState.currentQuestionIndex < i && !appState.isLastQuestion) {
-            appState.nextQuestion();
-          }
+          // v1.0.2 设计审查修复：单次跳转替代 while 逐题循环
+          appState.jumpToQuestion(i);
+          _scrollController.jumpTo(0);
         },
       ),
     ).then((_) => _modalOpen = false);
@@ -893,6 +931,9 @@ class _QuizScreenState extends State<QuizScreen> {
   /// - practice：触发提交确认
   Future<void> _handleFinishSwipe(AppState appState) async {
     if (widget.quizMode == QuizMode.memorize) {
+      // v1.0.2 设计审查修复：末题左滑不走 endSession/abortSession，
+      // 此处显式复位 skipFSRS（生命周期收口，防泄漏到下一会话）
+      context.read<AppState>().skipFSRS = false;
       if (!mounted) return;
       Navigator.pop(context);
       return;
@@ -903,7 +944,14 @@ class _QuizScreenState extends State<QuizScreen> {
     }
     try {
       await appState.endSession();
-    } catch (_) {}
+    } catch (e) {
+      // v1.0.2 设计审查修复：保存失败不再静默吞掉
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存失败：$e')),
+      );
+      return;
+    }
     if (!mounted) return;
     Navigator.pop(context);
   }
@@ -1058,8 +1106,10 @@ class _QuizScreenState extends State<QuizScreen> {
         Text('正确答案: $correct',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.tertiary)),
         const SizedBox(height: 4),
+        // v1.0.2 设计审查修复：答对时"你的答案"不再恒显示错误红色
         Text('你的答案: $user',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.error)),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+              color: lastRecord.isCorrect ? cs.tertiary : cs.error)),
       ],
     );
   }
@@ -1093,9 +1143,9 @@ class _QuizScreenState extends State<QuizScreen> {
           // v1.0.2: API 未配置拦截重新生成
           if (!appState.settings.isConfigured) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('请先在设置中配置 API Key 后再查看解析。'),
-                  backgroundColor: Colors.orange),
+              SnackBar(
+                  content: const Text('请先在设置中配置 API Key 后再查看解析。'),
+                  backgroundColor: AppThemeColors.of(context).warning),
             );
             return;
           }
@@ -1115,9 +1165,9 @@ class _QuizScreenState extends State<QuizScreen> {
           // v1.0.2: API 未配置拦截解析请求
           if (!appState.settings.isConfigured) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('请先在设置中配置 API Key 后再查看解析。'),
-                  backgroundColor: Colors.orange),
+              SnackBar(
+                  content: const Text('请先在设置中配置 API Key 后再查看解析。'),
+                  backgroundColor: AppThemeColors.of(context).warning),
             );
             return;
           }
@@ -1210,9 +1260,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     // v1.0.2: API 未配置拦截追问（对齐里程碑：后再追问）
                     if (!appState.settings.isConfigured) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('请先在设置中配置 API Key 后再追问。'),
-                            backgroundColor: Colors.orange),
+                        SnackBar(
+                            content: const Text('请先在设置中配置 API Key 后再追问。'),
+                            backgroundColor: AppThemeColors.of(context).warning),
                       );
                       return;
                     }
@@ -1288,6 +1338,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   icon: const Icon(Icons.arrow_back_ios, size: 18),
                   onPressed: appState.hasPrevious
                       ? () {
+                          if (_submitting) return;
                           appState.previousQuestion();
                           _scrollController.jumpTo(0);
                         }
@@ -1302,14 +1353,10 @@ class _QuizScreenState extends State<QuizScreen> {
                         final ans = _practiceAnswersMap.containsKey(i);
                         return GestureDetector(
                           onTap: () {
-                            while (appState.currentQuestionIndex > i &&
-                                appState.hasPrevious) {
-                              appState.previousQuestion();
-                            }
-                            while (appState.currentQuestionIndex < i &&
-                                !appState.isLastQuestion) {
-                              appState.nextQuestion();
-                            }
+                            // v1.0.2 设计审查修复：单次跳转替代 while 循环
+                            if (_submitting) return;
+                            appState.jumpToQuestion(i);
+                            _scrollController.jumpTo(0);
                           },
                           child: Container(
                             width: 26,
@@ -1347,6 +1394,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   icon: const Icon(Icons.arrow_forward_ios, size: 18),
                   onPressed: !appState.isLastQuestion
                       ? () {
+                          if (_submitting) return;
                           appState.nextQuestion();
                           _scrollController.jumpTo(0);
                         }
@@ -1422,6 +1470,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         foregroundColor: cs.onSurfaceVariant,
                       ),
                       onPressed: () {
+                        if (_submitting) return; // 提交期间禁切题
                         _showAnalysis = false;
                         _showManualAnalysis = false;
                         _followUpController.clear();
@@ -1435,7 +1484,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 ],
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _advanceQuestion(appState),
+                    onPressed: () {
+                      if (_submitting) return; // 提交期间禁切题
+                      _advanceQuestion(appState);
+                    },
                     child: const Text('下一题', style: TextStyle(fontSize: 16)),
                   ),
                 ),
@@ -1447,6 +1499,7 @@ class _QuizScreenState extends State<QuizScreen> {
   /// v1.0.2 统一重构：练习提交确认弹窗（对齐里程碑文案：确认提交 (已选 X 题)）
   void _showSubmit(AppState appState) {
     if (_practiceSubmitted) return;
+    if (_modalOpen) return; // v1.0.2 设计审查修复：弹窗防重
     final total = appState.quizQuestions.length;
     final answered = _practiceAnswersMap.length;
     _modalOpen = true;
@@ -1505,7 +1558,7 @@ class _QuizScreenState extends State<QuizScreen> {
             blank: blank,
             total: qs.length,
             accuracy: acc,
-            elapsedSeconds: _elapsedSeconds,
+            elapsedSeconds: _elapsedSeconds.value,
             timing: widget.practiceTiming ?? PracticeTiming.untimed,
             durationMinutes: widget.practiceDurationMinutes,
             wrongList: wrongList,
@@ -1517,16 +1570,48 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
+  /// v1.0.2 设计审查修复：结束会话防重（_ending 标志）+ 保存失败提示重试/放弃
+  /// （此前双击会因会话已 reset 抛未捕获 StateError）
   Future<void> _handleEndSession(
       BuildContext context, AppState appState) async {
-    final session = await appState.endSession();
-    if (!mounted) return;
-
-    Navigator.pushReplacement(
-      context,      MaterialPageRoute(
-        builder: (_) => SessionSummaryScreen(session: session),
-      ),
-    );
+    if (_ending) return;
+    _ending = true;
+    try {
+      final session = await appState.endSession();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SessionSummaryScreen(session: session),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final retry = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('保存失败'),
+          content: Text('会话保存失败：$e\n\n可重试保存，或放弃本次进度。'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('放弃')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('重试')),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (retry == true) {
+        _ending = false;
+        await _handleEndSession(context, appState);
+      } else {
+        Navigator.pop(context);
+      }
+    } finally {
+      _ending = false;
+    }
   }
 }
 

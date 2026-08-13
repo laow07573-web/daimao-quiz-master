@@ -6,8 +6,7 @@ enum PracticeTiming { timed, untimed }
 
 /// 练习模式入口：选择时间模式（v1.0.2 统一重构：选择后进入统一答题页）
 class PracticeEntryScreen extends StatelessWidget {
-  final List<Question> questions;
-  const PracticeEntryScreen({super.key, required this.questions});
+  const PracticeEntryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

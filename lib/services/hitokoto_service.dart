@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -58,7 +57,4 @@ class HitokotoService {
     final t = await fetch();
     return t ?? _defaultText;
   }
-
-  /// 平台判定（便于测试）
-  static bool get isNetworkAvailable => !Platform.environment.containsKey('FLUTTER_TEST_NETWORK_OFF');
 }

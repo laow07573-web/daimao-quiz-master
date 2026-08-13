@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +11,7 @@ import '../services/database_service.dart';
 import '../services/debug_log_service.dart';
 import '../services/keepalive_service.dart';
 
-/// 开发者选项（v1.0.2）：密码进入 `kskblzdjd`
+/// 开发者选项（v1.0.2）：密码进入，调试专用
 /// 日志 / 模拟长期使用 / 保活状态 / DB 备份导入导出
 class DeveloperOptionsScreen extends StatefulWidget {
   const DeveloperOptionsScreen({super.key});
@@ -19,10 +21,15 @@ class DeveloperOptionsScreen extends StatefulWidget {
 }
 
 class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
-  static const _password = 'kskblzdjd';
+  // v1.0.2 设计审查修复：不再明文存密码/写注释，改 SHA-256 哈希比对
+  static const _passwordHash =
+      '4e350f267cd76d000e9d0f99691683ebd989182a1b8266c02bc3739ef2fa1211';
+
+  static bool _checkPassword(String input) =>
+      sha256.convert(utf8.encode(input)).toString() == _passwordHash;
+
   bool _unlocked = false;
   bool _simulating = false;
-  bool _accessibilityOn = false;
   bool _batteryIgnored = true;
   String? _status;
   // v1.0.2 修复：密码输入 controller 由 State 管理，避免每次 build 新建泄漏
@@ -41,11 +48,10 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   }
 
   Future<void> _checkKeepalive() async {
-    final acc = await KeepAliveService.instance.isAccessibilityEnabled();
+    // v1.0.2 设计审查修复（简化保活）：不再查询无障碍状态
     final bat = await KeepAliveService.instance.isIgnoringBatteryOptimizations();
     if (!mounted) return;
     setState(() {
-      _accessibilityOn = acc;
       _batteryIgnored = bat;
     });
   }
@@ -194,15 +200,24 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
   }
 
   Future<void> _exportBackup() async {
-    final dir = (await Directory.systemTemp.createTemp('backup')).path;
-    final path = '$dir/flashcard_backup_${DateTime.now().millisecondsSinceEpoch}.db';
+    // v1.0.2 设计审查修复：复用系统临时目录单文件（此前每次 createTemp('backup')
+    // 目录且从不清理，累积垃圾）
+    final dir = Directory.systemTemp;
+    final path =
+        '${dir.path}/flashcard_backup_${DateTime.now().millisecondsSinceEpoch}.db';
     final err = await DatabaseService.instance.exportBackup(path);
     if (err != null) {
       if (!mounted) return;
       setState(() => _status = '导出失败: $err');
       return;
     }
-    await Share.shareXFiles([XFile(path)], subject: '呆猫刷题宝数据库备份');
+    try {
+      await Share.shareXFiles([XFile(path)], subject: '呆猫刷题宝数据库备份');
+    } catch (e) {
+      // v1.0.2 设计审查修复：分享失败不再静默
+      if (!mounted) return;
+      setState(() => _status = '分享失败: $e');
+    }
   }
 
   Future<void> _importBackup() async {
@@ -279,7 +294,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                     borderRadius: BorderRadius.circular(10)),
               ),
               onSubmitted: (v) {
-                if (v == _password) {
+                if (_checkPassword(v)) {
                   setState(() => _unlocked = true);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -291,7 +306,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () {
-                if (controller.text == _password) {
+                if (_checkPassword(controller.text)) {
                   setState(() => _unlocked = true);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -381,18 +396,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           },
         ),
         const SizedBox(height: 8),
-        _DevCard(
-          icon: Icons.health_and_safety_outlined,
-          title: '保活（无障碍）状态',
-          subtitle: _accessibilityOn
-              ? '无障碍保活：已开启'
-              : '无障碍保活：未开启',
-          onTap: () async {
-            await KeepAliveService.instance.openAccessibilitySettings();
-            await _checkKeepalive();
-          },
-        ),
-        const SizedBox(height: 8),
+        // v1.0.2 设计审查修复（简化保活）：移除无障碍保活入口（服务已删除）
         _DevCard(
           icon: Icons.battery_charging_full,
           title: '电池优化',

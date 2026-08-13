@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
+import '../utils/app_constants.dart';
+import '../utils/format_utils.dart';
 import '../widgets/monthly_calendar.dart';
 import '../widgets/trend_chart.dart';
 import 'error_book_screen.dart';
@@ -46,7 +48,8 @@ class StatsTabState extends State<StatsTab> {
   @override
   void initState() {
     super.initState();
-    _quarterController = PageController(initialPage: 4 * 200);
+    // v1.0.2 设计审查修复：年份跨度提为常量 kYearPageSpan
+    _quarterController = PageController(initialPage: 4 * kYearPageSpan);
     _loadAll();
   }
 
@@ -79,8 +82,7 @@ class StatsTabState extends State<StatsTab> {
       setState(() {
         _yearlyTotals = yearly;
         _vacationDays = {
-          for (final d in appState.vacationDateRange)
-            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'
+          for (final d in appState.vacationDateRange) dateKeyOf(d)
         };
         _trendData = trend;
         _periodQuestions = periodStats.totalQuestions;
@@ -154,7 +156,9 @@ class StatsTabState extends State<StatsTab> {
       builder: (ctx) => AlertDialog(
         title: const Text('隐藏今日记录'),
         // v1.0.2 对齐里程碑：将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。
-        content: const Text('将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。\n将同步更新本次统计、错题本和复习计划。'),
+        // v1.0.2 设计审查修复：文案如实（隐藏只剔除统计/打卡口径，
+        // 错题本与复习计划不受影响——隐藏不删除不可逆数据）
+        content: const Text('将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。\n今日记录将从统计、打卡与历史列表中剔除；错题本与复习计划不受影响。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -293,7 +297,7 @@ class StatsTabState extends State<StatsTab> {
     final todayKey = MonthCalendar.dateKeyOf(now);
     // 绝对季度索引 = year*4 + (month-1)~/3
     final initialAbsQuarter = now.year * 4 + (now.month - 1) ~/ 3;
-    const initialPage = 4 * 200; // 大初始页：前后 200 年范围可翻
+    const initialPage = 4 * kYearPageSpan; // 大初始页：前后 200 年范围可翻
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -132,21 +132,8 @@
                 android:value="Daily study reminder service to keep streak notifications working while app is closed" />
         </service>
 
-        <service
-            android:name="com.flashcard.app.KeepAliveAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
-
-            <intent-filter>
-
-                <action
-                    android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@ref/0x7f100001" />
-        </service>
+        <!-- v1.0.2 设计审查（简化保活）：KeepAliveAccessibilityService 已按产品决策
+             移除，基线随之上移。此注释仅用于说明基线变更原因。 -->
 
         <receiver
             android:name="com.pravera.flutter_foreground_task.service.RebootReceiver"

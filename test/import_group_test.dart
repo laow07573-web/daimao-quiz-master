@@ -124,8 +124,9 @@ void main() {
           {'title': '血糖正常值', 'correct_answer': '3.9-6.1', 'type': 'fill_blank'},
         ],
       }));
-      final (banks, questions) =
+      final (banks, questions, err) =
           await BankFileService.importJsonFile(path);
+      expect(err, isNull);
       expect(banks, 2);
       expect(questions, 3);
       final all = await DatabaseService.instance.getAllBanks();
@@ -145,8 +146,9 @@ void main() {
         {'title': '题一', 'correct_answer': 'A'},
         {'title': '题二', 'correct_answer': 'B'},
       ]));
-      final (banks, questions) =
+      final (banks, questions, err) =
           await BankFileService.importJsonFile(path);
+      expect(err, isNull);
       expect(banks, 1);
       expect(questions, 2);
       final all = await DatabaseService.instance.getAllBanks();
@@ -167,7 +169,7 @@ void main() {
       await db.addToErrorBook(qs.first.id!);
       await db.deleteBank(bankId);
       expect((await db.getAllBanks()).length, 0);
-      expect(await db.getErrorBookCount(), 0);
+      expect(await db.getFullErrorCount('all'), 0);
     });
   });
 }

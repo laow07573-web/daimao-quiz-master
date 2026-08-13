@@ -16,23 +16,20 @@ import 'database_service.dart';
 class BankFileService {
   static final DatabaseService _db = DatabaseService.instance;
 
-  /// 解析 JSON 文件 → 按组返回（组名 → 题目列表）
-  /// 返回空 Map 表示解析失败（错误信息见 [lastError]）
-  static String? lastError;
-
-  static Future<Map<String, List<Question>>> parseJsonFile(String filePath) async {
-    lastError = null;
+  /// 解析 JSON 文件 → 返回 (组名 → 题目列表, 错误信息)。
+  /// v1.0.2 设计审查修复：错误信息随返回值传递
+  /// （此前用静态 lastError 全局变量，并发/重入会被覆盖）
+  static Future<(Map<String, List<Question>>, String?)> parseJsonFile(
+      String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
-      lastError = '文件不存在: $filePath';
-      return {};
+      return (<String, List<Question>>{}, '文件不存在: $filePath');
     }
     final String raw;
     try {
       raw = await file.readAsString();
     } catch (e) {
-      lastError = '读取文件失败: $e';
-      return {};
+      return (<String, List<Question>>{}, '读取文件失败: $e');
     }
 
     final dynamic data;
@@ -40,8 +37,7 @@ class BankFileService {
       data = jsonDecode(raw);
     } catch (e) {
       // v1.0.2 对齐里程碑：不是有效的 JSON 文件
-      lastError = '不是有效的 JSON 文件: $e';
-      return {};
+      return (<String, List<Question>>{}, '不是有效的 JSON 文件: $e');
     }
 
     final now = DateTime.now().toIso8601String();
@@ -51,8 +47,7 @@ class BankFileService {
       // 单题库：数组
       final questions = _parseQuestions(data, now);
       if (questions.isEmpty) {
-        lastError = '文件中没有有效题目';
-        return {};
+        return (<String, List<Question>>{}, '文件中没有有效题目');
       }
       final baseName = filePath.split(RegExp(r'[\\/]')).last
           .replaceAll(RegExp(r'\.json$', caseSensitive: false), '');
@@ -62,8 +57,7 @@ class BankFileService {
       // 有 questions 键但缺 format 标记 → 提示缺少 format 标记
       if (data.containsKey('questions')) {
         if (data['format'] != 'daimao-flashcard-questions') {
-          lastError = '不是呆猫刷题宝题库文件（缺少 format 标记）';
-          return {};
+          return (<String, List<Question>>{}, '不是呆猫刷题宝题库文件（缺少 format 标记）');
         }
         if (data['questions'] is List) {
           final questions = _parseQuestions(data['questions'] as List, now);
@@ -82,14 +76,12 @@ class BankFileService {
         }
       }
       if (groups.isEmpty) {
-        lastError = '文件中没有有效题目分组';
-        return {};
+        return (<String, List<Question>>{}, '文件中没有有效题目分组');
       }
     } else {
-      lastError = 'JSON 顶层应为数组或对象';
-      return {};
+      return (<String, List<Question>>{}, 'JSON 顶层应为数组或对象');
     }
-    return groups;
+    return (groups, null);
   }
 
   static List<Question> _parseQuestions(List list, String now) {
@@ -181,10 +173,10 @@ class BankFileService {
     return null;
   }
 
-  /// 导入 JSON 文件（分组建库）：返回 (成功组数, 导入题目数)
-  static Future<(int, int)> importJsonFile(String filePath) async {
-    final groups = await parseJsonFile(filePath);
-    if (groups.isEmpty) return (0, 0);
+  /// 导入 JSON 文件（分组建库）：返回 (成功组数, 导入题目数, 错误信息)
+  static Future<(int, int, String?)> importJsonFile(String filePath) async {
+    final (groups, err) = await parseJsonFile(filePath);
+    if (groups.isEmpty) return (0, 0, err);
     final now = DateTime.now().toIso8601String();
     var bankCount = 0;
     var questionCount = 0;
@@ -202,7 +194,7 @@ class BankFileService {
       bankCount++;
       questionCount += questions.length;
     }
-    return (bankCount, questionCount);
+    return (bankCount, questionCount, null);
   }
 
   /// 导出题库为 JSON 文件（v1.0.2 扩展：带 format 标记 + 题库名，
