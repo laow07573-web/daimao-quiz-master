@@ -38,8 +38,6 @@ class StatsTabState extends State<StatsTab> {
   List<QuizSession> _recentSessions = [];
   // v1.0.2 七项改进：历史会话关联的题库名（session_banks）
   Map<int, List<String>> _sessionBankNames = {};
-  // v1.0.2 对齐里程碑：隐藏/恢复今日记录
-  int _hiddenTodayCount = 0;
 
   bool _loading = true;
   String? _error;
@@ -129,7 +127,6 @@ class StatsTabState extends State<StatsTab> {
       final kps = await appState.getAccuracyByKnowledgePoint();
       final errors = await appState.getErrorBookStats();
       final sessions = await appState.getRecentSessions(10);
-      final hidden = await appState.getHiddenTodayRecordCount();
       // v1.0.2 七项改进：会话关联题库名（历史副标题）
       final bankNames = <int, List<String>>{};
       for (final s in sessions) {
@@ -151,57 +148,10 @@ class StatsTabState extends State<StatsTab> {
         _errorStats = errors;
         _recentSessions = sessions;
         _sessionBankNames = bankNames;
-        _hiddenTodayCount = hidden;
       });
     } catch (_) {
       // 排行加载失败不影响主统计展示
     }
-  }
-
-  /// v1.0.2 对齐里程碑：隐藏今日答题记录（确认说明）
-  Future<void> _hideToday() async {
-    final appState = context.read<AppState>();
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('隐藏今日记录'),
-        // v1.0.2 对齐里程碑：将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。
-        // v1.0.2 设计审查修复：文案如实（隐藏只剔除统计/打卡口径，
-        // 错题本与复习计划不受影响——隐藏不删除不可逆数据）
-        content: const Text('将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题。\n今日记录将从统计、打卡与历史列表中剔除；错题本与复习计划不受影响。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('隐藏')),
-        ],
-      ),
-    );
-    if (sure != true || !mounted) return;
-    final hidden = await appState.hideTodayRecords();
-    if (!mounted) return;
-    await _loadAll();
-    // v1.0.2 修复：隐藏后同步刷新排行与恢复卡片（此前恢复入口不可达）
-    await _loadRankings();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(hidden > 0 ? '已隐藏 $hidden 条今日记录' : '今日暂无答题记录'),
-        backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-
-  /// v1.0.2 对齐里程碑：恢复被隐藏的今日记录
-  Future<void> _restoreToday() async {
-    final appState = context.read<AppState>();
-    await appState.restoreTodayRecords();
-    if (!mounted) return;
-    await _loadAll();
-    // v1.0.2 修复：恢复后同步刷新（恢复卡片消失、排行回填）
-    await _loadRankings();
   }
 
   @override
@@ -261,36 +211,9 @@ class StatsTabState extends State<StatsTab> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      // v1.0.2 对齐里程碑：恢复被隐藏的今日记录
-                      if (_hiddenTodayCount > 0)
-                        _SectionCard(
-                          title: '今日记录',
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '已隐藏 $_hiddenTodayCount 条今日记录，可通过下方按钮恢复',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: cs.onSurfaceVariant),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: _restoreToday,
-                                child: const Text('恢复今日刷题记录',
-                                    style: TextStyle(fontSize: 12)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 14),
+                      // v1.0.2 七项改进：隐藏/恢复今日记录入口已移入开发者模式
                       _SectionCard(
                         title: '历史记录',
-                        trailing: TextButton(
-                          onPressed: _hideToday,
-                          child: const Text('隐藏今日记录',
-                              style: TextStyle(fontSize: 12)),
-                        ),
                         child: _HistorySection(
                             sessions: _recentSessions,
                             bankNames: _sessionBankNames),
