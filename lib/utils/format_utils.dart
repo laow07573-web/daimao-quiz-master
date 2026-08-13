@@ -24,3 +24,16 @@ String fmtClock(int s) =>
 
 /// 秒 → 'X分Y秒'（练习结果页）
 String fmtDurationCn(int s) => '${s ~/ 60}分${s % 60}秒';
+
+/// FSRS 可见化：相对天数标签（按自然日粒度）。
+/// 返回 '已到期N天' / '今天' / '明天' / 'N天后'
+String relativeDayLabel(DateTime due, {DateTime? now}) {
+  final n = now ?? DateTime.now();
+  final today = DateTime(n.year, n.month, n.day);
+  final d = DateTime(due.year, due.month, due.day);
+  final diff = d.difference(today).inDays;
+  if (diff < 0) return '已到期${-diff}天';
+  if (diff == 0) return '今天';
+  if (diff == 1) return '明天';
+  return '$diff天后';
+}

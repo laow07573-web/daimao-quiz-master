@@ -798,7 +798,9 @@ class _ErrorStatsSection extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}',
+                    '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}'
+                    // v1.0.2 FSRS 可见化：该题库最早到期卡
+                    '${s['next_due_at'] != null ? ' · 下次到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
                     style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                   ),
                 ],

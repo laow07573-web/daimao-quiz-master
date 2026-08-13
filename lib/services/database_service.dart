@@ -878,7 +878,22 @@ class DatabaseService {
     return map;
   }
 
-  /// 按题库获取错题统计（到期题数 + 收藏题数 + 全部去重数）
+  /// 批量取题目复习卡（question_id → 卡；FSRS 可见化：错题本逐题「下次复习」显示用）
+  Future<Map<int, FSRSCardState>> getFsrsCardsByIds(
+      List<int> questionIds) async {
+    if (questionIds.isEmpty) return const {};
+    final db = await database;
+    final placeholders = List.filled(questionIds.length, '?').join(',');
+    final maps = await db.query('fsrs_cards',
+        where: 'question_id IN ($placeholders)', whereArgs: questionIds);
+    return {
+      for (final m in maps)
+        (m['question_id'] as int): FSRSCardState.fromMap(m),
+    };
+  }
+
+  /// 按题库获取错题统计（到期题数 + 收藏题数 + 全部去重数）。
+  /// v1.0.2 FSRS 可见化：加 next_due_at（该题库到期卡中最早的到期时间）
   Future<List<Map<String, dynamic>>> getErrorStatsByBank() async {
     final db = await database;
     return await db.rawQuery('''
@@ -894,7 +909,11 @@ class DatabaseService {
           WHEN (fc.next_review_at IS NOT NULL AND datetime(fc.next_review_at) <= datetime('now', 'localtime'))
             OR eb.question_id IS NOT NULL
           THEN q.id END
-        ) as all_count
+        ) as all_count,
+        MIN(CASE
+          WHEN fc.next_review_at IS NOT NULL AND datetime(fc.next_review_at) <= datetime('now', 'localtime')
+          THEN fc.next_review_at END
+        ) as next_due_at
       FROM question_banks qb
       LEFT JOIN questions q ON q.bank_id = qb.id
       LEFT JOIN fsrs_cards fc ON fc.question_id = q.id

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
+import '../services/fsrs_service.dart';
+import '../utils/format_utils.dart';
 import 'quiz_screen.dart';
 
 /// 错题本（v1.0.2 重写）
@@ -145,6 +147,9 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     final questions =
         await appState.getFullQuestionsByKnowledgePoint(kp, _filter,
             bankIds: bankIds);
+    // v1.0.2 FSRS 可见化：逐题复习卡（下次复习时间）
+    final cards = await appState.getFsrsCardsByIds(
+        questions.map((q) => q.id).whereType<int>().toList());
     if (!mounted) return;
     final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
@@ -184,16 +189,41 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                   child: ListView.builder(
                     shrinkWrap: true,
                     itemCount: questions.length > 8 ? 8 : questions.length,
-                    itemBuilder: (context, i) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      child: Text(
-                        '${i + 1}. ${questions[i].title}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            TextStyle(fontSize: 13, color: cs.onSurface),
-                      ),
-                    ),
+                    itemBuilder: (context, i) {
+                      final q = questions[i];
+                      final card = q.id != null ? cards[q.id] : null;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${i + 1}. ${q.title}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 13, color: cs.onSurface),
+                              ),
+                            ),
+                            // v1.0.2 FSRS 可见化：下次复习时间（到期红色）
+                            if (card != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                '下次复习：${relativeDayLabel(card.nextReviewAt)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: FSRSService.isDue(
+                                          card, DateTime.now())
+                                      ? cs.error
+                                      : cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               const SizedBox(height: 14),
@@ -622,6 +652,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                   count: count,
                                   due: due,
                                   bookmark: bookmark,
+                                  // v1.0.2 FSRS 可见化：题库最早到期时间
+                                  nextDueAt: s['next_due_at'] as String?,
                                   selected: selected,
                                   colorScheme: cs,
                                   onTap: () {
@@ -666,6 +698,8 @@ class _BankErrorCard extends StatelessWidget {
   final int count;
   final int due;
   final int bookmark;
+  // v1.0.2 FSRS 可见化：该题库到期卡中最早到期时间（ISO，无到期卡为 null）
+  final String? nextDueAt;
   final bool selected;
   final ColorScheme colorScheme;
   final VoidCallback onTap;
@@ -675,6 +709,7 @@ class _BankErrorCard extends StatelessWidget {
     required this.count,
     required this.due,
     required this.bookmark,
+    this.nextDueAt,
     required this.selected,
     required this.colorScheme,
     required this.onTap,
@@ -735,6 +770,19 @@ class _BankErrorCard extends StatelessWidget {
                       Text('$bookmark 收藏',
                           style: TextStyle(
                               fontSize: 12, color: cs.secondary)),
+                      // v1.0.2 FSRS 可见化：下次到期（该题库最早到期卡）
+                      if (nextDueAt != null) ...[
+                        const SizedBox(width: 8),
+                        Text('·',
+                            style: TextStyle(
+                                fontSize: 12, color: cs.onSurfaceVariant)),
+                        const SizedBox(width: 8),
+                        Text(
+                          '下次到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
+                          style: TextStyle(
+                              fontSize: 12, color: cs.error),
+                        ),
+                      ],
                     ],
                   ),
                 ],

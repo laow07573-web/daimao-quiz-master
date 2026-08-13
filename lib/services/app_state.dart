@@ -72,6 +72,16 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Map<String, int> _currentQuestionStats = {};
   Map<String, int> get currentQuestionStats => _currentQuestionStats;
 
+  // v1.0.2 FSRS 可见化：当前题的复习卡（下次复习时间展示）
+  FSRSCardState? _currentFsrsCard;
+  FSRSCardState? get currentFsrsCard => _currentFsrsCard;
+
+  /// 清空当前题上下文（单题统计 + 复习卡）
+  void _clearQuestionContext() {
+    _currentQuestionStats = {};
+    _currentFsrsCard = null;
+  }
+
   // 首页统计
   HomeStats? _homeStats;
   HomeStats? get homeStats => _homeStats;
@@ -653,7 +663,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _currentQuestionIndex = 0;
     _currentAnalysis = null;
     _lastAnswerRecord = null;
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _analysisLoading = false;
     _answerHistory.clear();
     _answerHistory.length = _quizQuestions.length;
@@ -706,6 +716,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         DebugLogService.instance.log('FSRS', '更新 FSRS 失败: $e');
       }
     }
+    // v1.0.2 FSRS 可见化：提交后重读复习卡（间隔已更新），题号不变才回显
+    if (_currentQuestionIndex == submitIndex) {
+      _currentFsrsCard = await _db.getFSRSCard(submitQid);
+    }
 
     notifyListeners();
   }
@@ -715,7 +729,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 更新路径（不新增记录、不双计会话统计）；此前置 null 会走新增路径
   void resetCurrentAnswer() {
     _lastAnswerRecord = null;
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _currentAnalysis = null;
     _analysisLoading = false;
     notifyListeners();
@@ -840,8 +854,15 @@ void set skipFSRS(bool v) => _skipFSRS = v;
           notifyListeners();
         }
       });
+      // v1.0.2 FSRS 可见化：切题异步读复习卡（竞态守卫）
+      _db.getFSRSCard(qid).then((card) {
+        if (_quizService.currentQuestion?.id == qid) {
+          _currentFsrsCard = card;
+          notifyListeners();
+        }
+      });
     } else {
-      _currentQuestionStats = {};
+      _clearQuestionContext();
     }
   }
 
@@ -854,7 +875,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _quizService.abortSession();
     _currentSession = null;
     _quizQuestions = [];
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _lastAnswerRecord = null;
     notifyListeners();
   }
@@ -868,7 +889,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _quizService.reset();
     _currentSession = null;
     _quizQuestions = [];
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _lastAnswerRecord = null;
     // 已答题 → 今天已刷，续排明天提醒
     try {
@@ -893,7 +914,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _quizQuestions = questions;
     _currentSession = session;
     _currentAnalysis = null;
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _analysisLoading = false;
     _answerHistory.clear();
     _answerHistory.length = questions.length;
@@ -925,6 +946,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 会话关联的题库名（统计页历史副标题用）
   Future<List<String>> getSessionBankNames(int sessionId) =>
       _db.getSessionBankNames(sessionId);
+
+  /// v1.0.2 FSRS 可见化：批量取题目复习卡（错题本知识点弹窗逐题展示用）
+  Future<Map<int, FSRSCardState>> getFsrsCardsByIds(List<int> questionIds) =>
+      _db.getFsrsCardsByIds(questionIds);
 
   Future<void> updateCurrentQuestion(String title, String answer, String? type) async {
     final q = currentQuestion;
@@ -1058,7 +1083,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _currentQuestionIndex = 0;
     _currentAnalysis = null;
     _lastAnswerRecord = null;
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _answerHistory.clear();
     _answerHistory.length = _quizQuestions.length;
 

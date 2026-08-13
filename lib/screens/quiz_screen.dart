@@ -7,6 +7,7 @@ import '../models/question.dart';
 import '../services/app_state.dart';
 import '../services/quiz_service.dart';
 import '../services/theme_service.dart';
+import '../utils/format_utils.dart';
 import '../widgets/ai_response_widget.dart';
 import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
@@ -508,7 +509,9 @@ class _QuizScreenState extends State<QuizScreen> {
               const Spacer(),
               if (stats.isNotEmpty)
                 Text(
-                  '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%',
+                  '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%'
+                  // v1.0.2 FSRS 可见化：答完题展示下次复习时间
+                  '${appState.currentFsrsCard != null ? ' · 下次复习：${relativeDayLabel(appState.currentFsrsCard!.nextReviewAt)}' : ''}',
                   style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
             ],
