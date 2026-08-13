@@ -1216,6 +1216,19 @@ class DatabaseService {
     final simCardIds = <int>{};
     final simBookmarkIds = <int>{};
 
+    // v1.0.2 设计审查修复：预取真实复习卡/收藏的题号集合。
+    // 此前模拟对已有复习卡直接 replace（覆盖真实复习进度）、对已有收藏
+    // 仍记入锚点，导致「清除模拟数据」按题号删除时误删用户真实收藏/复习卡。
+    // 现在：模拟遇到已有真实数据的题一律跳过，锚点只记模拟真正新建的条目
+    final existingCardIds = <int>{
+      for (final r in await db.rawQuery('SELECT question_id FROM fsrs_cards'))
+        r['question_id'] as int,
+    };
+    final existingBookmarkIds = <int>{
+      for (final r in await db.rawQuery('SELECT question_id FROM error_book'))
+        r['question_id'] as int,
+    };
+
     final anchor = DateTime.now().subtract(Duration(days: days - 1));
     final rng = Random(20260808); // 固定种子 → 同一题库下重复执行数据量一致
 
@@ -1276,18 +1289,27 @@ class DatabaseService {
           });
           recordCount++;
           if (!isCorrect) {
-            // 答错的题自动进错题本并建复习卡
-            simCardIds.add(q.id!);
-            await txn.insert('fsrs_cards', {
-              ...FSRSService.initCard(q.id!, DateTime(d.year, d.month, d.day))
-                  .toMap(),
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
-            cardCount++;
-            simBookmarkIds.add(q.id!);
-            await txn.insert('error_book', {
-              'question_id': q.id!,
-              'added_at': DateTime.now().toIso8601String(),
-            }, conflictAlgorithm: ConflictAlgorithm.ignore);
+            // 答错的题自动进错题本并建复习卡。
+            // v1.0.2 设计审查修复：已有真实复习卡/收藏的题跳过（不覆盖、
+            // 不记锚点），否则「清除模拟数据」会误删用户真实数据。
+            // 插入后同步更新内存集合：同一题多次答错只建一次卡/收藏
+            if (!existingCardIds.contains(q.id)) {
+              existingCardIds.add(q.id!);
+              simCardIds.add(q.id!);
+              await txn.insert('fsrs_cards', {
+                ...FSRSService.initCard(q.id!, DateTime(d.year, d.month, d.day))
+                    .toMap(),
+              });
+              cardCount++;
+            }
+            if (!existingBookmarkIds.contains(q.id)) {
+              existingBookmarkIds.add(q.id!);
+              simBookmarkIds.add(q.id!);
+              await txn.insert('error_book', {
+                'question_id': q.id!,
+                'added_at': DateTime.now().toIso8601String(),
+              });
+            }
           }
         }
       }

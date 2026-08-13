@@ -324,9 +324,23 @@ void main() {
     // 幂等：再次清除无操作
     expect(await db.clearSimulatedData(), 0);
 
-    // 场景2：无模拟锚点时，用户真实收藏与复习卡不受影响
+    // 场景2：真实收藏与复习卡**先于模拟存在**（v1.0.2 设计审查回归：
+    // 此前模拟会把已有复习卡 replace 覆盖、把已有收藏记入锚点，
+    // 「清除模拟数据」按题号删除会误删真实错题数据）
     await db.addToErrorBook(qs[0].id!);
     await db.upsertFSRSCard(FSRSService.initCard(qs[0].id!, DateTime.now()));
+    final cardBefore = await db.getFSRSCard(qs[0].id!);
+    final r2 = await db.simulateLongTermUse(days: 30);
+    expect(r2.error, isNull);
+    // 模拟期间真实复习卡不被覆盖
+    final cardDuring = await db.getFSRSCard(qs[0].id!);
+    expect(cardDuring, isNotNull);
+    expect(cardDuring!.reviewCount, cardBefore!.reviewCount);
+    await db.clearSimulatedData();
+    // 清除模拟数据后真实收藏与复习卡仍在
+    expect(await db.isInErrorBook(qs[0].id!), isTrue);
+    expect(await db.getFSRSCard(qs[0].id!), isNotNull);
+    // 无模拟锚点时再次清除仍不影响真实数据
     await db.clearSimulatedData();
     expect(await db.isInErrorBook(qs[0].id!), isTrue);
     expect(await db.getFSRSCard(qs[0].id!), isNotNull);
