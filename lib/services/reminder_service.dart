@@ -179,7 +179,7 @@ class ReminderService {
     );
     await _notifications.zonedSchedule(
       alarmId,
-      '呆猫刷题宝',
+      '猫卷',
       await _buildReminderText(),
       tz.TZDateTime.from(target, tz.local),
       details,
@@ -201,7 +201,7 @@ class ReminderService {
     if (await FlutterForegroundTask.isRunningService) return;
     final hitokoto = await _fetchHitokoto();
     await FlutterForegroundTask.startService(
-      notificationTitle: '呆猫刷题宝',
+      notificationTitle: '猫卷',
       notificationText: hitokoto,
       callback: _foregroundCallback,
     );
@@ -256,7 +256,7 @@ class ReminderService {
     await prefs.setBool('$_notifiedKeyPrefix${dateKeyOf(now)}', true);
     await _notifications.show(
       notifyId,
-      '呆猫刷题宝',
+      '猫卷',
       await _buildReminderText(),
       const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -302,7 +302,7 @@ class ReminderService {
     if (!await hasNotificationPermission()) return false;
     await _notifications.show(
       9999,
-      '呆猫刷题宝',
+      '猫卷',
       '这是一条测试通知，说明提醒渠道工作正常 ✅',
       const NotificationDetails(
         android: AndroidNotificationDetails(

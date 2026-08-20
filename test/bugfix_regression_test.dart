@@ -136,7 +136,7 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('bank_import');
     final file = File('${dir.path}/multi.json');
     await file.writeAsString('''{
-  "format": "daimao-flashcard-questions",
+  "format": "maojuan-quiz-questions",
   "name": "多选",
   "questions": [
     {"title": "q1", "options": ["A. 甲", "B. 乙", "C. 丙"],
@@ -158,6 +158,31 @@ void main() {
     expect(QuizService.judgeAnswer(qs[0], 'A,C'), isTrue);
     expect(QuizService.judgeAnswer(qs[0], 'C,A'), isTrue);
     expect(QuizService.judgeAnswer(qs[0], 'A,B'), isFalse);
+    try {
+      dir.deleteSync(recursive: true);
+    } catch (_) {}
+  });
+
+  test('改名兼容：旧 format 标记（daimao-flashcard-questions）文件仍可导入', () async {
+    final dir = Directory.systemTemp.createTempSync('legacy_format');
+    final file = File('${dir.path}/legacy.json');
+    await file.writeAsString('''{
+  "format": "daimao-flashcard-questions",
+  "name": "旧版导出",
+  "questions": [
+    {"title": "q1", "correct_answer": "A"}
+  ]
+}''');
+    final (groups, err) = await BankFileService.parseJsonFile(file.path);
+    expect(err, isNull);
+    expect(groups.keys.first, '旧版导出');
+    expect(groups.values.first.length, 1);
+    // 缺标记文件仍拒绝
+    final bad = File('${dir.path}/bad.json');
+    await bad.writeAsString(
+        '{"name":"无标记","questions":[{"title":"q","correct_answer":"A"}]}');
+    final (_, err2) = await BankFileService.parseJsonFile(bad.path);
+    expect(err2, isNotNull);
     try {
       dir.deleteSync(recursive: true);
     } catch (_) {}
@@ -246,6 +271,19 @@ void main() {
     // v1 密文（XOR）仍能解
     final v1Cipher = _xorEncrypt('sk-legacy-key-123');
     expect(KeyCrypto.decrypt(v1Cipher), 'sk-legacy-key-123');
+  });
+
+  test('KeyCrypto 改名 v3：新密文 round-trip + 旧 v2 密文仍可解（数据兼容）', () {
+    // v3 round-trip
+    final v3 = KeyCrypto.encrypt('sk-v3-roundtrip-key');
+    expect(v3, startsWith('v3:'));
+    expect(KeyCrypto.decrypt(v3), 'sk-v3-roundtrip-key');
+    // v2 历史密文（改名前的算法 + 旧盐生成，升级后必须仍能解出）
+    const v2Legacy = 'v2:RGZ98RP7rJLCUvIURRbYfRvegORpfMyV8eD0397wpai2DU9EY37/+yjR6yupIvGh';
+    expect(KeyCrypto.decrypt(v2Legacy), 'sk-test-renaming-123');
+    // 篡改检测：v3 密文被改一个字符 → 解出空串
+    final tampered = 'v3:RGZ98RP7rJLCUvIURRbYfRvegORpfMyV8eD0397wpai2DU9EY37/+yjR6yupIvGh';
+    expect(KeyCrypto.decrypt(tampered), isEmpty);
   });
 
   test('重新作答：更新原记录不新增，会话统计差量修正', () async {

@@ -69,7 +69,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           Text(
                             // v1.0.2 对齐里程碑：昵称（设置后首页显示专属问候）
                             context.watch<AppState>().settings.nickname.isEmpty
-                                ? '呆猫刷题宝'
+                                ? '猫卷'
                                 : context.read<AppState>().settings.nickname,
                             style: TextStyle(
                               fontSize: 14,
@@ -129,7 +129,7 @@ class _ProfileTabState extends State<ProfileTab> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('呆猫刷题宝'),
+        title: const Text('猫卷'),
         content: Text(
           '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：$kAppVersion',
         ),

@@ -10,7 +10,7 @@ import 'package:flutter/services.dart';
 ///   都放行，防篡改形同虚设）；debug 构建放行便于开发
 class TamperCheck {
   /// 官方签名 SHA-256 前 16 位（Base64）。
-  /// 由正式证书（android/app/keystore/刷题宝_正式签名.jks，别名 quiz）计算：
+  /// 由正式证书（android/app/keystore/猫卷_正式签名.jks，别名 quiz）计算：
   /// SHA-256 → Base64 → 取前 16 位（与 MainActivity.getSignatureHash 输出格式一致）
   static const String officialHash = 'Q6ngoZDOGzAlUFW0';
 

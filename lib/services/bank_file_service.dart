@@ -16,6 +16,11 @@ import 'database_service.dart';
 class BankFileService {
   static final DatabaseService _db = DatabaseService.instance;
 
+  /// v1.0.2 改名「猫卷」：导出文件格式标记。
+  /// 导入同时接受旧标记（daimao-flashcard-questions），旧版导出的题库文件仍可导入
+  static const String formatMarker = 'maojuan-quiz-questions';
+  static const String legacyFormatMarker = 'daimao-flashcard-questions';
+
   /// 解析 JSON 文件 → 返回 (组名 → 题目列表, 错误信息)。
   /// v1.0.2 设计审查修复：错误信息随返回值传递
   /// （此前用静态 lastError 全局变量，并发/重入会被覆盖）
@@ -56,8 +61,9 @@ class BankFileService {
       // v1.0.2 对齐里程碑：本软件导出的 .json（format 标记 + questions 数组）→ 单题库；
       // 有 questions 键但缺 format 标记 → 提示缺少 format 标记
       if (data.containsKey('questions')) {
-        if (data['format'] != 'daimao-flashcard-questions') {
-          return (<String, List<Question>>{}, '不是呆猫刷题宝题库文件（缺少 format 标记）');
+        final marker = data['format'];
+        if (marker != formatMarker && marker != legacyFormatMarker) {
+          return (<String, List<Question>>{}, '不是猫卷题库文件（缺少 format 标记）');
         }
         if (data['questions'] is List) {
           final questions = _parseQuestions(data['questions'] as List, now);
@@ -227,7 +233,7 @@ class BankFileService {
           'knowledge_point': q.knowledgePoint,
         }).toList();
     final json = const JsonEncoder.withIndent('  ').convert({
-      'format': 'daimao-flashcard-questions',
+      'format': formatMarker,
       'name': bankName,
       'count': list.length,
       'questions': list,

@@ -1,4 +1,4 @@
-﻿# 呆猫刷题宝 · 基线对照验证（后续每次更新打包后必跑）
+﻿# 猫卷 · 基线对照验证（后续每次更新打包后必跑）
 # 用法: powershell -ExecutionPolicy Bypass -File verify_reference.ps1 [APK路径]
 # 默认取 dist\ 下最新 apk；对照基准: ..\..\reference\
 param([string]$ApkPath = '')

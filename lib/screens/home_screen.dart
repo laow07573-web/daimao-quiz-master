@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        title: const Text('呆猫刷题宝',
+        title: const Text('猫卷',
             style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
@@ -220,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '呆猫刷题宝',
+                      '猫卷',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,

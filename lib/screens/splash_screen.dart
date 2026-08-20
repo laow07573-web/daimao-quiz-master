@@ -68,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 20),
             // 软件名字
             Text(
-              '呆猫刷题宝',
+              '猫卷',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,

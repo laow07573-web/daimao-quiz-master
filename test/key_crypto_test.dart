@@ -5,16 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flashcard_app/services/key_crypto.dart';
 
 void main() {
-  group('KeyCrypto AES-256-GCM v2', () {
+  group('KeyCrypto AES-256-GCM v3（改名「猫卷」新盐）', () {
     test('加解密往返', () {
       const plain = 'sk-abc1234567890';
       final enc = KeyCrypto.encrypt(plain);
       expect(KeyCrypto.decrypt(enc), plain);
     });
 
-    test('密文带 v2: 前缀', () {
+    test('密文带 v3: 前缀', () {
       final enc = KeyCrypto.encrypt('hello-world');
-      expect(enc.startsWith('v2:'), isTrue);
+      expect(enc.startsWith('v3:'), isTrue);
     });
 
     test('两次加密密文不同（随机 nonce）', () {
@@ -28,8 +28,16 @@ void main() {
       final enc = KeyCrypto.encrypt('secret-api-key');
       final bytes = base64Decode(enc.substring(3));
       bytes[bytes.length - 1] ^= 0x01; // 翻转 tag 的一位
-      final tampered = 'v2:' + base64Encode(bytes);
+      final tampered = 'v3:' + base64Encode(bytes);
       expect(KeyCrypto.decrypt(tampered), isEmpty);
+    });
+
+    test('v2 旧盐密文仍可解（改名升级兼容）', () {
+      // 由改名前的 encrypt('sk-test-renaming-123') 生成的真实 v2 密文，
+      // 升级后解密链必须仍能解出（旧盐仅保留解密路径）
+      const v2Legacy =
+          'v2:RGZ98RP7rJLCUvIURRbYfRvegORpfMyV8eD0397wpai2DU9EY37/+yjR6yupIvGh';
+      expect(KeyCrypto.decrypt(v2Legacy), 'sk-test-renaming-123');
     });
 
     test('v1 XOR 旧格式仍可解（兼容回退）', () {

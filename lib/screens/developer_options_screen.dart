@@ -212,7 +212,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
       return;
     }
     try {
-      await Share.shareXFiles([XFile(path)], subject: '呆猫刷题宝数据库备份');
+      await Share.shareXFiles([XFile(path)], subject: '猫卷数据库备份');
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
       if (!mounted) return;

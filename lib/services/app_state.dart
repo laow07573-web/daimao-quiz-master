@@ -1133,7 +1133,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
           'knowledge_point': q.knowledgePoint,
         }).toList();
     final json = const JsonEncoder.withIndent('  ').convert({
-      'format': 'daimao-flashcard-questions',
+      'format': BankFileService.formatMarker,
       'name': '错题导出_${DateTime.now().millisecondsSinceEpoch}',
       'count': list.length,
       'questions': list,

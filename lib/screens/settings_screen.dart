@@ -902,7 +902,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             final file = await DebugLogService.instance.exportToFile();
                             if (mounted) {
                               await Share.shareXFiles(
-                                [XFile(file.path)], subject: '呆猫刷题宝调试日志',
+                                [XFile(file.path)], subject: '猫卷调试日志',
                               );
                             }
                           } catch (e) {

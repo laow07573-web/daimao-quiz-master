@@ -79,7 +79,7 @@ class DebugLogService {
     final file = File('${dir.path}/debug_log_$timestamp.txt');
 
     final buffer = StringBuffer();
-    buffer.writeln('=== 呆猫刷题宝 调试日志 ===');
+    buffer.writeln('=== 猫卷 调试日志 ===');
     buffer.writeln('导出时间: ${DateTime.now().toIso8601String()}');
     buffer.writeln('条目数: ${_entries.length}');
     // v1.0.2 七项改进：导出脱敏（作答内容与 AI 响应原文已隐藏）
@@ -97,7 +97,7 @@ class DebugLogService {
 
   String exportToString() {
     final buffer = StringBuffer();
-    buffer.writeln('=== 呆猫刷题宝 调试日志 ===');
+    buffer.writeln('=== 猫卷 调试日志 ===');
     buffer.writeln('导出时间: ${DateTime.now().toIso8601String()}');
     buffer.writeln('条目数: ${_entries.length}');
     // v1.0.2 七项改进：导出脱敏（作答内容与 AI 响应原文已隐藏）

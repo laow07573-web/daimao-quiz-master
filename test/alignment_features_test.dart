@@ -266,7 +266,7 @@ void main() {
     final file = File(
         '${Directory.systemTemp.path}/test_export_${DateTime.now().millisecondsSinceEpoch}.json');
     await file.writeAsString(
-        '{"format":"daimao-flashcard-questions","name":"错题导出_1","count":1,"questions":[{"title":"q1","options":[],"correct_answer":"A","analysis":null,"question_type":"single_choice","knowledge_point":"血液"}]}');
+        '{"format":"maojuan-quiz-questions","name":"错题导出_1","count":1,"questions":[{"title":"q1","options":[],"correct_answer":"A","analysis":null,"question_type":"single_choice","knowledge_point":"血液"}]}');
 
     final (groups, err) = await BankFileService.parseJsonFile(file.path);
     expect(err, isNull);
@@ -308,7 +308,7 @@ void main() {
     final exported = await BankFileService.exportBank(bankId, bank.name, dest);
     expect(exported, isNotNull);
     final raw = await File(exported!).readAsString();
-    expect(raw, contains('"format": "daimao-flashcard-questions"'));
+    expect(raw, contains('"format": "maojuan-quiz-questions"'));
     expect(raw, contains('"name": "导出测试题库"'));
     expect(raw, contains('"knowledge_point": "细菌的形态结构"'));
     expect(raw, contains('"analysis": "解析内容"'));

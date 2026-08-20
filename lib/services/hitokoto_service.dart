@@ -38,7 +38,7 @@ class HitokotoService {
     try {
       final resp = await http
           .get(Uri.parse('https://v1.hitokoto.cn/?c=k&c=i&c=d'), headers: {
-        'User-Agent': 'daimao-flashcard/1.0',
+        'User-Agent': 'maojuan-quiz/1.0',
       }).timeout(const Duration(seconds: 5));
       if (resp.statusCode != 200) return null;
       final data = jsonDecode(utf8.decode(resp.bodyBytes));

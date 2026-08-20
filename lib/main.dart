@@ -193,7 +193,7 @@ class FlashcardApp extends StatelessWidget {
             ? Brightness.light
             : Brightness.dark;
     return MaterialApp(
-      title: '呆猫刷题宝',
+      title: '猫卷',
       debugShowCheckedModeBanner: false,
       theme: theme,
       darkTheme: themeService.darkThemeData,

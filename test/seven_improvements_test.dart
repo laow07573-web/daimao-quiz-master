@@ -121,7 +121,7 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('seven_dup');
     final path = '${dir.path}/dup_${DateTime.now().millisecondsSinceEpoch}.json';
     await File(path).writeAsString(
-        '{"format":"daimao-flashcard-questions","name":"临床检验","count":1,'
+        '{"format":"maojuan-quiz-questions","name":"临床检验","count":1,'
         '"questions":[{"title":"q1","correct_answer":"A"}]}');
     final (banks1, _, err1, renamed1) =
         await BankFileService.importJsonFile(path);

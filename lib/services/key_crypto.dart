@@ -4,27 +4,33 @@ import 'dart:typed_data';
 
 import 'package:pointycastle/export.dart';
 
-/// API Key 加密（v1.0.2 升级：AES-256-GCM）
+/// API Key 加密（v1.0.2 升级：AES-256-GCM；改名「猫卷」后换新盐 v3）
 ///
-/// 密文格式（v2）：`v2:` + base64(nonce12 ‖ ciphertext ‖ tag16)
+/// 密文格式（v3）：`v3:` + base64(nonce12 ‖ ciphertext ‖ tag16)
 /// 密钥 = 固定盐经 SHA-256 派生（与 v1 的固定种子同级别的"混淆级"设计）
 ///
-/// 解密回退链：v2 → v1 XOR（严格 base64 字符集校验）→ 明文（旧数据兼容）
+/// 解密回退链：v3（新盐）→ v2（旧盐，升级前已存密文）→ v1 XOR
+/// （严格 base64 字符集校验）→ 明文（旧数据兼容）
 /// 篡改检测：GCM MAC 校验失败返回空串
 class KeyCrypto {
   static const _seed = 0x5EEDC0DE;
 
-  // ---------------- v2: AES-256-GCM ----------------
+  // ---------------- v3: AES-256-GCM（猫卷新盐） ----------------
 
-  static const _v2Prefix = 'v2:';
+  static const _v3Prefix = 'v3:';
   static const _nonceLen = 12;
   static const _tagLen = 16;
-  static const _salt = 'daimao-quiz-flashcard-salt-v2';
+  static const _v3Salt = 'maojuan-quiz-salt-v3';
+
+  // ---------------- v2: 旧盐（仅用于解密升级前的历史密文） ----------------
+
+  static const _v2Prefix = 'v2:';
+  static const _v2LegacySalt = 'daimao-quiz-flashcard-salt-v2';
 
   /// 密钥 = 盐 SHA-256 派生
-  static Uint8List _deriveKey() {
+  static Uint8List _deriveKey(String salt) {
     final digest = SHA256Digest();
-    var input = Uint8List.fromList(utf8.encode(_salt));
+    var input = Uint8List.fromList(utf8.encode(salt));
     // 多轮哈希增强（轻量 KDF）
     for (var i = 0; i < 1000; i++) {
       input = digest.process(input);
@@ -66,31 +72,26 @@ class KeyCrypto {
 
   static String encrypt(String plain) {
     if (plain.isEmpty) return '';
-    final key = _deriveKey();
+    final key = _deriveKey(_v3Salt);
     final nonce = _randomBytes(_nonceLen);
     final ciphertext = _aesGcmEncrypt(key, nonce, Uint8List.fromList(utf8.encode(plain)));
     final combined = Uint8List(_nonceLen + ciphertext.length)
       ..setRange(0, _nonceLen, nonce)
       ..setRange(_nonceLen, _nonceLen + ciphertext.length, ciphertext);
-    return _v2Prefix + base64.encode(combined);
+    return _v3Prefix + base64.encode(combined);
   }
 
   static String decrypt(String encoded) {
     if (encoded.isEmpty) return '';
 
-    // v2: AES-256-GCM
+    // v3: 猫卷新盐（当前版本加密格式）
+    if (encoded.startsWith(_v3Prefix)) {
+      return _gcmDecode(encoded.substring(_v3Prefix.length), _v3Salt) ?? '';
+    }
+
+    // v2: 旧盐（改名前的历史密文，回退解密保证已存数据可读）
     if (encoded.startsWith(_v2Prefix)) {
-      final raw = _tryBase64(encoded.substring(_v2Prefix.length));
-      if (raw == null || raw.length < _nonceLen + _tagLen) return '';
-      final nonce = Uint8List.sublistView(raw, 0, _nonceLen);
-      final body = Uint8List.sublistView(raw, _nonceLen);
-      final plain = _aesGcmDecrypt(_deriveKey(), nonce, body);
-      if (plain == null) return ''; // 篡改检测：MAC 校验失败返回空串
-      try {
-        return utf8.decode(plain);
-      } catch (_) {
-        return '';
-      }
+      return _gcmDecode(encoded.substring(_v2Prefix.length), _v2LegacySalt) ?? '';
     }
 
     // v1: XOR（严格 base64 字符集校验，防止把明文当密文解）
@@ -114,6 +115,21 @@ class KeyCrypto {
 
     // 旧版明文 Key，直接返回
     return encoded;
+  }
+
+  /// GCM 密文体（不含前缀）按指定盐解密；失败（MAC 校验/格式/编码）返回 null
+  static String? _gcmDecode(String body, String salt) {
+    final raw = _tryBase64(body);
+    if (raw == null || raw.length < _nonceLen + _tagLen) return null;
+    final nonce = Uint8List.sublistView(raw, 0, _nonceLen);
+    final ciphertextAndTag = Uint8List.sublistView(raw, _nonceLen);
+    final plain = _aesGcmDecrypt(_deriveKey(salt), nonce, ciphertextAndTag);
+    if (plain == null) return null; // MAC 校验失败或数据损坏
+    try {
+      return utf8.decode(plain);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 可读性校验：控制字符/替换符比例低（用于区分 v1 XOR 解出的真实 key 与乱码）
