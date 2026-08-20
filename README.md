@@ -2,7 +2,7 @@
 那可以试试使用deepcode深度开发的猫卷
 # 猫卷
 
-DeepSeek AI 驱动的本地刷题助手 · 支持单选/多选/判断/填空/名解/简答/问答 · Windows + Android 双端
+DeepSeek AI 驱动的本地刷题助手 · 支持单选/多选/判断/填空/名解/简答/问答 · Android 端
 
 本软件由 B站 **笨蛋鱼坏蛋猫** 开发
 
@@ -43,11 +43,6 @@ DeepSeek AI 驱动的本地刷题助手 · 支持单选/多选/判断/填空/名
 ---
 
 ## 安装
-
-### Windows
-
-1. 下载 `猫卷.zip` 解压
-2. 双击 `flashcard_app.exe` 运行
 
 ### Android
 
@@ -116,7 +111,6 @@ Flutter 3.24 · SQLite · DeepSeek API · Provider · FSRS-5 · SharedPreference
 
 ```bash
 flutter pub get
-flutter build windows --release
 flutter build apk --release --obfuscate --split-debug-info=build/debug-info
 ```
 

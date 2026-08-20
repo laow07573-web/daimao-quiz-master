@@ -29,6 +29,8 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
+    // 桌面分支仅保留给测试宿主（flutter test 在 Windows 上运行需要 FFI）。
+    // 正式产品只做 Android，无需此分支的发布形态
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;

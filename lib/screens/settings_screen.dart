@@ -961,7 +961,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   _HelpItem(
                     icon: Icons.phone_android,
-                    text: '支持 Windows 和 Android 双平台运行',
+                    // v1.0.2 只做 Android 端（Windows 平台工程已移除）
+                    text: '支持 Android 端使用',
                     cs: cs,
                   ),
                 ],

@@ -1,5 +1,5 @@
 ﻿name: flashcard_app
-description: 刷题软件 - 支持本地题库、AI解析、数据统计的跨平台刷题工具
+description: 猫卷 - 本地题库、AI解析、间隔复习的 Android 刷题工具
 publish_to: 'none'
 version: 1.26.6+17
 
