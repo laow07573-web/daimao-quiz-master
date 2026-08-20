@@ -105,7 +105,7 @@ $chunk
       "correct_answer": "A/B/C/D/对/错/填空答案",
       "question_type": "single_choice/multi_choice/true_false/fill_blank/ming_jie/jian_da/jie_da",
       "analysis": "如果原文有解析则提取，否则留空",
-      "knowledge_point": "该题所属的教材章节级知识点，如'细菌的形态结构'"
+      "knowledge_point": "该题所属的教材章节级知识点，如'解剖学'"
     }
   ]
 }
@@ -118,7 +118,7 @@ $chunk
 5. 名词解释：question_type="ming_jie"，options 为空 []，correct_answer 为完整释义段落
 6. 简答题：question_type="jian_da"，options 为空 []，correct_answer 为参考答案段落
 7. 问答题：question_type="jie_da"，options 为空 []，correct_answer 为参考答案段落
-8. knowledge_point 命名规范：统一用教材章节式命名（如"细菌的形态结构""消毒灭菌""免疫应答"），不要用自由短语或长句，控制在10字以内
+8. knowledge_point 命名规范：统一用教材章节式命名（如"解剖学""生理学""病理学"），不要用自由短语或长句，控制在10字以内
 9. 原文中的解析内容请保留到 analysis 字段
 10. 只返回 JSON，不要任何其他文字
 
@@ -357,7 +357,7 @@ ${question.optionsWithLabels.join('\n')}
   Future<String> tagKnowledgePoint(Question question) async {
     final prompt = '''请判断下面这道题属于哪个教材章节级知识点。
 按以下格式回复（直接说知识点名，不说题库名）：
-1. 只输出一个章节级知识点名称（如"细菌的形态结构""消毒灭菌""免疫应答"）
+1. 只输出一个章节级知识点名称（如"解剖学""生理学""病理学"）
 2. 控制在10字以内，不要加引号、标点或解释
 3. 若无法判断，输出"其他"
 

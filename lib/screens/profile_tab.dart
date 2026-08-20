@@ -131,7 +131,8 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (ctx) => AlertDialog(
         title: const Text('猫卷'),
         content: Text(
-          '医学检验考试刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：$kAppVersion',
+          // v1.0.2 定位：医学生备考（未来拓展通用场景）
+          '医学备考刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：$kAppVersion',
         ),
         actions: [
           TextButton(

@@ -1406,8 +1406,9 @@ class DatabaseService {
     final anchor = DateTime.now().subtract(Duration(days: days - 1));
     final rng = Random(20260808); // 固定种子 → 同一题库下重复执行数据量一致
 
-    // 随机 1~2 个知识点作为薄弱点（若启用）：给部分题打标签
-    const kpPool = ['细菌的形态结构', '消毒灭菌', '免疫应答', '临床检验基础', '血液学检验'];
+    // 随机 1~2 个知识点作为薄弱点（若启用）：给部分题打标签。
+    // v1.0.2 定位调整：医学课程知识点（医学生通用，不再绑定具体专业）
+    const kpPool = ['解剖学', '生理学', '病理学', '药理学', '内科学'];
     final weakKps = randomWeakKp
         ? (kpPool.toList()..shuffle(rng)).take(rng.nextInt(2) + 1).toList()
         : <String>[];
