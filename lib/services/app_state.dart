@@ -5,6 +5,7 @@ import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
+import '../models/follow_up_message.dart';
 import '../models/app_settings.dart';
 import 'database_service.dart';
 import 'doc_parser_service.dart';
@@ -76,10 +77,17 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   FSRSCardState? _currentFsrsCard;
   FSRSCardState? get currentFsrsCard => _currentFsrsCard;
 
-  /// 清空当前题上下文（单题统计 + 复习卡）
+  // v1.0.2 聊天气泡式追问：当前题追问历史（用户/AI 消息）
+  List<FollowUpMessage> _followUpHistory = [];
+  List<FollowUpMessage> get followUpHistory => _followUpHistory;
+  bool _followUpLoading = false;
+  bool get followUpLoading => _followUpLoading;
+
+  /// 清空当前题上下文（单题统计 + 复习卡 + 追问历史）
   void _clearQuestionContext() {
     _currentQuestionStats = {};
     _currentFsrsCard = null;
+    _followUpHistory = [];
   }
 
   // 首页统计
@@ -780,6 +788,22 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 手动查看解析
   Future<void> showAnalysis() async {
     await _loadAnalysis();
+    await _loadFollowUpHistory();
+  }
+
+  /// 加载当前题的追问历史（聊天气泡式）
+  Future<void> _loadFollowUpHistory() async {
+    final q = currentQuestion;
+    if (q?.id == null) {
+      if (_followUpHistory.isNotEmpty) {
+        _followUpHistory = [];
+        notifyListeners();
+      }
+      return;
+    }
+    final rows = await _db.getFollowUpMessages(q!.id!);
+    _followUpHistory = rows.map(FollowUpMessage.fromMap).toList();
+    notifyListeners();
   }
 
   /// 重新生成解析（清除缓存）
@@ -793,18 +817,35 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _loadAnalysis();
   }
 
-  /// 追问题目
-  Future<String> askFollowUp(String question) async {
-    if (_aiService == null || currentQuestion == null) return '';
-    if (_currentAnalysis == null) return '';
-    final result = await _aiService!.askFollowUp(
-      currentQuestion!,
-      _currentAnalysis!,
-      question,
-    );
-    // v1.0.2 对齐里程碑：失败统一提示
-    if (_isAiError(result)) return '追问失败，请检查网络后重试。';
-    return result;
+  /// 追问题目（聊天气泡式：用户消息与 AI 回复均入历史并持久化）
+  Future<void> sendFollowUp(String question) async {
+    final q = currentQuestion;
+    if (_aiService == null || q?.id == null || _currentAnalysis == null) return;
+    if (_followUpLoading) return; // 发送中防重复
+    _followUpLoading = true;
+
+    final qId = q!.id!;
+    final userMsg = FollowUpMessage(role: 'user', content: question);
+    _followUpHistory = [..._followUpHistory, userMsg];
+    notifyListeners();
+    await _db.saveFollowUpMessage(qId, 'user', question);
+
+    var reply = '';
+    try {
+      reply = await _aiService!.askFollowUp(q, _currentAnalysis!, question);
+    } catch (e) {
+      DebugLogService.instance.log('AI', '追问失败: $e');
+    }
+    if (_isAiError(reply)) reply = '追问失败，请检查网络后重试。';
+
+    _followUpLoading = false;
+    // 竞态保护：期间切题则不再插入当前 UI 历史（数据库已按捕获题号保存）
+    if (currentQuestion?.id == qId) {
+      final aiMsg = FollowUpMessage(role: 'assistant', content: reply);
+      _followUpHistory = [..._followUpHistory, aiMsg];
+      notifyListeners();
+    }
+    await _db.saveFollowUpMessage(qId, 'assistant', reply);
   }
 
   void nextQuestion() {

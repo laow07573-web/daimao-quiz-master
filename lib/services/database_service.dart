@@ -52,7 +52,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 8,
+      version: 9,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -213,6 +213,21 @@ class DatabaseService {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_session_questions_session '
           'ON session_questions(session_id)');
     }
+    if (oldVersion < 9) {
+      // v1.0.2 聊天气泡式追问：每道题的追问历史（用户/AI 消息持久化）
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS follow_up_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          question_id INTEGER NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_follow_up_question '
+          'ON follow_up_messages(question_id)');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -335,6 +350,20 @@ class DatabaseService {
 
     await db.execute('CREATE INDEX idx_session_questions_session '
         'ON session_questions(session_id)');
+
+    // v1.0.2 聊天气泡式追问：每道题的追问历史（用户/AI 消息持久化）
+    await db.execute('''
+      CREATE TABLE follow_up_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('CREATE INDEX idx_follow_up_question '
+        'ON follow_up_messages(question_id)');
   }
 
   // ======================== QuestionBank CRUD ========================
@@ -490,6 +519,33 @@ class DatabaseService {
       ORDER BY sq.position
     ''', [sessionId]);
     return rows.map((m) => Question.fromMap(m)).toList();
+  }
+
+  // ======================== 追问消息（聊天气泡式持久化） ========================
+
+  /// 保存一条追问消息（role: 'user' | 'assistant'）
+  Future<void> saveFollowUpMessage(
+      int questionId, String role, String content) async {
+    final db = await database;
+    await db.insert('follow_up_messages', {
+      'question_id': questionId,
+      'role': role,
+      'content': content,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// 某题的追问历史（按时间正序，最多 50 条）
+  Future<List<Map<String, dynamic>>> getFollowUpMessages(
+      int questionId) async {
+    final db = await database;
+    return await db.query(
+      'follow_up_messages',
+      where: 'question_id = ?',
+      whereArgs: [questionId],
+      orderBy: 'created_at ASC, id ASC',
+      limit: 50,
+    );
   }
 
   /// 某会话的全部作答记录（question_id → 记录，断点续刷恢复历史用）
@@ -1578,7 +1634,7 @@ class DatabaseService {
       tmpDb = await databaseFactory.openDatabase(filePath);
       final versionRows = await tmpDb.rawQuery('PRAGMA user_version');
       final version = versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
-      if (version < 1 || version > 8) {
+      if (version < 1 || version > 9) {
         // user_version 0/非法：非本 App 生成或版本被外部重置，导入后会触发
         // onUpgrade(0→8) 破坏性重建清空题目，拒绝导入
         return '文件不是有效的数据库备份（版本信息缺失或非法）';
