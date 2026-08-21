@@ -344,8 +344,21 @@ class _QuizScreenState extends State<QuizScreen> {
                         // v1.0.2 统一重构：练习模式选项区恒可修改（不显示判定结果）
                         if (_isMemorizeMode)
                           _buildMemorizeOptions(question, cs, appState)
-                        else if (isPractice || !isAnswered)
-                          ...[_buildOptionsArea(appState, question, cs)]
+                        else if (isPractice || !isAnswered) ...[
+                          _buildOptionsArea(appState, question, cs),
+                          // v1.0.2 UI 审查修复：未作答时下方大片空白，
+                          // 加轻提示引导答题
+                          if (!isPractice && !isAnswered) ...[
+                            const SizedBox(height: 20),
+                            Center(
+                              child: Text(
+                                '点击选项提交答案，答对自动进入下一题',
+                                style: TextStyle(
+                                    fontSize: 12, color: cs.onSurfaceVariant),
+                              ),
+                            ),
+                          ],
+                        ]
                         else ...[
                           _buildAnsweredResult(appState, question, cs),
                           const SizedBox(height: 12),
@@ -861,10 +874,11 @@ class _QuizScreenState extends State<QuizScreen> {
         }
       }
       if (record != null && record.isCorrect && !appState.isLastQuestion) {
-        // v1.0.2 修复：600ms 延迟自动跳题前比对题号，
+        // v1.0.2 修复：延迟自动跳题前比对题号，
         // 用户在窗口内手动跳题时不重复跳转（避免跳过中间题）
+        // v1.0.2 UI 审查修复：600 → 800ms，给答案反馈留足节奏
         final answeredIndex = appState.currentQuestionIndex;
-        await Future.delayed(const Duration(milliseconds: 600));
+        await Future.delayed(const Duration(milliseconds: 800));
         if (mounted && appState.currentQuestionIndex == answeredIndex) {
           _advanceQuestion(appState);
         }
@@ -977,6 +991,9 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildAnsweredResult(AppState appState, Question question, ColorScheme cs) {
     final qt = question.questionType;
+    // v1.0.2 UI 审查修复：对/错反馈统一用语义色 success(绿)/danger(红)，
+    // 原 tertiary/error 在部分主题下呈现粉紫/橙，与"绿对红错"心智不符
+    final ac = AppThemeColors.of(context);
     if (qt == 'fill_blank' || qt == 'true_false') {
       final lastRecord = appState.lastAnswerRecord;
       final userAnswer = lastRecord?.userAnswer ?? '';
@@ -987,9 +1004,9 @@ class _QuizScreenState extends State<QuizScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isCorrect ? cs.tertiaryContainer : cs.errorContainer,
+          color: isCorrect ? ac.successContainer : ac.dangerContainer,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isCorrect ? cs.tertiary : cs.error),
+          border: Border.all(color: isCorrect ? ac.success : ac.danger),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -997,31 +1014,31 @@ class _QuizScreenState extends State<QuizScreen> {
             Row(
               children: [
                 Icon(isCorrect ? Icons.check_circle : Icons.cancel,
-                    color: isCorrect ? cs.tertiary : cs.error, size: 20),
+                    color: isCorrect ? ac.success : ac.danger, size: 20),
                 const SizedBox(width: 8),
                 Text(isCorrect ? '回答正确' : '回答错误',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: isCorrect ? cs.onTertiaryContainer : cs.onErrorContainer)),
+                        color: isCorrect ? ac.success : ac.danger)),
               ],
             ),
             const SizedBox(height: 10),
             if (qt == 'fill_blank') ...[
               Text('你的答案: $userAnswer',
-                  style: TextStyle(fontSize: 14, color: isCorrect ? cs.onTertiaryContainer : cs.onErrorContainer)),
+                  style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : ac.danger)),
               if (!isCorrect) ...[
                 const SizedBox(height: 4),
                 Text('正确答案: $correctAnswer',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: cs.tertiary)),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ac.success)),
               ],
             ],
             if (qt == 'true_false') ...[
               Text('你选择了: ${userAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
-                  style: TextStyle(fontSize: 14, color: isCorrect ? cs.onTertiaryContainer : cs.onErrorContainer)),
+                  style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : ac.danger)),
               if (!isCorrect)
                 Text('正确答案: ${correctAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: cs.tertiary)),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ac.success)),
             ],
           ],
         ),
@@ -1041,6 +1058,9 @@ class _QuizScreenState extends State<QuizScreen> {
     final options = question.options;
     if (options.isEmpty) return const SizedBox.shrink();
 
+    // v1.0.2 UI 审查修复：正确/错误高亮统一 success(绿)/danger(红) 语义色
+    final ac = AppThemeColors.of(context);
+
     return Column(
       children: options.asMap().entries.map((entry) {
         final idx = entry.key;
@@ -1052,13 +1072,13 @@ class _QuizScreenState extends State<QuizScreen> {
         Color textColor = cs.onSurface;
         Color borderColor = cs.outlineVariant;
         if (isCorrect) {
-          bgColor = cs.tertiaryContainer;
-          textColor = cs.onTertiaryContainer;
-          borderColor = cs.tertiary;
+          bgColor = ac.successContainer;
+          textColor = ac.success;
+          borderColor = ac.success;
         } else if (isUserWrong) {
-          bgColor = cs.errorContainer;
-          textColor = cs.onErrorContainer;
-          borderColor = cs.error;
+          bgColor = ac.dangerContainer;
+          textColor = ac.danger;
+          borderColor = ac.danger;
         }
 
         return Padding(
@@ -1076,7 +1096,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 Container(
                   width: 26, height: 26,
                   decoration: BoxDecoration(
-                    color: isCorrect ? cs.tertiary : isUserWrong ? cs.error : cs.outlineVariant,
+                    color: isCorrect ? ac.success : isUserWrong ? ac.danger : cs.outlineVariant,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -1105,16 +1125,18 @@ class _QuizScreenState extends State<QuizScreen> {
     final correct = question.correctAnswer;
     final user = lastRecord.userAnswer;
     DebugLogService.instance.logResultFeedback(correct, user ?? 'null');
+    // v1.0.2 UI 审查修复：tertiary/error → success/danger（绿对红错语义）
+    final ac = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('正确答案: $correct',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.tertiary)),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: ac.success)),
         const SizedBox(height: 4),
         // v1.0.2 设计审查修复：答对时"你的答案"不再恒显示错误红色
         Text('你的答案: $user',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
-              color: lastRecord.isCorrect ? cs.tertiary : cs.error)),
+              color: lastRecord.isCorrect ? ac.success : ac.danger)),
       ],
     );
   }
@@ -1452,7 +1474,15 @@ class _QuizScreenState extends State<QuizScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: Icon(_inErrorBook ? Icons.bookmark : Icons.bookmark_border, size: 17),
-                    label: Text(_inErrorBook ? '已收藏' : '错题本', style: const TextStyle(fontSize: 13)),
+                    // v1.0.2 UI 审查修复：单行不换行 + 紧凑内边距（竖排问题）
+                    label: Text(_inErrorBook ? '已收藏' : '错题本',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: const TextStyle(fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: () async {
                       final q = appState.currentQuestion;
                       if (q?.id != null) {
@@ -1470,9 +1500,12 @@ class _QuizScreenState extends State<QuizScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.arrow_back, size: 18),
-                      label: const Text('上一题', style: TextStyle(fontSize: 14)),
+                      label: const Text('上一题',
+                          maxLines: 1, softWrap: false, style: TextStyle(fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: cs.onSurfaceVariant,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
                       ),
                       onPressed: () {
                         if (_submitting) return; // 提交期间禁切题
@@ -1493,7 +1526,12 @@ class _QuizScreenState extends State<QuizScreen> {
                       if (_submitting) return; // 提交期间禁切题
                       _advanceQuestion(appState);
                     },
-                    child: const Text('下一题', style: TextStyle(fontSize: 16)),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('下一题',
+                        maxLines: 1, softWrap: false, style: TextStyle(fontSize: 16)),
                   ),
                 ),
               ],

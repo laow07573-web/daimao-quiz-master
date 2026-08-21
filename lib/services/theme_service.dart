@@ -86,6 +86,12 @@ class ThemeService extends ChangeNotifier {
         AppTheme.oceanGalaxy => '碧海银河',
       };
 
+  /// v1.0.2 UI 审查修复：主题选择行的三色预览（导航/背景/强调）
+  static List<Color> previewColorsOf(AppTheme t) {
+    final c = _colorsOf(t);
+    return [c.navBar, c.background, c.accent];
+  }
+
   // ======================== 5 套主题配色（设计稿） ========================
 
   static AppThemeColors _colorsOf(AppTheme t) => switch (t) {

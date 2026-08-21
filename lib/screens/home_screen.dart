@@ -554,7 +554,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _QuickActionTile(
           icon: Icons.replay_rounded,
           label: '错题本',
-          subtitle: '使用 FSRS 算法全权生成',
+          // v1.0.2 UI 审查修复：文案生硬 → 直白说明功能
+          subtitle: '智能排期，只显示应复习的错题',
           iconColor: cs.error,
           cs: cs,
           onTap: () =>

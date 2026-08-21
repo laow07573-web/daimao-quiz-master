@@ -248,6 +248,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 6),
                   TextField(
                     controller: _endpointController,
+                    // v1.0.2 UI 审查修复：长 API 地址单行截断，
+                    // 改为最多 2 行换行完整显示
+                    minLines: 1,
+                    maxLines: 2,
+                    keyboardType: TextInputType.url,
                     decoration: InputDecoration(
                       hintText: AppSettings.defaultApiEndpoint,
                       border: OutlineInputBorder(
@@ -744,10 +749,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(children: [
                     ...AppTheme.values.map((t) {
                       final label = ThemeService.labelOf(t);
+                      // v1.0.2 UI 审查修复：主题选择行加三色预览
+                      // （导航/背景/强调），降低切换决策成本
+                      final previews = ThemeService.previewColorsOf(t);
                       return RadioListTile<AppTheme>(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: Text(label, style: const TextStyle(fontSize: 14)),
+                        title: Row(
+                          children: [
+                            ...previews.map((c) => Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: c,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.black.withOpacity(0.15),
+                                          width: 0.8),
+                                    ),
+                                  ),
+                                )),
+                            const SizedBox(width: 6),
+                            Text(label, style: const TextStyle(fontSize: 14)),
+                          ],
+                        ),
                         value: t,
                         groupValue: themeService.current,
                         onChanged: (v) => themeService.switchTo(v!),
@@ -794,6 +821,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
+                // v1.0.2 UI 审查修复：星际穿越等主题下卡片与页面背景
+                // 对比微弱，加细边框分隔
+                border: Border.all(color: cs.outlineVariant),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -841,7 +871,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.file_download, size: 16),
-                          label: const Text('导出日志文件', style: TextStyle(fontSize: 13)),
+                          // v1.0.2 UI 审查修复：短文案 + 单行 + 紧凑，
+                          // 原"导出日志文件"在窄按钮内换行两行
+                          label: const Text('导出日志',
+                              maxLines: 1,
+                              softWrap: false,
+                              style: TextStyle(fontSize: 13)),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            visualDensity: VisualDensity.compact,
+                          ),
                           onPressed: () async {
                             try {
                               if (!DebugLogService.instance.enabled) {

@@ -34,9 +34,11 @@ class MonthCalendar extends StatelessWidget {
   /// 热力色阶（与首页/统计页统一口径）
   static Color heatColor(int total, ColorScheme cs) {
     if (total <= 0) return cs.surfaceContainerHighest.withOpacity(0.55);
-    if (total < 50) return cs.primary.withOpacity(0.2);
-    if (total < 200) return cs.primary.withOpacity(0.4);
-    return cs.primary.withOpacity(0.65);
+    // v1.0.2 UI 审查修复：加深色阶（0.2/0.4/0.65 → 0.28/0.52/0.85），
+    // 浅色主题下「少/达标/多」区分度不足
+    if (total < 50) return cs.primary.withOpacity(0.28);
+    if (total < 200) return cs.primary.withOpacity(0.52);
+    return cs.primary.withOpacity(0.85);
   }
 
   @override
@@ -115,7 +117,8 @@ class MonthCalendar extends StatelessWidget {
         child: Text(
           '$day',
           style: TextStyle(
-            fontSize: 10,
+            // v1.0.2 UI 审查修复：10 → 11，三列月历可读性
+            fontSize: 11,
             fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
             color: isVacation
                 ? cs.onErrorContainer

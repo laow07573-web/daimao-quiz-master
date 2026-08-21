@@ -113,6 +113,35 @@ class _ProfileTabState extends State<ProfileTab> {
             onTap: () => _showAbout(context),
           ),
           const SizedBox(height: 20),
+          // v1.0.2 UI 审查修复：入口下方补产品定位卡，消除下半屏空白
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('猫卷 · 医学备考刷题平台',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: cs.onSurface)),
+                const SizedBox(height: 6),
+                Text(
+                  '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧',
+                  style: TextStyle(
+                      fontSize: 12,
+                      height: 1.7,
+                      color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           Center(
             child: Text(
               // v1.0.2 对齐里程碑：页脚带版本号

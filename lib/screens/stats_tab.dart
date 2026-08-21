@@ -253,7 +253,8 @@ class StatsTabState extends State<StatsTab> {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (var m = 0; m < 3; m++)
+                      for (var m = 0; m < 3; m++) ...[
+                        if (m > 0) const SizedBox(width: 6),
                         Expanded(
                           child: MonthCalendar(
                             year: year,
@@ -263,12 +264,13 @@ class StatsTabState extends State<StatsTab> {
                             todayKey: todayKey,
                             heatColors: [
                               ac.cardBorder,
-                              ac.accent.withOpacity(0.18),
-                              ac.accent.withOpacity(0.4),
-                              ac.accent.withOpacity(0.65),
+                              ac.accent.withOpacity(0.28),
+                              ac.accent.withOpacity(0.52),
+                              ac.accent.withOpacity(0.85),
                             ],
                           ),
                         ),
+                      ],
                     ],
                   );
                 },

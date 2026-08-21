@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../services/hitokoto_service.dart';
+import '../services/theme_service.dart';
 import 'main_shell.dart';
 
 /// 启动闪屏页（v1.0.2 对齐原版设计：App Logo + 标题 + 今日一言 + 加载圈）
@@ -22,8 +23,8 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _loadHitokoto();
-    // 固定 2 秒自动进入主界面
-    _timer = Timer(const Duration(seconds: 2), _enterApp);
+    // v1.0.2 UI 审查修复：固定 2 秒 → 1.4 秒（启动更快，避免等待感）
+    _timer = Timer(const Duration(milliseconds: 1400), _enterApp);
   }
 
   Future<void> _loadHitokoto() async {
@@ -47,9 +48,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    // v1.0.2 UI 审查修复：浅色主题下白底闪屏与白底 logo 融合不可辨，
+    // 改为导航色深底 + 浅色文字；浅色导航主题（护眼/极简）向黑加深
+    final ac = AppThemeColors.of(context);
+    final nav = ac.navBar;
+    final bg = ThemeData.estimateBrightnessForColor(nav) == Brightness.light
+        ? Color.lerp(nav, Colors.black, 0.35)!
+        : nav;
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: bg,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -62,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 width: 96,
                 height: 96,
                 errorBuilder: (_, __, ___) =>
-                    Icon(Icons.school, size: 88, color: cs.primary),
+                    Icon(Icons.school, size: 88, color: Colors.white),
               ),
             ),
             const SizedBox(height: 20),
@@ -72,14 +79,14 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: cs.onSurface,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 12),
             // 今日一言
             Text(
               '今日一言',
-              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6)),
             ),
             const SizedBox(height: 6),
             Padding(
@@ -91,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
-                  color: cs.onSurfaceVariant,
+                  color: Colors.white.withOpacity(0.85),
                   height: 1.5,
                 ),
               ),
@@ -100,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(
               width: 28,
               height: 28,
-              child: CircularProgressIndicator(strokeWidth: 3),
+              child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
             ),
           ],
         ),

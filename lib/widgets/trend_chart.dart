@@ -98,14 +98,16 @@ class _TrendChartState extends State<TrendChart> {
   }
 
   double get _chartMax {
-    // v1.0.2 UI 设计稿：左侧 Y 轴固定 0-100 刻度（打卡线 50 恒在图内，
-    // 数据全为 0 时柱子贴合底边）；数据超过 100 时自适应上扩
+    // v1.0.2 UI 审查修复：原固定 0-100 轴使 2~30 题的小量柱仅有数像素、
+    // 图表观感"空白"；改为下限 20 的自适应轴，小数据量时柱高可见，
+    // 数据超过 100 时仍自适应上扩。
     var maxTotal = 1.0;
     for (final d in widget.days) {
       final t = (d['total'] as int?) ?? 0;
       if (t > maxTotal) maxTotal = t.toDouble();
     }
-    return math.max(100.0, maxTotal * 1.15);
+    if (maxTotal <= 0) return 100.0;
+    return math.max(20.0, maxTotal * 1.15);
   }
 
   @override
