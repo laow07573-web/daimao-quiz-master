@@ -1324,7 +1324,7 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() async {
     final db = await database;
     return await db.rawQuery('''
-      SELECT q.knowledge_point as kp, COUNT(ar.id) as total,
+      SELECT q.knowledge_point as name, COUNT(ar.id) as total,
              SUM(CASE WHEN ar.is_correct = 1 THEN 1 ELSE 0 END) as correct
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id

@@ -144,7 +144,22 @@ class StatsTabState extends State<StatsTab> {
                   'accuracy': b.accuracy,
                 })
             .toList();
-        _kpAccuracy = kps;
+        // v1.0.2 修复：按知识点排行键名归一（UI 读 name/accuracy），
+        // 缺失知识点兜底「未打标签」，total=0 不除零
+        _kpAccuracy = kps
+            .map((k) {
+              final total = (k['total'] as num?) ?? 0;
+              final correct = (k['correct'] as num?) ?? 0;
+              return {
+                'name': (k['name'] as String?)?.trim().isNotEmpty ?? false
+                    ? k['name'] as String
+                    : '未打标签',
+                'total': total,
+                'correct': correct,
+                'accuracy': total > 0 ? correct / total * 100 : 0.0,
+              };
+            })
+            .toList();
         _errorStats = errors;
         _recentSessions = sessions;
         _sessionBankNames = bankNames;
