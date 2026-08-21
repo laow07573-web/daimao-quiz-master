@@ -24,9 +24,10 @@ class AiResponseWidget extends StatelessWidget {
     final spans = <InlineSpan>[];
 
     for (final rawLine in _sanitize(text).split('\n')) {
-      var line = rawLine;
+      // v1.0.2 UI 审查修复：AI 常返回缩进嵌套列表（"  - A. xxx"），
+      // 去掉前导空白后再匹配，避免 "- " 原样残留
+      var line = rawLine.replaceFirst(RegExp(r'^\s+'), '');
       if (line.isEmpty) {
-        spans.add(TextSpan(text: '\n'));
         continue;
       }
       var leading = '';
