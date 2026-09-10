@@ -19,11 +19,11 @@
   --bg:#070A14; --bg2:#0C1120; --surface:rgba(255,255,255,.035);
   --surface2:rgba(255,255,255,.06); --line:rgba(255,255,255,.09);
   --tx:#EEF2FA; --tx2:#9AA6BF; --tx3:#6B7794;
-  --c1:#2563EB;  /* 品牌鲜明 */
-  --c2:#4A7A5D;  /* 护眼柔和 */
+  --c1:#2563EB;  /* 清蓝 */
+  --c2:#2F7D5B;  /* 松绿 */
   --c3:#2DA8A6;  /* 极简 */
-  --c4:#7C3AED;  /* 星际穿越 */
-  --c5:#4C7CD6;  /* 碧海银河 */
+  --c4:#5B9BFF;  /* 清蓝-dark */
+  --c5:#4ECDC4;  /* 墨黑 */
   --ok:#22C55E; --warn:#F59E0B; --dan:#EF4444;
   --r:20px;
 }
@@ -294,14 +294,11 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 [data-mock]{position:absolute;inset:0;opacity:0;transition:opacity .85s ease}
 [data-mock].on{opacity:1}
 .mscr{position:absolute;inset:0;overflow:hidden;background:var(--m-bg,#F0F4F8)}
-/* 5 套主题 token（浅色，取自 lib/services/theme_service.dart） */
-.mscr[data-t="brand"]{--m-nav:#1E3A5F;--m-bg:#F0F4F8;--m-accent:#2563EB;--m-card:#fff;--m-bd:#D9E2EC;--m-s2:#E8EDF4;--m-navfg:#fff}
-.mscr[data-t="eyeCare"]{--m-nav:#DAE1D4;--m-bg:#FAFAF9;--m-accent:#4A7A5D;--m-card:#fff;--m-bd:#E4E8E0;--m-s2:#EDF1EC;--m-navfg:#1F2933}
-.mscr[data-t="minimal"]{--m-nav:#E4ECF3;--m-bg:#F9FAFB;--m-accent:#2DA8A6;--m-card:#fff;--m-bd:#E5EBF0;--m-s2:#E9F2F2;--m-navfg:#1F2933}
-.mscr[data-t="starVoyage"]{--m-nav:#1E1B4B;--m-bg:#F5F3FF;--m-accent:#7C3AED;--m-card:#fff;--m-bd:#DDD6FE;--m-s2:#ECE8FA;--m-navfg:#fff}
-.mscr[data-t="oceanGalaxy"]{--m-nav:#1A253E;--m-bg:#F0F4F9;--m-accent:#4C7CD6;--m-card:#fff;--m-bd:#DDE6F2;--m-s2:#E6EDF6;--m-navfg:#fff}
-/* 深色变体（品牌-dark） */
-.mscr[data-dark="1"]{--m-nav:#4344B8;--m-bg:#14151F;--m-accent:#8B8CF8;--m-card:#1F2030;--m-bd:#2C2D42;--m-s2:#232538;--m-navfg:#fff;--m-fg:#E7EAF3;--m-fg2:#9AA3B8}
+/* 3 套主题 token（Mao Des，取自 lib/services/theme_service.dart） */
+.mscr[data-t="clear"]{--m-nav:#FFFFFF;--m-bg:#F5F7FA;--m-accent:#2563EB;--m-card:#FFFFFF;--m-bd:#E2E8F0;--m-s2:#EDF1F7;--m-navfg:#111827;--m-fg:#111827;--m-fg2:#566072;--m-fg3:#8A94A6}
+.mscr[data-t="sage"]{--m-nav:#FFFFFF;--m-bg:#F6F8F5;--m-accent:#2F7D5B;--m-card:#FFFFFF;--m-bd:#E1E8DF;--m-s2:#EDF2EC;--m-navfg:#1A211C;--m-fg:#1A211C;--m-fg2:#556057;--m-fg3:#8A948C}
+.mscr[data-t="ink"]{--m-nav:#FFFFFF;--m-bg:#FAF8F4;--m-accent:#1F6F5C;--m-card:#FFFFFF;--m-bd:#E6E1D7;--m-s2:#F1EEE7;--m-navfg:#17181A;--m-fg:#17181A;--m-fg2:#565A60;--m-fg3:#8C9098}
+.mscr[data-dark="1"]{--m-nav:#151D2E;--m-bg:#0B1220;--m-accent:#5B9BFF;--m-card:#151D2E;--m-bd:#2A3549;--m-s2:#1D2739;--m-navfg:#F1F4F9;--m-fg:#F1F4F9;--m-fg2:#A3AEC2;--m-fg3:#6F7C93}
 .mscr{--m-ok:#15803D;--m-okbg:#DCFCE7;--m-bad:#B91C1C;--m-badbg:#FEE2E2;--m-warn:#F59E0B;--m-fg:#1F2933;--m-fg2:#6B7280}
 .mscr[data-dark="1"]{--m-ok:#4ADE80;--m-okbg:#14532D;--m-bad:#F87171;--m-badbg:#7F1D1D}
 
@@ -324,8 +321,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .mstat .bat i{position:absolute;left:1.2px;top:1.2px;bottom:1.2px;width:10px;background:currentColor;border-radius:1.5px}
 
 /* —— 导航栏 —— */
-.mapp{height:50px;flex:0 0 50px;display:flex;align-items:center;gap:8px;padding:0 14px;
-  background:var(--m-nav);color:var(--m-navfg)}
+.mapp{height:50px;flex:0 0 50px;display:flex;align-items:center;gap:8px;padding:0 16px;
+  background:var(--m-nav);color:var(--m-navfg);
+  border-bottom:1px solid var(--m-bd)}
 .mapp b{font-size:19px;font-weight:600;letter-spacing:.3px}
 .mapp .sp{flex:1}
 .mapp .ic{width:22px;height:22px;display:grid;place-items:center;opacity:.95}
@@ -341,7 +339,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .mbody[data-pan]::-webkit-scrollbar{display:none}
 
 /* —— Hero 问候卡 —— */
-.mhero{border-radius:16px;padding:20px 22px;color:#fff;
+.mhero{border-radius:18px;padding:20px;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.07);
   background:linear-gradient(135deg,color-mix(in srgb,var(--m-accent) 92%,#000),color-mix(in srgb,var(--m-accent) 72%,#000))}
 .mhero .hi{font-size:20px;font-weight:600}
 .mhero .hn{font-size:13px;opacity:.85;margin-top:2px}
@@ -353,7 +351,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* —— 通用卡片 —— */
-.mcard{background:var(--m-card);border:1px solid var(--m-bd);border-radius:16px;padding:14px}
+.mcard{background:var(--m-card);border:1px solid var(--m-bd);border-radius:18px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
 .mch{display:flex;align-items:center;gap:8px}
 .mch .v4{width:4px;height:18px;border-radius:2px;background:var(--m-accent)}
 .mch b{font-size:16px;font-weight:600}
@@ -388,7 +386,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 /* —— 三指标 —— */
 .m3{display:flex;gap:10px}
-.m3>div{flex:1;background:var(--m-s2);border-radius:12px;padding:12px 10px;text-align:center}
+.m3>div{flex:1;background:var(--m-card);border:1px solid var(--m-bd);border-radius:14px;padding:12px 10px;text-align:center}
 .m3 b{display:block;font-size:16px;font-weight:700;color:var(--m-accent)}
 .m3 em{font-size:11.5px;color:var(--m-fg2);font-style:normal}
 
@@ -396,7 +394,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .mqt{font-size:16px;font-weight:600;margin-bottom:-2px}
 .mq{display:flex;flex-direction:column;gap:10px}
 .mqi{display:flex;align-items:center;gap:12px;background:var(--m-card);border:1px solid var(--m-bd);
-  border-radius:12px;padding:13px 14px}
+  border-radius:14px;padding:14px 16px}
 .mqi .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:0 0 38px}
 .mqi .tx{flex:1;min-width:0}
 .mqi .tx b{display:block;font-size:15px;font-weight:600}
@@ -410,15 +408,15 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .mnav>div.on{color:var(--m-accent);font-weight:600}
 
 /* —— 题目卡 —— */
-.mqcard{background:var(--m-s2);border-radius:16px;padding:16px}
-.mtag{display:inline-block;font-size:13px;font-weight:500;color:var(--m-accent);
-  background:color-mix(in srgb,var(--m-accent) 12%,transparent);border-radius:4px;padding:3px 8px}
+.mqcard{background:var(--m-s2);border-radius:18px;padding:16px}
+.mtag{display:inline-block;font-size:12px;font-weight:500;color:var(--m-accent);
+  background:var(--m-accent-soft,color-mix(in srgb,var(--m-accent) 12%,transparent));border-radius:6px;padding:3px 8px}
 .mqstat{float:right;font-size:12px;color:var(--m-fg2);margin-top:3px}
 .mstem{font-size:15px;font-weight:500;line-height:1.6;margin-top:10px;clear:both}
 
 /* —— 选项 —— */
 .mopts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
-.mopt{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;
+.mopt{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;
   background:var(--m-s2);border:1px solid var(--m-bd)}
 .mopt .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:0 0 28px;
   font-size:14px;font-weight:700;color:var(--m-accent);
@@ -442,11 +440,11 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .mfb .rr{font-size:14px;margin-top:8px}
 .mfb.ok .rr{color:var(--m-ok)}.mfb.bad .rr{color:var(--m-bad)}
 .mbtn{display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;
-  border:1px solid var(--m-bd);border-radius:10px;padding:11px;color:var(--m-accent);
+  border:1px solid var(--m-bd);border-radius:14px;padding:12px;color:var(--m-accent);
   background:var(--m-card);font-weight:500}
 
 /* —— AI 解析卡 —— */
-.mai{background:var(--m-s2);border-radius:12px;padding:14px}
+.mai{background:var(--m-s2);border-radius:14px;padding:16px}
 .maih{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:var(--m-accent)}
 .maih .sp{flex:1}
 .mtxt{font-size:13px;line-height:1.6;margin-top:10px;color:var(--m-fg)}
@@ -467,9 +465,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 [data-anim] .mbub{opacity:0;transform:translateY(10px) scale(.97)}
 [data-anim] .mbub.in{opacity:1;transform:none}
 .mbub.u{align-self:flex-end;background:var(--m-accent);color:#fff;
-  border-bottom-right-radius:4px}
+  border-bottom-right-radius:6px}
 .mbub.a{align-self:flex-start;background:var(--m-s2);color:var(--m-fg);
-  border-bottom-left-radius:4px}
+  border-bottom-left-radius:6px}
 .mbub.a b{color:var(--m-accent)}
 .minrow{display:flex;gap:8px;align-items:center;margin-top:10px}
 .minput{flex:1;border:1px solid var(--m-bd);border-radius:8px;padding:9px 12px;
@@ -534,7 +532,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 首页 -->
 <template id="tpl-home">
-<div class="mscr" data-t="brand">
+<div class="mscr" data-t="clear">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
@@ -574,7 +572,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 答题页（已作答：正确绿 / 错选红） -->
 <template id="tpl-quiz">
-<div class="mscr" data-t="brand" data-compact="1">
+<div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span>
@@ -613,7 +611,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- AI 解析 + 追问聊天 -->
 <template id="tpl-ai">
-<div class="mscr" data-t="brand" data-compact="1">
+<div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span><span class="pill">背题模式</span></div>
@@ -641,7 +639,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 统计页 -->
 <template id="tpl-stats">
-<div class="mscr" data-t="brand">
+<div class="mscr" data-t="clear">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b>统计</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4"/></svg></span></div>
@@ -701,7 +699,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 错题本 -->
 <template id="tpl-errbook">
-<div class="mscr" data-t="brand" data-compact="1">
+<div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg></span></div>
@@ -745,7 +743,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 导入题库 -->
 <template id="tpl-import">
-<div class="mscr" data-t="brand" data-compact="1">
+<div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b style="font-size:18px">导入题库</b></div>
@@ -783,7 +781,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 深色主题首页 -->
 <template id="tpl-home-dark">
-<div class="mscr" data-t="brand" data-dark="1">
+<div class="mscr" data-t="clear" data-dark="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat" style="color:#E7EAF3"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
@@ -848,7 +846,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <span class="slogan-chip">🔁 FSRS-5 间隔复习</span>
       <span class="slogan-chip">✍️ 手写批注</span>
       <span class="slogan-chip">📊 学习数据可视化</span>
-      <span class="slogan-chip">🌙 5 套主题 + 深色</span>
+      <span class="slogan-chip">🌙 3 套主题 + 深色</span>
     </div>
     <div class="btn-row">
       <a class="btn btn-p" href="#download">📱 立即下载体验</a>
@@ -1229,10 +1227,10 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 <div class="feat" id="f10">
   <div class="f-text reveal">
     <div class="f-no">功能 10</div>
-    <h3>五套主题，<em>加上各自的深色版</em></h3>
+    <h3>三套主题，<em>每套都有深色版</em></h3>
     <p class="f-desc">长时间刷题，界面得顺眼。五套配色风格各配一套深色变体，可跟随系统自动切换。</p>
     <ul class="f-list">
-      <li><b>五种风格</b>：品牌鲜明 / 护眼柔和 / 极简 / 星际穿越 / 碧海银河</li>
+      <li><b>三种风格</b>：清蓝（清爽专业）/ 松绿（护眼低疲劳）/ 墨黑（深色优先）</li>
       <li><b>深色模式</b>：每套主题都有深色变体，跟随系统 / 手动切换</li>
       <li><b>全局统一</b>：切换即时生效，所有页面同步换肤</li>
       <li><b>语义色体系</b>：对错用固定的成功 / 危险色，任何主题下判断一致</li>
@@ -1243,17 +1241,15 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
         <dt>用什么</dt>
         <dd>Flutter Material 3 的 <code>ColorScheme.fromSeed</code> 以强调色为种子生成完整配色；主题扩展 <code>ThemeExtension&lt;AppThemeColors&gt;</code> 承载语义色；选择持久化到 <code>SharedPreferences</code>。</dd>
         <dt>怎么做</dt>
-        <dd>① 5 套主题 × 浅色/深色 = <b>10 套色板</b>，各自定义导航色、背景、强调色、卡片与描边；② 页面<b>禁止硬编码色值</b>，一律通过语义取色（导航、背景、强调、成功、危险、警告），从根本上杜绝"换了主题某处看不清楚"；③ 判断题的对错用固定的成功/危险语义色，<b>不随主题偏移</b>，保证"绿对红错"的认知一致；④ 深色变体由种子色自动派生，配色关系可控。</dd>
+        <dd>① 每套主题<b>显式定义 12 个语义色位</b>（背景/表面/描边/三级文字/强调/语义色），不再依赖 Material 自动生成 —— 从根上消除"色相过载"；② 页面<b>禁止硬编码色值</b>，一律语义取色，杜绝"换主题某处看不清"；③ 判断题对错用固定的成功/危险色，<b>不随主题偏移</b>，保证"绿对红错"认知一致；④ 全套组件（按钮/输入框/弹窗/导航/卡片）统一组件主题，视觉语言一致。</dd>
       </dl>
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:22px">
     <div class="themes">
-      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1E3A5F,#2563EB)"></div><div class="nm">品牌鲜明</div></div>
-      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#DAE1D4,#4A7A5D)"></div><div class="nm">护眼柔和</div></div>
-      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#E4ECF3,#2DA8A6)"></div><div class="nm">极简</div></div>
-      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1E1B4B,#7C3AED)"></div><div class="nm">星际穿越</div></div>
-      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1A253E,#4C7CD6)"></div><div class="nm">碧海银河</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#F5F7FA,#2563EB)"></div><div class="nm">清蓝</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#F6F8F5,#2F7D5B)"></div><div class="nm">松绿</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#FAF8F4,#1F6F5C)"></div><div class="nm">墨黑</div></div>
     </div>
     <div style="display:flex;gap:14px;align-items:flex-start">
       <div class="phone" style="--ar:390/867;width:min(210px,56vw)">
