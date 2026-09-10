@@ -461,8 +461,11 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 /* —— 追问气泡 —— */
 .mbubs{display:flex;flex-direction:column;gap:8px}
 .mbub{max-width:82%;padding:10px 12px;border-radius:16px;font-size:12.5px;line-height:1.55;
-  opacity:0;transform:translateY(10px) scale(.97);transition:.55s cubic-bezier(.22,1,.36,1)}
+  opacity:1;transform:none;transition:.55s cubic-bezier(.22,1,.36,1)}
 .mbub.in{opacity:1;transform:none}
+/* JS 接管后（data-anim）才从隐藏态播放，无 JS 时内容依然可见 */
+[data-anim] .mbub{opacity:0;transform:translateY(10px) scale(.97)}
+[data-anim] .mbub.in{opacity:1;transform:none}
 .mbub.u{align-self:flex-end;background:var(--m-accent);color:#fff;
   border-bottom-right-radius:4px}
 .mbub.a{align-self:flex-start;background:var(--m-s2);color:var(--m-fg);
@@ -473,6 +476,19 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   font-size:13px;color:var(--m-fg2);background:var(--m-card)}
 .msend{background:var(--m-accent);color:#fff;border-radius:8px;padding:9px 14px;
   font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px}
+
+
+/* 紧凑模式：让内容略高的界面（答题/AI/导入/错题本）完整装下不裁切 */
+.mscr[data-compact] .mbody{gap:9px;padding:11px}
+.mscr[data-compact] .mqcard{padding:13px}
+.mscr[data-compact] .mopts{gap:7px;margin-top:11px}
+.mscr[data-compact] .mopt{padding:11px 13px}
+.mscr[data-compact] .mfb{padding:11px 13px}
+.mscr[data-compact] .mai{padding:12px}
+.mscr[data-compact] .mtxt{margin-top:8px;font-size:12.5px;line-height:1.55}
+.mscr[data-compact] .mbtn{padding:10px}
+.mscr[data-compact] .mstem{font-size:14.5px;line-height:1.5;margin-top:9px}
+.mscr[data-compact] .mcard{padding:11px}
 
 /* —— 统计页 —— */
 .mseg{display:flex;gap:8px}
@@ -558,7 +574,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 答题页（已作答：正确绿 / 错选红） -->
 <template id="tpl-quiz">
-<div class="mscr" data-t="brand">
+<div class="mscr" data-t="brand" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span>
@@ -597,7 +613,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- AI 解析 + 追问聊天 -->
 <template id="tpl-ai">
-<div class="mscr" data-t="brand">
+<div class="mscr" data-t="brand" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span><span class="pill">背题模式</span></div>
@@ -685,7 +701,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 错题本 -->
 <template id="tpl-errbook">
-<div class="mscr" data-t="brand">
+<div class="mscr" data-t="brand" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg></span></div>
@@ -729,7 +745,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- 导入题库 -->
 <template id="tpl-import">
-<div class="mscr" data-t="brand">
+<div class="mscr" data-t="brand" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b style="font-size:18px">导入题库</b></div>
@@ -1531,51 +1547,92 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   }
 
   /* 打字机（AI 解析正文） */
+  /* AI 正文：默认就显示完整内容（保证任何情况下都能看到），
+     进入视口时再用「时间驱动」的打字动画重播一遍（后台标签 timer 节流也不影响最终结果） */
+  function renderFull(box){
+    var plain = (box.dataset.type || '').replace(/\*\*(.+?)\*\*/g, '$1');
+    var esc = function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var html = esc(plain).replace(/\*\*([^*]+)\*\*/g, '<span class="k">$1</span>')
+                         .replace(/\*\*(.+)$/, '<span class="k">$1</span>');
+    box.innerHTML = html.replace(/\n/g, '<br>');
+  }
+
   function typeInto(box){
-    if(box._typed) return; box._typed = true;
-    var html = (box.dataset.type || '')
-      .replace(/\*\*(.+?)\*\*/g, '<span class="k">$1</span>')
-      .replace(/\n/g, '<br>');
-    var i = 0, step = 3;
+    if(box._running) return;
+    box._running = true;
+    var plain = (box.dataset.type || '').replace(/\*\*(.+?)\*\*/g, '$1');
+    var esc = function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var render = function(n){
+      var html = esc(plain.slice(0, n));
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="k">$1</span>');
+      html = html.replace(/\*\*(.+)$/, '<span class="k">$1</span>');
+      return html.replace(/\n/g, '<br>');
+    };
+    var start = Date.now(), DURATION = 1500;      // 1.5 秒打完全文（时间驱动，不受帧率影响）
     (function tick(){
-      i = Math.min(i + step, html.length);
-      box.innerHTML = html.slice(0, i) + (i < html.length ? '<span class="mcur"></span>' : '');
-      if(i < html.length) setTimeout(tick, 22);
+      var p = Math.min(1, (Date.now() - start) / DURATION);
+      var i = Math.round(p * plain.length);
+      if(p >= 1){
+        box._running = false;
+        box.innerHTML = render(plain.length);
+        return;
+      }
+      box.innerHTML = render(i) + '<span class="mcur"></span>';
+      setTimeout(tick, 40);
     })();
   }
 
-  /* 追问气泡依次出现 */
-  function playBubbles(box){
-    if(box._played) return; box._played = true;
+  /* 追问气泡依次出现（可重播） */
+  function playBubbles(box, replay){
+    if(box._timers) box._timers.forEach(clearTimeout);
+    box._timers = [];
+    if(!replay && box._done) return;
     var bs = box.querySelectorAll('.mbub');
-    bs.forEach(function(b, i){
+    box.setAttribute('data-anim', '1');   // 交给 JS 播放（无 JS 时默认可见）
+    bs.forEach(function(b){
       b.classList.remove('in');
-      setTimeout(function(){ b.classList.add('in'); }, i * 560 + 260);
     });
+    bs.forEach(function(b, i){
+      box._timers.push(setTimeout(function(){ b.classList.add('in'); }, i * 560 + 200));
+    });
+    box._done = true;
   }
 
-  /* 激活某个界面时触发其内部动画 */
-  function activate(mock){
+  /* 激活某个界面时触发其内部动画；打字机只播一次（避免反复重启看不到完整内容） */
+  function activate(mock, replay){
     if(!mock) return;
-    var t = mock.querySelector('.mtxt[data-type]');
-    if(t) typeInto(t);
+    // AI 正文：内容已预渲染（始终可见），进入视口时重播一次打字动画
+    mock.querySelectorAll('.mtxt[data-type]').forEach(function(t){
+      if(t._played) return;
+      t._played = true;
+      typeInto(t);
+    });
     var c = mock.querySelector('.mbubs');
-    if(c) playBubbles(c);
-    // 缓慢上下滚动：展示手机框之外的更多内容（模拟真人浏览）
-    mock.querySelectorAll('.mbody[data-pan]').forEach(function(b){
-      if(b._panning) return; b._panning = true;
-      var dir = 1, pos = 0, max = 0;
+    if(c) playBubbles(c, replay);
+    // 所有界面统一缓慢滚动浏览：滚到底停留 1.2s 再回滚，确保底部内容被看到
+    mock.querySelectorAll('.mbody').forEach(function(b){
+      if(b._panning) return;
+      b._panning = true;
+      b.style.overflowY = 'auto';
+      b.style.scrollbarWidth = 'none';
+      b.style.msOverflowStyle = 'none';
+      var dir = 1, pos = 0, hold = 0, started = false;
       function step(){
-        max = b.scrollHeight - b.clientHeight;
-        if(max <= 4){ requestAnimationFrame(step); return; }
-        pos += dir * 0.45;
-        if(pos >= max){ pos = max; dir = -1; }
-        if(pos <= 0){ pos = 0; dir = 1; }
+        var max = b.scrollHeight - b.clientHeight;
+        if(max <= 2){
+          if(!started || Date.now() - started < 3000){ requestAnimationFrame(step); }
+          return;
+        }
+        started = started || Date.now();
+        if(hold > 0){ hold--; requestAnimationFrame(step); return; }
+        pos += dir * 0.4;
+        if(pos >= max){ pos = max; dir = -1; hold = 75; }
+        if(pos <= 0){ pos = 0; dir = 1; hold = 45; }
         b.scrollTop = pos;
         requestAnimationFrame(step);
       }
       b.scrollTop = 0;
-      setTimeout(step, 1400);
+      setTimeout(step, 1200);
     });
   }
 
@@ -1612,28 +1669,39 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     window.addEventListener('resize', fit);
     if(window.ResizeObserver){ new ResizeObserver(fit).observe(host); }
 
-    // 生成月历/图表
+    // 生成月历/图表 + 预渲染 AI 正文（保证内容始终可见）
     screens.forEach(function(m){
       m.querySelectorAll('.mcal').forEach(buildCal);
       m.querySelectorAll('.mchart').forEach(buildChart);
+      m.querySelectorAll('.mtxt[data-type]').forEach(renderFull);
     });
 
     var i = 0;
     screens[0].classList.add('on');
+    // 首屏立即激活（不等观察器），保证动画与滚动一定启动
     activate(screens[0]);
     if(screens.length > 1){
-      setInterval(function(){
-        screens[i].classList.remove('on');
-        i = (i + 1) % screens.length;
-        screens[i].classList.add('on');
-        activate(screens[i]);
-      }, 3000);
+      // 轮播：驻留时间按内容长度动态计算（内容越长看得越久），
+      // 保证每屏都能滚动浏览一遍再切换
+      (function next(){
+        var cur = screens[i];
+        var body = cur.querySelector('.mbody');
+        var overflow = body ? Math.max(0, body.scrollHeight - body.clientHeight) : 0;
+        var stay = 3600 + Math.min(7000, Math.round(overflow / 100 * 1000)) + 1800;
+        setTimeout(function(){
+          cur.classList.remove('on');
+          i = (i + 1) % screens.length;
+          screens[i].classList.add('on');
+          activate(screens[i], true);
+          next();
+        }, stay);
+      })();
     }
   }
 
   document.querySelectorAll('[data-mocks]').forEach(initHost);
 
-  /* 非轮播的独立 mock（如功能区块里的单屏） */
+  /* 非轮播的独立 mock（如功能区块里的单屏）：进入视口时激活动画 */
   document.querySelectorAll('[data-mock]').forEach(function(host){
     var kinds = (host.dataset.mock || '').split(',').filter(Boolean);
     if(!kinds.length) return;
@@ -1649,8 +1717,26 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     if(window.ResizeObserver){ new ResizeObserver(fit).observe(host); }
     m.querySelectorAll('.mcal').forEach(buildCal);
     m.querySelectorAll('.mchart').forEach(buildChart);
+    m.querySelectorAll('.mtxt[data-type]').forEach(renderFull);   // 预渲染，内容始终可见
     m.classList.add('on');
+    // 关键：进入视口才播放（首屏立即，其他滚动到时播放；离开再进入时重播）
+    visible(m, function(){ activate(m, true); });
   });
+
+  /* 进入视口触发（threshold 放宽 + 已在视口内立即执行 + 兜底超时） */
+  function visible(el, cb){
+    var fired = false;
+    function once(){
+      if(fired) return; fired = true; cb();
+    }
+    if(!('IntersectionObserver' in window)){ once(); return; }
+    var io = new IntersectionObserver(function(list){
+      list.forEach(function(e){ if(e.isIntersecting) once(); });
+    }, {threshold: 0.08, rootMargin: '0px 0px -40px 0px'});
+    io.observe(el);
+    // 兜底：无论如何 3.5s 内必播放一次（防止观察器失效导致内容静止）
+    setTimeout(once, 3500);
+  }
 })();
 
 /* ────────── 兼容旧轮播（剩余真实截图区块） ────────── */
