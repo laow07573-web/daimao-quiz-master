@@ -286,6 +286,223 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   *{animation:none!important;transition-duration:.01ms!important}
   .reveal{opacity:1;transform:none}
 }
+
+/* ════════════════════════════════════════════════════════════════
+   重绘 App 界面（纯 HTML/CSS 矢量渲染 —— 无位图，任意缩放不糊、永不裁切）
+   设计基准宽度 390px；--ratio = 该界面宽高比；运行时用 --s 缩放到画框
+   ════════════════════════════════════════════════════════════════ */
+[data-mock]{position:absolute;inset:0;opacity:0;transition:opacity .85s ease}
+[data-mock].on{opacity:1}
+.mscr{position:absolute;inset:0;overflow:hidden;background:var(--m-bg,#F0F4F8)}
+/* 5 套主题 token（浅色，取自 lib/services/theme_service.dart） */
+.mscr[data-t="brand"]{--m-nav:#1E3A5F;--m-bg:#F0F4F8;--m-accent:#2563EB;--m-card:#fff;--m-bd:#D9E2EC;--m-s2:#E8EDF4;--m-navfg:#fff}
+.mscr[data-t="eyeCare"]{--m-nav:#DAE1D4;--m-bg:#FAFAF9;--m-accent:#4A7A5D;--m-card:#fff;--m-bd:#E4E8E0;--m-s2:#EDF1EC;--m-navfg:#1F2933}
+.mscr[data-t="minimal"]{--m-nav:#E4ECF3;--m-bg:#F9FAFB;--m-accent:#2DA8A6;--m-card:#fff;--m-bd:#E5EBF0;--m-s2:#E9F2F2;--m-navfg:#1F2933}
+.mscr[data-t="starVoyage"]{--m-nav:#1E1B4B;--m-bg:#F5F3FF;--m-accent:#7C3AED;--m-card:#fff;--m-bd:#DDD6FE;--m-s2:#ECE8FA;--m-navfg:#fff}
+.mscr[data-t="oceanGalaxy"]{--m-nav:#1A253E;--m-bg:#F0F4F9;--m-accent:#4C7CD6;--m-card:#fff;--m-bd:#DDE6F2;--m-s2:#E6EDF6;--m-navfg:#fff}
+/* 深色变体（品牌-dark） */
+.mscr[data-dark="1"]{--m-nav:#4344B8;--m-bg:#14151F;--m-accent:#8B8CF8;--m-card:#1F2030;--m-bd:#2C2D42;--m-s2:#232538;--m-navfg:#fff;--m-fg:#E7EAF3;--m-fg2:#9AA3B8}
+.mscr{--m-ok:#15803D;--m-okbg:#DCFCE7;--m-bad:#B91C1C;--m-badbg:#FEE2E2;--m-warn:#F59E0B;--m-fg:#1F2933;--m-fg2:#6B7280}
+.mscr[data-dark="1"]{--m-ok:#4ADE80;--m-okbg:#14532D;--m-bad:#F87171;--m-badbg:#7F1D1D}
+
+.mroot{position:absolute;top:0;left:0;width:390px;height:calc(390px / var(--ratio,.45));
+  transform:scale(var(--s,1));transform-origin:top left;display:flex;flex-direction:column;
+  background:var(--m-bg);color:var(--m-fg);overflow:hidden;
+  font-family:"MiSans","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  line-height:1.5;letter-spacing:0;font-weight:400}
+
+/* —— 状态栏 —— */
+.mstat{height:26px;flex:0 0 26px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;font-size:11px;font-weight:600;color:var(--m-fg);opacity:.85}
+.mstat .mi{display:flex;align-items:center;gap:3px}
+.mstat .b{display:flex;align-items:flex-end;gap:1.5px;height:9px}
+.mstat .b i{width:2.5px;background:currentColor;border-radius:1px}
+.mstat .b i:nth-child(1){height:3px}.mstat .b i:nth-child(2){height:5px}
+.mstat .b i:nth-child(3){height:7px}.mstat .b i:nth-child(4){height:9px}
+.mstat .bat{width:17px;height:9px;border:1.2px solid currentColor;border-radius:2.5px;position:relative;opacity:.9}
+.mstat .bat::after{content:"";position:absolute;right:-3px;top:2.4px;width:1.6px;height:4px;background:currentColor;border-radius:0 1px 1px 0}
+.mstat .bat i{position:absolute;left:1.2px;top:1.2px;bottom:1.2px;width:10px;background:currentColor;border-radius:1.5px}
+
+/* —— 导航栏 —— */
+.mapp{height:50px;flex:0 0 50px;display:flex;align-items:center;gap:8px;padding:0 14px;
+  background:var(--m-nav);color:var(--m-navfg)}
+.mapp b{font-size:19px;font-weight:600;letter-spacing:.3px}
+.mapp .sp{flex:1}
+.mapp .ic{width:22px;height:22px;display:grid;place-items:center;opacity:.95}
+.mapp .cnt{font-size:14px;font-weight:600;opacity:.95}
+.mapp .pill{font-size:11px;font-weight:600;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,.22)}
+.mprog{height:4px;flex:0 0 4px;background:var(--m-s2);position:relative}
+.mprog i{position:absolute;left:0;top:0;bottom:0;background:var(--m-accent);border-radius:0 2px 2px 0}
+
+/* —— 内容区（自然裁切，等同真机可视区域） —— */
+.mbody{flex:1;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:12px}
+/* 可滚动浏览（隐藏滚动条，由 JS 缓慢上下平移，展示更多内容） */
+.mbody[data-pan]{overflow-y:auto;-ms-overflow-style:none;scrollbar-width:none}
+.mbody[data-pan]::-webkit-scrollbar{display:none}
+
+/* —— Hero 问候卡 —— */
+.mhero{border-radius:16px;padding:20px 22px;color:#fff;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--m-accent) 92%,#000),color-mix(in srgb,var(--m-accent) 72%,#000))}
+.mhero .hi{font-size:20px;font-weight:600}
+.mhero .hn{font-size:13px;opacity:.85;margin-top:2px}
+.mhero .hr{display:flex;align-items:center;gap:12px;margin-top:14px}
+.mhero .lg{width:42px;height:42px;border-radius:10px;background:#fff;display:grid;place-items:center;
+  font-size:20px;font-weight:700;color:var(--m-accent);flex:0 0 42px}
+.mhero .ht{font-size:15px;font-weight:600}
+.mhero .hq{font-size:13px;opacity:.9;line-height:1.4;margin-top:1px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* —— 通用卡片 —— */
+.mcard{background:var(--m-card);border:1px solid var(--m-bd);border-radius:16px;padding:14px}
+.mch{display:flex;align-items:center;gap:8px}
+.mch .v4{width:4px;height:18px;border-radius:2px;background:var(--m-accent)}
+.mch b{font-size:16px;font-weight:600}
+.mch .sp{flex:1}
+.mch .lk{font-size:12px;color:var(--m-fg2);display:flex;align-items:center;gap:3px}
+
+/* —— 本周战绩双数据块 —— */
+.mduo{display:flex;gap:12px;margin-top:12px}
+.mduo>div{flex:1;background:color-mix(in srgb,var(--m-accent) 7%,transparent);border-radius:10px;
+  padding:12px 0;text-align:center}
+.mduo b{font-size:26px;font-weight:700;color:var(--m-accent);line-height:1.1}
+.mduo s{font-size:13px;color:var(--m-fg2);text-decoration:none}
+.mduo em{display:block;font-size:12px;color:var(--m-fg2);font-style:normal;margin-top:2px}
+
+/* —— 月历热力图 —— */
+.mcal{margin-top:12px}
+.mcalh{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:5px}
+.mcalh s{font-size:11px;font-weight:400;color:var(--m-fg2);text-decoration:none}
+.mcalw{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:9px;
+  color:var(--m-fg2);text-align:center;margin-bottom:3px}
+.mcalg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.mcalg i{aspect-ratio:1;max-height:32px;border-radius:4px;display:grid;place-items:center;
+  font-size:9.5px;font-weight:500;color:var(--m-fg)}
+.mcalg i.e{background:transparent}
+.mcalg i.l0{background:var(--m-bd)}
+.mcalg i.l1{background:color-mix(in srgb,var(--m-accent) 28%,#fff)}
+.mcalg i.l2{background:color-mix(in srgb,var(--m-accent) 52%,#fff);color:#fff}
+.mcalg i.l3{background:color-mix(in srgb,var(--m-accent) 85%,#000);color:#fff}
+.mcalg i.td{box-shadow:inset 0 0 0 1.6px var(--m-accent);font-weight:700}
+.mstreak{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;font-weight:600}
+.mstreak svg{color:var(--m-accent)}
+
+/* —— 三指标 —— */
+.m3{display:flex;gap:10px}
+.m3>div{flex:1;background:var(--m-s2);border-radius:12px;padding:12px 10px;text-align:center}
+.m3 b{display:block;font-size:16px;font-weight:700;color:var(--m-accent)}
+.m3 em{font-size:11.5px;color:var(--m-fg2);font-style:normal}
+
+/* —— 快速操作 —— */
+.mqt{font-size:16px;font-weight:600;margin-bottom:-2px}
+.mq{display:flex;flex-direction:column;gap:10px}
+.mqi{display:flex;align-items:center;gap:12px;background:var(--m-card);border:1px solid var(--m-bd);
+  border-radius:12px;padding:13px 14px}
+.mqi .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:0 0 38px}
+.mqi .tx{flex:1;min-width:0}
+.mqi .tx b{display:block;font-size:15px;font-weight:600}
+.mqi .tx em{font-size:13px;color:var(--m-fg2);font-style:normal;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+
+/* —— 底部导航 —— */
+.mnav{flex:0 0 56px;height:56px;display:flex;background:var(--m-card);border-top:1px solid var(--m-bd)}
+.mnav>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:11px;color:var(--m-fg2)}
+.mnav>div.on{color:var(--m-accent);font-weight:600}
+
+/* —— 题目卡 —— */
+.mqcard{background:var(--m-s2);border-radius:16px;padding:16px}
+.mtag{display:inline-block;font-size:13px;font-weight:500;color:var(--m-accent);
+  background:color-mix(in srgb,var(--m-accent) 12%,transparent);border-radius:4px;padding:3px 8px}
+.mqstat{float:right;font-size:12px;color:var(--m-fg2);margin-top:3px}
+.mstem{font-size:15px;font-weight:500;line-height:1.6;margin-top:10px;clear:both}
+
+/* —— 选项 —— */
+.mopts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.mopt{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;
+  background:var(--m-s2);border:1px solid var(--m-bd)}
+.mopt .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:0 0 28px;
+  font-size:14px;font-weight:700;color:var(--m-accent);
+  background:color-mix(in srgb,var(--m-accent) 12%,transparent)}
+.mopt .tx{font-size:15px;line-height:1.4}
+.mopt.sel{background:color-mix(in srgb,var(--m-accent) 8%,transparent);border:1.5px solid var(--m-accent)}
+.mopt.sel .n{background:var(--m-accent);color:#fff}
+.mopt.ok{background:var(--m-okbg);border:1px solid var(--m-ok)}
+.mopt.ok .n{width:26px;height:26px;flex:0 0 26px;background:var(--m-ok);color:#fff}
+.mopt.ok .tx{color:var(--m-ok);font-size:14px}
+.mopt.bad{background:var(--m-badbg);border:1px solid var(--m-bad)}
+.mopt.bad .n{width:26px;height:26px;flex:0 0 26px;background:var(--m-bad);color:#fff}
+.mopt.bad .tx{color:var(--m-bad);font-size:14px}
+
+/* —— 已答反馈 —— */
+.mfb{border-radius:12px;padding:14px;border:1px solid}
+.mfb.ok{background:var(--m-okbg);border-color:var(--m-ok)}
+.mfb.bad{background:var(--m-badbg);border-color:var(--m-bad)}
+.mfb .tt{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}
+.mfb.ok .tt{color:var(--m-ok)}.mfb.bad .tt{color:var(--m-bad)}
+.mfb .rr{font-size:14px;margin-top:8px}
+.mfb.ok .rr{color:var(--m-ok)}.mfb.bad .rr{color:var(--m-bad)}
+.mbtn{display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;
+  border:1px solid var(--m-bd);border-radius:10px;padding:11px;color:var(--m-accent);
+  background:var(--m-card);font-weight:500}
+
+/* —— AI 解析卡 —— */
+.mai{background:var(--m-s2);border-radius:12px;padding:14px}
+.maih{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:var(--m-accent)}
+.maih .sp{flex:1}
+.mtxt{font-size:13px;line-height:1.6;margin-top:10px;color:var(--m-fg)}
+.mtxt .k{font-weight:600}
+.mtxt ul{margin:2px 0 0;padding:0;list-style:none}
+.mtxt li{padding-left:14px;position:relative}
+.mtxt li::before{content:"•";position:absolute;left:2px}
+.mtxt hr{border:none;border-top:1px solid var(--m-bd);margin:12px 0}
+.mcur{display:inline-block;width:6px;height:12px;background:var(--m-accent);
+  vertical-align:-1px;animation:blink .9s steps(1) infinite}
+
+/* —— 追问气泡 —— */
+.mbubs{display:flex;flex-direction:column;gap:8px}
+.mbub{max-width:82%;padding:10px 12px;border-radius:16px;font-size:12.5px;line-height:1.55;
+  opacity:0;transform:translateY(10px) scale(.97);transition:.55s cubic-bezier(.22,1,.36,1)}
+.mbub.in{opacity:1;transform:none}
+.mbub.u{align-self:flex-end;background:var(--m-accent);color:#fff;
+  border-bottom-right-radius:4px}
+.mbub.a{align-self:flex-start;background:var(--m-s2);color:var(--m-fg);
+  border-bottom-left-radius:4px}
+.mbub.a b{color:var(--m-accent)}
+.minrow{display:flex;gap:8px;align-items:center;margin-top:10px}
+.minput{flex:1;border:1px solid var(--m-bd);border-radius:8px;padding:9px 12px;
+  font-size:13px;color:var(--m-fg2);background:var(--m-card)}
+.msend{background:var(--m-accent);color:#fff;border-radius:8px;padding:9px 14px;
+  font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px}
+
+/* —— 统计页 —— */
+.mseg{display:flex;gap:8px}
+.mseg span{font-size:12px;padding:5px 12px;border-radius:14px;color:var(--m-fg2);background:transparent}
+.mseg span.on{background:color-mix(in srgb,var(--m-accent) 15%,transparent);color:var(--m-accent);font-weight:600}
+.mt4{display:flex;margin-top:12px}
+.mt4>div{flex:1;text-align:center}
+.mt4 b{display:block;font-size:16px;font-weight:700}
+.mt4 em{font-size:11.5px;color:var(--m-fg2);font-style:normal}
+.mlegend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--m-fg2)}
+.mlegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.mchart{margin-top:8px}
+.mrank{margin-top:10px;display:flex;flex-direction:column;gap:9px}
+.mrank .r{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.mrank .r .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrank .r .dt{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.mrank .r .pc{font-weight:600;font-size:12.5px}
+.mtabs{display:flex;gap:8px;margin-top:10px}
+.mtabs span{font-size:12px;padding:5px 12px;border-radius:12px;color:var(--m-fg2)}
+.mtabs span.on{background:color-mix(in srgb,var(--m-accent) 15%,transparent);color:var(--m-accent);font-weight:600}
+.mtw{display:flex;gap:10px;margin-top:12px}
+.mtw>div{flex:1;border-radius:10px;padding:12px 0;text-align:center;background:color-mix(in srgb,var(--m-fg) 5%,transparent)}
+.mtw b{display:block;font-size:18px;font-weight:700}
+.mtw em{font-size:11.5px;color:var(--m-fg2);font-style:normal}
+.mhist{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+.mhist .h{display:flex;align-items:center;gap:10px}
+.mhist .h .t{flex:1;min-width:0}
+.mhist .h .t b{display:block;font-size:12.5px;font-weight:600}
+.mhist .h .t em{font-size:11px;color:var(--m-fg2);font-style:normal}
+.mhist .h .v{font-size:12px;font-weight:600;color:var(--m-accent);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -294,6 +511,296 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 <div class="grid-lines"></div>
 
 <div class="wrap">
+
+<!-- ══════════════════════════════════════════════════════════════
+     重绘 App 界面模板（矢量，无位图）—— 由 JS 克隆到各画框中
+     ══════════════════════════════════════════════════════════════ -->
+
+<!-- 首页 -->
+<template id="tpl-home">
+<div class="mscr" data-t="brand">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
+  <div class="mbody" data-pan="1">
+    <div class="mhero">
+      <div class="hi">下午好！</div>
+      <div class="hn">备考的小猫</div>
+      <div class="hr"><div class="lg">猫</div><div><div class="ht">猫卷</div><div class="hq">山不让尘，川不辞盈。</div></div></div>
+    </div>
+    <div class="mcard">
+      <div class="mch"><i class="v4"></i><b>本周战绩</b><span class="sp"></span><span class="lk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>历史报告</span></div>
+      <div class="mduo"><div><b>128</b><s> 道</s><em>本周刷题</em></div><div><b>76</b><s>%</s><em>平均正确率</em></div></div>
+      <div class="mcal" data-y="2026" data-m="8" data-today="11" data-h="0,0,3,2,1,0,0,2,3,1,0,0,1,2,3,3,2,0,0,1,2,1,0,0,3,2,2,1,3,0,0"></div>
+      <div class="mstreak"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c2.6 3.6 5 5.1 5 8.6a5 5 0 0 1-10 0c0-2.2 1-3.4 2-4.4.3 1.2 1 2 1.8 2 1.1 0 1.4-1.2 1.4-2.2 0-1.3-.4-2.6-.2-4z"/></svg>连续打卡 3 周 2 天</div>
+    </div>
+    <div class="m3">
+      <div><b>6h 24m</b><em>累计刷题时长</em></div>
+      <div><b>1284 题</b><em>总刷题量</em></div>
+      <div><b>76%</b><em>平均正确率</em></div>
+    </div>
+    <div class="mqt">快速操作</div>
+    <div class="mq">
+      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/><circle cx="15" cy="9" r="1.7"/></svg></span><span class="tx"><b>定向爆破</b><em>已选 2 个题库，全部</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 10%,transparent);color:color-mix(in srgb,var(--m-accent) 80%,transparent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg></span><span class="tx"><b>管理题库</b><em>3 个题库</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-bad) 12%,transparent);color:var(--m-bad)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 1 0 2.3-5.4M4.5 3.5v4.2h4.2"/></svg></span><span class="tx"><b>错题本</b><em>智能排期，只显示应复习的错题</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+      <div class="mqi"><span class="ic" style="background:rgba(124,58,237,.12);color:#7C3AED"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17v3h16v-3M12 3v12M8 7l4-4 4 4"/></svg></span><span class="tx"><b>导入题库</b><em>AI 解析 DOCX，JSON 直接入库</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </div>
+  </div>
+  <div class="mnav">
+    <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- 答题页（已作答：正确绿 / 错选红） -->
+<template id="tpl-quiz">
+<div class="mscr" data-t="brand">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span>
+    <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></svg></span>
+    <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+    <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19c3.2-1 4.2-6.5 7.2-6.5s2.2 4.4 5.2 4.4 3.2-3.4 5.6-3.4"/></svg></span>
+  </div>
+  <div class="mprog"><i style="width:1.3%"></i></div>
+  <div class="mbody">
+    <div class="mqcard">
+      <span class="mtag">单选</span>
+      <span class="mqstat">作答 3 次　正确率 66%</span>
+      <div class="mstem">患者，男，46 岁。因“反复上腹痛 3 年，加重 2 周”就诊。胃镜检查示胃窦部黏膜变薄，血管透见。最可能的诊断是？</div>
+    </div>
+    <div class="mopts">
+      <div class="mopt"><span class="n">A</span><span class="tx">急性胃炎</span></div>
+      <div class="mopt sel"><span class="n"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="tx">慢性萎缩性胃炎</span></div>
+      <div class="mopt bad"><span class="n"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span><span class="tx">胃溃疡</span></div>
+      <div class="mopt ok"><span class="n"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="tx">慢性浅表性胃炎</span></div>
+    </div>
+    <div class="mfb bad">
+      <div class="tt"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>回答错误</div>
+      <div class="rr">正确答案: D</div>
+      <div class="rr" style="opacity:.85">你的答案: C</div>
+    </div>
+    <div class="mbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>查看 AI 解析</div>
+  </div>
+  <div class="mnav" style="border-top:1px solid var(--m-bd);background:var(--m-bg);gap:10px;padding:8px 12px;align-items:center">
+    <div style="flex:0 0 auto;flex-direction:row;gap:6px;border:1px solid var(--m-bd);border-radius:10px;padding:9px 12px;background:var(--m-card);color:var(--m-fg)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>错题本</div>
+    <div style="flex:0 0 auto;flex-direction:row;gap:6px;border:1px solid var(--m-bd);border-radius:10px;padding:9px 12px;background:var(--m-card);color:var(--m-fg2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>上一题</div>
+    <div style="flex:1;flex-direction:row;justify-content:center;background:var(--m-accent);color:#fff;border-radius:10px;padding:10px 0;font-size:15px;font-weight:600">下一题</div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- AI 解析 + 追问聊天 -->
+<template id="tpl-ai">
+<div class="mscr" data-t="brand">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span><span class="pill">背题模式</span></div>
+  <div class="mprog"><i style="width:1.3%"></i></div>
+  <div class="mbody">
+    <div class="mai">
+      <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>AI解析<span class="sp"></span></div>
+      <div class="mtxt" id="ai-typing" data-type="**答案：** D&#10;**题眼：** 看到「黏膜变薄、血管透见」→ 直接锁定萎缩性胃炎&#10;**解析：**&#10;- **定性/计算**：正常胃黏膜厚度均匀、血管不可见；黏膜变薄伴血管透见是腺体萎缩的典型内镜表现&#10;- **排除法**：A/C 急性胃炎与胃溃疡均为黏膜充血水肿或溃疡凹陷，不会变薄透见血管&#10;**避坑指南：** 别把「血管透见」与「充血发红」混淆，前者提示萎缩、后者提示急性炎症&#10;**一句话记忆：** 薄到透血管 = 萎缩"></div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mbubs" id="ai-chat">
+        <div class="mbub u in">为什么黏膜变薄就能定性为萎缩性胃炎？</div>
+        <div class="mbub a in">因为 <b>腺体萎缩</b> 直接导致黏膜层变薄：腺体数量减少 → 黏膜厚度下降 → 固有层血管显露，这是萎缩的病理基础。</div>
+        <div class="mbub u in">那浅表性胃炎有什么区别？</div>
+      </div>
+      <div class="minrow">
+        <span class="minput">追问AI相关问题...</span>
+        <span class="msend"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-6z"/></svg>发送</span>
+      </div>
+    </div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- 统计页 -->
+<template id="tpl-stats">
+<div class="mscr" data-t="brand">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><b>统计</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4"/></svg></span></div>
+  <div class="mbody" data-pan="1" style="gap:12px">
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">统计概览</b><span class="sp"></span><span class="mseg" style="margin:0"><span class="on">本周</span><span>本月</span><span>全部</span></span></div>
+      <div class="mt4">
+        <div><b style="color:var(--m-accent)">128</b><em>刷题量</em></div>
+        <div><b style="color:var(--m-accent)">76.4%</b><em>正确率</em></div>
+        <div><b style="color:var(--m-fg2)">6h24m</b><em>学习时长</em></div>
+        <div><b style="color:var(--m-bad)">12 天</b><em>最长连击</em></div>
+      </div>
+    </div>
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">年度坚持</b><span class="sp"></span><span class="lk"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <div class="mcal" style="flex:1;margin:0" data-y="2026" data-m="7" data-h="0,2,1,0,3,2,0,1,2,0,0,3,1,2,0,1,3,2,0,0,1,2,3,0,2,1,0,0,3,1,2"></div>
+        <div class="mcal" style="flex:1;margin:0" data-y="2026" data-m="8" data-today="11" data-h="0,0,3,2,1,0,0,2,3,1,0,0,1,2,3,3,2,0,0,1,2,1,0,0,3,2,2,1,3,0,0"></div>
+        <div class="mcal" style="flex:1;margin:0" data-y="2026" data-m="9" data-h="1,2,0,0,3,2,1,0,2,3,0,0,1,2,0,1,3,2,0,2,1,0,0,3,1,2,0,1,2,0"></div>
+      </div>
+      <div class="mlegend"><i style="background:color-mix(in srgb,var(--m-accent) 28%,#fff)"></i>少<i style="background:color-mix(in srgb,var(--m-accent) 52%,#fff)"></i>达标<i style="background:color-mix(in srgb,var(--m-accent) 85%,#000)"></i>多<i style="border:1.5px solid var(--m-accent)"></i>今天</div>
+    </div>
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">近一年趋势</b></div>
+      <div class="mchart" data-d="12,38,55,42,60,88,72,45,30,66,92,58,40,76"></div>
+    </div>
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">正确率排行</b></div>
+      <div class="mtabs"><span class="on">按题库</span><span>按知识点</span></div>
+      <div class="mrank">
+        <div class="r"><span class="nm">内科学</span><span class="dt" style="background:var(--m-accent);opacity:.7"></span><span class="pc">84.2%</span></div>
+        <div class="r"><span class="nm">解剖学</span><span class="dt" style="background:var(--m-accent);opacity:.45"></span><span class="pc">71.5%</span></div>
+        <div class="r"><span class="nm">病理学</span><span class="dt" style="background:var(--m-bad);opacity:.7"></span><span class="pc">52.8%</span></div>
+      </div>
+    </div>
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">错题统计</b></div>
+      <div class="mtw">
+        <div><b style="color:var(--m-bad)">46 题</b><em>错题总数</em></div>
+        <div><b style="color:var(--m-accent)">18 题</b><em>待复习</em></div>
+      </div>
+      <div style="font-size:12px;color:var(--m-fg2);margin-top:12px">按题库分布</div>
+      <div class="mhist" style="gap:8px;margin-top:6px">
+        <div class="h"><span class="t"><b>内科学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 12 · 收藏 5 · 下次到期：明天</span></div>
+        <div class="h"><span class="t"><b>病理学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 6 · 收藏 3</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mnav">
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- 错题本 -->
+<template id="tpl-errbook">
+<div class="mscr" data-t="brand">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg></span></div>
+  <div class="mbody" data-pan="1">
+    <div class="mseg"><span class="on">全部</span><span>错题</span><span>收藏</span></div>
+    <div class="mcard" style="padding:12px">
+      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:8px">知识点</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <span class="mtag" style="font-size:12px">内科学 · 12</span>
+        <span class="mtag" style="font-size:12px">病理学 · 9</span>
+        <span class="mtag" style="font-size:12px">解剖学 · 6</span>
+        <span class="mtag" style="font-size:12px">药理学 · 4</span>
+        <span class="mtag" style="font-size:12px">生理学 · 3</span>
+      </div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mch"><b style="font-size:14px">内科学</b><span class="sp"></span><span class="lk" style="color:var(--m-bad);background:color-mix(in srgb,var(--m-bad) 10%,transparent);padding:3px 8px;border-radius:8px">下次到期：明天</span></div>
+      <div style="font-size:12.5px;color:var(--m-fg);margin-top:10px;line-height:1.55">患者，男，46 岁。因“反复上腹痛 3 年，加重 2 周”就诊。胃镜检查示胃窦部黏膜变薄，血管透见。最可能的诊断是？</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px">
+        <span style="color:var(--m-bad)">你的答案 C</span><span style="color:var(--m-fg2)">·</span><span style="color:var(--m-ok)">正确答案 D</span>
+        <span class="sp" style="flex:1"></span><span style="color:var(--m-fg2)">错 3 次</span>
+      </div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mch"><b style="font-size:14px">病理学</b><span class="sp"></span><span class="lk" style="padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)">已到期 2 天</span></div>
+      <div style="font-size:12.5px;color:var(--m-fg);margin-top:10px;line-height:1.55">关于细胞凋亡与坏死的区别，下列哪项描述是正确的？</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px">
+        <span style="color:var(--m-bad)">你的答案 A</span><span style="color:var(--m-fg2)">·</span><span style="color:var(--m-ok)">正确答案 B</span>
+        <span class="sp" style="flex:1"></span><span style="color:var(--m-fg2)">错 2 次</span>
+      </div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mch"><b style="font-size:14px">解剖学</b><span class="sp"></span><span class="lk" style="padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)">已到期 5 天</span></div>
+      <div style="font-size:12.5px;color:var(--m-fg);margin-top:10px;line-height:1.55">穿经腮腺的结构由前向后依次为？</div>
+    </div>
+    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">开始复习（18 题）</div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- 导入题库 -->
+<template id="tpl-import">
+<div class="mscr" data-t="brand">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><b style="font-size:18px">导入题库</b></div>
+  <div class="mbody" style="gap:12px">
+    <div class="mcard" style="padding:16px;text-align:center;border:1.5px dashed color-mix(in srgb,var(--m-accent) 45%,var(--m-bd))">
+      <div style="width:52px;height:52px;margin:0 auto 10px;border-radius:14px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);display:grid;place-items:center;color:var(--m-accent)">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17v3h16v-3M12 3v12M8 7l4-4 4 4"/></svg>
+      </div>
+      <div style="font-size:15px;font-weight:600">选择文档文件</div>
+      <div style="font-size:12.5px;color:var(--m-fg2);margin-top:5px;line-height:1.6">支持 DOCX 自动解析、JSON 直接入库<br>AI 会提取题目、选项、答案与解析</div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:9px">解析进度</div>
+      <div style="height:6px;border-radius:3px;background:var(--m-s2);overflow:hidden">
+        <div style="width:68%;height:100%;background:var(--m-accent);border-radius:3px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px">
+        <span style="color:var(--m-accent);font-weight:600">已解析 68%</span>
+        <span style="color:var(--m-fg2)">共 5 个分块，3 路并发</span>
+      </div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mch"><b style="font-size:14px">文档信息</b></div>
+      <div class="mhist" style="gap:8px;margin-top:8px">
+        <div class="h"><span class="t"><b>内科学复习题.docx</b><em>1.2 MB · 320 道题</em></span></div>
+        <div class="h"><span class="t"><b>题库格式</b><em>DOCX · 已识别题号 320 处</em></span></div>
+        <div class="h"><span class="t"><b>知识点打标</b><em>已自动标注 312 道</em></span></div>
+      </div>
+    </div>
+    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">确认导入</div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- 深色主题首页 -->
+<template id="tpl-home-dark">
+<div class="mscr" data-t="brand" data-dark="1">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat" style="color:#E7EAF3"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
+  <div class="mbody">
+    <div class="mhero" style="background:linear-gradient(135deg,#4F46E5,#7C3AED)">
+      <div class="hi">晚上好！</div>
+      <div class="hn">备考的小猫</div>
+      <div class="hr"><div class="lg">猫</div><div><div class="ht">猫卷</div><div class="hq">夜色正好，来几道题。</div></div></div>
+    </div>
+    <div class="mcard">
+      <div class="mch"><i class="v4"></i><b>本周战绩</b><span class="sp"></span><span class="lk">历史报告</span></div>
+      <div class="mduo"><div><b>128</b><s> 道</s><em>本周刷题</em></div><div><b>76</b><s>%</s><em>平均正确率</em></div></div>
+      <div class="mcal" data-y="2026" data-m="8" data-today="11" data-h="0,0,3,2,1,0,0,2,3,1,0,0,1,2,3,3,2,0,0,1,2,1,0,0,3,2,2,1,3,0,0"></div>
+      <div class="mstreak">连续打卡 3 周 2 天</div>
+    </div>
+    <div class="m3">
+      <div><b>6h 24m</b><em>累计刷题时长</em></div>
+      <div><b>1284 题</b><em>总刷题量</em></div>
+      <div><b>76%</b><em>平均正确率</em></div>
+    </div>
+    <div class="mq">
+      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 15%,transparent);color:var(--m-accent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/></svg></span><span class="tx"><b>定向爆破</b><em>已选 2 个题库，全部</em></span></div>
+      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 15%,transparent);color:var(--m-accent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg></span><span class="tx"><b>管理题库</b><em>3 个题库</em></span></div>
+    </div>
+  </div>
+  <div class="mnav">
+    <div class="on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
+    <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
+  </div>
+ </div>
+</div>
+</template>
 
 <!-- ═══ 导航 ═══ -->
 <nav>
@@ -344,16 +851,8 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <div class="chip a"><span class="ic">🔒</span> API Key 本地加密</div>
     <div class="chip c"><span class="ic">📶</span> 离线可刷题</div>
     <div class="chip b"><span class="ic">⚡</span> FSRS-5 <span class="v">到期提醒</span></div>
-    <div class="phone" id="hero-phone" style="--ar:1116/2480;width:min(368px,84vw)">
-      
-      <div class="scr" id="hero-scr">
-        <img src="assets/84_analysis_new.webp" alt="AI 题眼破题解析" class="on">
-        <img src="assets/101_bubbles.webp" alt="AI 追问聊天">
-        <img src="assets/57_errorbook.webp" alt="错题本与复习排期">
-        <img src="assets/91_trend_new.webp" alt="统计与趋势">
-        <img src="assets/31_dark_pinpai.webp" alt="深色主题">
-        <img src="assets/80_splash_new.webp" alt="启动页">
-      </div>
+    <div class="phone" id="hero-phone" style="--ar:390/867;width:min(368px,84vw)">
+      <div class="scr" id="hero-scr" data-mocks="home,quiz,ai,stats"></div>
     </div>
   </div>
 </section>
@@ -407,9 +906,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" style="--ar:1080/1920;width:min(300px,78vw)">
+    <div class="phone" style="--ar:390/867;width:min(300px,78vw)">
       
-      <div class="scr"><img src="assets/demo_17_import_page.webp" alt="导入页" class="on"></div>
+      <div class="scr" data-mock="import"></div>
     </div>
     <div class="chip b"><span class="ic">🧩</span> 2000 字 / 块</div>
     <div class="chip a" style="top:16%"><span class="ic">⚡</span> 3 路并发</div>
@@ -470,13 +969,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" id="mode-phone" style="--ar:1600/2560;width:min(300px,78vw)">
+    <div class="phone" id="mode-phone" style="--ar:390/867;width:min(300px,78vw)">
       
-      <div class="scr" id="mode-scr">
-        <img src="assets/tab_new_countsheet.webp" alt="数量选择" class="on">
-        <img src="assets/tab_new_modesheet.webp" alt="模式选择">
-        <img src="assets/tab_new_quiz.webp" alt="刷题中">
-      </div>
+      <div class="scr" data-mocks="quiz,stats,ai"></div>
     </div>
     <div class="chip a" style="top:14%"><span class="ic">🎯</span> 答对自动跳题</div>
     <div class="chip c"><span class="ic">⏸</span> 随时暂停续刷</div>
@@ -506,9 +1001,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" style="--ar:1600/2560;width:min(300px,78vw)">
+    <div class="phone" style="--ar:390/867;width:min(300px,78vw)">
       
-      <div class="scr"><img src="assets/tab_new_answersheet.webp" alt="答题卡" class="on"></div>
+      <div class="scr" data-mock="quiz"></div>
     </div>
     <div class="chip b"><span class="ic">✅</span> 7 种题型</div>
   </div>
@@ -538,9 +1033,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="phone" style="--ar:1116/2480;width:min(285px,76vw)">
+    <div class="phone" style="--ar:390/867;width:min(285px,76vw)">
       
-      <div class="scr"><img src="assets/84_analysis_new.webp" alt="AI 解析" class="on"></div>
+      <div class="scr" data-mock="ai"></div>
     </div>
     <div class="tech" style="max-width:400px">
       <div class="tech-h">⚙ 解析输出示例</div>
@@ -572,9 +1067,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
-    <div class="phone" style="--ar:1116/2480;width:min(318px,80vw)">
+    <div class="phone" style="--ar:390/867;width:min(318px,80vw)">
       
-      <div class="scr"><img src="assets/101_bubbles.webp" alt="追问聊天" class="on"></div>
+      <div class="scr" data-mock="ai"></div>
     </div>
     <div class="bubbles" id="chat-demo">
       <div class="bub u">为什么 PaCO₂ 升高就能定性为呼吸性酸中毒？</div>
@@ -609,9 +1104,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
-    <div class="phone" style="--ar:1116/2480;width:min(285px,76vw)">
+    <div class="phone" style="--ar:390/867;width:min(285px,76vw)">
       
-      <div class="scr"><img src="assets/57_errorbook.webp" alt="错题本" class="on"></div>
+      <div class="scr" data-mock="errbook"></div>
     </div>
     <div class="timeline">
       <div style="font-size:13px;color:var(--tx2);margin-bottom:16px">FSRS-5 复习间隔演进（示意）</div>
@@ -652,9 +1147,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="phone" style="--ar:1600/2560;width:min(318px,80vw)">
+    <div class="phone" style="--ar:390/867;width:min(318px,80vw)">
       
-      <div class="scr"><img src="assets/tab_new_stats.webp" alt="统计页" class="on"></div>
+      <div class="scr" data-mock="stats"></div>
     </div>
     <div class="window" style="--ar:1280/800;max-width:420px">
       <div class="bar"><i></i><i></i><i></i></div>
@@ -745,13 +1240,13 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1A253E,#4C7CD6)"></div><div class="nm">碧海银河</div></div>
     </div>
     <div style="display:flex;gap:14px;align-items:flex-start">
-      <div class="phone" style="--ar:1080/1920;width:min(210px,56vw)">
+      <div class="phone" style="--ar:390/867;width:min(210px,56vw)">
         
-        <div class="scr"><img src="assets/demo_07_home_dark.webp" alt="深色首页" class="on"></div>
+        <div class="scr" data-mock="home-dark"></div>
       </div>
-      <div class="phone" style="--ar:1116/2480;width:min(210px,56vw)">
+      <div class="phone" style="--ar:390/867;width:min(210px,56vw)">
         
-        <div class="scr"><img src="assets/31_dark_pinpai.webp" alt="深色主题设置" class="on"></div>
+        <div class="scr" data-mock="home-dark"></div>
       </div>
     </div>
   </div>
@@ -821,9 +1316,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
         <div class="scr"><img src="assets/tab_new_profile.webp" alt="我的页面" class="on"></div>
       </div>
       <div style="font-size:30px;color:var(--c3)">⇄</div>
-      <div class="phone" style="--ar:1600/2560;width:min(238px,58vw)">
+      <div class="phone" style="--ar:390/867;width:min(238px,58vw)">
         
-        <div class="scr"><img src="assets/tab_new_home.webp" alt="首页" class="on"></div>
+        <div class="scr" data-mock="home"></div>
       </div>
     </div>
     <div class="chip b" style="top:8%"><span class="ic">📡</span> UDP 自动发现</div>
@@ -959,7 +1454,206 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   setTimeout(function(){ els.forEach(function(e){ e.classList.add('in'); }); }, 2500);
 })();
 
-/* ────────── 手机轮播（Hero / 模式） ────────── */
+/* ────────── 重绘界面渲染器（矢量，无位图） ────────── */
+(function(){
+  var BASE = 390;   // 设计基准宽度
+
+  function makeMock(kind){
+    var tpl = document.getElementById('tpl-' + kind);
+    if(!tpl) return null;
+    return tpl.content.firstElementChild.cloneNode(true);
+  }
+
+  /* 月历：按 data-h 数据生成 7 列网格（真实日期与今天高亮） */
+  function buildCal(box){
+    var y = +box.dataset.y, m = +box.dataset.m;
+    var todayKey = box.dataset.today ? +box.dataset.today : null;
+    var heat = (box.dataset.h || '').split(',').map(function(v){ return +v || 0; });
+    var days = new Date(y, m, 0).getDate();
+    var lead = new Date(y, m - 1, 1).getDay();   // 0=周日
+    var leadMon = (lead + 6) % 7;                // 转成周一开头
+    var html = '<div class="mcalh"><span>' + m + '月</span><s>' + y + '年</s></div>' +
+      '<div class="mcalw"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
+      '<div class="mcalg">';
+    for(var i = 0; i < leadMon; i++) html += '<i class="e"></i>';
+    for(var d = 1; d <= days; d++){
+      var lv = heat[d - 1] || 0;
+      var cls = 'l' + Math.min(lv, 3);
+      if(todayKey === d) cls += ' td';
+      html += '<i class="' + cls + '">' + d + '</i>';
+    }
+    var cells = leadMon + days;
+    var tail = (7 - cells % 7) % 7;
+    for(var k = 0; k < tail; k++) html += '<i class="e"></i>';
+    html += '</div>';
+    box.innerHTML = html;
+  }
+
+  /* 趋势图：自绘 SVG 柱状 + 正确率折线（矢量） */
+  function buildChart(box){
+    var data = (box.dataset.d || '').split(',').map(function(v){ return +v || 0; });
+    var W = 320, H = 110, padL = 22, padR = 4, padB = 16, padT = 8;
+    var max = Math.max(20, Math.max.apply(null, data) * 1.15);
+    var iw = W - padL - padR, ih = H - padB - padT;
+    var bw = iw / data.length;
+    var s = '';
+    // 左轴刻度
+    [0, 25, 50, 75, 100].forEach(function(v){
+      var yy = padT + ih - (v / max) * ih;
+      if(yy < padT - 1) return;
+      s += '<text x="' + (padL - 5) + '" y="' + (yy + 3) + '" text-anchor="end" font-size="7.5" fill="#9AA3B8">' + v + '</text>';
+    });
+    // 打卡 50 题虚线
+    var y50 = padT + ih - (50 / max) * ih;
+    if(y50 > padT){
+      s += '<line x1="' + padL + '" y1="' + y50 + '" x2="' + (W - padR) + '" y2="' + y50 +
+           '" stroke="#F59E0B" stroke-opacity=".65" stroke-width="1" stroke-dasharray="3 3"/>';
+    }
+    // 柱
+    var acc = [];
+    data.forEach(function(v, i){
+      var h = (v / max) * ih;
+      var x = padL + i * bw + bw * 0.18, w = bw * 0.64;
+      s += '<rect x="' + x.toFixed(1) + '" y="' + (padT + ih - h).toFixed(1) + '" width="' + w.toFixed(1) +
+           '" height="' + h.toFixed(1) + '" rx="2" fill="var(--m-accent)" fill-opacity=".55"/>';
+      acc.push(Math.min(100, 40 + (v / max) * 55));
+    });
+    // 正确率折线
+    var pts = acc.map(function(a, i){
+      return [(padL + i * bw + bw / 2).toFixed(1), (padT + ih - (a / 100) * ih).toFixed(1)];
+    });
+    s += '<polyline points="' + pts.map(function(p){ return p.join(','); }).join(' ') +
+         '" fill="none" stroke="var(--m-accent)" stroke-width="1.6" stroke-opacity=".85" stroke-linejoin="round"/>';
+    // X 轴
+    s += '<line x1="' + padL + '" y1="' + (padT + ih) + '" x2="' + (W - padR) + '" y2="' + (padT + ih) +
+         '" stroke="#D9E2EC" stroke-width="1"/>';
+    box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">' + s + '</svg>';
+  }
+
+  /* 打字机（AI 解析正文） */
+  function typeInto(box){
+    if(box._typed) return; box._typed = true;
+    var html = (box.dataset.type || '')
+      .replace(/\*\*(.+?)\*\*/g, '<span class="k">$1</span>')
+      .replace(/\n/g, '<br>');
+    var i = 0, step = 3;
+    (function tick(){
+      i = Math.min(i + step, html.length);
+      box.innerHTML = html.slice(0, i) + (i < html.length ? '<span class="mcur"></span>' : '');
+      if(i < html.length) setTimeout(tick, 22);
+    })();
+  }
+
+  /* 追问气泡依次出现 */
+  function playBubbles(box){
+    if(box._played) return; box._played = true;
+    var bs = box.querySelectorAll('.mbub');
+    bs.forEach(function(b, i){
+      b.classList.remove('in');
+      setTimeout(function(){ b.classList.add('in'); }, i * 560 + 260);
+    });
+  }
+
+  /* 激活某个界面时触发其内部动画 */
+  function activate(mock){
+    if(!mock) return;
+    var t = mock.querySelector('.mtxt[data-type]');
+    if(t) typeInto(t);
+    var c = mock.querySelector('.mbubs');
+    if(c) playBubbles(c);
+    // 缓慢上下滚动：展示手机框之外的更多内容（模拟真人浏览）
+    mock.querySelectorAll('.mbody[data-pan]').forEach(function(b){
+      if(b._panning) return; b._panning = true;
+      var dir = 1, pos = 0, max = 0;
+      function step(){
+        max = b.scrollHeight - b.clientHeight;
+        if(max <= 4){ requestAnimationFrame(step); return; }
+        pos += dir * 0.45;
+        if(pos >= max){ pos = max; dir = -1; }
+        if(pos <= 0){ pos = 0; dir = 1; }
+        b.scrollTop = pos;
+        requestAnimationFrame(step);
+      }
+      b.scrollTop = 0;
+      setTimeout(step, 1400);
+    });
+  }
+
+  function initHost(host){
+    var kinds = (host.dataset.mocks || '').split(',').filter(Boolean);
+    if(!kinds.length) return;
+    var cs = getComputedStyle(host);
+    var ar = (cs.aspectRatio || '').split('/').map(function(v){ return parseFloat(v); });
+    var ratio = (ar.length === 2 && ar[1]) ? ar[0] / ar[1] : 0.45;
+
+    var screens = [];
+    kinds.forEach(function(k){
+      var m = makeMock(k);
+      if(!m) return;
+      m.querySelectorAll('.mroot').forEach(function(r){
+        r.style.setProperty('--ratio', ratio);
+      });
+      m.classList.remove('on');
+      host.appendChild(m);
+      screens.push(m);
+    });
+    if(!screens.length) return;
+
+    // 缩放：把 390px 设计稿等比缩放到画框实际宽度
+    function fit(){
+      var w = host.clientWidth;
+      if(!w) return;
+      var s = w / BASE;
+      screens.forEach(function(m){
+        m.querySelectorAll('.mroot').forEach(function(r){ r.style.setProperty('--s', s); });
+      });
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    if(window.ResizeObserver){ new ResizeObserver(fit).observe(host); }
+
+    // 生成月历/图表
+    screens.forEach(function(m){
+      m.querySelectorAll('.mcal').forEach(buildCal);
+      m.querySelectorAll('.mchart').forEach(buildChart);
+    });
+
+    var i = 0;
+    screens[0].classList.add('on');
+    activate(screens[0]);
+    if(screens.length > 1){
+      setInterval(function(){
+        screens[i].classList.remove('on');
+        i = (i + 1) % screens.length;
+        screens[i].classList.add('on');
+        activate(screens[i]);
+      }, 3000);
+    }
+  }
+
+  document.querySelectorAll('[data-mocks]').forEach(initHost);
+
+  /* 非轮播的独立 mock（如功能区块里的单屏） */
+  document.querySelectorAll('[data-mock]').forEach(function(host){
+    var kinds = (host.dataset.mock || '').split(',').filter(Boolean);
+    if(!kinds.length) return;
+    var m = makeMock(kinds[0]);
+    if(!m) return;
+    host.appendChild(m);
+    var fit = function(){
+      var w = host.clientWidth; if(!w) return;
+      m.querySelectorAll('.mroot').forEach(function(r){ r.style.setProperty('--s', w / BASE); });
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    if(window.ResizeObserver){ new ResizeObserver(fit).observe(host); }
+    m.querySelectorAll('.mcal').forEach(buildCal);
+    m.querySelectorAll('.mchart').forEach(buildChart);
+    m.classList.add('on');
+  });
+})();
+
+/* ────────── 兼容旧轮播（剩余真实截图区块） ────────── */
 function cycle(id, ms){
   var scr = document.getElementById(id);
   if(!scr) return;
@@ -972,7 +1666,6 @@ function cycle(id, ms){
     imgs[i].classList.add('on');
   }, ms);
 }
-cycle('hero-scr', 2600);
 cycle('mode-scr', 2400);
 
 /* ────────── 数字滚动 ────────── */
