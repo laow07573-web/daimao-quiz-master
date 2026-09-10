@@ -1,156 +1,184 @@
-# 猫卷 UI 设计与开发指南（AI 助手交接文档）
+# 猫卷 UI 设计与开发指南（Mao Des 设计语言）
 
-> 版本：v1.0.2（2026-08-22）· 目的：给 Qoder CN / 任何 AI 开发工具无缝接手 UI 设计工作
-> 配套材料：`docs/功能实现路径.md`（链路）、`docs/UI交互缺陷审查报告.md`（已修复档案）、`docs/UI交互缺陷审查报告.md` 修复 commit `b9e43db / 4c32adc / 0c077af / a3be67d`
+> 版本：v1.28（2026-09-11）· 目的：给 AI 助手 / 新成员无缝接手 UI 开发
+> 配套材料：`docs/功能实现路径.md`（功能链路）、`lib/utils/design_tokens.dart`（令牌定义，权威来源）
+> 本轮重设计提交：`010fe43`(B1 基座) `04ae420`(B2 核心页) `a742fe7`(B3 次要页) `8726252`(B4 收口) `8a0ea7d`(B5 推广页)
 
 ---
 
 ## 1. 项目速览
 
-- **定位**：面向医学生的本地优先开源免费刷题 App（Android 端），无账号/无广告/无会员，AI 讲解走 BYOK（用户自持 API Key）
-- **技术栈**：Flutter 3.24.5 / Dart 3.5.4 · SQLite（schema **v9**）· Provider · FSRS-5 · DeepSeek API
-- **工程规模**：109 项自动化测试全绿 · 发布四维基线校验（组件/权限/文案/资源）· APK 签名锁定防篡改
-- **代码目录**：`lib/screens/`（15 个页面）、`lib/widgets/`（自定义组件）、`lib/services/`（状态与数据层）、`lib/models/`、`test/`（109 项）
-- **核心不变量**：包名 `com.flashcard.app`、签名证书 SHA-256 `43a9e0a1…60fe`、schema 版本 9、main 分支
+- **定位**：面向医学生的本地优先开源免费刷题 App（Android + Windows），无账号/无广告/无会员，AI 讲解走 BYOK
+- **技术栈**：Flutter 3.24.5 / Dart 3.5.4 · SQLite（schema v11）· Provider · FSRS-5 · DeepSeek API
+- **工程规模**：179 项自动化测试全绿 · 发布四维基线校验 · APK 签名锁定防篡改
+- **核心不变量**：包名 `com.flashcard.app`、签名证书 SHA-256 `43a9e0a1…60fe`、main 分支
 
 ---
 
-## 2. UI 设计系统（重设计第一原则：永远通过语义色取色）
+## 2. 设计语言「Mao Des」
 
-### 2.1 主题结构
+上一版的问题不是"某处丑"，而是**设计语言缺失**：18 种字号（含 12.5/11.5 半像素）、
+卡片圆角 10/12/14/16 混用、组件主题只有 AppBar/Card 两个（其余裸用 Material 默认，
+导致胶囊按钮与方角卡片两套语言打架）、全局仅 3 处阴影（页面发平发闷）。
+本轮以**令牌层 + 全套组件主题**系统性重建。
 
-- 5 套主题（枚举 `AppTheme`）：`brand` 品牌鲜明 / `eyeCare` 护眼柔和 / `minimal` 极简 / `starVoyage` 星际穿越 / `oceanGalaxy` 碧海银河
-- 每套主题有**浅色 + 深色两套色板**（`ThemeService._colorsOf` / `_darkColorsOf`），配合 `ThemeMode`（跟随系统 / 浅色 / 深色）共 5×2 形态
-- 全局入口：`lib/services/theme_service.dart`（枚举、色板、`AppThemeColors` 扩展、`labelOf`、`previewColorsOf`、切换持久化）
+### 2.1 设计令牌（唯一取值来源）
 
-### 2.2 取色规则（必守）
+**所有** 字号 / 间距 / 圆角 / 阴影 / 动效时长必须引用 `lib/utils/design_tokens.dart`，
+页面内不得再写零散字面量。当前令牌化程度：字号与圆角字面量残留 **0** 处，令牌引用 **453** 处。
+
+#### 字阶（7 级，基准 14，无半像素）
+
+| 令牌 | 字号/字重/行高 | 用途 |
+|---|---|---|
+| `MaoType.display` | 30 / 700 / 1.15 | 大数字（正确率、题量） |
+| `MaoType.h1` | 22 / 600 / 1.35 | 页面标题 |
+| `MaoType.h2` | 17 / 600 / 1.35 | 区块标题 |
+| `MaoType.h3` | 15 / 600 / 1.35 | 卡片标题、列表主文字 |
+| `MaoType.body` | 14 / 400 / 1.6 | 正文（主力） |
+| `MaoType.caption` | 12 / 400 / 1.5 | 次要说明 |
+| `MaoType.micro` | 11 / 500 / 1.4 | 标签、极小文字 |
+
+> 也提供组合样式：`MaoType.h1Style` / `bodyStyle` / `captionStyle` 等，直接 `.copyWith(color:)` 使用。
+
+#### 间距（4pt 栅格）
+`MaoSpace.xxs/xs/sm/md/lg/xl/xxl` = **4/8/12/16/20/24/32**
+预设：`pagePadding` / `cardPadding`；常量 `page`(16) / `card`(16) / `section`(16) / `item`(12)
+
+#### 圆角
+`MaoRadius.chip`(6) 标签 · `small`(10) 小控件 · `control`(14) **按钮与输入框** ·
+`card`(18) **卡片** · `large`(24) **弹窗与底部弹层** · `pill`(999) 胶囊
+预设 `chipBorder` / `smallBorder` / `controlBorder` / `cardBorder` / `largeBorder`
+
+#### 层次（阴影三级）
+`MaoShadow.level1` 卡片（`0 1px 3px @4%`）· `level2` 悬浮/底部栏（`0 4px 14px @7%`）·
+`level3` 弹窗（`0 16px 40px @14%`）· `hairline`(1) 描边宽度
+
+#### 动效
+`MaoMotion.fast/normal/slow` = 160/240/320ms · `standard`(easeOutCubic) / `emphasized`(easeOutBack)
+
+### 2.2 主题（3 套，替代旧 5 套）
+
+| 主题 | 定位 | accent（浅/深） | 背景（浅/深） |
+|---|---|---|---|
+| `clear` **清蓝**（默认） | 清爽专业 | `#2563EB` / `#5B9BFF` | `#F5F7FA` / `#0B1220` |
+| `sage` **松绿** | 护眼低疲劳 | `#2F7D5B` / `#58BE8E` | `#F6F8F5` / `#0C1310` |
+| `ink` **墨黑** | 深色优先 | `#1F6F5C` / `#4ECDC4` | `#FAF8F4` / `#0C0D10` |
+
+- 每套**显式定义 12 个语义色位**（`background/surface/surfaceAlt/border/textPrimary/
+  textSecondary/textTertiary/accent/accentSoft/onAccent/navBackground/navForeground`），
+  **不再使用 `ColorScheme.fromSeed`** —— 那是旧版"色相过载"的根源（M3 自动生成的
+  secondary/tertiary 不受控，单屏可出现 7+ 个竞争色块）。
+- **旧存档自动迁移**：老用户的 `brand/eyeCare/minimal/starVoyage/oceanGalaxy`
+  映射到新 3 套（`ThemeService._migrateLegacyTheme`），升级不丢主题偏好。
+- 旧字段名保留为别名（`navBar`/`card`/`cardBorder`/`successContainer`/`dangerContainer`），
+  新代码请用新名（`navBackground`/`surface`/`border`/`successSoft`/`dangerSoft`）。
+
+### 2.3 取色规则（必守）
 
 ```dart
-// ✅ 唯一正确姿势：从上下文取语义色
-final ac = AppThemeColors.of(context);   // 或 Theme.of(context).extension<AppThemeColors>()!
-// ❌ 禁止：UI 中硬编码 Color(0xFF...)、Colors.xxx（黑/白/红/绿直接写）
+final ac = AppThemeColors.of(context);   // 唯一姿势
+// ❌ 禁止 Colors.red / Color(0xFF...) / Theme.of(context).colorScheme.xxx
 ```
+`AppThemeColors.of` 已做**安全兜底**：未挂扩展时按当前 `colorScheme` 现算，不会返回 null。
 
-语义色清单（`AppThemeColors`）：
+语义色别名（页面常用的 Material 名 → Mao Des 名）：
+`cs.onSurface→textPrimary` · `cs.onSurfaceVariant→textSecondary` ·
+`cs.surfaceContainerHighest→surfaceAlt` · `cs.primary→accent` · `cs.error→danger` ·
+`cs.outlineVariant→border`（迁移脚本：`tools/migrate_colors.py`）
 
-| 字段 | 用途 | 默认值（未在色板覆盖时） |
-|---|---|---|
-| `navBar` | AppBar/导航栏 | 主题主色 |
-| `background` | 页面背景 | — |
-| `accent` | 按钮/高亮/进度条/选中态 | — |
-| `onAccent` | accent 上的文字/图标 | 白或深色（随变体） |
-| `card` / `cardBorder` | 卡片与描边 | — |
-| `success` / `successContainer` | **判题对、背题高亮、正确项**（绿系，跨主题恒绿） | `#22C55E` / `#DCFCE7` |
-| `danger` / `dangerContainer` | **判题错、危险操作**（红系，跨主题恒红） | `#EF4444` / `#FEE2E2` |
-| `warning` | 余额不足、未配置提示（橙） | `#F59E0B` |
+判题对错**必须**用 `success`(绿) / `danger`(红)，不随主题偏移。
 
-> ⚠️ 历史教训：曾用 M3 的 `tertiary`（紫）/`error`（红）判题，碧海主题下"正确=粉紫、错误=橙"，与绿对红错心智不符（`quiz_screen.dart` 三处已改语义色）——**重设计时勿回退到 tertiary/error 判题色**。
+### 2.4 组件主题（全套，页面不再裸用默认）
 
-### 2.3 色板速查（重设计改色时务必双套都改）
+`_buildTheme` 内统一定义：`appBarTheme`（**与页面同色 + 底部 hairline**，不再用深色色块）·
+`cardTheme`（18 圆角 + 实色描边）· `filledButtonTheme`/`elevatedButtonTheme`/
+`outlinedButtonTheme`/`textButtonTheme`（统一 14 圆角、46 高、三级层次）·
+`inputDecorationTheme`（14 圆角 + focus 2px 强调环）· `dialogTheme`（24 圆角）·
+`bottomSheetTheme`（顶部 24 圆角 + 拖拽柄）· `snackBarTheme`（浮动 + 14 圆角）·
+`navigationBarTheme`/`navigationRailTheme` · `chipTheme` · `listTileTheme` ·
+`dividerTheme` · `progressIndicatorTheme` · `iconTheme` · `pageTransitionsTheme`
+（统一 `FadeUpwardsPageTransitionsBuilder`，替代默认硬切）
 
-**浅色**（navBar / background / accent）：
-
-| 主题 | navBar | background | accent |
-|---|---|---|---|
-| brand | `#1E3A5F` | `#F0F4F8` | `#2563EB` |
-| eyeCare | `#DAE1D4` | `#FAFAF9` | `#4A7A5D` |
-| minimal | `#E4ECF3` | `#F9FAFB` | `#2DA8A6` |
-| starVoyage | `#1E1B4B` | `#F5F3FF` | `#7C3AED` |
-| oceanGalaxy | `#1A253E` | `#F0F4F9` | `#4C7CD6` |
-
-**深色**（navBar / background / accent / onAccent）：
-
-| 主题 | navBar | background | accent | onAccent |
-|---|---|---|---|---|
-| brand | `#1A2B45` | `#0F172A` | `#60A5FA` | `#0F172A` |
-| eyeCare | `#2C3A31` | `#131713` | `#7BA98A` | `#131713` |
-| minimal | `#17464A` | `#0F1517` | `#57CBC4` | `#0F1517` |
-| starVoyage | `#0F0720` | `#020617` | `#C084FC` | `#020617` |
-| oceanGalaxy | `#1D2A4A` | `#101624` | `#7CA3E8` | `#101624` |
-
-> 卡片/描边：浅色 = 白 / 各主题浅灰蓝；深色 = `card` 略亮于 `background`、`cardBorder` 再亮一档（详见 `_darkColorsOf`）。
-
-### 2.4 主题切换链路
-
-`settings_screen.dart`（主题单选 + 深色模式单选）→ `ThemeService.switchTo(v)` / `switchThemeMode(v)` → `notifyListeners()` → `main.dart` 重建 MaterialApp（theme/darkTheme/themeMode）→ 全页面即时生效。设置页已做三色预览圆点（`previewColorsOf`）。
+### 2.5 图标规范
+常态 outlined / 选中态 filled；尺寸 18（行内）/ 20（按钮）/ 24（导航）。
 
 ---
 
-## 3. 关键 UI 组件地图
+## 3. 关键组件地图
 
 | 区域 | 文件 | 注意点 |
 |---|---|---|
-| 主壳三 Tab | `lib/screens/main_shell.dart` | IndexedStack 保活，切 Tab 触发的刷新回调勿丢 |
-| 首页 | `lib/screens/home_screen.dart` | 战区卡/指标卡/快速操作/月历热力/断点续刷卡 |
-| 答题页（刷题/练习/背题统一） | `lib/screens/quiz_screen.dart` | **判题色=语义色**；底部三按钮单行；未答题有引导提示；**追问=聊天气泡区**（用户右/AI 左） |
-| AI 回复渲染 | `lib/widgets/ai_response_widget.dart` | **自研轻量渲染器**：`**加粗**`/`- 列表`/`# 标题`/Markdown 表格/`代码`/缩进嵌套。**勿换回 flutter_markdown 0.7.1**（中文全角标点后星号解析失败 bug）。表格渲染有测试锁定 |
-| 统计页 | `lib/screens/stats_tab.dart` + `lib/widgets/trend_chart.dart`、`monthly_calendar.dart` | 趋势图轴 `chartMax=max(20, dataMax*1.15)`（小值柱可见）；「按知识点」排行键为 `name/accuracy`（对齐 `_AccuracyRanking`，勿改回 kp 键） |
-| 设置页 | `lib/screens/settings_screen.dart` | API 配置/主题/提醒/保活/调试日志（导出按钮短文案限行） |
-| 错题本/练习/小结 | `error_book_screen.dart` / `practice_screen.dart` / `session_summary_screen.dart` | 答错弹窗逐题下次复习（FSRS 可见化） |
-| 闪屏 | `lib/screens/splash_screen.dart` | **深底闪屏**（浅色导航主题自动向黑加深 35%），1.4s；白色文字 |
-
-各组件均从 `AppThemeColors` 取色；**新增视觉效果请扩展语义色而非硬编码**。
-
----
-
-## 4. UI 重设计红线（改完自检清单）
-
-1. **颜色**：所有色值来自 `AppThemeColors`；新增语义色 → 同时在 `_colorsOf` 与 `_darkColorsOf` 两套色板补值（5×2 共 10 处）
-2. **深色模式**：任何新页面/组件必须在深色变体下可读（文字对比度、卡片层次）；改完切 5 套主题 × 深/浅跑一遍
-3. **文案变化**：发布时 `verify_reference` 会报「多/缺」差异——属预期，走白名单合并流程（见 §5），**不要为了消差异去改 baseline 参考 APK**
-4. **数据层勿动**：schema v9、统计口径（`hidden=0 AND source='real'` 过滤）、`follow_up_messages` 表、备份校验 1..9——UI 改动不要触碰
-5. **安全体系勿动**：`tamper_check.dart`（签名 hash 锁定）、keystore（`keystore/猫卷_*.jks`，**不在 git 中**）、`key_crypto.dart`（v3 加密链）
-6. **测试对应**：`widget_test.dart`（主题/闪屏字）、`ai_response_render_test.dart`（渲染器）、`accuracy_kp_test.dart`、`follow_up_test.dart`、`seven_improvements_test.dart`——改 UI 先看这些测试是否要同步
+| 设计令牌 | `lib/utils/design_tokens.dart` | **唯一取值来源**，改设计先改这里 |
+| 主题 | `lib/services/theme_service.dart` | 3 主题 × 深浅、12 色位、全套组件主题 |
+| 主壳 | `lib/screens/main_shell.dart` | 底部导航加顶部 hairline；宽屏 NavigationRail |
+| 首页 | `lib/screens/home_screen.dart` | Hero 卡用**双色位移渐变**（非透明度衰减，避免发灰） |
+| 答题页 | `lib/screens/quiz_screen.dart` | 判题色 = success/danger；底部按钮单行；追问气泡 |
+| AI 渲染 | `lib/widgets/ai_response_widget.dart` | 自研渲染器，**勿换回 flutter_markdown** |
+| 统计页 | `lib/screens/stats_tab.dart` + `trend_chart.dart` | 轴 `max(20, dataMax*1.15)`；排行键 `name/accuracy` |
+| 闪屏 | `lib/screens/splash_screen.dart` | 主题底 + 浅色文字 |
+| 推广页 | `promo/index.html` | 矢量重绘界面，须与 App 设计同步 |
 
 ---
 
-## 5. 命令链（每次改动后按顺序执行，全部通过才算完成）
+## 4. 改 UI 的红线
+
+1. **取值走令牌**：字号/间距/圆角/阴影/动效一律引用 `design_tokens.dart`
+2. **颜色走语义色**：`AppThemeColors.of(context)`；新增色位须同时在 `_lightOf` 与 `_darkOf` 补齐（3×2 = 6 处）
+3. **深色模式**：新页面必须在 3 套主题 × 深/浅共 6 种形态下可读
+4. **判题色不动**：success(绿)/danger(红)，不用 M3 的 tertiary/error
+5. **文案变化**：会触发 `verify_reference` 文案差异，走白名单合并
+   （`REFCHECK_MERGE=1` 强制合并，见 §5），**不要改 baseline 参考 APK**
+6. **数据层/安全体系不碰**：schema、统计口径、密钥加密、防篡改、AI 渲染器
+7. **测试对应**：`widget_test`（闪屏/首页文案）、`trend_chart_test`（颜色断言）、
+   `selection_highlight_test`（像素判据）、`wide_layout/window_adapt`（坐标断言）
+
+---
+
+## 5. 命令链（每次改动后按序执行）
 
 ```bash
-# 1. 静态检查
+export PATH="/d/dev/flutter/bin:$PATH"
+
 flutter analyze                        # 必须 0 issues
-
-# 2. 自动化测试（109 项）
-flutter test                           # 必须全部通过
-
-# 3. 发布构建（Release + 混淆 + 符号表）
+flutter test                           # 必须 179 项全绿
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 
-# 4. 四维基线校验（组件/权限/文案/资源 对照 reference 原版 APK）
+# 四维基线校验（组件/权限/文案/资源）
 cmd //c "tools\\reference_check\\verify_reference.bat build\\app\\outputs\\flutter-apk\\app-release.apk"
-#    → 若 FAIL：/d/dev/flutter/bin/cache/dart-sdk/bin/dart.exe /tmp/merge_whitelist.dart 合并差异后复验 → 直至 >>> PASS
+#   FAIL 时：REFCHECK_MERGE=1 cmd //c "...verify_reference.bat <apk>" 强制并入白名单，再复验
+#   白名单：reference/known_differences.txt（文案）+ known_manifest_differences.txt（组件权限）
 
-# 5. 签名复验（必须为 43a9e0a1…60fe，保证可覆盖升级）
+# 签名复验（必须 43a9e0a1…60fe）
 "D:/dev/Android/Sdk/build-tools/35.0.0/apksigner.bat" verify --print-certs dist/xxx.apk
 
-# 6. 交付（dist/ 用不混淆版本名，如 猫卷_v1.0.2_描述_日期.apk + .sha256）
-sha256sum "dist/猫卷_v1.0.2_xxx.apk" | tee "dist/猫卷_v1.0.2_xxx.apk.sha256"
+sha256sum "dist/猫卷_v1.27.0_xxx_日期.apk" | tee "dist/....sha256"
 ```
-
-环境变量（Git Bash）：`export PATH="/d/dev/flutter/bin:$PATH"`；JDK21 `D:\dev\jdk21`、Android SDK `D:\dev\Android\Sdk`（构建工具 35.0.0）。
 
 ---
 
-## 6. 已修复缺陷档案（防止回踩）
+## 6. 已修复问题档案（防回踩）
 
-| 轮次 | 修复内容 | commit |
+| 轮次 | 内容 | commit |
 |---|---|---|
-| UI 扫描 | 12 项：AI 渲染 Markdown、对错语义色、趋势轴、按钮竖排、月历可读性、闪屏融合、主题预览、日志按钮、API 输入框、未答提示、文案等 | `b9e43db` / `4c32adc` |
-| 追问聊天 | 聊天气泡 + Markdown 表格渲染 + 按题持久化（schema v9） | `0c077af` |
+| UI 扫描修复 | 12 项：AI 渲染/语义色/趋势轴/按钮竖排/月历/闪屏/主题预览等 | `b9e43db` `4c32adc` |
+| 追问聊天 | 聊天气泡 + Markdown 表格 + 按题持久化（schema v9） | `0c077af` |
 | 排行 null | 按知识点键名对齐（name/accuracy） | `a3be67d` |
-
-**已知待办**：深色下系统原生选择器未专项验证；管理题库/导入页 UI 未实机走查（设备交互受限，代码与测试覆盖）。
+| **UI 重设计** | **全新设计语言 Mao Des：令牌层 + 3 主题 + 全套组件主题** | **`010fe43`→`8a0ea7d`** |
 
 ---
 
-## 7. 给 Qoder CN 的起步 Prompt 骨架
+## 7. 给 AI 助手的起步 Prompt
 
 ```
-你是猫卷（Flutter 刷题 App）的 UI 设计师。先读 docs/UI设计系统与开发指南.md 与
-docs/功能实现路径.md，再动手。遵守：
-1. 颜色一律走 AppThemeColors.of(context)，新语义色须双色板（浅/深 × 5 主题）补齐；
-2. 判题对错用 success/danger 语义色（绿/红），不得用 tertiary/error；
-3. 改完跑 §5 命令链（analyze/test/build/verify）；
-4. 深色模式 5 套都过一遍；文案差异走白名单合并，不改 baseline。
+你是猫卷（Flutter 刷题 App）的 UI 工程师。先读 lib/utils/design_tokens.dart
+与 docs/UI设计系统与开发指南.md，再动手。铁律：
+1. 字号/间距/圆角/阴影/动效一律引用 MaoType/MaoSpace/MaoRadius/MaoShadow/MaoMotion，
+   不写任何字面量；
+2. 颜色一律 AppThemeColors.of(context)，新色位须补齐浅/深两套；
+3. 判题对错用 success/danger（绿/红），不用 tertiary/error；
+4. 改完跑 §5 命令链（analyze/test/build/verify），3 套主题 × 深浅共 6 形态都过一遍；
+5. 文案差异走 REFCHECK_MERGE 白名单合并，不改 baseline。
+
 本轮任务：______
 ```
