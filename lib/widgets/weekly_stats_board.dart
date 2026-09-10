@@ -52,7 +52,6 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
-    final cs = Theme.of(context).colorScheme;
     final now = DateTime.now();
     final todayKey = MonthCalendar.dateKeyOf(now);
     final streakDays = widget.streakDays;
@@ -85,7 +84,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: cs.onSurface,
+                  color: ac.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -98,12 +97,12 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.history, size: 15, color: cs.onSurfaceVariant),
+                        Icon(Icons.history, size: 15, color: ac.textSecondary),
                         const SizedBox(width: 4),
                         Text(
                           '历史报告',
                           style: TextStyle(
-                              fontSize: 13, color: cs.onSurfaceVariant),
+                              fontSize: 13, color: ac.textSecondary),
                         ),
                       ],
                     ),
@@ -120,7 +119,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 value: '${widget.weekTotal}',
                 suffix: ' 道',
                 accent: ac.accent,
-                cs: cs,
+                ac: ac,
               ),
               const SizedBox(width: 12),
               _StatBlock(
@@ -128,7 +127,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 value: widget.weekAccuracy.toStringAsFixed(0),
                 suffix: '%',
                 accent: ac.accent,
-                cs: cs,
+                ac: ac,
               ),
             ],
           ),
@@ -149,7 +148,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: cs.onSurface),
+                    color: ac.textPrimary),
               ),
             ],
           ),
@@ -203,17 +202,18 @@ class _StatBlock extends StatelessWidget {
     required this.value,
     required this.suffix,
     required this.accent,
-    required this.cs,
+    required this.ac,
   });
 
   final String label;
   final String value;
   final String suffix;
   final Color accent;
-  final ColorScheme cs;
+  final AppThemeColors ac;
 
   @override
   Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -236,7 +236,7 @@ class _StatBlock extends StatelessWidget {
                   ),
                   TextSpan(
                     text: suffix,
-                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
                   ),
                 ],
               ),
@@ -244,7 +244,7 @@ class _StatBlock extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
             ),
           ],
         ),

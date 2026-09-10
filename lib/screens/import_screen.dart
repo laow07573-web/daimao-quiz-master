@@ -48,10 +48,9 @@ class _ImportScreenState extends State<ImportScreen> {
   @override
   Widget build(BuildContext context) {
     // v1.0.2 设计审查修复：整页蓝白硬编码 → 主题色（此前切换任意主题都不变）
-    final cs = Theme.of(context).colorScheme;
     final ac = AppThemeColors.of(context);
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       appBar: AppBar(
         title: const Text('导入题库'),
         elevation: 0,
@@ -78,13 +77,13 @@ class _ImportScreenState extends State<ImportScreen> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [cs.primary, cs.primary.withOpacity(0.8)],
+                      colors: [ac.accent, ac.accent.withOpacity(0.8)],
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.auto_awesome, color: cs.onPrimary, size: 22),
+                      Icon(Icons.auto_awesome, color: ac.onAccent, size: 22),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -92,14 +91,14 @@ class _ImportScreenState extends State<ImportScreen> {
                           children: [
                             Text('AI 智能解析',
                                 style: TextStyle(
-                                    color: cs.onPrimary,
+                                    color: ac.onAccent,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15)),
                             const SizedBox(height: 4),
                             Text(
                               '自动提取题干、选项、答案，兼容各种 DOCX 格式',
                               style: TextStyle(
-                                  color: cs.onPrimary.withOpacity(0.7),
+                                  color: ac.onAccent.withOpacity(0.7),
                                   fontSize: 12),
                             ),
                           ],
@@ -128,7 +127,7 @@ class _ImportScreenState extends State<ImportScreen> {
                         child: Text(
                           '支持 .docx 格式。解析后先预览题目，可编辑、删除后再确认入库。\n旧版 .doc 文件请先用 Word 另存为 .docx。',
                           style: TextStyle(
-                              fontSize: 13, color: cs.onSurfaceVariant),
+                              fontSize: 13, color: ac.textSecondary),
                         ),
                       ),
                     ],
@@ -169,7 +168,7 @@ class _ImportScreenState extends State<ImportScreen> {
                                   '内置 10 道医学示例题（单选/多选/判断），无需文件立即体验',
                                   style: TextStyle(
                                       fontSize: 13,
-                                      color: cs.onSurfaceVariant)),
+                                      color: ac.textSecondary)),
                             ],
                           ),
                         ),
@@ -196,7 +195,7 @@ class _ImportScreenState extends State<ImportScreen> {
                     child: Column(
                       children: [
                         Icon(Icons.cloud_upload_outlined,
-                            size: 48, color: cs.onSurfaceVariant),
+                            size: 48, color: ac.textSecondary),
                         const SizedBox(height: 12),
                         Text('点击选择 DOCX 文件',
                             style: TextStyle(
@@ -204,17 +203,17 @@ class _ImportScreenState extends State<ImportScreen> {
                         const SizedBox(height: 4),
                         Text('AI 将自动识别题目、选项和答案',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: ac.textSecondary)),
                         const SizedBox(height: 4),
                         // v1.0.2 对齐里程碑：JSON 直导入库提示
                         Text('导入 .json 题库文件，无需 AI 解析，题目答案直接入库',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: ac.textSecondary)),
                         const SizedBox(height: 4),
                         Text(
                             '选择本软件导出的 .json 题库文件（可多选）。导入完成后会显示导入报告。',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: ac.textSecondary)),
                       ],
                     ),
                   ),
@@ -228,7 +227,7 @@ class _ImportScreenState extends State<ImportScreen> {
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: cs.onSurface)),
+                          color: ac.textPrimary)),
                   const SizedBox(height: 8),
                   for (var index = 0; index < _selectedFiles.length; index++)
                     Card(
@@ -269,10 +268,10 @@ class _ImportScreenState extends State<ImportScreen> {
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: BoxDecoration(
-                color: cs.surface,
+                color: ac.background,
                 border: Border(
                     top: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.6))),
+                        color: ac.border.withOpacity(0.6))),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -292,7 +291,7 @@ class _ImportScreenState extends State<ImportScreen> {
                           return Text(
                             '💰 余额 ¥${appState.aiService!.cachedBalance!.toStringAsFixed(2)}，预估可再导入 ${remaining > 0 ? "~$remaining 题" : "..."}',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant),
+                                fontSize: 13, color: ac.textSecondary),
                           );
                         },
                       ),
@@ -378,13 +377,13 @@ class _ImportScreenState extends State<ImportScreen> {
                           Text(appState.importStatus,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                  fontSize: 13, color: cs.onSurfaceVariant)),
+                                  fontSize: 13, color: ac.textSecondary)),
                           const SizedBox(height: 4),
                           Text('可离开本页，导入会继续在后台进行，进度在首页展示',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   fontSize: 13,
-                                  color: cs.onSurfaceVariant.withOpacity(0.8))),
+                                  color: ac.textSecondary.withOpacity(0.8))),
                         ],
                       ),
                     ),

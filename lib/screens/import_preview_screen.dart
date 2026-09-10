@@ -24,7 +24,6 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
       builder: (context, appState, _) {
         final questions = appState.previewQuestions;
         // v1.0.2 设计审查修复：整页蓝白硬编码 → 主题色。
-        final cs = Theme.of(context).colorScheme;
         final ac = AppThemeColors.of(context);
 
         // v1.27：按校验结果分类（统计栏计数 + 徽章点击筛选题目共用）。
@@ -52,7 +51,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
             : classified.where((c) => c.cls == _filter).toList();
 
         return Scaffold(
-          backgroundColor: cs.surface,
+          backgroundColor: ac.background,
           appBar: AppBar(
             title: Text('预览: ${appState.previewBankName}'),
             elevation: 0,
@@ -82,7 +81,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                       : '解析完成，共 0 道题目',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 14, color: cs.onSurfaceVariant)))
+                          fontSize: 14, color: ac.textSecondary)))
               : Column(
                   children: [
                     // 统计栏（v1.27：徽章可点击筛选对应分类题目）
@@ -97,12 +96,12 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                           if (_filter != _PreviewFilter.all) ...[
                             Text('已筛出 ${shown.length} 题 · 再点徽章可取消',
                                 style: TextStyle(
-                                    fontSize: 12.5, color: cs.onSurfaceVariant)),
+                                    fontSize: 12.5, color: ac.textSecondary)),
                             const SizedBox(width: 8),
                           ],
                           Text('共 ${questions.length} 题',
                               style: TextStyle(
-                                  fontSize: 13, color: cs.onSurfaceVariant)),
+                                  fontSize: 13, color: ac.textSecondary)),
                         ],
                       ),
                     ),
@@ -121,7 +120,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                         child: Text(
                           '${appState.previewParseErrors.length} 个分块解析失败（已跳过）：'
                           '${appState.previewParseErrors.join('；')}',
-                          style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                          style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
                         ),
                       ),
 
@@ -131,7 +130,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                           ? Center(
                               child: Text('该分类下暂无题目',
                                   style: TextStyle(
-                                      fontSize: 13, color: cs.onSurfaceVariant)))
+                                      fontSize: 13, color: ac.textSecondary)))
                           : ListView.builder(
                               padding: const EdgeInsets.all(12),
                               itemCount: shown.length,
@@ -327,7 +326,6 @@ class _QuestionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // v1.0.2 设计审查修复：硬编码色 → 主题色/语义色
-    final cs = Theme.of(context).colorScheme;
     final ac = AppThemeColors.of(context);
     final hasError = errors.any((e) => e.isError);
     return Container(
@@ -340,7 +338,7 @@ class _QuestionCard extends StatelessWidget {
             : null,
         boxShadow: [
           BoxShadow(
-              color: cs.shadow.withOpacity(0.03),
+              color: ac.border.withOpacity(0.03),
               blurRadius: 6,
               offset: const Offset(0, 1)),
         ],
@@ -356,11 +354,11 @@ class _QuestionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.1),
+                    color: ac.accent.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text('第 ${index + 1} 题',
-                      style: TextStyle(fontSize: 12.5, color: cs.primary)),
+                      style: TextStyle(fontSize: 12.5, color: ac.accent)),
                 ),
                 const SizedBox(width: 8),
                 if (question.questionType == 'multi_choice')
@@ -392,7 +390,7 @@ class _QuestionCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: question.title.isEmpty ? ac.danger : cs.onSurface,
+                color: question.title.isEmpty ? ac.danger : ac.textPrimary,
               ),
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
@@ -409,7 +407,7 @@ class _QuestionCard extends StatelessWidget {
                 children: question.optionsWithLabels.map((o) => Text(
                       o,
                       style: TextStyle(
-                          fontSize: 13, color: cs.onSurfaceVariant),
+                          fontSize: 13, color: ac.textSecondary),
                     )).toList(),
               ),
             ),
@@ -550,7 +548,6 @@ class _EditCardState extends State<_EditCard> {
   @override
   Widget build(BuildContext context) {
     // v1.0.2 设计审查修复：硬编码色 → 主题色
-    final cs = Theme.of(context).colorScheme;
     final ac = AppThemeColors.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -558,7 +555,7 @@ class _EditCardState extends State<_EditCard> {
       decoration: BoxDecoration(
         color: ac.card,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.primary),
+        border: Border.all(color: ac.accent),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

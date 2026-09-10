@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -258,7 +259,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Scaffold(
       // v1.0.2 对齐里程碑：开发者模式（已开启）
       appBar: AppBar(
@@ -273,12 +274,13 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
       ),
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
-        child: !_unlocked ? _buildLock(cs) : _buildPanel(cs),
+        child: !_unlocked ? _buildLock(ac) : _buildPanel(ac),
       ),
     );
   }
 
-  Widget _buildLock(ColorScheme cs) {
+  Widget _buildLock(AppThemeColors ac) {
+    final ac = AppThemeColors.of(context);
     final controller = _lockController;
     return Center(
       child: Padding(
@@ -286,7 +288,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline, size: 56, color: cs.primary),
+            Icon(Icons.lock_outline, size: 56, color: ac.accent),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
@@ -326,7 +328,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
     );
   }
 
-  Widget _buildPanel(ColorScheme cs) {
+  Widget _buildPanel(AppThemeColors ac) {
+    final ac = AppThemeColors.of(context);
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
@@ -429,7 +432,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Text(_status!,
-                style: TextStyle(fontSize: 13, color: cs.primary)),
+                style: TextStyle(fontSize: 13, color: ac.accent)),
           ),
       ],
     );
@@ -451,19 +454,19 @@ class _DevCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          color: ac.surfaceAlt.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: cs.primary),
+            Icon(icon, size: 20, color: ac.accent),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -473,15 +476,15 @@ class _DevCard extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: cs.onSurface)),
+                          color: ac.textPrimary)),
                   if (subtitle != null)
                     Text(subtitle!,
                         style: TextStyle(
-                            fontSize: 12.5, color: cs.onSurfaceVariant)),
+                            fontSize: 12.5, color: ac.textSecondary)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
+            Icon(Icons.chevron_right, size: 18, color: ac.textSecondary),
           ],
         ),
       ),

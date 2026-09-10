@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -19,9 +20,9 @@ class BankManageScreen extends StatefulWidget {
 class _BankManageScreenState extends State<BankManageScreen> {
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       appBar: AppBar(
         title: const Text('题库管理'),
         actions: [
@@ -44,10 +45,10 @@ class _BankManageScreenState extends State<BankManageScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.library_books_outlined,
-                      size: 64, color: cs.outlineVariant),
+                      size: 64, color: ac.border),
                   const SizedBox(height: 16),
                   Text('还没有题库',
-                      style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant)),
+                      style: TextStyle(fontSize: 16, color: ac.textSecondary)),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.upload_file),
@@ -65,7 +66,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
 
           return Column(
             children: [
-              _buildQuizSettings(appState, cs),
+              _buildQuizSettings(appState, ac),
               const Divider(height: 1),
               Expanded(
                 // v1.0.3 宽屏重设计：宽屏题库卡 2 列网格，窄屏维持单列
@@ -77,7 +78,6 @@ class _BankManageScreenState extends State<BankManageScreen> {
                     return _BankCard(
                       bank: bank,
                       isSelected: isSelected,
-                      cs: cs,
                       onTap: () => appState.toggleBankSelection(bank.id!),
                       onDelete: () => _confirmDelete(context, appState, bank),
                       onExport: () => _exportBank(context, bank),
@@ -113,25 +113,26 @@ class _BankManageScreenState extends State<BankManageScreen> {
     );
   }
 
-  Widget _buildQuizSettings(AppState appState, ColorScheme cs) {
+  Widget _buildQuizSettings(AppState appState, AppThemeColors ac) {
+    final ac = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
-      color: cs.surfaceContainerHighest,
+      color: ac.surfaceAlt,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.tune, size: 18, color: cs.primary),
+              Icon(Icons.tune, size: 18, color: ac.accent),
               const SizedBox(width: 6),
               Text('刷题设置',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: cs.onSurface)),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ac.textPrimary)),
               const Spacer(),
               Text(
                 appState.selectedBankIds.isEmpty
                     ? '点击题目前方选择框'
                     : '已选 ${appState.selectedBankIds.length} 个题库',
-                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                style: TextStyle(fontSize: 13, color: ac.textSecondary),
               ),
             ],
           ),
@@ -139,14 +140,14 @@ class _BankManageScreenState extends State<BankManageScreen> {
           Row(
             children: [
               Text('刷题模式: ',
-                  style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
+                  style: TextStyle(fontSize: 14, color: ac.textSecondary)),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: (appState.selectedBankIds.length > 1
-                          ? cs.secondary
-                          : cs.primary)
+                          ? ac.textSecondary
+                          : ac.accent)
                       .withOpacity(0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -155,8 +156,8 @@ class _BankManageScreenState extends State<BankManageScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     color: appState.selectedBankIds.length > 1
-                        ? cs.secondary
-                        : cs.primary,
+                        ? ac.textSecondary
+                        : ac.accent,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -170,7 +171,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
 
   void _confirmDelete(
       BuildContext context, AppState appState, QuestionBank bank) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -185,7 +186,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
               appState.deleteBank(bank.id!);
               Navigator.pop(ctx);
             },
-            style: TextButton.styleFrom(foregroundColor: cs.error),
+            style: TextButton.styleFrom(foregroundColor: ac.danger),
             child: const Text('删除'),
           ),
         ],
@@ -228,7 +229,6 @@ class _BankManageScreenState extends State<BankManageScreen> {
 class _BankCard extends StatelessWidget {
   final QuestionBank bank;
   final bool isSelected;
-  final ColorScheme cs;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onExport;
@@ -236,7 +236,6 @@ class _BankCard extends StatelessWidget {
   const _BankCard({
     required this.bank,
     required this.isSelected,
-    required this.cs,
     required this.onTap,
     required this.onDelete,
     required this.onExport,
@@ -244,16 +243,17 @@ class _BankCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
+          color: ac.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? cs.primary : cs.outlineVariant,
+            color: isSelected ? ac.accent : ac.border,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -265,15 +265,15 @@ class _BankCard extends StatelessWidget {
                 width: 22,
                 height: 22,
                 decoration: BoxDecoration(
-                  color: isSelected ? cs.primary : Colors.transparent,
+                  color: isSelected ? ac.accent : Colors.transparent,
                   border: Border.all(
-                    color: isSelected ? cs.primary : cs.outlineVariant,
+                    color: isSelected ? ac.accent : ac.border,
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: isSelected
-                    ? Icon(Icons.check, size: 16, color: cs.onPrimary)
+                    ? Icon(Icons.check, size: 16, color: ac.onAccent)
                     : null,
               ),
             ),
@@ -284,23 +284,23 @@ class _BankCard extends StatelessWidget {
                 children: [
                   Text(bank.name,
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                          fontSize: 15, fontWeight: FontWeight.w600, color: ac.textPrimary)),
                   const SizedBox(height: 4),
                   Text('${bank.questionCount} 道题目',
                       style: TextStyle(
-                          fontSize: 13, color: cs.onSurfaceVariant)),
+                          fontSize: 13, color: ac.textSecondary)),
                 ],
               ),
             ),
             IconButton(
               tooltip: '导出题库',
               icon: Icon(Icons.file_download_outlined,
-                  color: cs.onSurfaceVariant, size: 20),
+                  color: ac.textSecondary, size: 20),
               onPressed: onExport,
             ),
             IconButton(
               icon: Icon(Icons.delete_outline,
-                  color: cs.onSurfaceVariant, size: 20),
+                  color: ac.textSecondary, size: 20),
               onPressed: onDelete,
             ),
           ],

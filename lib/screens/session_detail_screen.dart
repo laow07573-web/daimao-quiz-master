@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
@@ -70,7 +71,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     final s = _session;
     return Scaffold(
       appBar: AppBar(title: const Text('会话详情')),
@@ -85,7 +86,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withOpacity(0.5),
+                    color: ac.surfaceAlt.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
@@ -102,7 +103,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 ),
                 const SizedBox(height: 14),
                 if (_error != null)
-                  Text(_error!, style: TextStyle(color: cs.error))
+                  Text(_error!, style: TextStyle(color: ac.danger))
                 else if (_records!.isEmpty)
                   // v1.0.2 对齐里程碑：暂无该次作答记录
                   Padding(
@@ -110,7 +111,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     child: Center(
                       child: Text('暂无该次作答记录',
                           style: TextStyle(
-                              fontSize: 13, color: cs.onSurfaceVariant)),
+                              fontSize: 13, color: ac.textSecondary)),
                     ),
                   )
                 else
@@ -143,7 +144,7 @@ class _Info extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Expanded(
       child: Column(
         children: [
@@ -151,9 +152,9 @@ class _Info extends StatelessWidget {
               style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: cs.onSurface)),
+                  color: ac.textPrimary)),
           Text(label,
-              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 11.5, color: ac.textSecondary)),
         ],
       ),
     );
@@ -170,7 +171,7 @@ class _RecordTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     final isCorrect = (record['is_correct'] as int?) == 1;
     final title = (record['question_title'] as String?) ?? '未知题目';
     final userAnswer = (record['user_answer'] as String?)?.trim() ?? '';
@@ -180,7 +181,7 @@ class _RecordTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.4),
+        color: ac.surfaceAlt.withOpacity(0.4),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -194,7 +195,7 @@ class _RecordTile extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: (isCorrect ? cs.primary : cs.error).withOpacity(0.15),
+                  color: (isCorrect ? ac.accent : ac.danger).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -202,7 +203,7 @@ class _RecordTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
-                    color: isCorrect ? cs.primary : cs.error,
+                    color: isCorrect ? ac.accent : ac.danger,
                   ),
                 ),
               ),
@@ -212,7 +213,7 @@ class _RecordTile extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      TextStyle(fontSize: 13, color: cs.onSurface),
+                      TextStyle(fontSize: 13, color: ac.textPrimary),
                 ),
               ),
             ],
@@ -220,14 +221,14 @@ class _RecordTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '你的答案：${userAnswer.isEmpty ? '（未作答）' : userAnswer}',
-            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+            style: TextStyle(fontSize: 13, color: ac.textSecondary),
           ),
           if (correctAnswer.isNotEmpty)
             Text(
               '正确答案：$correctAnswer',
               style: TextStyle(
                 fontSize: 13,
-                color: isCorrect ? cs.onSurfaceVariant : cs.error,
+                color: isCorrect ? ac.textSecondary : ac.danger,
               ),
             ),
           // v1.0.2 对齐里程碑：改判
@@ -238,7 +239,7 @@ class _RecordTile extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 foregroundColor:
-                    isCorrect ? cs.onSurfaceVariant : cs.tertiary,
+                    isCorrect ? ac.textSecondary : ac.accent,
               ),
               onPressed: disabled ? null : () => onRejudge(!isCorrect),
               child: Text(

@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import '../services/debug_log_service.dart';
 
@@ -21,8 +22,8 @@ class AiResponseWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textColor = color ?? cs.onSurface;
+    final ac = AppThemeColors.of(context);
+    final textColor = color ?? ac.textPrimary;
     final base = TextStyle(
       fontSize: fontSize,
       height: 1.6,
@@ -31,7 +32,7 @@ class AiResponseWidget extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: _parseBlocks(_sanitize(text)).map((b) => _buildBlock(b, base, cs)).toList(),
+      children: _parseBlocks(_sanitize(text)).map((b) => _buildBlock(b, base, ac)).toList(),
     );
   }
 
@@ -127,12 +128,12 @@ class AiResponseWidget extends StatelessWidget {
 
   // ======================== 块级渲染 ========================
 
-  Widget _buildBlock(_Block block, TextStyle base, ColorScheme cs) {
+  Widget _buildBlock(_Block block, TextStyle base, AppThemeColors ac) {
     if (block is _TableBlock) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Table(
-          border: TableBorder.all(color: cs.outlineVariant.withOpacity(0.6), width: 0.6),
+          border: TableBorder.all(color: ac.border.withOpacity(0.6), width: 0.6),
           columnWidths: {
             for (var c = 0; c < block.rows.first.length; c++) c: const FlexColumnWidth(),
           },

@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
 import '../models/ink_annotation.dart';
@@ -43,13 +44,13 @@ class AnnotationToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
         return Container(
           width: double.infinity,
-          color: cs.surfaceContainerHighest,
+          color: ac.surfaceAlt,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -123,7 +124,7 @@ class AnnotationToolbar extends StatelessWidget {
                       icon: Icons.delete_outline,
                       label: '删选中',
                       shortcut: shortcuts ? 'Delete' : null,
-                      color: cs.error,
+                      color: ac.danger,
                       selected: false,
                       onTap: () => controller.deleteSelected(),
                     ),
@@ -132,7 +133,7 @@ class AnnotationToolbar extends StatelessWidget {
                     icon: Icons.delete_sweep_outlined,
                     label: '清全部',
                     shortcut: shortcuts ? 'Ctrl+Del' : null,
-                    color: cs.error,
+                    color: ac.danger,
                     selected: false,
                     onTap: () => _confirmClear(context, '一键清除旧手写批注'),
                   ),
@@ -142,7 +143,7 @@ class AnnotationToolbar extends StatelessWidget {
                     icon: Icons.delete_sweep_outlined,
                     label: '清草稿',
                     shortcut: shortcuts ? 'Ctrl+Del' : null,
-                    color: cs.error,
+                    color: ac.danger,
                     selected: false,
                     onTap: () => _confirmClear(context, '清空本次草稿'),
                   ),
@@ -156,7 +157,7 @@ class AnnotationToolbar extends StatelessWidget {
                       style: const TextStyle(fontSize: 13)),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    foregroundColor: cs.primary,
+                    foregroundColor: ac.accent,
                   ),
                 ),
               ],
@@ -227,8 +228,8 @@ class _ToolIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final effective = color ?? cs.onSurfaceVariant;
+    final ac = AppThemeColors.of(context);
+    final effective = color ?? ac.textSecondary;
     return Tooltip(
       message: shortcut == null ? label : '$label ($shortcut)',
       child: InkWell(
@@ -237,10 +238,10 @@ class _ToolIcon extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: selected ? cs.primary.withOpacity(0.12) : null,
+            color: selected ? ac.accent.withOpacity(0.12) : null,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 20, color: selected ? cs.primary : effective),
+          child: Icon(icon, size: 20, color: selected ? ac.accent : effective),
         ),
       ),
     );

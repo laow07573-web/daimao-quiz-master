@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
 class PracticeAnswerState {
@@ -23,27 +24,27 @@ class AnswerSheetWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('答题卡', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurface)),
+          Text('答题卡', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: ac.textPrimary)),
           const SizedBox(height: 4),
           Row(
             children: [
               if (showResult) ...[
-                _legend(cs.tertiary, '答对'),
+                _legend(ac.accent, '答对'),
                 const SizedBox(width: 12),
-                _legend(cs.error, '答错'),
+                _legend(ac.danger, '答错'),
                 const SizedBox(width: 12),
-                _legend(cs.onSurfaceVariant, '未答'),
+                _legend(ac.textSecondary, '未答'),
               ] else ...[
-                _legend(cs.primary, '已答'),
+                _legend(ac.accent, '已答'),
                 const SizedBox(width: 12),
-                _legend(cs.onSurfaceVariant, '未答'),
+                _legend(ac.textSecondary, '未答'),
               ],
             ],
           ),
@@ -56,21 +57,21 @@ class AnswerSheetWidget extends StatelessWidget {
               Color bg;
               Color fg;
               if (!a.answered) {
-                bg = cs.surfaceContainerHighest;
-                fg = cs.onSurfaceVariant;
+                bg = ac.surfaceAlt;
+                fg = ac.textSecondary;
               } else if (showResult && a.correct) {
-                bg = cs.tertiary.withOpacity(0.2);
-                fg = cs.tertiary;
+                bg = ac.accent.withOpacity(0.2);
+                fg = ac.accent;
               } else if (showResult) {
-                bg = cs.error.withOpacity(0.2);
-                fg = cs.error;
+                bg = ac.danger.withOpacity(0.2);
+                fg = ac.danger;
               } else {
                 // 练习模式：已答用主题色（不判定对错）
-                bg = cs.primary.withOpacity(0.2);
-                fg = cs.primary;
+                bg = ac.accent.withOpacity(0.2);
+                fg = ac.accent;
               }
               if (i == currentIndex) {
-                bg = cs.primaryContainer;
+                bg = ac.accentSoft;
               }
               return GestureDetector(
                 onTap: () => onJumpTo(i),
@@ -80,7 +81,7 @@ class AnswerSheetWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: bg,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: i == currentIndex ? cs.primary : cs.outlineVariant, width: i == currentIndex ? 2 : 1),
+                    border: Border.all(color: i == currentIndex ? ac.accent : ac.border, width: i == currentIndex ? 2 : 1),
                   ),
                   alignment: Alignment.center,
                   child: Text('${i + 1}',

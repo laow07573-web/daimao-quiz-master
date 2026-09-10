@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
 /// 单月打卡日历（v1.0.2 UI 设计稿）
@@ -32,18 +33,17 @@ class MonthCalendar extends StatelessWidget {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   /// 热力色阶（与首页/统计页统一口径）
-  static Color heatColor(int total, ColorScheme cs) {
-    if (total <= 0) return cs.surfaceContainerHighest.withOpacity(0.55);
-    // v1.0.2 UI 审查修复：加深色阶（0.2/0.4/0.65 → 0.28/0.52/0.85），
-    // 浅色主题下「少/达标/多」区分度不足
-    if (total < 50) return cs.primary.withOpacity(0.28);
-    if (total < 200) return cs.primary.withOpacity(0.52);
-    return cs.primary.withOpacity(0.85);
+  static Color heatColor(int total, AppThemeColors ac) {
+    if (total <= 0) return ac.surfaceAlt.withOpacity(0.55);
+    // 加深色阶：「少/达标/多」区分度足
+    if (total < 50) return ac.accent.withOpacity(0.28);
+    if (total < 200) return ac.accent.withOpacity(0.52);
+    return ac.accent.withOpacity(0.85);
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final firstWeekday = DateTime(year, month, 1).weekday; // 1=周一
     final leading = firstWeekday - 1;
@@ -61,7 +61,7 @@ class MonthCalendar extends StatelessWidget {
               const Spacer(),
               Text('$year年',
                   style: TextStyle(
-                      fontSize: 11.5, color: cs.onSurfaceVariant)),
+                      fontSize: 11.5, color: ac.textSecondary)),
             ],
           ),
         ),
@@ -81,7 +81,7 @@ class MonthCalendar extends StatelessWidget {
                 childAspectRatio: cellW / cellH,
                 children: [
                   for (var i = 0; i < 42; i++)
-                    _buildCell(i - leading + 1, daysInMonth, cs),
+                    _buildCell(i - leading + 1, daysInMonth, ac),
                 ],
               ),
             );
@@ -91,7 +91,7 @@ class MonthCalendar extends StatelessWidget {
     );
   }
 
-  Widget _buildCell(int day, int daysInMonth, ColorScheme cs) {
+  Widget _buildCell(int day, int daysInMonth, AppThemeColors ac) {
     if (day < 1 || day > daysInMonth) {
       return const SizedBox.shrink();
     }
@@ -99,7 +99,7 @@ class MonthCalendar extends StatelessWidget {
     final total = dailyTotals[key] ?? 0;
     final isToday = todayKey != null && key == todayKey;
     final isVacation = vacationDays.contains(key);
-    final color = isVacation ? cs.error.withOpacity(0.55) : _heat(total, cs);
+    final color = isVacation ? ac.danger.withOpacity(0.55) : _heat(total, ac);
 
     return InkWell(
       borderRadius: BorderRadius.circular(4),
@@ -110,7 +110,7 @@ class MonthCalendar extends StatelessWidget {
           color: color,
           borderRadius: BorderRadius.circular(4),
           border: isToday
-              ? Border.all(color: _todayColor(cs), width: 1.5)
+              ? Border.all(color: _todayColor(ac), width: 1.5)
               : null,
         ),
         alignment: Alignment.center,
@@ -121,15 +121,15 @@ class MonthCalendar extends StatelessWidget {
             fontSize: 12.5,
             fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
             color: isVacation
-                ? cs.onErrorContainer
-                : _cellTextColor(total, cs),
+                ? ac.danger
+                : _cellTextColor(total, ac),
           ),
         ),
       ),
     );
   }
 
-  Color _heat(int total, ColorScheme cs) {
+  Color _heat(int total, AppThemeColors ac) {
     final custom = heatColors;
     if (custom != null && custom.length >= 4) {
       if (total <= 0) return custom[0];
@@ -137,17 +137,17 @@ class MonthCalendar extends StatelessWidget {
       if (total < 200) return custom[2];
       return custom[3];
     }
-    return MonthCalendar.heatColor(total, cs);
+    return MonthCalendar.heatColor(total, ac);
   }
 
-  Color _todayColor(ColorScheme cs) {
+  Color _todayColor(AppThemeColors ac) {
     final custom = heatColors;
     if (custom != null && custom.length >= 4) return custom[3];
-    return cs.primary;
+    return ac.accent;
   }
 
-  Color _cellTextColor(int total, ColorScheme cs) {
-    if (total <= 0) return cs.onSurfaceVariant.withOpacity(0.55);
-    return cs.onSurface;
+  Color _cellTextColor(int total, AppThemeColors ac) {
+    if (total <= 0) return ac.textSecondary.withOpacity(0.55);
+    return ac.textPrimary;
   }
 }

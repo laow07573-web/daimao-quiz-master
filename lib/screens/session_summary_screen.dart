@@ -43,15 +43,15 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
     final accuracy = session.accuracy;
     final minutes = session.durationSeconds ~/ 60;
     final seconds = session.durationSeconds % 60;
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       appBar: AppBar(
         title: const Text('刷题小结'),
         elevation: 0,
-        backgroundColor: cs.primary,
-        foregroundColor: cs.onPrimary,
+        backgroundColor: ac.accent,
+        foregroundColor: ac.onAccent,
         automaticallyImplyLeading: false,
       ),
       // 平板适配：内容限宽居中（手机无影响）
@@ -66,7 +66,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [cs.primary, cs.primary.withAlpha(200)],
+                  colors: [ac.accent, ac.accent.withAlpha(200)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -75,17 +75,17 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               child: Column(
                 children: [
                   Text('本次刷题完成',
-                      style: TextStyle(color: cs.onPrimary.withOpacity(0.7), fontSize: 14)),
+                      style: TextStyle(color: ac.onAccent.withOpacity(0.7), fontSize: 14)),
                   const SizedBox(height: 12),
                   Text('${accuracy.toStringAsFixed(1)}%',
                       style: TextStyle(
-                          color: cs.onPrimary,
+                          color: ac.onAccent,
                           fontSize: 48,
                           fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('正确率',
                       style: TextStyle(
-                          color: cs.onPrimary.withOpacity(0.8), fontSize: 14)),
+                          color: ac.onAccent.withOpacity(0.8), fontSize: 14)),
                 ],
               ),
             ),
@@ -100,9 +100,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.quiz_outlined,
                     label: '总题量',
                     value: '${session.totalQuestions}',
-                    color: cs.primary,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    color: ac.accent,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -113,8 +113,8 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     value: '${session.correctCount}',
                     // v1.0.2 设计审查修复：硬编码绿色 → 主题语义色
                     color: AppThemeColors.of(context).success,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -123,9 +123,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.cancel_outlined,
                     label: '错误',
                     value: '${session.wrongCount}',
-                    color: cs.error,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    color: ac.danger,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -134,9 +134,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.timer_outlined,
                     label: '用时',
                     value: '$minutes\'${seconds.toString().padLeft(2, '0')}"',
-                    color: cs.secondary,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    color: ac.textSecondary,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
               ],
@@ -149,7 +149,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
+                color: ac.surfaceAlt,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -158,11 +158,11 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                   Row(
                     children: [
                       Icon(Icons.auto_awesome,
-                          color: cs.secondary, size: 20),
+                          color: ac.textSecondary, size: 20),
                       const SizedBox(width: 8),
                       Text('AI 小结',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15, color: cs.onSurface)),
+                              fontWeight: FontWeight.bold, fontSize: 15, color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -170,13 +170,13 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     Center(
                         child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: CircularProgressIndicator(color: cs.primary),
+                      child: CircularProgressIndicator(color: ac.accent),
                     ))
                   else
                     AiResponseWidget(
                       text: _summaryText ?? '生成小结失败',
                       fontSize: 14,
-                      color: cs.onSurface,
+                      color: ac.textPrimary,
                     ),
                 ],
               ),

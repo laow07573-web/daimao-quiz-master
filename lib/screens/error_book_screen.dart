@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -143,6 +144,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
 
   /// v1.0.2 对齐原版：知识点标签点击 → 底部弹窗列出该知识点题目，可复习
   Future<void> _showKpQuestions(String kp) async {
+    final ac = AppThemeColors.of(context);
     final appState = context.read<AppState>();
     final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
     final questions =
@@ -152,10 +154,9 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     final cards = await appState.getFsrsCardsByIds(
         questions.map((q) => q.id).whereType<int>().toList());
     if (!mounted) return;
-    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
@@ -172,7 +173,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant.withOpacity(0.3),
+                      color: ac.textSecondary.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(2)),
                 ),
               ),
@@ -181,12 +182,12 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: cs.onSurface)),
+                      color: ac.textPrimary)),
               const SizedBox(height: 10),
               if (questions.isEmpty)
                 Text('该知识点暂无符合条件的题目',
                     style: TextStyle(
-                        fontSize: 13, color: cs.onSurfaceVariant))
+                        fontSize: 13, color: ac.textSecondary))
               else
                 Flexible(
                   child: ListView.builder(
@@ -206,7 +207,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontSize: 13, color: cs.onSurface),
+                                    fontSize: 13, color: ac.textPrimary),
                               ),
                             ),
                             // v1.0.2 FSRS 可见化：下次复习时间（到期红色）
@@ -218,8 +219,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                   fontSize: 12.5,
                                   color: FSRSService.isDue(
                                           card, DateTime.now())
-                                      ? cs.error
-                                      : cs.onSurfaceVariant,
+                                      ? ac.danger
+                                      : ac.textSecondary,
                                 ),
                               ),
                             ],
@@ -326,7 +327,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('（共 $count 题）已导出为 .json 文件。'),
-        backgroundColor: Theme.of(context).colorScheme.tertiary,
+        backgroundColor: AppThemeColors.of(context).warning,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -414,10 +415,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       appBar: AppBar(
         title: const Text('错题本'),
         actions: [
@@ -439,13 +440,13 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.check_circle_outline,
-                          size: 64, color: cs.primary.withOpacity(0.6)),
+                          size: 64, color: ac.accent.withOpacity(0.6)),
                       const SizedBox(height: 16),
                       Text(_emptyText, style: const TextStyle(fontSize: 16)),
                       const SizedBox(height: 8),
                       Text('继续刷题积累吧！',
                           style: TextStyle(
-                              fontSize: 13, color: cs.onSurfaceVariant)),
+                              fontSize: 13, color: ac.textSecondary)),
                     ],
                   ),
                 )
@@ -485,13 +486,13 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                           Text(
                             '共 ${_totalCount} 题待复习',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurface),
+                                fontSize: 13, color: ac.textPrimary),
                           ),
                           const SizedBox(width: 10),
                           Text(
                             '收藏 ${_stats!.fold<int>(0, (s, x) => s + ((x['bookmark_count'] as int?) ?? 0))} 题',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant),
+                                fontSize: 13, color: ac.textSecondary),
                           ),
                         ],
                       ),
@@ -504,7 +505,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest.withOpacity(0.4),
+                            color: ac.surfaceAlt.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Column(
@@ -513,19 +514,19 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Row(
                                 children: [
                                   Icon(Icons.insights,
-                                      size: 15, color: cs.tertiary),
+                                      size: 15, color: ac.accent),
                                   const SizedBox(width: 6),
                                   Text('薄弱知识点',
                                       style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
-                                          color: cs.onSurface)),
+                                          color: ac.textPrimary)),
                                   const Spacer(),
                                   // v1.0.2 对齐里程碑：按知识点分组
                                   Text('按知识点分组',
                                       style: TextStyle(
                                           fontSize: 12.5,
-                                          color: cs.onSurfaceVariant)),
+                                          color: ac.textSecondary)),
                                 ],
                               ),
                               const SizedBox(height: 2),
@@ -535,7 +536,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 child: Text('优先复习知识点',
                                     style: TextStyle(
                                         fontSize: 12.5,
-                                        color: cs.onSurfaceVariant)),
+                                        color: ac.textSecondary)),
                               ),
                               const SizedBox(height: 10),
                               // 标签云（圆角 8px 卡片）
@@ -552,11 +553,11 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 12, vertical: 7),
                                         decoration: BoxDecoration(
-                                          color: cs.primary.withOpacity(0.12),
+                                          color: ac.accent.withOpacity(0.12),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                           border: Border.all(
-                                              color: cs.primary
+                                              color: ac.accent
                                                   .withOpacity(0.25)),
                                         ),
                                         child: Row(
@@ -566,14 +567,14 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                               '${kp['kp']}',
                                               style: TextStyle(
                                                   fontSize: 13,
-                                                  color: cs.onSurface),
+                                                  color: ac.textPrimary),
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
                                               '${kp['cnt']} 题',
                                               style: TextStyle(
                                                   fontSize: 11.5,
-                                                  color: cs.primary),
+                                                  color: ac.accent),
                                             ),
                                           ],
                                         ),
@@ -592,7 +593,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: cs.tertiaryContainer.withOpacity(0.35),
+                            color: ac.accentSoft.withOpacity(0.35),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Column(
@@ -602,7 +603,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 '本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。',
                                 style: TextStyle(
                                     fontSize: 12.5,
-                                    color: cs.onSurfaceVariant,
+                                    color: ac.textSecondary,
                                     height: 1.4),
                               ),
                               const SizedBox(height: 4),
@@ -610,7 +611,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 '点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。',
                                 style: TextStyle(
                                     fontSize: 12.5,
-                                    color: cs.onSurfaceVariant,
+                                    color: ac.textSecondary,
                                     height: 1.4),
                               ),
                               const SizedBox(height: 8),
@@ -659,7 +660,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                   // v1.0.2 FSRS 可见化：题库最早到期时间
                                   nextDueAt: s['next_due_at'] as String?,
                                   selected: selected,
-                                  colorScheme: cs,
+                                  ac: ac,
                                   onTap: () {
                                     setState(() {
                                       if (selected) {
@@ -726,7 +727,7 @@ class _BankErrorCard extends StatelessWidget {
   // v1.0.2 FSRS 可见化：该题库到期卡中最早到期时间（ISO，无到期卡为 null）
   final String? nextDueAt;
   final bool selected;
-  final ColorScheme colorScheme;
+  final AppThemeColors ac;
   final VoidCallback onTap;
 
   const _BankErrorCard({
@@ -736,13 +737,13 @@ class _BankErrorCard extends StatelessWidget {
     required this.bookmark,
     this.nextDueAt,
     required this.selected,
-    required this.colorScheme,
+    required this.ac,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = colorScheme;
+
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -750,10 +751,10 @@ class _BankErrorCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          color: ac.surfaceAlt.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? cs.primary : Colors.transparent,
+            color: selected ? ac.accent : Colors.transparent,
             width: 1.5,
           ),
         ),
@@ -763,7 +764,7 @@ class _BankErrorCard extends StatelessWidget {
               selected
                   ? Icons.check_circle
                   : Icons.radio_button_unchecked,
-              color: selected ? cs.primary : cs.outlineVariant,
+              color: selected ? ac.accent : ac.border,
               size: 22,
             ),
             const SizedBox(width: 12),
@@ -777,35 +778,35 @@ class _BankErrorCard extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: cs.onSurface)),
+                          color: ac.textPrimary)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       if (due > 0)
                         Text('$due 题到期',
                             style: TextStyle(
-                                fontSize: 13, color: cs.error)),
+                                fontSize: 13, color: ac.danger)),
                       if (due > 0 && bookmark > 0) ...[
                         const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: ac.textSecondary)),
                         const SizedBox(width: 8),
                       ],
                       Text('$bookmark 收藏',
                           style: TextStyle(
-                              fontSize: 13, color: cs.secondary)),
+                              fontSize: 13, color: ac.textSecondary)),
                       // v1.0.2 FSRS 可见化：下次到期（该题库最早到期卡）
                       if (nextDueAt != null) ...[
                         const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
-                                fontSize: 13, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: ac.textSecondary)),
                         const SizedBox(width: 8),
                         Text(
                           '下次到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
                           style: TextStyle(
-                              fontSize: 13, color: cs.error),
+                              fontSize: 13, color: ac.danger),
                         ),
                       ],
                     ],
@@ -817,7 +818,7 @@ class _BankErrorCard extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: cs.primary)),
+                    color: ac.accent)),
           ],
         ),
       ),
