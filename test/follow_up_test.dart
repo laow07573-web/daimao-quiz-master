@@ -93,13 +93,14 @@ void main() {
     expect(rows, isEmpty, reason: '级联删除后追问历史应为空');
   });
 
-  test('schema 版本为 9（备份导入校验范围含 9）', () async {
+  test('schema 版本为 10（备份导入校验范围含 10）', () async {
     final (_, qid) = await seedBankAndQuestion();
     final db = DatabaseService.instance;
     await db.saveFollowUpMessage(qid, 'user', '消息');
     expect(await db.getFollowUpMessages(qid), isNotEmpty);
 
-    // 导出备份后校验：v9 应通过（版本范围 1..9）
+    // 导出备份后校验：v10 应通过（版本范围 1..10，
+    // v1.0.3 手写批注升级同款 bug 不重现）
     final bakPath =
         '${Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path}'
         '/flashcard_app/test_follow_up_bak.db';
@@ -108,7 +109,7 @@ void main() {
     final ok = await db.exportBackup(bakPath);
     expect(ok, isNull, reason: '导出不应报错');
     final error = await db.validateBackupFile(bakPath);
-    expect(error, isNull, reason: 'v9 备份应通过校验');
+    expect(error, isNull, reason: 'v10 备份应通过校验');
     if (await bakFile.exists()) await bakFile.delete();
   });
 }
