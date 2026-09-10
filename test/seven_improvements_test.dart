@@ -149,25 +149,25 @@ void main() {
     } catch (_) {}
   });
 
-  test('深色模式：切换持久化 + 5 套深色变体可生成', () async {
+  test('深色模式：切换持久化 + 3 套深色变体可生成', () async {
     SharedPreferences.setMockInitialValues({});
     final ts = ThemeService();
     await ts.init();
-    expect(ts.themeMode, ThemeMode.light);
+    expect(ts.themeMode, ThemeMode.system);   // v1.28 新设计语言：默认跟随系统
     await ts.switchThemeMode(ThemeMode.dark);
     final ts2 = ThemeService();
     await ts2.init();
     expect(ts2.themeMode, ThemeMode.dark);
     expect(ts2.themeData.brightness, Brightness.light);
     expect(ts2.darkThemeData.brightness, Brightness.dark);
-    // 5 套主题深色变体：深背景 + 挂载配色扩展
+    // 3 套主题深色变体：深背景 + 挂载配色扩展
     for (final t in AppTheme.values) {
       await ts2.switchTo(t);
       final darkTheme = ts2.darkThemeData;
       expect(darkTheme.brightness, Brightness.dark);
       final ac = darkTheme.extension<AppThemeColors>()!;
       expect(ac.background.computeLuminance(), lessThan(0.1));
-      expect(ac.card.computeLuminance(), lessThan(0.15));
+      expect(ac.surface.computeLuminance(), lessThan(0.15));
     }
   });
 

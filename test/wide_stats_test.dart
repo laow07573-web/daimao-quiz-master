@@ -157,6 +157,10 @@ void main() {
     expect(find.text('近一年趋势'), findsOneWidget);
     expect(find.text('正确率排行'), findsOneWidget);
     expect(find.text('错题统计'), findsOneWidget);
+    // v1.28 新设计语言：间距调整后内容更长，滚动到历史记录区再断言
+    await tester.scrollUntilVisible(find.text('历史记录'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await settleFrames(tester);
     expect(find.text('历史记录'), findsOneWidget);
 
     // 2. 周期切换（本周/本月/全部）无异常（切周期内部查 DB，走 runAsync）

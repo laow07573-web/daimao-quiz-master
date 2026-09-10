@@ -388,11 +388,35 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final ts = ThemeService();
     await ts.init();
-    expect(ts.current, AppTheme.brand);
-    await ts.switchTo(AppTheme.minimal);
+    expect(ts.current, AppTheme.clear);
+    await ts.switchTo(AppTheme.sage);
     final ts2 = ThemeService();
     await ts2.init();
-    expect(ts2.current, AppTheme.minimal);
+    expect(ts2.current, AppTheme.sage);
+  });
+
+  test('旧版 5 套主题存档可平滑迁移到新 3 套', () async {
+    // 老用户升级：存档里是旧枚举名（brand/minimal/starVoyage…），
+    // 不应导致主题丢失或回退默认。
+    SharedPreferences.setMockInitialValues({'app_theme': 'minimal'});
+    final tsA = ThemeService();
+    await tsA.init();
+    expect(tsA.current, AppTheme.sage, reason: 'minimal（青绿）应迁移到松绿');
+
+    SharedPreferences.setMockInitialValues({'app_theme': 'starVoyage'});
+    final tsB = ThemeService();
+    await tsB.init();
+    expect(tsB.current, AppTheme.ink, reason: 'starVoyage（深紫）应迁移到墨黑');
+
+    SharedPreferences.setMockInitialValues({'app_theme': 'brand'});
+    final tsC = ThemeService();
+    await tsC.init();
+    expect(tsC.current, AppTheme.clear, reason: 'brand（蓝）应迁移到清蓝');
+
+    SharedPreferences.setMockInitialValues({'app_theme': 'oceanGalaxy'});
+    final tsD = ThemeService();
+    await tsD.init();
+    expect(tsD.current, AppTheme.clear, reason: 'oceanGalaxy（蓝）应迁移到清蓝');
   });
 
   test('空题库 startQuiz 不产生 0 题幽灵会话', () async {

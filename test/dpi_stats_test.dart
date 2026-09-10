@@ -159,9 +159,8 @@ void main() {
     await settle();
     expect(tester.takeException(), isNull);
     expect(find.text('统计概览'), findsOneWidget);
-    expect(find.text('历史记录'), findsOneWidget);
 
-    // 周期切换
+    // 周期切换（顶部区域，先做，避免滚动后 chip 移出视口）
     await tester.tap(find.text('全部'));
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 50)));
@@ -172,8 +171,19 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 50)));
     await settle();
     expect(tester.takeException(), isNull);
+    await tester.scrollUntilVisible(find.text('统计概览'), -300,
+        scrollable: find.byType(Scrollable).first);
+    await settle();
+
+    // v1.28 新设计语言：间距调整后内容更长，用 ensureVisible 精确滚到目标
+    // （不用 scrollUntilVisible 全程滚动，避免把其他待交互元素推出视口）
+    await tester.ensureVisible(find.text('历史记录'));
+    await settle();
+    expect(find.text('历史记录'), findsOneWidget);
 
     // 排行页签
+    await tester.ensureVisible(find.text('按知识点'));
+    await settle();
     await tester.tap(find.text('按知识点'));
     await settle();
     expect(tester.takeException(), isNull);
