@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
@@ -362,12 +363,12 @@ class StatsTabState extends State<StatsTab> {
               height: 14,
               decoration: BoxDecoration(
                 border: Border.all(color: ac.accent, width: 1.5),
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(MaoRadius.chip),
               ),
             ),
             const SizedBox(width: 2),
             Text('今天',
-                style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
+                style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
           ],
         ),
       ],
@@ -457,13 +458,13 @@ class _PeriodChips extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 6),
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(MaoRadius.control),
               onTap: () => onChanged(value),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(MaoRadius.control),
                   color: current == value
                       ? ac.accent.withOpacity(0.15)
                       : Colors.transparent,
@@ -471,7 +472,7 @@ class _PeriodChips extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: MaoType.body,
                     color: current == value ? ac.accent : ac.textSecondary,
                     fontWeight:
                         current == value ? FontWeight.w600 : FontWeight.normal,
@@ -506,11 +507,11 @@ class _OverviewStat extends StatelessWidget {
         Text(
           value + suffix,
           style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, color: color),
+              fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: color),
         ),
         const SizedBox(height: 2),
         Text(label,
-            style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
+            style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
       ],
     );
   }
@@ -533,11 +534,11 @@ class _LegendItem extends StatelessWidget {
           height: 14,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(MaoRadius.chip),
           ),
         ),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
+        Text(label, style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
         const SizedBox(width: 8),
       ],
     );
@@ -562,7 +563,7 @@ class _SectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ac.surfaceAlt.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(MaoRadius.control),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,7 +573,7 @@ class _SectionCard extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: MaoType.body,
                   fontWeight: FontWeight.bold,
                   color: ac.textPrimary,
                 ),
@@ -645,7 +646,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
             padding: const EdgeInsets.symmetric(vertical: 16),
             // v1.0.2 UI 设计稿：空状态提示
             child: Text('暂无数据，刷几道题后再来看看',
-                style: TextStyle(color: ac.textSecondary, fontSize: 12)),
+                style: TextStyle(color: ac.textSecondary, fontSize: MaoType.caption)),
           )
         else
           for (final item in data.take(8))
@@ -659,7 +660,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          TextStyle(fontSize: 13, color: ac.textPrimary),
+                          TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -677,7 +678,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                   Text(
                     '${(item['accuracy'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
                     style: TextStyle(
-                        fontSize: 13,
+                        fontSize: MaoType.body,
                         fontWeight: FontWeight.w600,
                         color: ac.textPrimary),
                   ),
@@ -704,18 +705,18 @@ class _SegBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(MaoRadius.control),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
           color: active ? ac.accent.withOpacity(0.15) : Colors.transparent,
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: MaoType.body,
             color: active ? ac.accent : ac.textSecondary,
           ),
         ),
@@ -774,11 +775,11 @@ class _ErrorStatsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text('按题库分布', style: TextStyle(fontSize: 13, color: ac.textSecondary)),
+        Text('按题库分布', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         const SizedBox(height: 6),
         if (stats.isEmpty)
           // v1.0.2 UI 设计稿：空状态「0题错题总数」
-          Text('0题错题总数', style: TextStyle(fontSize: 13, color: ac.textSecondary))
+          Text('0题错题总数', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary))
         else
           for (final s in stats.take(5))
             Padding(
@@ -790,14 +791,14 @@ class _ErrorStatsSection extends StatelessWidget {
                       '${s['bank_name']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: ac.textPrimary),
+                      style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
                     ),
                   ),
                   Text(
                     '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}'
                     // v1.0.2 FSRS 可见化：该题库最早到期卡
                     '${s['next_due_at'] != null ? ' · 下次到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
-                    style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+                    style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
                   ),
                 ],
               ),
@@ -824,12 +825,12 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(MaoRadius.small),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(MaoRadius.small),
           color: color.withOpacity(0.1),
         ),
         child: Column(
@@ -837,12 +838,12 @@ class _ErrorCard extends StatelessWidget {
             // v1.0.2 UI 设计稿：数值带单位（0题错题总数 / 0题待复习）
             Text('$value 题',
                 style: TextStyle(
-                    fontSize: 18,
+                    fontSize: MaoType.h2,
                     fontWeight: FontWeight.bold,
                     color: color)),
             Text(label,
                 style:
-                    TextStyle(fontSize: 12.5, color: ac.textSecondary)),
+                    TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
           ],
         ),
       ),
@@ -889,7 +890,7 @@ class _HistorySection extends StatelessWidget {
         child: Center(
           // v1.0.2 UI 设计稿：空状态提示
           child: Text('暂无练习记录',
-              style: TextStyle(fontSize: 13, color: ac.textSecondary)),
+              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         ),
       );
     }
@@ -897,7 +898,7 @@ class _HistorySection extends StatelessWidget {
       children: [
         for (final s in sessions)
           InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(MaoRadius.small),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -915,7 +916,7 @@ class _HistorySection extends StatelessWidget {
                         Text(
                           _modeLabel(s.mode),
                           style: TextStyle(
-                              fontSize: 13,
+                              fontSize: MaoType.body,
                               fontWeight: FontWeight.w600,
                               color: ac.textPrimary),
                         ),
@@ -929,7 +930,7 @@ class _HistorySection extends StatelessWidget {
                                   (names.length > 2 ? ' 等${names.length}个' : '');
                             })(),
                             style: TextStyle(
-                                fontSize: 12.5, color: ac.textSecondary),
+                                fontSize: MaoType.caption, color: ac.textSecondary),
                           ),
                         Text(
                           // v1.0.2 修复：未完成会话（异常退出遗留）加标识
@@ -937,14 +938,14 @@ class _HistorySection extends StatelessWidget {
                               ? '${_formatTime(s.startTime)} · 未完成'
                               : _formatTime(s.startTime),
                           style: TextStyle(
-                              fontSize: 12.5, color: ac.textSecondary),
+                              fontSize: MaoType.caption, color: ac.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${s.totalQuestions} 题 · ${s.accuracy.toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.chevron_right,
@@ -985,7 +986,7 @@ class _ErrorView extends StatelessWidget {
           Text(error,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
+              style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
           const SizedBox(height: 10),
           FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
         ],

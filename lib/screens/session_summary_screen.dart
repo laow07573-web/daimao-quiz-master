@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
@@ -70,22 +71,22 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(MaoRadius.card),
               ),
               child: Column(
                 children: [
                   Text('本次刷题完成',
-                      style: TextStyle(color: ac.onAccent.withOpacity(0.7), fontSize: 14)),
+                      style: TextStyle(color: ac.onAccent.withOpacity(0.7), fontSize: MaoType.body)),
                   const SizedBox(height: 12),
                   Text('${accuracy.toStringAsFixed(1)}%',
                       style: TextStyle(
                           color: ac.onAccent,
-                          fontSize: 48,
+                          fontSize: MaoType.display,
                           fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('正确率',
                       style: TextStyle(
-                          color: ac.onAccent.withOpacity(0.8), fontSize: 14)),
+                          color: ac.onAccent.withOpacity(0.8), fontSize: MaoType.body)),
                 ],
               ),
             ),
@@ -150,7 +151,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,7 +163,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                       const SizedBox(width: 8),
                       Text('AI 小结',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15, color: ac.textPrimary)),
+                              fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -175,7 +176,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                   else
                     AiResponseWidget(
                       text: _summaryText ?? '生成小结失败',
-                      fontSize: 14,
+                      fontSize: MaoType.body,
                       color: ac.textPrimary,
                     ),
                 ],
@@ -191,7 +192,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                 onPressed: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
-                child: const Text('返回首页', style: TextStyle(fontSize: 16)),
+                child: const Text('返回首页', style: TextStyle(fontSize: MaoType.h3)),
               ),
             ),
             const SizedBox(height: 10),
@@ -209,7 +210,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                         builder: (_) => const QuizScreen()),
                   );
                 },
-                child: const Text('再来一轮', style: TextStyle(fontSize: 16)),
+                child: const Text('再来一轮', style: TextStyle(fontSize: MaoType.h3)),
               ),
             ),
           ],
@@ -243,7 +244,7 @@ class _StatChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
       ),
       child: Column(
         children: [
@@ -251,9 +252,9 @@ class _StatChip extends StatelessWidget {
           const SizedBox(height: 4),
           Text(value,
               style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+                  fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: color)),
           Text(label,
-              style: TextStyle(fontSize: 11.5, color: onSurfaceVariant)),
+              style: TextStyle(fontSize: MaoType.micro, color: onSurfaceVariant)),
         ],
       ),
     );

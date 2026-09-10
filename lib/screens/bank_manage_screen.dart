@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'dart:io';
 
@@ -48,7 +49,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
                       size: 64, color: ac.border),
                   const SizedBox(height: 16),
                   Text('还没有题库',
-                      style: TextStyle(fontSize: 16, color: ac.textSecondary)),
+                      style: TextStyle(fontSize: MaoType.h3, color: ac.textSecondary)),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.upload_file),
@@ -126,13 +127,13 @@ class _BankManageScreenState extends State<BankManageScreen> {
               Icon(Icons.tune, size: 18, color: ac.accent),
               const SizedBox(width: 6),
               Text('刷题设置',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ac.textPrimary)),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
               const Spacer(),
               Text(
                 appState.selectedBankIds.isEmpty
                     ? '点击题目前方选择框'
                     : '已选 ${appState.selectedBankIds.length} 个题库',
-                style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
               ),
             ],
           ),
@@ -140,7 +141,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
           Row(
             children: [
               Text('刷题模式: ',
-                  style: TextStyle(fontSize: 14, color: ac.textSecondary)),
+                  style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -149,12 +150,12 @@ class _BankManageScreenState extends State<BankManageScreen> {
                           ? ac.textSecondary
                           : ac.accent)
                       .withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(MaoRadius.chip),
                 ),
                 child: Text(
                   appState.selectedBankIds.length > 1 ? '混合刷题' : '单题库刷题',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: MaoType.body,
                     color: appState.selectedBankIds.length > 1
                         ? ac.textSecondary
                         : ac.accent,
@@ -251,7 +252,7 @@ class _BankCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: ac.surfaceAlt,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(MaoRadius.small),
           border: Border.all(
             color: isSelected ? ac.accent : ac.border,
             width: isSelected ? 2 : 1,
@@ -270,7 +271,7 @@ class _BankCard extends StatelessWidget {
                     color: isSelected ? ac.accent : ac.border,
                     width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(MaoRadius.chip),
                 ),
                 child: isSelected
                     ? Icon(Icons.check, size: 16, color: ac.onAccent)
@@ -284,11 +285,11 @@ class _BankCard extends StatelessWidget {
                 children: [
                   Text(bank.name,
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600, color: ac.textPrimary)),
+                          fontSize: MaoType.h3, fontWeight: FontWeight.w600, color: ac.textPrimary)),
                   const SizedBox(height: 4),
                   Text('${bank.questionCount} 道题目',
                       style: TextStyle(
-                          fontSize: 13, color: ac.textSecondary)),
+                          fontSize: MaoType.body, color: ac.textSecondary)),
                 ],
               ),
             ),

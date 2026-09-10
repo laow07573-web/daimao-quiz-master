@@ -1,3 +1,4 @@
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
 import '../models/ink_annotation.dart';
@@ -123,7 +124,7 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> {
       onPointerCancel: _onCancel,
       child: RepaintBoundary(
         child: CustomPaint(
-          painter: _InkPainter(c, widget.frameFilter),
+          painter: _InkPainter(c, widget.frameFilter, AppThemeColors.of(context)),
           size: Size.infinite,
         ),
       ),
@@ -137,7 +138,11 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> {
 
 /// 笔迹渲染器
 class _InkPainter extends CustomPainter {
-  _InkPainter(this.controller, this.frameFilter) : super(repaint: controller);
+  _InkPainter(this.controller, this.frameFilter, this.ac)
+      : super(repaint: controller);
+
+  /// 主题语义色（画布选中框等装饰用）
+  final AppThemeColors ac;
 
   final AnnotationController controller;
 
@@ -170,14 +175,14 @@ class _InkPainter extends CustomPainter {
       // 淡蓝底色填充（选中区域一目了然）
       canvas.drawRect(
         rect,
-        Paint()..color = Colors.blue.withOpacity(0.10),
+        Paint()..color = ac.accent.withOpacity(0.10),
       );
       // 虚线描边（宽 2.2 更醒目）
       canvas.drawPath(_dashRect(rect, 7, 5),
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.2
-            ..color = Colors.blue);
+            ..color = ac.accent);
     }
   }
 

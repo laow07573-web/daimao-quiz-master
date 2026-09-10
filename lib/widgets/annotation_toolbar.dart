@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
@@ -154,7 +155,7 @@ class AnnotationToolbar extends StatelessWidget {
                   onPressed: onFinish,
                   icon: const Icon(Icons.check, size: 18),
                   label: Text(shortcuts ? '完成 (Esc)' : '完成',
-                      style: const TextStyle(fontSize: 13)),
+                      style: const TextStyle(fontSize: MaoType.body)),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     foregroundColor: ac.accent,
@@ -234,12 +235,12 @@ class _ToolIcon extends StatelessWidget {
       message: shortcut == null ? label : '$label ($shortcut)',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
             color: selected ? ac.accent.withOpacity(0.12) : null,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(MaoRadius.small),
           ),
           child: Icon(icon, size: 20, color: selected ? ac.accent : effective),
         ),

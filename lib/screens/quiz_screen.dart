@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import '../utils/design_tokens.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -307,7 +308,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: warn ? ac.danger : ac.accent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(MaoRadius.control),
                             ),
                             child: Text(
                               widget.practiceTiming == PracticeTiming.timed
@@ -458,7 +459,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               child: Text(
                                 '点击选项提交答案，答对自动进入下一题',
                                 style: TextStyle(
-                                    fontSize: 13, color: ac.textSecondary),
+                                    fontSize: MaoType.body, color: ac.textSecondary),
                               ),
                             ),
                           ],
@@ -477,7 +478,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               child: TextButton.icon(
                                 icon: const Icon(Icons.edit_outlined, size: 15),
                                 label: const Text('重新作答',
-                                    style: TextStyle(fontSize: 12)),
+                                    style: TextStyle(fontSize: MaoType.caption)),
                                 style: TextButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
                                   foregroundColor: ac.textSecondary,
@@ -746,8 +747,8 @@ class _QuizScreenState extends State<QuizScreen> {
     if (options.isEmpty) {
       return Container(
         width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: ac.successContainer, borderRadius: BorderRadius.circular(10), border: Border.all(color: ac.success)),
-        child: Text('正确答案: ${question.correctAnswer}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: ac.success)),
+        decoration: BoxDecoration(color: ac.successContainer, borderRadius: BorderRadius.circular(MaoRadius.small), border: Border.all(color: ac.success)),
+        child: Text('正确答案: ${question.correctAnswer}', style: TextStyle(fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.success)),
       );
     }
     final correctSet = question.questionType == 'multi_choice' ? question.correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {question.correctAnswer.toUpperCase().trim()};
@@ -756,11 +757,11 @@ class _QuizScreenState extends State<QuizScreen> {
       final isCorrect = correctSet.contains(question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : label);
       return Padding(padding: const EdgeInsets.only(bottom: 8), child: Container(
         width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: isCorrect ? ac.successContainer : ac.surfaceAlt, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? ac.success : ac.border)),
+        decoration: BoxDecoration(color: isCorrect ? ac.successContainer : ac.surfaceAlt, borderRadius: BorderRadius.circular(MaoRadius.small), border: Border.all(color: isCorrect ? ac.success : ac.border)),
         child: Row(children: [
-          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : ac.surfaceAlt, shape: BoxShape.circle), child: Center(child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ac.textSecondary)))),
+          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : ac.surfaceAlt, shape: BoxShape.circle), child: Center(child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.body, color: ac.textSecondary)))),
           const SizedBox(width: 12),
-          Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : ac.textPrimary, height: 1.4))),
+          Expanded(child: Text(options[i], style: TextStyle(fontSize: MaoType.body, color: isCorrect ? ac.success : ac.textPrimary, height: 1.4))),
         ]),
       ));
     }));
@@ -772,7 +773,7 @@ class _QuizScreenState extends State<QuizScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(MaoRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -783,12 +784,12 @@ class _QuizScreenState extends State<QuizScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: ac.accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(MaoRadius.chip),
                 ),
                 child: Text(
                   // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
                   question.typeLabel,
-                  style: TextStyle(fontSize: 13, color: ac.accent),
+                  style: TextStyle(fontSize: MaoType.body, color: ac.accent),
                 ),
               ),
               const Spacer(),
@@ -797,13 +798,13 @@ class _QuizScreenState extends State<QuizScreen> {
                   '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%'
                   // v1.0.2 FSRS 可见化：答完题展示下次复习时间
                   '${appState.currentFsrsCard != null ? ' · 下次复习：${relativeDayLabel(appState.currentFsrsCard!.nextReviewAt)}' : ''}',
-                  style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                  style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                 ),
             ],
           ),
           const SizedBox(height: 12),
           Text(question.title,
-              style: TextStyle(fontSize: 16, height: 1.6, fontWeight: FontWeight.w500, color: ac.textPrimary)),
+              style: TextStyle(fontSize: MaoType.h3, height: 1.6, fontWeight: FontWeight.w500, color: ac.textPrimary)),
         ],
       ),
     );
@@ -870,7 +871,7 @@ class _QuizScreenState extends State<QuizScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: selected ? ac.accent.withOpacity(0.08) : ac.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(MaoRadius.control),
               border: Border.all(
                 color: selected ? ac.accent : ac.border,
                 width: selected ? 1.5 : 1,
@@ -884,17 +885,17 @@ class _QuizScreenState extends State<QuizScreen> {
                   decoration: BoxDecoration(
                     color: selected ? ac.accent : ac.accent.withOpacity(0.12),
                     shape: isMulti ? BoxShape.rectangle : BoxShape.circle,
-                    borderRadius: isMulti ? BorderRadius.circular(4) : null,
+                    borderRadius: isMulti ? BorderRadius.circular(MaoRadius.chip) : null,
                   ),
                   child: Center(
                     child: selected
                         ? Icon(Icons.check, size: 16, color: ac.onAccent)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: ac.accent, fontSize: 14)),
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: ac.accent, fontSize: MaoType.body)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(option, style: TextStyle(fontSize: 15, height: 1.4, color: ac.textPrimary)),
+                  child: Text(option, style: TextStyle(fontSize: MaoType.h3, height: 1.4, color: ac.textPrimary)),
                 ),
               ],
             ),
@@ -913,7 +914,7 @@ class _QuizScreenState extends State<QuizScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.check_circle),
-              label: Text('确认提交 (已选${_selectedOptions.length}项)', style: const TextStyle(fontSize: 15)),
+              label: Text('确认提交 (已选${_selectedOptions.length}项)', style: const TextStyle(fontSize: MaoType.h3)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _selectedOptions.isEmpty ? ac.surfaceAlt : ac.accent,
                 foregroundColor: _selectedOptions.isEmpty ? ac.textSecondary : ac.onAccent,
@@ -977,10 +978,10 @@ class _QuizScreenState extends State<QuizScreen> {
             focusNode: _fillBlankFocusNodes[i],
             decoration: InputDecoration(
               hintText: n == 1 ? '请输入答案...' : '第 ${i + 1} 空',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.control)),
               prefixIcon: const Icon(Icons.edit),
             ),
-            style: TextStyle(fontSize: 15, color: ac.textPrimary),
+            style: TextStyle(fontSize: MaoType.h3, color: ac.textPrimary),
             // v1.0.2 完善：回车跳到下一空，最后一空提交
             onSubmitted: (v) {
               if (i < n - 1) {
@@ -1016,10 +1017,10 @@ class _QuizScreenState extends State<QuizScreen> {
           maxLines: 6,
           decoration: InputDecoration(
             hintText: '请输入$label答案...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.control)),
             alignLabelWithHint: true,
           ),
-          style: TextStyle(fontSize: 15, color: ac.textPrimary),
+          style: TextStyle(fontSize: MaoType.h3, color: ac.textPrimary),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1065,7 +1066,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 color: isPractice && cur == '对'
                     ? ac.successContainer
                     : ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
                 border: Border.all(
                     color: isPractice && cur == '对' ? ac.success : ac.success),
               ),
@@ -1073,7 +1074,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 // v1.0.2 设计审查修复：硬编码绿色 → 语义色
                 child: Text('✓  正确',
                     style: TextStyle(
-                        fontSize: 18,
+                        fontSize: MaoType.h2,
                         fontWeight: FontWeight.bold,
                         color: ac.success)),
               ),
@@ -1096,13 +1097,13 @@ class _QuizScreenState extends State<QuizScreen> {
                 color: isPractice && cur == '错'
                     ? ac.dangerContainer
                     : ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
                 border: Border.all(color: ac.danger),
               ),
               child: Center(
                 child: Text('✗  错误',
                     style: TextStyle(
-                        fontSize: 18,
+                        fontSize: MaoType.h2,
                         fontWeight: FontWeight.bold,
                         color: ac.danger)),
               ),
@@ -1289,7 +1290,7 @@ class _QuizScreenState extends State<QuizScreen> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isCorrect ? ac.successContainer : ac.dangerContainer,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
           border: Border.all(color: isCorrect ? ac.success : ac.danger),
         ),
         child: Column(
@@ -1303,26 +1304,26 @@ class _QuizScreenState extends State<QuizScreen> {
                 Text(isCorrect ? '回答正确' : '回答错误',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontSize: MaoType.h3,
                         color: isCorrect ? ac.success : ac.danger)),
               ],
             ),
             const SizedBox(height: 10),
             if (qt == 'fill_blank') ...[
               Text('你的答案: $userAnswer',
-                  style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : ac.danger)),
+                  style: TextStyle(fontSize: MaoType.body, color: isCorrect ? ac.success : ac.danger)),
               if (!isCorrect) ...[
                 const SizedBox(height: 4),
                 Text('正确答案: $correctAnswer',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ac.success)),
+                    style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.bold, color: ac.success)),
               ],
             ],
             if (qt == 'true_false') ...[
               Text('你选择了: ${userAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
-                  style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : ac.danger)),
+                  style: TextStyle(fontSize: MaoType.body, color: isCorrect ? ac.success : ac.danger)),
               if (!isCorrect)
                 Text('正确答案: ${correctAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ac.success)),
+                    style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.bold, color: ac.success)),
             ],
           ],
         ),
@@ -1371,7 +1372,7 @@ class _QuizScreenState extends State<QuizScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: bgColor,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(MaoRadius.control),
               border: Border.all(color: borderColor),
             ),
             child: Row(
@@ -1385,13 +1386,13 @@ class _QuizScreenState extends State<QuizScreen> {
                   child: Center(
                     child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent)
                         : isUserWrong ? Icon(Icons.close, size: 14, color: ac.onAccent)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ac.textSecondary)),
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.body, color: ac.textSecondary)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(entry.value,
-                    style: TextStyle(fontSize: 14, color: textColor, height: 1.4),
+                    style: TextStyle(fontSize: MaoType.body, color: textColor, height: 1.4),
                   ),
                 ),
               ],
@@ -1414,11 +1415,11 @@ class _QuizScreenState extends State<QuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('正确答案: $correct',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: ac.success)),
+          style: TextStyle(fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.success)),
         const SizedBox(height: 4),
         // v1.0.2 设计审查修复：答对时"你的答案"不再恒显示错误红色
         Text('你的答案: $user',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+          style: TextStyle(fontSize: MaoType.h3, fontWeight: FontWeight.bold,
               color: lastRecord.isCorrect ? ac.success : ac.danger)),
       ],
     );
@@ -1443,11 +1444,11 @@ class _QuizScreenState extends State<QuizScreen> {
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.refresh, size: 16),
-        label: const Text('重新生成解析', style: TextStyle(fontSize: 13)),
+        label: const Text('重新生成解析', style: TextStyle(fontSize: MaoType.body)),
         style: OutlinedButton.styleFrom(
           foregroundColor: ac.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MaoRadius.small)),
         ),
         onPressed: () {
           // v1.0.2: API 未配置拦截重新生成
@@ -1488,7 +1489,7 @@ class _QuizScreenState extends State<QuizScreen> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: ac.surfaceAlt,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(MaoRadius.control),
             border: Border.all(color: ac.border),
           ),
           child: Row(
@@ -1497,7 +1498,7 @@ class _QuizScreenState extends State<QuizScreen> {
               Icon(Icons.lightbulb_outline, color: ac.textSecondary, size: 18),
               const SizedBox(width: 8),
               Text('查看AI解析',
-                  style: TextStyle(color: ac.accent, fontSize: 14)),
+                  style: TextStyle(color: ac.accent, fontSize: MaoType.body)),
             ],
           ),
         ),
@@ -1508,7 +1509,7 @@ class _QuizScreenState extends State<QuizScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(MaoRadius.control),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1521,7 +1522,7 @@ class _QuizScreenState extends State<QuizScreen> {
               Text('AI解析',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
+                      fontSize: MaoType.h3,
                       color: ac.accent)),
               const Spacer(),
               if (appState.analysisLoading)
@@ -1536,10 +1537,10 @@ class _QuizScreenState extends State<QuizScreen> {
             AiResponseWidget(text: appState.currentAnalysis!)
           else if (appState.analysisLoading)
             Text('正在生成AI解析...',
-                style: TextStyle(color: ac.textSecondary, fontSize: 14))
+                style: TextStyle(color: ac.textSecondary, fontSize: MaoType.body))
           else
             Text('解析生成失败',
-                style: TextStyle(color: ac.textSecondary, fontSize: 14)),
+                style: TextStyle(color: ac.textSecondary, fontSize: MaoType.body)),
 
           if (appState.currentAnalysis != null &&
               appState.currentAnalysis!.isNotEmpty) ...[
@@ -1568,19 +1569,19 @@ class _QuizScreenState extends State<QuizScreen> {
                     decoration: InputDecoration(
                       hintText: '追问AI相关问题...',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(MaoRadius.small)),
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       isDense: true,
                     ),
-                    style: const TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: MaoType.body),
                     onSubmitted: (_) => _sendFollowUp(appState),
                   ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.send, size: 16),
-                  label: const Text('发送', style: TextStyle(fontSize: 13)),
+                  label: const Text('发送', style: TextStyle(fontSize: MaoType.body)),
                   onPressed: () => _sendFollowUp(appState),
                 ),
               ],
@@ -1685,7 +1686,7 @@ class _QuizScreenState extends State<QuizScreen> {
                             child: Center(
                               child: Text('${i + 1}',
                                   style: TextStyle(
-                                      fontSize: 11.5,
+                                      fontSize: MaoType.micro,
                                       fontWeight: cur
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -1748,7 +1749,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 },
                 child: Text(
                     widget.quizMode == QuizMode.memorize ? '回到首页' : '完成刷题，查看小结',
-                    style: const TextStyle(fontSize: 16)),
+                    style: const TextStyle(fontSize: MaoType.h3)),
               ),
             )
           : Row(
@@ -1760,7 +1761,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     label: Text(_inErrorBook ? '已收藏' : '错题本',
                         maxLines: 1,
                         softWrap: false,
-                        style: const TextStyle(fontSize: 13)),
+                        style: const TextStyle(fontSize: MaoType.body)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       visualDensity: VisualDensity.compact,
@@ -1783,7 +1784,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.arrow_back, size: 18),
                       label: const Text('上一题',
-                          maxLines: 1, softWrap: false, style: TextStyle(fontSize: 14)),
+                          maxLines: 1, softWrap: false, style: TextStyle(fontSize: MaoType.body)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ac.textSecondary,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1812,7 +1813,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       visualDensity: VisualDensity.compact,
                     ),
                     child: const Text('下一题',
-                        maxLines: 1, softWrap: false, style: TextStyle(fontSize: 16)),
+                        maxLines: 1, softWrap: false, style: TextStyle(fontSize: MaoType.h3)),
                   ),
                 ),
               ],
@@ -1977,8 +1978,8 @@ class _FollowUpBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isUser ? ac.accent : ac.surfaceAlt,
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(12),
-                    topRight: const Radius.circular(12),
+                    topLeft: const Radius.circular(MaoRadius.control),
+                    topRight: const Radius.circular(MaoRadius.control),
                     bottomLeft: Radius.circular(isUser ? 12 : 4),
                     bottomRight: Radius.circular(isUser ? 4 : 12),
                   ),
@@ -1986,8 +1987,8 @@ class _FollowUpBubble extends StatelessWidget {
                 child: isUser
                     ? Text(message.content,
                         style: TextStyle(
-                            fontSize: 13, color: ac.onAccent, height: 1.5))
-                    : AiResponseWidget(text: message.content, fontSize: 12),
+                            fontSize: MaoType.body, color: ac.onAccent, height: 1.5))
+                    : AiResponseWidget(text: message.content, fontSize: MaoType.caption),
               ),
             ),
           ),
@@ -2010,10 +2011,10 @@ class _FollowUpTypingBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: ac.surfaceAlt,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(4),
+          topLeft: Radius.circular(MaoRadius.control),
+          topRight: Radius.circular(MaoRadius.control),
+          bottomLeft: Radius.circular(MaoRadius.control),
+          bottomRight: Radius.circular(MaoRadius.chip),
         ),
       ),
       child: Row(
@@ -2026,7 +2027,7 @@ class _FollowUpTypingBubble extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text('AI 正在回复...',
-              style: TextStyle(fontSize: 13, color: ac.textSecondary)),
+              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         ],
       ),
     );

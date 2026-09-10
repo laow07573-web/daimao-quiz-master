@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -87,7 +88,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: ac.surfaceAlt.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(MaoRadius.control),
                   ),
                   child: Row(
                     children: [
@@ -111,7 +112,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                     child: Center(
                       child: Text('暂无该次作答记录',
                           style: TextStyle(
-                              fontSize: 13, color: ac.textSecondary)),
+                              fontSize: MaoType.body, color: ac.textSecondary)),
                     ),
                   )
                 else
@@ -150,11 +151,11 @@ class _Info extends StatelessWidget {
         children: [
           Text(value,
               style: TextStyle(
-                  fontSize: 15,
+                  fontSize: MaoType.h3,
                   fontWeight: FontWeight.bold,
                   color: ac.textPrimary)),
           Text(label,
-              style: TextStyle(fontSize: 11.5, color: ac.textSecondary)),
+              style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary)),
         ],
       ),
     );
@@ -182,7 +183,7 @@ class _RecordTile extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: ac.surfaceAlt.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,12 +197,12 @@ class _RecordTile extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: (isCorrect ? ac.accent : ac.danger).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(MaoRadius.chip),
                 ),
                 child: Text(
                   isCorrect ? '对' : '错',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: MaoType.caption,
                     fontWeight: FontWeight.bold,
                     color: isCorrect ? ac.accent : ac.danger,
                   ),
@@ -213,7 +214,7 @@ class _RecordTile extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      TextStyle(fontSize: 13, color: ac.textPrimary),
+                      TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
                 ),
               ),
             ],
@@ -221,13 +222,13 @@ class _RecordTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '你的答案：${userAnswer.isEmpty ? '（未作答）' : userAnswer}',
-            style: TextStyle(fontSize: 13, color: ac.textSecondary),
+            style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
           ),
           if (correctAnswer.isNotEmpty)
             Text(
               '正确答案：$correctAnswer',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: MaoType.body,
                 color: isCorrect ? ac.textSecondary : ac.danger,
               ),
             ),
@@ -245,7 +246,7 @@ class _RecordTile extends StatelessWidget {
               child: Text(
                 // v1.0.2 对齐里程碑：判错了，改判正确
                 isCorrect ? '改判为错误' : '判错了，改判正确',
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: MaoType.caption),
               ),
             ),
           ),

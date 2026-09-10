@@ -236,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Text(
                   '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
                   style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: MaoType.caption,
                       color: ac.textSecondary.withOpacity(0.7)),
                 ),
               ),
@@ -354,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -370,13 +370,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   height: 4,
                   decoration: BoxDecoration(
                       color: ac.textSecondary.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2)),
+                      borderRadius: BorderRadius.circular(MaoRadius.chip)),
                 ),
               ),
               const SizedBox(height: 16),
               Text('历史报告（近 7 天）',
                   style: TextStyle(
-                      fontSize: 16,
+                      fontSize: MaoType.h3,
                       fontWeight: FontWeight.bold,
                       color: ac.textPrimary)),
               const SizedBox(height: 12),
@@ -392,12 +392,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           '${(d['date'] as DateTime).day}日 周'
                           '${week[(d['date'] as DateTime).weekday - 1]}',
                           style: TextStyle(
-                              fontSize: 13, color: ac.textPrimary),
+                              fontSize: MaoType.body, color: ac.textPrimary),
                         ),
                       ),
                       Text('${d['total']} 题',
                           style: TextStyle(
-                              fontSize: 13,
+                              fontSize: MaoType.body,
                               fontWeight: FontWeight.w600,
                               color: (d['total'] as int) > 0
                                   ? ac.accent
@@ -406,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         _accuracyText(d, accByDay),
                         style: TextStyle(
-                            fontSize: 13, color: ac.textSecondary),
+                            fontSize: MaoType.body, color: ac.textSecondary),
                       ),
                     ],
                   ),
@@ -445,9 +445,9 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Material(
         color: ac.card,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(MaoRadius.control),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
           onTap: () async {
             final ok = await appState.resumeUnfinishedSession();
             if (!ok || !mounted) return;
@@ -460,7 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(MaoRadius.control),
               // v1.27 呼吸感：续刷卡边框弱化，降低视觉噪音。
               border: Border.all(color: ac.accent.withOpacity(0.35)),
             ),
@@ -475,13 +475,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text('继续上次刷题',
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              fontSize: 15,
+                              fontSize: MaoType.h3,
                               color: ac.textPrimary)),
                       const SizedBox(height: 2),
                       Text(
                         '已答 $answered/${session.totalQuestions} 题 · $modeLabel',
                         style: TextStyle(
-                            fontSize: 13, color: ac.textSecondary),
+                            fontSize: MaoType.body, color: ac.textSecondary),
                       ),
                     ],
                   ),
@@ -504,7 +504,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: ac.danger.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
         border: Border.all(color: ac.danger.withOpacity(0.4)),
       ),
       child: Row(
@@ -514,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Text(
               '寒暑假模式已开启，答题功能暂停，错题本仍可浏览',
-              style: TextStyle(fontSize: 13, color: ac.danger),
+              style: TextStyle(fontSize: MaoType.body, color: ac.danger),
             ),
           ),
         ],
@@ -530,7 +530,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: ac.accentSoft.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
         border: Border.all(color: ac.accent.withOpacity(0.5)),
       ),
       child: Row(
@@ -540,7 +540,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Text(
               'API 余额不足 ¥1，建议尽快充值以免影响使用',
-              style: TextStyle(fontSize: 13, color: ac.textPrimary),
+              style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
             ),
           ),
         ],
@@ -655,7 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Text('快速操作',
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: ac.textPrimary)),
+                fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.textPrimary)),
         const SizedBox(height: 12),
         if (isWideLayout(context))
           // v1.0.3 窗口自适应：按最大单元宽自动决定列数（宽窗 2 列，
@@ -694,14 +694,14 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: ac.background,
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: ac.textSecondary.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: ac.textSecondary.withOpacity(0.3), borderRadius: BorderRadius.circular(MaoRadius.chip)))),
             const SizedBox(height: 20),
-            Text('选择刷题数量', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ac.textPrimary), textAlign: TextAlign.center),
+            Text('选择刷题数量', style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.bold, color: ac.textPrimary), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             Wrap(spacing: 12, runSpacing: 12, alignment: WrapAlignment.center, children: [
               ...[10, 20, 30, 50, 80, 100].map((n) => ChoiceChip(
@@ -713,7 +713,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ChoiceChip(label: const Text('自定义'), selected: false, onSelected: (_) { Navigator.pop(ctx); _showCustomCountDialog(context, appState); }),
             ]),
             const SizedBox(height: 12),
-            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 13, color: ac.textSecondary), textAlign: TextAlign.center),
+            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary), textAlign: TextAlign.center),
           ]),
         ),
       ),
@@ -756,7 +756,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -770,17 +770,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 40, height: 4,
                   decoration: BoxDecoration(
                     color: ac.textSecondary.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(MaoRadius.chip),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
               Text('选择刷题模式',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ac.textPrimary),
+                  style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.bold, color: ac.textPrimary),
                   textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
-                  style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                  style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   textAlign: TextAlign.center),
               const SizedBox(height: 20),
               _ModeOption(
@@ -907,7 +907,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(MaoRadius.control),
         border: Border.all(color: ac.accent.withOpacity(0.35)),
       ),
       child: Column(
@@ -925,20 +925,20 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: Text('正在导入题库，可先去做别的',
                     style: TextStyle(
-                        fontSize: 14,
+                        fontSize: MaoType.body,
                         fontWeight: FontWeight.w600,
                         color: ac.textPrimary)),
               ),
               Text('${(progress * 100).toInt()}%',
                   style: TextStyle(
-                      fontSize: 13,
+                      fontSize: MaoType.body,
                       fontWeight: FontWeight.w600,
                       color: ac.accent)),
             ],
           ),
           const SizedBox(height: 10),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(MaoRadius.chip),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
@@ -946,7 +946,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 6),
           Text(appState.importStatus,
-              style: TextStyle(fontSize: 13, color: ac.textSecondary)),
+              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         ],
       ),
     );
@@ -964,7 +964,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: ac.accent.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
           border: Border.all(color: ac.accent.withOpacity(0.5)),
         ),
         child: Row(
@@ -977,13 +977,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text('已解析 ${appState.previewQuestions.length} 道题，待确认',
                       style: TextStyle(
-                          fontSize: 14,
+                          fontSize: MaoType.body,
                           fontWeight: FontWeight.w600,
                           color: ac.accent)),
                   const SizedBox(height: 2),
                   Text('点击查看预览，确认后入库',
                       style:
-                          TextStyle(fontSize: 13, color: ac.textSecondary)),
+                          TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
                 ],
               ),
             ),
@@ -1094,7 +1094,7 @@ class _QuickActionTile extends StatelessWidget {
                     children: [
                       Text(label,
                           style: MaoType.h3Style.copyWith(
-                              color: ac.textPrimary, fontSize: 15)),
+                              color: ac.textPrimary, fontSize: MaoType.h3)),
                       const SizedBox(height: MaoSpace.xxs / 2),
                       Text(subtitle,
                           maxLines: 1,
@@ -1139,7 +1139,7 @@ class _ModeOption extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: ac.surfaceAlt,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
           border: Border.all(color: ac.border),
         ),
         child: Row(
@@ -1148,7 +1148,7 @@ class _ModeOption extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(MaoRadius.small),
               ),
               child: Icon(icon, color: color, size: 22),
             ),
@@ -1162,13 +1162,13 @@ class _ModeOption extends StatelessWidget {
                       Text(label,
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              fontSize: 15,
+                              fontSize: MaoType.h3,
                               color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(desc,
-                      style: TextStyle(fontSize: 13, color: ac.textSecondary)),
+                      style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
                 ],
               ),
             ),

@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -68,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             // App Logo（圆角 22px 图片）
             ClipRRect(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(MaoRadius.large),
               child: Image.asset(
                 'assets/app_logo.png',
                 width: 96,
@@ -82,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Text(
               '猫卷',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: MaoType.display,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -91,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // 今日一言
             Text(
               '今日一言',
-              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.6)),
+              style: TextStyle(fontSize: MaoType.body, color: Colors.white.withOpacity(0.6)),
             ),
             const SizedBox(height: 6),
             Padding(
@@ -102,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: MaoType.body,
                   color: Colors.white.withOpacity(0.85),
                   height: 1.5,
                 ),

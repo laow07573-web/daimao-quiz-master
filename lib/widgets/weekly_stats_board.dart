@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import '../services/theme_service.dart';
 import '../utils/app_constants.dart';
@@ -61,7 +62,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ac.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(MaoRadius.card),
         border: Border.all(color: ac.cardBorder),
       ),
       child: Column(
@@ -75,14 +76,14 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 height: 18,
                 decoration: BoxDecoration(
                   color: ac.accent,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(MaoRadius.chip),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 '本周战绩',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: MaoType.h2,
                   fontWeight: FontWeight.bold,
                   color: ac.textPrimary,
                 ),
@@ -90,7 +91,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
               const Spacer(),
               if (widget.onHistoryReport != null)
                 InkWell(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(MaoRadius.chip),
                   onTap: widget.onHistoryReport,
                   child: Padding(
                     padding:
@@ -102,7 +103,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                         Text(
                           '历史报告',
                           style: TextStyle(
-                              fontSize: 13, color: ac.textSecondary),
+                              fontSize: MaoType.body, color: ac.textSecondary),
                         ),
                       ],
                     ),
@@ -146,7 +147,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                     ? '连续打卡 ${streakDays ~/ 7} 周 ${streakDays % 7} 天'
                     : '连续打卡 $streakDays 天',
                 style: TextStyle(
-                    fontSize: 13,
+                    fontSize: MaoType.body,
                     fontWeight: FontWeight.w600,
                     color: ac.textPrimary),
               ),
@@ -219,7 +220,7 @@ class _StatBlock extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: accent.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(MaoRadius.small),
         ),
         child: Column(
           children: [
@@ -229,14 +230,14 @@ class _StatBlock extends StatelessWidget {
                   TextSpan(
                     text: value,
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: MaoType.display,
                       fontWeight: FontWeight.bold,
                       color: accent,
                     ),
                   ),
                   TextSpan(
                     text: suffix,
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   ),
                 ],
               ),
@@ -244,7 +245,7 @@ class _StatBlock extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+              style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
             ),
           ],
         ),

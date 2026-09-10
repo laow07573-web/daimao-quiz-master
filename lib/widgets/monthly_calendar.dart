@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
@@ -57,11 +58,11 @@ class MonthCalendar extends StatelessWidget {
             children: [
               Text('$month月',
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+                      fontSize: MaoType.body, fontWeight: FontWeight.w600)),
               const Spacer(),
               Text('$year年',
                   style: TextStyle(
-                      fontSize: 11.5, color: ac.textSecondary)),
+                      fontSize: MaoType.micro, color: ac.textSecondary)),
             ],
           ),
         ),
@@ -102,13 +103,13 @@ class MonthCalendar extends StatelessWidget {
     final color = isVacation ? ac.danger.withOpacity(0.55) : _heat(total, ac);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(MaoRadius.chip),
       onTap: onDayTap == null ? null : () => onDayTap!(day),
       child: Container(
         margin: const EdgeInsets.all(1),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(MaoRadius.chip),
           border: isToday
               ? Border.all(color: _todayColor(ac), width: 1.5)
               : null,
@@ -118,7 +119,7 @@ class MonthCalendar extends StatelessWidget {
           '$day',
           style: TextStyle(
             // v1.0.2 UI 审查修复：10 → 11，三列月历可读性
-            fontSize: 12.5,
+            fontSize: MaoType.caption,
             fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
             color: isVacation
                 ? ac.danger

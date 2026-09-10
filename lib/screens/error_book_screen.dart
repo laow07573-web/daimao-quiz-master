@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -160,7 +161,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -174,20 +175,20 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                   height: 4,
                   decoration: BoxDecoration(
                       color: ac.textSecondary.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2)),
+                      borderRadius: BorderRadius.circular(MaoRadius.chip)),
                 ),
               ),
               const SizedBox(height: 16),
               Text('$kp · ${questions.length} 题',
                   style: TextStyle(
-                      fontSize: 16,
+                      fontSize: MaoType.h3,
                       fontWeight: FontWeight.bold,
                       color: ac.textPrimary)),
               const SizedBox(height: 10),
               if (questions.isEmpty)
                 Text('该知识点暂无符合条件的题目',
                     style: TextStyle(
-                        fontSize: 13, color: ac.textSecondary))
+                        fontSize: MaoType.body, color: ac.textSecondary))
               else
                 Flexible(
                   child: ListView.builder(
@@ -207,7 +208,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontSize: 13, color: ac.textPrimary),
+                                    fontSize: MaoType.body, color: ac.textPrimary),
                               ),
                             ),
                             // v1.0.2 FSRS 可见化：下次复习时间（到期红色）
@@ -216,7 +217,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Text(
                                 '下次复习：${relativeDayLabel(card.nextReviewAt)}',
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: MaoType.caption,
                                   color: FSRSService.isDue(
                                           card, DateTime.now())
                                       ? ac.danger
@@ -293,7 +294,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
           title: const Text('薄弱知识点建议'),
           content: SingleChildScrollView(
             child: SelectableText(result,
-                style: const TextStyle(fontSize: 13, height: 1.5)),
+                style: const TextStyle(fontSize: MaoType.body, height: 1.5)),
           ),
           actions: [
             TextButton(
@@ -442,11 +443,11 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                       Icon(Icons.check_circle_outline,
                           size: 64, color: ac.accent.withOpacity(0.6)),
                       const SizedBox(height: 16),
-                      Text(_emptyText, style: const TextStyle(fontSize: 16)),
+                      Text(_emptyText, style: const TextStyle(fontSize: MaoType.h3)),
                       const SizedBox(height: 8),
                       Text('继续刷题积累吧！',
                           style: TextStyle(
-                              fontSize: 13, color: ac.textSecondary)),
+                              fontSize: MaoType.body, color: ac.textSecondary)),
                     ],
                   ),
                 )
@@ -462,7 +463,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               padding: const EdgeInsets.only(right: 8),
                               child: ChoiceChip(
                                 label: Text(label,
-                                    style: const TextStyle(fontSize: 12)),
+                                    style: const TextStyle(fontSize: MaoType.caption)),
                                 selected: _filter == value,
                                 onSelected: (_) => _switchFilter(value),
                               ),
@@ -472,7 +473,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                             onPressed: _toggleSelectAll,
                             child: Text(
                               _allSelected ? '取消全选' : '全选',
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: MaoType.caption),
                             ),
                           ),
                         ],
@@ -486,13 +487,13 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                           Text(
                             '共 ${_totalCount} 题待复习',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textPrimary),
+                                fontSize: MaoType.body, color: ac.textPrimary),
                           ),
                           const SizedBox(width: 10),
                           Text(
                             '收藏 ${_stats!.fold<int>(0, (s, x) => s + ((x['bookmark_count'] as int?) ?? 0))} 题',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary),
+                                fontSize: MaoType.body, color: ac.textSecondary),
                           ),
                         ],
                       ),
@@ -506,7 +507,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: ac.surfaceAlt.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(MaoRadius.small),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,14 +519,14 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                   const SizedBox(width: 6),
                                   Text('薄弱知识点',
                                       style: TextStyle(
-                                          fontSize: 13,
+                                          fontSize: MaoType.body,
                                           fontWeight: FontWeight.w600,
                                           color: ac.textPrimary)),
                                   const Spacer(),
                                   // v1.0.2 对齐里程碑：按知识点分组
                                   Text('按知识点分组',
                                       style: TextStyle(
-                                          fontSize: 12.5,
+                                          fontSize: MaoType.caption,
                                           color: ac.textSecondary)),
                                 ],
                               ),
@@ -535,7 +536,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 alignment: Alignment.centerLeft,
                                 child: Text('优先复习知识点',
                                     style: TextStyle(
-                                        fontSize: 12.5,
+                                        fontSize: MaoType.caption,
                                         color: ac.textSecondary)),
                               ),
                               const SizedBox(height: 10),
@@ -546,7 +547,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 children: [
                                   for (final kp in _kpStats.take(10))
                                     InkWell(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(MaoRadius.small),
                                       onTap: () =>
                                           _showKpQuestions(kp['kp'] as String),
                                       child: Container(
@@ -555,7 +556,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                         decoration: BoxDecoration(
                                           color: ac.accent.withOpacity(0.12),
                                           borderRadius:
-                                              BorderRadius.circular(8),
+                                              BorderRadius.circular(MaoRadius.small),
                                           border: Border.all(
                                               color: ac.accent
                                                   .withOpacity(0.25)),
@@ -566,14 +567,14 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                             Text(
                                               '${kp['kp']}',
                                               style: TextStyle(
-                                                  fontSize: 13,
+                                                  fontSize: MaoType.body,
                                                   color: ac.textPrimary),
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
                                               '${kp['cnt']} 题',
                                               style: TextStyle(
-                                                  fontSize: 11.5,
+                                                  fontSize: MaoType.micro,
                                                   color: ac.accent),
                                             ),
                                           ],
@@ -594,7 +595,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: ac.accentSoft.withOpacity(0.35),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(MaoRadius.small),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,7 +603,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Text(
                                 '本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。',
                                 style: TextStyle(
-                                    fontSize: 12.5,
+                                    fontSize: MaoType.caption,
                                     color: ac.textSecondary,
                                     height: 1.4),
                               ),
@@ -610,7 +611,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Text(
                                 '点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。',
                                 style: TextStyle(
-                                    fontSize: 12.5,
+                                    fontSize: MaoType.caption,
                                     color: ac.textSecondary,
                                     height: 1.4),
                               ),
@@ -629,7 +630,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                   label: Text(
                                       _adviceLoading ? '正在生成建议...' : '生成建议',
                                       style:
-                                          const TextStyle(fontSize: 13)),
+                                          const TextStyle(fontSize: MaoType.body)),
                                   onPressed:
                                       _adviceLoading ? null : _generateAdvice,
                                 ),
@@ -706,7 +707,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               _selectedBanks.isEmpty
                                   ? '全题库重刷（共 $_totalCount 题）'
                                   : '开始重刷（已选 $_totalSelected 题）',
-                              style: const TextStyle(fontSize: 15),
+                              style: const TextStyle(fontSize: MaoType.h3),
                             ),
                           ),
                         ),
@@ -745,14 +746,14 @@ class _BankErrorCard extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(MaoRadius.control),
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: ac.surfaceAlt.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
           border: Border.all(
             color: selected ? ac.accent : Colors.transparent,
             width: 1.5,
@@ -776,7 +777,7 @@ class _BankErrorCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 14,
+                          fontSize: MaoType.body,
                           fontWeight: FontWeight.w600,
                           color: ac.textPrimary)),
                   const SizedBox(height: 4),
@@ -785,28 +786,28 @@ class _BankErrorCard extends StatelessWidget {
                       if (due > 0)
                         Text('$due 题到期',
                             style: TextStyle(
-                                fontSize: 13, color: ac.danger)),
+                                fontSize: MaoType.body, color: ac.danger)),
                       if (due > 0 && bookmark > 0) ...[
                         const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary)),
+                                fontSize: MaoType.body, color: ac.textSecondary)),
                         const SizedBox(width: 8),
                       ],
                       Text('$bookmark 收藏',
                           style: TextStyle(
-                              fontSize: 13, color: ac.textSecondary)),
+                              fontSize: MaoType.body, color: ac.textSecondary)),
                       // v1.0.2 FSRS 可见化：下次到期（该题库最早到期卡）
                       if (nextDueAt != null) ...[
                         const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary)),
+                                fontSize: MaoType.body, color: ac.textSecondary)),
                         const SizedBox(width: 8),
                         Text(
                           '下次到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
                           style: TextStyle(
-                              fontSize: 13, color: ac.danger),
+                              fontSize: MaoType.body, color: ac.danger),
                         ),
                       ],
                     ],
@@ -816,7 +817,7 @@ class _BankErrorCard extends StatelessWidget {
             ),
             Text('$count 题',
                 style: TextStyle(
-                    fontSize: 13,
+                    fontSize: MaoType.body,
                     fontWeight: FontWeight.w600,
                     color: ac.accent)),
           ],

@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -175,7 +176,7 @@ class _TrendChartState extends State<TrendChart> {
                       width: 8,
                       height: 4,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(MaoRadius.chip),
                         color: i == _page ? ac.accent : ac.border,
                       ),
                     ),
@@ -186,7 +187,7 @@ class _TrendChartState extends State<TrendChart> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
                   _pageRangeLabel,
-                  style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+                  style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
                 ),
               ),
             if (_pages.length > 1)
@@ -342,7 +343,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: v.toInt().toString(),
-          style: TextStyle(fontSize: 11, color: ac.textSecondary),
+          style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -359,7 +360,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${pct.toInt()}%',
-          style: TextStyle(fontSize: 8, color: ac.textSecondary),
+          style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -377,7 +378,7 @@ class _TrendPainter extends CustomPainter {
       final bottom = _yFor(0);
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTRB(x - barW / 2, top, x + barW / 2, bottom),
-        const Radius.circular(3),
+        const Radius.circular(MaoRadius.chip),
       );
       canvas.drawRRect(
         rect,
@@ -425,7 +426,7 @@ class _TrendPainter extends CustomPainter {
       text: TextSpan(
         text: '打卡 $checkInThreshold 题',
         style: TextStyle(
-            fontSize: 11, color: ac.textPrimary),
+            fontSize: MaoType.micro, color: ac.textPrimary),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -434,7 +435,7 @@ class _TrendPainter extends CustomPainter {
     final labelY = y - 16;
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(labelX, labelY, rectW, 15),
-      const Radius.circular(8),
+      const Radius.circular(MaoRadius.small),
     );
     canvas.drawRRect(rect, Paint()..color = ac.warning);
     tp.paint(canvas, Offset(labelX + 7, labelY + (15 - tp.height) / 2));
@@ -451,7 +452,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${date.month}/${date.day}',
-          style: TextStyle(fontSize: 8, color: ac.textSecondary),
+          style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -472,7 +473,7 @@ class _TrendPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: '${date.month}/${date.day} ${total}题 ${acc.toStringAsFixed(0)}%',
-        style: const TextStyle(fontSize: 11.5, color: Colors.white),
+        style: MaoType.microStyle.copyWith(color: ac.onAccent),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -486,7 +487,7 @@ class _TrendPainter extends CustomPainter {
         math.max(leftPad, math.min(_x(i) - rectW / 2, _size.width - rightPad - rectW - 4));
     final rect = RRect.fromRectAndRadius(
       Rect.fromLTWH(bubbleX, bubbleY, rectW, rectH),
-      const Radius.circular(6),
+      const Radius.circular(MaoRadius.chip),
     );
     canvas.drawRRect(rect, Paint()..color = ac.accent);
     tp.paint(canvas, Offset(bubbleX + 8, bubbleY + (rectH - tp.height) / 2));

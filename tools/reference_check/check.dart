@@ -34,14 +34,26 @@ void main(List<String> args) {
   final results = <String>[];
   var pass = true;
 
+  // 组件/权限维度的已审阅差异白名单（如「局域网同步」新增的 Wi-Fi 权限）。
+  // 与文案白名单同构，设 REFCHECK_MERGE=1 时把本轮差异并入。
+  final manifestWlFile =
+      File('$refDir\\known_manifest_differences.txt');
+  final manifestWl = manifestWlFile.existsSync()
+      ? manifestWlFile.readAsLinesSync().map((s) => s.trim()).toSet()
+      : <String>{};
+  final manifestReviewed = <String>{};
+
   // ---- 1. 组件（activity/service/receiver/provider）----
   final reComp = RegExp(r'android:name="([^"]+)"');
   Set<String> comps(String m) =>
       reComp.allMatches(m).map((e) => e.group(1)!).toSet();
   final refC = comps(refManifest);
   final newC = comps(newManifest);
-  final onlyRef = refC.difference(newC);
-  final onlyNew = newC.difference(refC);
+  final onlyRef = refC.difference(newC).difference(manifestWl);
+  final onlyNew = newC.difference(refC).difference(manifestWl);
+  manifestReviewed
+    ..addAll(refC.difference(newC))
+    ..addAll(newC.difference(refC));
   results.add('【组件】原版有新版无: ${onlyRef.isEmpty ? "无" : onlyRef.join(", ")}');
   results.add('【组件】新版有原版无: ${onlyNew.isEmpty ? "无" : onlyNew.join(", ")}');
   if (onlyRef.isNotEmpty || onlyNew.isNotEmpty) pass = false;
@@ -52,11 +64,22 @@ void main(List<String> args) {
       rePerm.allMatches(m).map((e) => e.group(1)!).toSet();
   final refP = perms(refManifest);
   final newP = perms(newManifest);
-  final onlyRefP = refP.difference(newP);
-  final onlyNewP = newP.difference(refP);
+  final onlyRefP = refP.difference(newP).difference(manifestWl);
+  final onlyNewP = newP.difference(refP).difference(manifestWl);
+  manifestReviewed
+    ..addAll(refP.difference(newP))
+    ..addAll(newP.difference(refP));
   results.add('【权限】原版有新版无: ${onlyRefP.isEmpty ? "无" : onlyRefP.join(", ")}');
   results.add('【权限】新版有原版无: ${onlyNewP.isEmpty ? "无" : onlyNewP.join(", ")}');
   if (onlyRefP.isNotEmpty || onlyNewP.isNotEmpty) pass = false;
+  if (manifestReviewed.isNotEmpty &&
+      Platform.environment['REFCHECK_MERGE'] == '1') {
+    manifestWl.addAll(manifestReviewed);
+    manifestWlFile.writeAsStringSync(
+        (manifestWl.toList()..sort()).join('\n'), flush: true);
+    results.add('（已将 ${manifestReviewed.length} 条组件/权限差异并入基线 '
+        'known_manifest_differences.txt）');
+  }
 
   // ---- 3. 中文文案（去空白包含匹配 + 白名单：只报真正的信号缺失）----
   // 去空白：Dart 字符串插值会把 '已隐藏 X 条' 拆成多段，空白差异不算数
@@ -162,8 +185,11 @@ void main(List<String> args) {
   if (onlyRefA.isNotEmpty || onlyNewA.isNotEmpty) pass = false;
 
   results.add(pass ? '>>> PASS：四维对照全部一致' : '>>> FAIL：存在差异，见上方清单');
-  // 无基线外差异时，把本轮已审阅条目并入基线（供下次增量对照）
-  if (pass && missingReal.isNotEmpty) {
+  // 把本轮已审阅条目并入基线（供下次增量对照）。
+  // 默认仅在 PASS 时写回；设 REFCHECK_MERGE=1 可强制合并（用于
+  // "本轮差异已人工确认、需要并入白名单"的收尾场景）。
+  final forceMerge = Platform.environment['REFCHECK_MERGE'] == '1';
+  if ((pass || forceMerge) && missingReal.isNotEmpty) {
     final existing = whitelistFile.existsSync()
         ? whitelistFile.readAsLinesSync().toSet()
         : <String>{};

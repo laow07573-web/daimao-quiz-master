@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
@@ -22,7 +23,7 @@ class PracticeEntryScreen extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.timer, size: 64, color: ac.accent),
             const SizedBox(height: 16),
-            const Text('练习模式', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text('练习模式', style: TextStyle(fontSize: MaoType.display, fontWeight: FontWeight.bold)),
             const SizedBox(height: 32),
             SizedBox(width: 300, child: _card(context, ac, Icons.hourglass_empty, '不限时练习', '不设截止时间，正计时', '自由作答，随时手动提交', () => _start(context, PracticeTiming.untimed, 0))),
             const SizedBox(height: 16),
@@ -36,7 +37,7 @@ class PracticeEntryScreen extends StatelessWidget {
   Widget _card(BuildContext ctx, AppThemeColors ac, IconData icon, String title, String desc, String hint, VoidCallback onTap) {
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(MaoRadius.control),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -44,10 +45,10 @@ class PracticeEntryScreen extends StatelessWidget {
             Icon(icon, size: 36, color: ac.accent),
             const SizedBox(width: 16),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: ac.textPrimary)),
+              Text(title, style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.w600, color: ac.textPrimary)),
               const SizedBox(height: 4),
-              Text(desc, style: TextStyle(fontSize: 13, color: ac.textSecondary)),
-              Text(hint, style: TextStyle(fontSize: 12.5, color: ac.border)),
+              Text(desc, style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
+              Text(hint, style: TextStyle(fontSize: MaoType.caption, color: ac.border)),
             ])),
             Icon(Icons.chevron_right, color: ac.border),
           ]),
@@ -64,7 +65,7 @@ class PracticeEntryScreen extends StatelessWidget {
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('设定练习时长（分钟）', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text('设定练习时长（分钟）', style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           Wrap(spacing: 12, runSpacing: 12, children: [
             ... [15, 30, 45, 60, 90, 120].map((m) => ChoiceChip(label: Text('$m 分钟'), selected: false, onSelected: (_) { Navigator.pop(ctx); _start(context, PracticeTiming.timed, m); })),
@@ -160,8 +161,8 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
         child: ListView(controller: _scrollController, padding: const EdgeInsets.all(20), children: [
-        Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: LinearGradient(colors: [ac.accent, ac.accent.withOpacity(0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16)),
-          child: Column(children: [Text('${widget.accuracy}%', style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 8), Text('正确${widget.correct} · 错误${widget.wrong} · 未答${widget.blank}', style: const TextStyle(fontSize: 16, color: Colors.white70)), const SizedBox(height: 4), Text(widget.timing == PracticeTiming.timed ? '限时${widget.durationMinutes}分钟 · 实际${_fmt(widget.elapsedSeconds)}' : '不限时 · 用时${_fmt(widget.elapsedSeconds)}', style: const TextStyle(fontSize: 13, color: Colors.white54))])),
+        Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: LinearGradient(colors: [ac.accent, ac.accent.withOpacity(0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(MaoRadius.card)),
+          child: Column(children: [Text('${widget.accuracy}%', style: MaoType.displayStyle.copyWith(fontSize: MaoType.display, color: ac.onAccent)), const SizedBox(height: 8), Text('正确${widget.correct} · 错误${widget.wrong} · 未答${widget.blank}', style: MaoType.h3Style.copyWith(color: ac.onAccent.withOpacity(0.85))), const SizedBox(height: 4), Text(widget.timing == PracticeTiming.timed ? '限时${widget.durationMinutes}分钟 · 实际${_fmt(widget.elapsedSeconds)}' : '不限时 · 用时${_fmt(widget.elapsedSeconds)}', style: MaoType.captionStyle.copyWith(color: ac.onAccent.withOpacity(0.7)))])),
         const SizedBox(height: 20),
         // v1.0.2 七项改进：复盘答题卡（答对绿/答错红/未答灰，点格子定位错题）
         if (widget.answerStates.isNotEmpty) ...[
@@ -175,17 +176,17 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
           ),
           const SizedBox(height: 12),
         ],
-        if (widget.wrongList.isNotEmpty) ...[Text('错题回顾 (${widget.wrongList.length}题)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
+        if (widget.wrongList.isNotEmpty) ...[Text('错题回顾 (${widget.wrongList.length}题)', style: const TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
           ...widget.wrongList.map((w) { final q = w['q'] as Question, ua = w['ua'] as String;
             final idx = (w['idx'] as int?) ?? -1;
             return Card(key: idx >= 0 ? (_tileKeys[idx] ??= GlobalKey()) : null, child: ExpansionTile(
               leading: CircleAvatar(backgroundColor: ac.danger.withOpacity(0.15), radius: 16, child: Icon(Icons.close, color: ac.danger, size: 16)),
-              title: Text(q.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
-              subtitle: Text('你的答案: $ua  →  正确答案: ${q.correctAnswer}', style: const TextStyle(fontSize: 12)),
-              children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Divider(), const Text('题目解析', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(height: 4), Text(q.analysis ?? '暂无解析', style: TextStyle(fontSize: 13, color: ac.textSecondary, height: 1.5))]))],
+              title: Text(q.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: MaoType.body)),
+              subtitle: Text('你的答案: $ua  →  正确答案: ${q.correctAnswer}', style: const TextStyle(fontSize: MaoType.caption)),
+              children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Divider(), const Text('题目解析', style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.body)), const SizedBox(height: 4), Text(q.analysis ?? '暂无解析', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary, height: 1.5))]))],
             ));
           })],
-        if (widget.wrongList.isEmpty) ...[const SizedBox(height: 40), Icon(Icons.celebration, size: 64, color: ac.accent), const SizedBox(height: 12), const Text('全部正确！', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center)],
+        if (widget.wrongList.isEmpty) ...[const SizedBox(height: 40), Icon(Icons.celebration, size: 64, color: ac.accent), const SizedBox(height: 12), const Text('全部正确！', style: TextStyle(fontSize: MaoType.h1, fontWeight: FontWeight.bold), textAlign: TextAlign.center)],
       ]),
       ),
     );

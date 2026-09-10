@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -79,7 +80,7 @@ class _ImportScreenState extends State<ImportScreen> {
                     gradient: LinearGradient(
                       colors: [ac.accent, ac.accent.withOpacity(0.8)],
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(MaoRadius.control),
                   ),
                   child: Row(
                     children: [
@@ -93,13 +94,13 @@ class _ImportScreenState extends State<ImportScreen> {
                                 style: TextStyle(
                                     color: ac.onAccent,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 15)),
+                                    fontSize: MaoType.h3)),
                             const SizedBox(height: 4),
                             Text(
                               '自动提取题干、选项、答案，兼容各种 DOCX 格式',
                               style: TextStyle(
                                   color: ac.onAccent.withOpacity(0.7),
-                                  fontSize: 12),
+                                  fontSize: MaoType.caption),
                             ),
                           ],
                         ),
@@ -115,7 +116,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: ac.warning.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(MaoRadius.small),
                     border: Border.all(color: ac.warning.withOpacity(0.5)),
                   ),
                   child: Row(
@@ -127,7 +128,7 @@ class _ImportScreenState extends State<ImportScreen> {
                         child: Text(
                           '支持 .docx 格式。解析后先预览题目，可编辑、删除后再确认入库。\n旧版 .doc 文件请先用 Word 另存为 .docx。',
                           style: TextStyle(
-                              fontSize: 13, color: ac.textSecondary),
+                              fontSize: MaoType.body, color: ac.textSecondary),
                         ),
                       ),
                     ],
@@ -145,7 +146,7 @@ class _ImportScreenState extends State<ImportScreen> {
                         horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
                       color: ac.accent.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(MaoRadius.control),
                       border:
                           Border.all(color: ac.accent.withOpacity(0.4)),
                     ),
@@ -160,14 +161,14 @@ class _ImportScreenState extends State<ImportScreen> {
                             children: [
                               Text('一键导入示例题库',
                                   style: TextStyle(
-                                      fontSize: 15,
+                                      fontSize: MaoType.h3,
                                       fontWeight: FontWeight.w600,
                                       color: ac.accent)),
                               const SizedBox(height: 2),
                               Text(
                                   '内置 10 道医学示例题（单选/多选/判断），无需文件立即体验',
                                   style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: MaoType.body,
                                       color: ac.textSecondary)),
                             ],
                           ),
@@ -188,7 +189,7 @@ class _ImportScreenState extends State<ImportScreen> {
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
                       color: ac.card,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(MaoRadius.control),
                       border: Border.all(
                           color: ac.accent.withOpacity(0.3), width: 2),
                     ),
@@ -199,21 +200,21 @@ class _ImportScreenState extends State<ImportScreen> {
                         const SizedBox(height: 12),
                         Text('点击选择 DOCX 文件',
                             style: TextStyle(
-                                fontSize: 16, color: ac.accent)),
+                                fontSize: MaoType.h3, color: ac.accent)),
                         const SizedBox(height: 4),
                         Text('AI 将自动识别题目、选项和答案',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary)),
+                                fontSize: MaoType.body, color: ac.textSecondary)),
                         const SizedBox(height: 4),
                         // v1.0.2 对齐里程碑：JSON 直导入库提示
                         Text('导入 .json 题库文件，无需 AI 解析，题目答案直接入库',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary)),
+                                fontSize: MaoType.body, color: ac.textSecondary)),
                         const SizedBox(height: 4),
                         Text(
                             '选择本软件导出的 .json 题库文件（可多选）。导入完成后会显示导入报告。',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary)),
+                                fontSize: MaoType.body, color: ac.textSecondary)),
                       ],
                     ),
                   ),
@@ -225,7 +226,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 if (_selectedFiles.isNotEmpty) ...[
                   Text('已选文件',
                       style: TextStyle(
-                          fontSize: 14,
+                          fontSize: MaoType.body,
                           fontWeight: FontWeight.w600,
                           color: ac.textPrimary)),
                   const SizedBox(height: 8),
@@ -238,7 +239,7 @@ class _ImportScreenState extends State<ImportScreen> {
                             color: ac.accent),
                         // v1.0.2 设计审查修复：取文件名用 path 包 basename
                         title: Text(p.basename(_selectedFiles[index]),
-                            style: const TextStyle(fontSize: 13)),
+                            style: const TextStyle(fontSize: MaoType.body)),
                         trailing: IconButton(
                           icon: const Icon(Icons.close, size: 18),
                           onPressed: isProcessing
@@ -291,7 +292,7 @@ class _ImportScreenState extends State<ImportScreen> {
                           return Text(
                             '💰 余额 ¥${appState.aiService!.cachedBalance!.toStringAsFixed(2)}，预估可再导入 ${remaining > 0 ? "~$remaining 题" : "..."}',
                             style: TextStyle(
-                                fontSize: 13, color: ac.textSecondary),
+                                fontSize: MaoType.body, color: ac.textSecondary),
                           );
                         },
                       ),
@@ -312,14 +313,14 @@ class _ImportScreenState extends State<ImportScreen> {
                           : const Icon(Icons.auto_awesome, size: 20),
                       label: Text(
                         isProcessing ? 'AI 解析中...' : '开始 AI 导入',
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(fontSize: MaoType.h3),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ac.accent,
                         foregroundColor: ac.onAccent,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(MaoRadius.small)),
                       ),
                       onPressed: isProcessing
                           ? null
@@ -367,7 +368,7 @@ class _ImportScreenState extends State<ImportScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(MaoRadius.chip),
                             child: LinearProgressIndicator(
                               value: appState.importProgress.clamp(0.0, 1.0),
                               minHeight: 6,
@@ -377,12 +378,12 @@ class _ImportScreenState extends State<ImportScreen> {
                           Text(appState.importStatus,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                  fontSize: 13, color: ac.textSecondary)),
+                                  fontSize: MaoType.body, color: ac.textSecondary)),
                           const SizedBox(height: 4),
                           Text('可离开本页，导入会继续在后台进行，进度在首页展示',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: MaoType.body,
                                   color: ac.textSecondary.withOpacity(0.8))),
                         ],
                       ),

@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -71,7 +72,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('取消')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+                backgroundColor: AppThemeColors.of(ctx).danger),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('清除'),
           ),
@@ -103,14 +105,14 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
               children: [
                 Text('基于当前题库生成过去若干天的使用数据：',
                     style: TextStyle(
-                        fontSize: 13,
+                        fontSize: MaoType.body,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 Text('使用 FSRS 算法全权生成，用于测试每日提醒、连击、首页战绩。',
                     style: TextStyle(
-                        fontSize: 13,
+                        fontSize: MaoType.body,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 12),
-                Text('生成天数：$days 天', style: const TextStyle(fontSize: 13)),
+                Text('生成天数：$days 天', style: const TextStyle(fontSize: MaoType.body)),
                 Slider(
                   value: days.toDouble(),
                   min: 30,
@@ -124,7 +126,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   title: const Text('随机 1~2 个知识点作为薄弱点',
-                      style: TextStyle(fontSize: 13)),
+                      style: TextStyle(fontSize: MaoType.body)),
                   value: randomWeakKp,
                   onChanged: (v) =>
                       setDialogState(() => randomWeakKp = v ?? false),
@@ -134,23 +136,23 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   title: const Text('把所有复习卡设为今天到期，便于测试错题复习',
-                      style: TextStyle(fontSize: 13)),
+                      style: TextStyle(fontSize: MaoType.body)),
                   value: dueToday,
                   onChanged: (v) => setDialogState(() => dueToday = v ?? false),
                 ),
                 const SizedBox(height: 4),
                 Text('· 答错的题自动进错题本并建复习卡',
                     style: TextStyle(
-                        fontSize: 13,
+                        fontSize: MaoType.body,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 Text('· 重复执行会先清理上次模拟的数据，可放心多试。',
                     style: TextStyle(
-                        fontSize: 13,
+                        fontSize: MaoType.body,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 if (dueToday)
                   Text('· 错题本的「待复习」数量会全部增加。',
                       style: TextStyle(
-                          fontSize: 13, color: Theme.of(ctx).colorScheme.error)),
+                          fontSize: MaoType.body, color: Theme.of(ctx).colorScheme.error)),
               ],
             ),
           ),
@@ -297,7 +299,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                 // v1.0.2 对齐里程碑：输入密码开启，调试专用
                 labelText: '输入密码开启，调试专用',
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(MaoRadius.small)),
               ),
               onSubmitted: (v) {
                 if (_checkPassword(v)) {
@@ -432,7 +434,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Text(_status!,
-                style: TextStyle(fontSize: 13, color: ac.accent)),
+                style: TextStyle(fontSize: MaoType.body, color: ac.accent)),
           ),
       ],
     );
@@ -456,13 +458,13 @@ class _DevCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(MaoRadius.control),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
           color: ac.surfaceAlt.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
         ),
         child: Row(
           children: [
@@ -474,13 +476,13 @@ class _DevCard extends StatelessWidget {
                 children: [
                   Text(title,
                       style: TextStyle(
-                          fontSize: 14,
+                          fontSize: MaoType.body,
                           fontWeight: FontWeight.w600,
                           color: ac.textPrimary)),
                   if (subtitle != null)
                     Text(subtitle!,
                         style: TextStyle(
-                            fontSize: 12.5, color: ac.textSecondary)),
+                            fontSize: MaoType.caption, color: ac.textSecondary)),
                 ],
               ),
             ),

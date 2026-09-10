@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -141,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,19 +153,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 8),
                       Text('AI 接口配置',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16, color: ac.textPrimary)),
+                              fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '默认使用 DeepSeek API，填写你的 API Key 即可使用。也可自定义接口地址和模型。',
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   ),
                   const SizedBox(height: 16),
 
                   // API Key
                   Text('API Key',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ac.textPrimary)),
+                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500, color: ac.textPrimary)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _apiKeyController,
@@ -172,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: InputDecoration(
                       hintText: 'sk-xxxxxxxxxxxxxxxxxxxxxxxx',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(MaoRadius.small)),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 12),
                       suffixIcon: IconButton(
@@ -194,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: ac.accentSoft.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(MaoRadius.small),
                       ),
                       child: Row(
                         children: [
@@ -203,11 +204,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               color: AppThemeColors.of(context).warning),
                           const SizedBox(width: 8),
                           Text('剩余 ¥${_balance!.toStringAsFixed(2)}',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: ac.accent)),
+                              style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w600, color: ac.accent)),
                           if (_estimated > 0) ...[
                             const SizedBox(width: 8),
                             Text('≈ ${_estimated} 题',
-                                style: TextStyle(fontSize: 13, color: ac.accent.withOpacity(0.7))),
+                                style: TextStyle(fontSize: MaoType.body, color: ac.accent.withOpacity(0.7))),
                           ],
                           const Spacer(),
                           _balanceLoading
@@ -230,7 +231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: ac.danger.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(MaoRadius.small),
                       ),
                       child: Row(
                         children: [
@@ -240,7 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Expanded(
                             child: Text('API 余额不足 ¥1，建议尽快充值以免影响使用',
                                 style: TextStyle(
-                                    fontSize: 13, color: ac.danger)),
+                                    fontSize: MaoType.body, color: ac.danger)),
                           ),
                         ],
                       ),
@@ -250,7 +251,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   // API Endpoint
                   Text('API 地址',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ac.textPrimary)),
+                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500, color: ac.textPrimary)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _endpointController,
@@ -262,24 +263,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: InputDecoration(
                       hintText: AppSettings.defaultApiEndpoint,
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(MaoRadius.small)),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 12),
                     ),
-                    style: const TextStyle(fontSize: 13),
+                    style: const TextStyle(fontSize: MaoType.body),
                   ),
                   const SizedBox(height: 14),
 
                   // Model
                   Text('模型名称',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ac.textPrimary)),
+                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500, color: ac.textPrimary)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _modelController,
                     decoration: InputDecoration(
                       hintText: AppSettings.defaultModel,
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(MaoRadius.small)),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 12),
                     ),
@@ -288,18 +289,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   // v1.0.2 对齐里程碑：昵称（首页专属问候）
                   Text('你的昵称',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ac.textPrimary)),
+                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500, color: ac.textPrimary)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _nicknameController,
                     decoration: InputDecoration(
                       hintText: '设置后，首页会显示对你的专属问候。',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(MaoRadius.small)),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 12),
                     ),
-                    style: const TextStyle(fontSize: 13),
+                    style: const TextStyle(fontSize: MaoType.body),
                   ),
                 ],
               ),
@@ -333,7 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   Navigator.pop(context);
                 },
-                child: const Text('保存设置', style: TextStyle(fontSize: 16)),
+                child: const Text('保存设置', style: TextStyle(fontSize: MaoType.h3)),
               ),
             ),
 
@@ -344,7 +345,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,7 +358,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Text('为剩余题目打标签',
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: MaoType.h3,
                                 color: ac.textPrimary)),
                       ),
                       if (_untaggedCount > 0)
@@ -366,11 +367,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: ac.danger.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(MaoRadius.small),
                           ),
                           child: Text('$_untaggedCount 题未打标签',
                               style: TextStyle(
-                                  fontSize: 12.5, color: ac.danger)),
+                                  fontSize: MaoType.caption, color: ac.danger)),
                         ),
                     ],
                   ),
@@ -378,12 +379,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // v1.0.2 对齐里程碑：打标签用途说明
                   Text(
                     '用于：根据错题分析薄弱知识点、错题本按章节分组。按知识点统计错题分布，优先攻克薄弱类型',
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary, height: 1.4),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary, height: 1.4),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '部分错题未打知识点标签，可去设置页「为剩余题目打标签」补齐后精炼更准。',
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary, height: 1.4),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary, height: 1.4),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -392,7 +393,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: const Icon(Icons.auto_awesome, size: 16),
                       label: Text(
                           _untaggedCount > 0 ? '开始打标签' : '暂无未打标签题目',
-                          style: const TextStyle(fontSize: 13)),
+                          style: const TextStyle(fontSize: MaoType.body)),
                       onPressed: (_untaggedCount > 0 &&
                               context.read<AppState>().settings.isConfigured)
                           ? () => _startTagging(context)
@@ -410,7 +411,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,17 +420,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Icon(Icons.music_note, color: ac.accent, size: 20),
                       const SizedBox(width: 8),
-                      Text('音效', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ac.textPrimary)),
+                      Text('音效', style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('答对/答错时播放提示音', style: TextStyle(fontSize: 13, color: ac.textSecondary)),
+                  Text('答对/答错时播放提示音', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
                   const SizedBox(height: 8),
                   Consumer<AppState>(
                     builder: (context, appState, _) => SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(appState.settings.soundEnabled ? '音效已开启' : '音效已关闭',
-                          style: TextStyle(fontSize: 14, color: ac.textPrimary)),
+                          style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary)),
                       value: appState.settings.soundEnabled,
                       onChanged: (v) {
                         appState.updateSettings(appState.settings.copyWith(soundEnabled: v));
@@ -453,7 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: ac.surfaceAlt,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(MaoRadius.control),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +466,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Text('局域网同步',
                               style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: MaoType.h3,
                                   color: ac.textPrimary)),
                         ],
                       ),
@@ -476,7 +477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         '若发现不了设备：确认双方接同一 Wi-Fi、对端应用在前台，'
                         'Windows 首次运行需在防火墙弹窗中允许本应用联网。',
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: MaoType.body,
                             color: ac.textSecondary,
                             height: 1.4),
                       ),
@@ -486,11 +487,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: Text(
                             syncSettings.autoSync ? '自动同步已开启' : '自动同步已关闭',
                             style:
-                                TextStyle(fontSize: 14, color: ac.textPrimary)),
+                                TextStyle(fontSize: MaoType.body, color: ac.textPrimary)),
                         subtitle: Text('开启后接入同一局域网自动发现并同步；'
                             '关闭时设备仍可互相发现，用「立即同步」手动触发',
                             style: TextStyle(
-                                fontSize: 12.5, color: ac.textSecondary)),
+                                fontSize: MaoType.caption, color: ac.textSecondary)),
                         value: syncSettings.autoSync,
                         onChanged: (v) async {
                           await appState.updateSettings(
@@ -511,7 +512,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         dense: true,
                         leading: const Icon(Icons.devices_other, size: 20),
                         title: Text('设备名：$displayName',
-                            style: const TextStyle(fontSize: 14)),
+                            style: const TextStyle(fontSize: MaoType.body)),
                         trailing: const Icon(Icons.edit, size: 18),
                         onTap: () => _editDeviceName(context, displayName),
                       ),
@@ -523,7 +524,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 '${sync.lastSyncAt != null ? ' · 上次同步 ${_fmtTime(sync.lastSyncAt)}' : ''}'
                                 '${sync.statusMessage.isNotEmpty ? '\n${sync.statusMessage}' : ''}',
                         style: TextStyle(
-                            fontSize: 13, color: ac.textSecondary, height: 1.5),
+                            fontSize: MaoType.body, color: ac.textSecondary, height: 1.5),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -537,7 +538,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       strokeWidth: 2))
                               : const Icon(Icons.sync, size: 16),
                           label: Text(sync.syncing ? '同步中...' : '立即同步',
-                              style: const TextStyle(fontSize: 13)),
+                              style: const TextStyle(fontSize: MaoType.body)),
                           onPressed: sync.syncing ? null : _syncNow,
                         ),
                       ),
@@ -557,7 +558,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: ac.surfaceAlt,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(MaoRadius.control),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,7 +570,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text('寒暑假模式',
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: MaoType.h3,
                                 color: ac.textPrimary)),
                       ],
                     ),
@@ -578,20 +579,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       '作用：开启后暂停每日提醒、错题 FSRS 复习与答题练习，本周战绩日历自动标注假期区间；连击冻结，假期不刷题也不断卡。',
                       style: TextStyle(
-                          fontSize: 13, color: ac.textSecondary, height: 1.4),
+                          fontSize: MaoType.body, color: ac.textSecondary, height: 1.4),
                     ),
                     // v1.0.2 修复：提示默认区间为当前自然月，需按实际假期调整
                     Text(
                       '默认区间为当前自然月，请开启后按实际假期调整起止日期。',
                       style: TextStyle(
-                          fontSize: 12.5, color: ac.textSecondary.withOpacity(0.8)),
+                          fontSize: MaoType.caption, color: ac.textSecondary.withOpacity(0.8)),
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(appState.vacationModeEnabled ? '已开启' : '已关闭',
                           style:
-                              TextStyle(fontSize: 14, color: ac.textPrimary)),
+                              TextStyle(fontSize: MaoType.body, color: ac.textPrimary)),
                       value: appState.vacationModeEnabled,
                       onChanged: (v) async {
                         final now = DateTime.now();
@@ -658,7 +659,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: ac.surfaceAlt,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(MaoRadius.control),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,7 +673,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text('提醒与复习',
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: MaoType.h3,
                                 color: ac.textPrimary)),
                       ],
                     ),
@@ -680,13 +681,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // v1.0.2 对齐里程碑：到点会提醒你刷题打卡，保持连胜
                     Text('到点会提醒你刷题打卡，保持连胜',
                         style: TextStyle(
-                            fontSize: 13, color: ac.textSecondary)),
+                            fontSize: MaoType.body, color: ac.textSecondary)),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(appState.reminderEnabled ? '已开启' : '已关闭',
                           style:
-                              TextStyle(fontSize: 14, color: ac.textPrimary)),
+                              TextStyle(fontSize: MaoType.body, color: ac.textPrimary)),
                       value: appState.reminderEnabled,
                       onChanged: (v) async {
                         // v1.0.2 修复：开启提醒前请求 Android 13+ 通知运行时权限
@@ -722,7 +723,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         leading: const Icon(Icons.schedule, size: 20),
                         title: Text(
                           '提醒时间：${_fmtTime(appState.reminderTime)}',
-                          style: const TextStyle(fontSize: 14),
+                          style: const TextStyle(fontSize: MaoType.body),
                         ),
                         trailing: const Icon(Icons.edit, size: 18),
                         onTap: () async {
@@ -748,7 +749,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.notifications_active, size: 16),
-                        label: const Text('发送测试通知', style: TextStyle(fontSize: 13)),
+                        label: const Text('发送测试通知', style: TextStyle(fontSize: MaoType.body)),
                         onPressed: () async {
                           // v1.0.2 修复：Android 13+ 先请求通知权限，再发测试通知
                           await ReminderService.instance
@@ -782,7 +783,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,7 +796,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text('电池优化',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: MaoType.h3,
                               color: ac.textPrimary)),
                       const Spacer(),
                       Icon(
@@ -811,20 +812,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     _batteryIgnored ? '电池优化：已豁免' : '电池优化：未豁免',
                     style: TextStyle(
-                        fontSize: 13,
+                        fontSize: MaoType.body,
                         color: _batteryIgnored ? ac.accent : ac.danger),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     '允许忽略电池优化，防止系统在后台清理每日提醒服务',
                     style:
-                        TextStyle(fontSize: 13, color: ac.textSecondary, height: 1.4),
+                        TextStyle(fontSize: MaoType.body, color: ac.textSecondary, height: 1.4),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '若仍收不到提醒：最近任务中长按本应用并锁定',
                     style:
-                        TextStyle(fontSize: 13, color: ac.textSecondary, height: 1.4),
+                        TextStyle(fontSize: MaoType.body, color: ac.textSecondary, height: 1.4),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -834,7 +835,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           icon: const Icon(Icons.battery_alert, size: 16),
                           label: Text(
                               _batteryIgnored ? '电池优化：已豁免' : '请求忽略电池优化',
-                              style: const TextStyle(fontSize: 12)),
+                              style: const TextStyle(fontSize: MaoType.caption)),
                           onPressed: _batteryIgnored
                               ? null
                               : () async {
@@ -853,7 +854,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
 
             // 主题切换
-            Text('主题外观', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ac.textPrimary)),
+            Text('主题外观', style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
             const SizedBox(height: 8),
             Consumer<ThemeService>(
               builder: (context, themeService, _) => Card(
@@ -879,13 +880,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       color: c,
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                          color: Colors.black.withOpacity(0.15),
+                                          color: ac.textPrimary.withOpacity(0.15),
                                           width: 0.8),
                                     ),
                                   ),
                                 )),
                             const SizedBox(width: 6),
-                            Text(label, style: const TextStyle(fontSize: 14)),
+                            Text(label, style: const TextStyle(fontSize: MaoType.body)),
                           ],
                         ),
                         value: t,
@@ -901,7 +902,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
 
             // v1.0.2 七项改进：深色模式（跟随系统/浅色/深色）
-            Text('深色模式', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ac.textPrimary)),
+            Text('深色模式', style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
             const SizedBox(height: 8),
             Consumer<ThemeService>(
               builder: (context, themeService, _) => Card(
@@ -916,7 +917,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       RadioListTile<ThemeMode>(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: Text(label, style: const TextStyle(fontSize: 14)),
+                        title: Text(label, style: const TextStyle(fontSize: MaoType.body)),
                         value: mode,
                         groupValue: themeService.themeMode,
                         onChanged: (v) => themeService.switchThemeMode(v!),
@@ -933,7 +934,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
                 // v1.0.2 UI 审查修复：星际穿越等主题下卡片与页面背景
                 // 对比微弱，加细边框分隔
                 border: Border.all(color: ac.border),
@@ -947,13 +948,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 8),
                       Text('调试日志',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16, color: ac.textPrimary)),
+                              fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '开启后记录 AI 渲染链路、答案提交等关键数据，帮助排查前端 Bug。',
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -963,7 +964,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(
                             _debugEnabled ? '日志已开启' : '日志已关闭',
-                            style: TextStyle(fontSize: 14, color: ac.textPrimary),
+                            style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
                           ),
                           value: _debugEnabled,
                           onChanged: (v) {
@@ -989,7 +990,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           label: const Text('导出日志',
                               maxLines: 1,
                               softWrap: false,
-                              style: TextStyle(fontSize: 13)),
+                              style: TextStyle(fontSize: MaoType.body)),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 6),
                             visualDensity: VisualDensity.compact,
@@ -1025,7 +1026,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 10),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.delete_outline, size: 16),
-                        label: const Text('清空', style: TextStyle(fontSize: 13)),
+                        label: const Text('清空', style: TextStyle(fontSize: MaoType.body)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: ac.danger,
                         ),
@@ -1044,7 +1045,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 10),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.share, size: 16),
-                        label: const Text('分享', style: TextStyle(fontSize: 13)),
+                        label: const Text('分享', style: TextStyle(fontSize: MaoType.body)),
                         style: OutlinedButton.styleFrom(foregroundColor: ac.accent),
                         onPressed: () async {
                           try {
@@ -1079,7 +1080,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1087,7 +1088,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text('使用说明',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: MaoType.h3,
                           color: ac.textPrimary)),
                   const SizedBox(height: 12),
                   _HelpItem(
@@ -1384,10 +1385,10 @@ class _TaggingDialogState extends State<_TaggingDialog> {
                     title: Text(q.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12)),
+                        style: const TextStyle(fontSize: MaoType.caption)),
                     trailing: Text(kp,
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: MaoType.body,
                             fontWeight: FontWeight.w600,
                             color: failed ? ac.danger : ac.accent)),
                   );
@@ -1403,7 +1404,7 @@ class _TaggingDialogState extends State<_TaggingDialog> {
                   const SizedBox(height: 16),
                   Text(
                     _paused ? '已暂停，可随时继续' : '正在逐题识别知识点...',
-                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
+                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   ),
                 ],
               ),
@@ -1463,7 +1464,7 @@ class _DateField extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(MaoRadius.small),
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
@@ -1477,7 +1478,7 @@ class _DateField extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(MaoRadius.small),
           border: Border.all(color: ac.border),
         ),
         child: Row(
@@ -1488,7 +1489,7 @@ class _DateField extends StatelessWidget {
               value == null
                   ? label
                   : '${value!.year}-${value!.month.toString().padLeft(2, '0')}-${value!.day.toString().padLeft(2, '0')}',
-              style: TextStyle(fontSize: 13, color: ac.textPrimary),
+              style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
             ),
           ],
         ),
@@ -1516,7 +1517,7 @@ class _HelpItem extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(text,
-                style: TextStyle(fontSize: 13, color: ac.textSecondary, height: 1.4)),
+                style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary, height: 1.4)),
           ),
         ],
       ),

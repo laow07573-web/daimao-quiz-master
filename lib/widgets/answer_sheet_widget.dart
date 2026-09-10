@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
@@ -31,7 +32,7 @@ class AnswerSheetWidget extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('答题卡', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: ac.textPrimary)),
+          Text('答题卡', style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.w600, color: ac.textPrimary)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -80,12 +81,12 @@ class AnswerSheetWidget extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: bg,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(MaoRadius.chip),
                     border: Border.all(color: i == currentIndex ? ac.accent : ac.border, width: i == currentIndex ? 2 : 1),
                   ),
                   alignment: Alignment.center,
                   child: Text('${i + 1}',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: fg)),
+                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w600, color: fg)),
                 ),
               );
             }),
@@ -100,9 +101,9 @@ class AnswerSheetWidget extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color.withOpacity(0.3), borderRadius: BorderRadius.circular(3))),
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color.withOpacity(0.3), borderRadius: BorderRadius.circular(MaoRadius.chip))),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: const TextStyle(fontSize: MaoType.caption)),
       ],
     );
   }

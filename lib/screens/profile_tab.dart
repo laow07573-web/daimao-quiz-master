@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
@@ -66,7 +67,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(MaoRadius.card),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,7 +75,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 Row(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(MaoRadius.control),
                       child: Image.asset(
                         'assets/app_logo.png',
                         width: 44,
@@ -91,7 +92,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           Text(
                             _greeting,
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: MaoType.h1,
                               fontWeight: FontWeight.w600,
                               color: ac.onAccent,
                             ),
@@ -103,7 +104,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                 ? '猫卷'
                                 : context.read<AppState>().settings.nickname,
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: MaoType.body,
                               color: ac.onAccent.withOpacity(0.85),
                             ),
                           ),
@@ -142,7 +143,7 @@ class _ProfileTabState extends State<ProfileTab> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: ac.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(MaoRadius.control),
               border: Border.all(color: ac.border),
             ),
             child: Column(
@@ -151,13 +152,13 @@ class _ProfileTabState extends State<ProfileTab> {
                 Text('猫卷 · 医学备考刷题平台',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: MaoType.body,
                         color: ac.textPrimary)),
                 const SizedBox(height: 6),
                 Text(
                   '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧',
                   style: TextStyle(
-                      fontSize: 13,
+                      fontSize: MaoType.body,
                       height: 1.7,
                       color: ac.textSecondary),
                 ),
@@ -169,7 +170,7 @@ class _ProfileTabState extends State<ProfileTab> {
             child: Text(
               // v1.0.2 对齐里程碑：页脚带版本号
               '本软件由b站：笨蛋鱼坏蛋猫开发|$kAppVersion',
-              style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+              style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
             ),
           ),
         ],
@@ -215,13 +216,13 @@ class _EntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(MaoRadius.control),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: ac.surfaceAlt.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(MaoRadius.control),
         ),
         child: Row(
           children: [
@@ -230,13 +231,13 @@ class _EntryTile extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(fontSize: 14, color: ac.textPrimary),
+                style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
               ),
             ),
             if (subtitle != null)
               Text(subtitle!,
                   style:
-                      TextStyle(fontSize: 13, color: ac.textSecondary)),
+                      TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
             const SizedBox(width: 4),
             Icon(Icons.chevron_right, size: 18, color: ac.textSecondary),
           ],

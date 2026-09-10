@@ -1,3 +1,4 @@
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/question.dart';
@@ -81,7 +82,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                       : '解析完成，共 0 道题目',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 14, color: ac.textSecondary)))
+                          fontSize: MaoType.body, color: ac.textSecondary)))
               : Column(
                   children: [
                     // 统计栏（v1.27：徽章可点击筛选对应分类题目）
@@ -96,12 +97,12 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                           if (_filter != _PreviewFilter.all) ...[
                             Text('已筛出 ${shown.length} 题 · 再点徽章可取消',
                                 style: TextStyle(
-                                    fontSize: 12.5, color: ac.textSecondary)),
+                                    fontSize: MaoType.caption, color: ac.textSecondary)),
                             const SizedBox(width: 8),
                           ],
                           Text('共 ${questions.length} 题',
                               style: TextStyle(
-                                  fontSize: 13, color: ac.textSecondary)),
+                                  fontSize: MaoType.body, color: ac.textSecondary)),
                         ],
                       ),
                     ),
@@ -114,13 +115,13 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: ac.warning.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(MaoRadius.small),
                           border: Border.all(color: ac.warning.withOpacity(0.5)),
                         ),
                         child: Text(
                           '${appState.previewParseErrors.length} 个分块解析失败（已跳过）：'
                           '${appState.previewParseErrors.join('；')}',
-                          style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
+                          style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
                         ),
                       ),
 
@@ -130,7 +131,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                           ? Center(
                               child: Text('该分类下暂无题目',
                                   style: TextStyle(
-                                      fontSize: 13, color: ac.textSecondary)))
+                                      fontSize: MaoType.body, color: ac.textSecondary)))
                           : ListView.builder(
                               padding: const EdgeInsets.all(12),
                               itemCount: shown.length,
@@ -178,10 +179,10 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: ac.success,
-                          foregroundColor: Colors.white,
+                          foregroundColor: ac.onAccent,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(MaoRadius.small)),
                         ),
                         onPressed: () async {
                           await appState.confirmImport();
@@ -196,7 +197,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                         },
                         child: Text(
                           '确认导入 ${questions.length} 道题目',
-                          style: const TextStyle(fontSize: 16),
+                          style: const TextStyle(fontSize: MaoType.h3),
                         ),
                       ),
                     ),
@@ -222,12 +223,12 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: color.withOpacity(active ? 0.22 : 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(MaoRadius.small),
             border: active ? Border.all(color: color) : null,
           ),
           child: Text(text,
               style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: MaoType.caption,
                   color: color,
                   fontWeight: active ? FontWeight.w700 : FontWeight.w500)),
         ),
@@ -263,7 +264,8 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
               appState.removePreviewQuestion(index);
               Navigator.pop(ctx);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+                foregroundColor: AppThemeColors.of(ctx).danger),
             child: const Text('删除'),
           ),
         ],
@@ -332,7 +334,7 @@ class _QuestionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: ac.card,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
         border: hasError
             ? Border.all(color: ac.danger.withOpacity(0.4))
             : null,
@@ -355,10 +357,10 @@ class _QuestionCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: ac.accent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(MaoRadius.chip),
                   ),
                   child: Text('第 ${index + 1} 题',
-                      style: TextStyle(fontSize: 12.5, color: ac.accent)),
+                      style: TextStyle(fontSize: MaoType.caption, color: ac.accent)),
                 ),
                 const SizedBox(width: 8),
                 if (question.questionType == 'multi_choice')
@@ -388,7 +390,7 @@ class _QuestionCard extends StatelessWidget {
             child: Text(
               question.title.isEmpty ? '(空题干)' : question.title,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: MaoType.body,
                 fontWeight: FontWeight.w500,
                 color: question.title.isEmpty ? ac.danger : ac.textPrimary,
               ),
@@ -407,7 +409,7 @@ class _QuestionCard extends StatelessWidget {
                 children: question.optionsWithLabels.map((o) => Text(
                       o,
                       style: TextStyle(
-                          fontSize: 13, color: ac.textSecondary),
+                          fontSize: MaoType.body, color: ac.textSecondary),
                     )).toList(),
               ),
             ),
@@ -418,7 +420,7 @@ class _QuestionCard extends StatelessWidget {
             child: Text(
               '答案: ${question.correctAnswer.isEmpty ? '(未识别)' : question.correctAnswer}',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: MaoType.body,
                 color: question.correctAnswer.isEmpty
                     ? ac.danger
                     : ac.success,
@@ -444,7 +446,7 @@ class _QuestionCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(e.message,
                             style: TextStyle(
-                                fontSize: 12.5,
+                                fontSize: MaoType.caption,
                                 color: e.isError ? ac.danger : ac.warning)),
                       ],
                     )).toList(),
@@ -467,9 +469,9 @@ class _Tag extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: BorderRadius.circular(MaoRadius.chip),
       ),
-      child: Text(text, style: TextStyle(fontSize: 11.5, color: color)),
+      child: Text(text, style: TextStyle(fontSize: MaoType.micro, color: color)),
     );
   }
 }
@@ -554,24 +556,24 @@ class _EditCardState extends State<_EditCard> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: ac.card,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
         border: Border.all(color: ac.accent),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 题干
-          const Text('题干', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          const Text('题干', style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
           TextField(
             controller: _titleCtrl,
             maxLines: 3,
             decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.chip)),
               contentPadding: const EdgeInsets.all(10),
               isDense: true,
             ),
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: MaoType.body),
           ),
           const SizedBox(height: 10),
 
@@ -585,23 +587,23 @@ class _EditCardState extends State<_EditCard> {
               icon: const Icon(Icons.add, size: 16),
               label: Text(
                   _optCtrls.length >= _maxOptions ? '选项已达上限 (Z)' : '添加选项',
-                  style: const TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: MaoType.body)),
             ),
           ),
           const SizedBox(height: 6),
 
           // 答案
-          const Text('正确答案', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          const Text('正确答案', style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
           TextField(
             controller: _answerCtrl,
             decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.chip)),
               contentPadding: const EdgeInsets.all(10),
               isDense: true,
               hintText: 'A / B / …（多选逗号分隔） / 对 / 错 / 文本答案',
             ),
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: MaoType.body),
           ),
           const SizedBox(height: 10),
 
@@ -676,12 +678,12 @@ class _EditCardState extends State<_EditCard> {
       controller: ctrl,
       decoration: InputDecoration(
         labelText: '选项 $label',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.chip)),
         contentPadding: const EdgeInsets.all(10),
         isDense: true,
-        labelStyle: const TextStyle(fontSize: 12),
+        labelStyle: const TextStyle(fontSize: MaoType.caption),
       ),
-      style: const TextStyle(fontSize: 13),
+      style: const TextStyle(fontSize: MaoType.body),
     );
   }
 }
