@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# v1.27.0 归档策略：冗余产物不入库（里程碑交付物仍保留在 dist/）
+dist/猫卷-Windows-*/
+dist/猫卷-Windows-*.zip
+dist/猫卷-Setup-1.26.6-Windows-x64.exe*
+docs/maojuan_plan/node_modules/
+docs/ui_review_assets/
+.qoder/
+/windows/flutter/ephemeral/
+
+# 安全加固：密钥/证书永不入库
+android/key.properties
+**/*.jks
+**/*.keystore

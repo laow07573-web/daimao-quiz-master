@@ -40,9 +40,9 @@ final ac = AppThemeColors.of(context);   // 或 Theme.of(context).extension<AppT
 | `accent` | 按钮/高亮/进度条/选中态 | — |
 | `onAccent` | accent 上的文字/图标 | 白或深色（随变体） |
 | `card` / `cardBorder` | 卡片与描边 | — |
-| `success` / `successContainer` | **判题对、背题高亮、正确项**（绿系，跨主题恒绿） | `#5CB85C` / `#E8F5E9` |
-| `danger` / `dangerContainer` | **判题错、危险操作**（红系，跨主题恒红） | `#D9534F` / `#FDECEA` |
-| `warning` | 余额不足、未配置提示（橙） | `#F0AD4E` |
+| `success` / `successContainer` | **判题对、背题高亮、正确项**（绿系，跨主题恒绿） | `#22C55E` / `#DCFCE7` |
+| `danger` / `dangerContainer` | **判题错、危险操作**（红系，跨主题恒红） | `#EF4444` / `#FEE2E2` |
+| `warning` | 余额不足、未配置提示（橙） | `#F59E0B` |
 
 > ⚠️ 历史教训：曾用 M3 的 `tertiary`（紫）/`error`（红）判题，碧海主题下"正确=粉紫、错误=橙"，与绿对红错心智不符（`quiz_screen.dart` 三处已改语义色）——**重设计时勿回退到 tertiary/error 判题色**。
 
@@ -52,20 +52,20 @@ final ac = AppThemeColors.of(context);   // 或 Theme.of(context).extension<AppT
 
 | 主题 | navBar | background | accent |
 |---|---|---|---|
-| brand | `#5D5FEF` | `#F5F6FA` | `#5D5FEF` |
+| brand | `#1E3A5F` | `#F0F4F8` | `#2563EB` |
 | eyeCare | `#DAE1D4` | `#FAFAF9` | `#4A7A5D` |
 | minimal | `#E4ECF3` | `#F9FAFB` | `#2DA8A6` |
-| starVoyage | `#1D1A1A` | `#E8DDCB` | `#E96D39` |
+| starVoyage | `#1E1B4B` | `#F5F3FF` | `#7C3AED` |
 | oceanGalaxy | `#1A253E` | `#F0F4F9` | `#4C7CD6` |
 
 **深色**（navBar / background / accent / onAccent）：
 
 | 主题 | navBar | background | accent | onAccent |
 |---|---|---|---|---|
-| brand | `#4344B8` | `#14151F` | `#8B8CF8` | `#14151F` |
+| brand | `#1A2B45` | `#0F172A` | `#60A5FA` | `#0F172A` |
 | eyeCare | `#2C3A31` | `#131713` | `#7BA98A` | `#131713` |
 | minimal | `#17464A` | `#0F1517` | `#57CBC4` | `#0F1517` |
-| starVoyage | `#33241B` | `#1A1410` | `#F08A52` | `#1A1410` |
+| starVoyage | `#0F0720` | `#020617` | `#C084FC` | `#020617` |
 | oceanGalaxy | `#1D2A4A` | `#101624` | `#7CA3E8` | `#101624` |
 
 > 卡片/描边：浅色 = 白 / 各主题浅灰蓝；深色 = `card` 略亮于 `background`、`cardBorder` 再亮一档（详见 `_darkColorsOf`）。
