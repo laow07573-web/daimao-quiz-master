@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
 import '../services/bank_file_service.dart';
 import '../models/question_bank.dart';
+import '../utils/responsive.dart';
 import 'import_screen.dart';
 
 class BankManageScreen extends StatefulWidget {
@@ -33,7 +34,9 @@ class _BankManageScreenState extends State<BankManageScreen> {
           ),
         ],
       ),
-      body: Consumer<AppState>(
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: Consumer<AppState>(
         builder: (context, appState, _) {
           if (appState.banks.isEmpty) {
             return Center(
@@ -65,10 +68,9 @@ class _BankManageScreenState extends State<BankManageScreen> {
               _buildQuizSettings(appState, cs),
               const Divider(height: 1),
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: appState.banks.length,
-                  itemBuilder: (context, index) {
+                // v1.0.3 宽屏重设计：宽屏题库卡 2 列网格，窄屏维持单列
+                child: Builder(builder: (context) {
+                  Widget buildCard(int index) {
                     final bank = appState.banks[index];
                     final isSelected =
                         appState.selectedBankIds.contains(bank.id);
@@ -80,12 +82,33 @@ class _BankManageScreenState extends State<BankManageScreen> {
                       onDelete: () => _confirmDelete(context, appState, bank),
                       onExport: () => _exportBank(context, bank),
                     );
-                  },
-                ),
+                  }
+
+                  if (isWideLayout(context)) {
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 0,
+                        childAspectRatio: 5.2,
+                      ),
+                      itemCount: appState.banks.length,
+                      itemBuilder: (context, index) => buildCard(index),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: appState.banks.length,
+                    itemBuilder: (context, index) => buildCard(index),
+                  );
+                }),
               ),
             ],
           );
         },
+      ),
       ),
     );
   }
@@ -108,7 +131,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
                 appState.selectedBankIds.isEmpty
                     ? '点击题目前方选择框'
                     : '已选 ${appState.selectedBankIds.length} 个题库',
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -265,7 +288,7 @@ class _BankCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text('${bank.questionCount} 道题目',
                       style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant)),
+                          fontSize: 13, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),

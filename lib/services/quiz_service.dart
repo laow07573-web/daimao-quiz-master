@@ -71,6 +71,10 @@ class QuizService {
     );
 
     if (persistSession) {
+      // 开始新会话前，清空上一次未完成会话的断档记录（会话行/题目顺序/题库关联）：
+      // 用户已开始新一轮答题，旧的中断会话不再可续刷。
+      // 空题库不建会话时不会走到这里，旧会话仍可续刷
+      await _db.deleteUnfinishedSessions();
       _currentSession = QuizSession(
         id: await _db.insertSession(_currentSession!),
         bankIds: _currentSession!.bankIds,

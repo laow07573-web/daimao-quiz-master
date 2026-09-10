@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
-import 'import_preview_screen.dart';
+import '../utils/responsive.dart';
 
 class ImportScreen extends StatefulWidget {
   const ImportScreen({super.key});
@@ -15,6 +17,18 @@ class ImportScreen extends StatefulWidget {
 
 class _ImportScreenState extends State<ImportScreen> {
   List<String> _selectedFiles = [];
+
+  /// v1.27 后台导入：示例题库任务交给应用层，立即回首页（进度在首页展示，
+  /// 完成后弹提示），不再阻塞在导入页。
+  void _importSample() {
+    final appState = context.read<AppState>();
+    if (appState.importTaskActive) return;
+    unawaited(appState.startBackgroundSampleImport());
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已开始导入示例题库，进度见首页')),
+    );
+    Navigator.pop(context);
+  }
 
   Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
@@ -46,10 +60,15 @@ class _ImportScreenState extends State<ImportScreen> {
       ),
       body: Consumer<AppState>(
         builder: (context, appState, _) {
-          final isProcessing =
-              appState.importStatus.contains('解析中') || appState.importStatus.contains('提取');
+          // v1.27 后台导入：任务状态改用应用层标志（进度精确展示，离开页面不中断）
+          final isProcessing = appState.importTaskActive;
 
-          return Padding(
+          // 平板适配：内容限宽居中（手机无影响）。
+          // v1.27 修复：整页改单滚动结构——此前文件列表被压在 Column 的
+          // Expanded 里，上方固定内容占满小窗口/手机屏时列表区几乎为 0，
+          // 无法滚动查看已选文件名；现在整页可滚动，操作按钮固定在页底。
+          return ResponsivePage(
+            child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,10 +128,54 @@ class _ImportScreenState extends State<ImportScreen> {
                         child: Text(
                           '支持 .docx 格式。解析后先预览题目，可编辑、删除后再确认入库。\n旧版 .doc 文件请先用 Word 另存为 .docx。',
                           style: TextStyle(
-                              fontSize: 12, color: cs.onSurfaceVariant),
+                              fontSize: 13, color: cs.onSurfaceVariant),
                         ),
                       ),
                     ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 一键导入内置示例题库（新用户/演示：无需文件立即体验刷题）
+                GestureDetector(
+                  onTap: isProcessing ? null : _importSample,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: ac.accent.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: ac.accent.withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.rocket_launch_outlined,
+                            color: ac.accent, size: 24),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('一键导入示例题库',
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: ac.accent)),
+                              const SizedBox(height: 2),
+                              Text(
+                                  '内置 10 道医学示例题（单选/多选/判断），无需文件立即体验',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: cs.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: ac.accent),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -141,17 +204,17 @@ class _ImportScreenState extends State<ImportScreen> {
                         const SizedBox(height: 4),
                         Text('AI 将自动识别题目、选项和答案',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: cs.onSurfaceVariant)),
                         const SizedBox(height: 4),
                         // v1.0.2 对齐里程碑：JSON 直导入库提示
                         Text('导入 .json 题库文件，无需 AI 解析，题目答案直接入库',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: cs.onSurfaceVariant)),
                         const SizedBox(height: 4),
                         Text(
                             '选择本软件导出的 .json 题库文件（可多选）。导入完成后会显示导入报告。',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: cs.onSurfaceVariant)),
                       ],
                     ),
                   ),
@@ -159,7 +222,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
                 const SizedBox(height: 16),
 
-                // 已选文件
+                // 已选文件（v1.27：随整页滚动，不再被压在 Expanded 小区域）
                 if (_selectedFiles.isNotEmpty) ...[
                   Text('已选文件',
                       style: TextStyle(
@@ -167,38 +230,57 @@ class _ImportScreenState extends State<ImportScreen> {
                           fontWeight: FontWeight.w600,
                           color: cs.onSurface)),
                   const SizedBox(height: 8),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _selectedFiles.length,
-                      itemBuilder: (context, index) {
-                        final path = _selectedFiles[index];
+                  for (var index = 0; index < _selectedFiles.length; index++)
+                    Card(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.description_outlined,
+                            color: ac.accent),
                         // v1.0.2 设计审查修复：取文件名用 path 包 basename
-                        final name = p.basename(path);
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.description_outlined,
-                                color: ac.accent),
-                            title: Text(name,
-                                style: const TextStyle(fontSize: 13)),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.close, size: 18),
-                              onPressed: isProcessing
-                                  ? null
-                                  : () => setState(() =>
-                                      _selectedFiles.removeAt(index)),
-                            ),
-                          ),
-                        );
-                      },
+                        title: Text(p.basename(_selectedFiles[index]),
+                            style: const TextStyle(fontSize: 13)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: isProcessing
+                              ? null
+                              : () => setState(
+                                  () => _selectedFiles.removeAt(index)),
+                        ),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 余额提示
-                  if (appState.aiService?.cachedBalance != null)
+                ],
+              ],
+            ),
+            ),
+          );
+        },
+      ),
+      
+      // v1.27 修复：余额/开始导入/进度固定在页底——文件再多也能滚动查看，
+      // 操作按钮始终可见（小窗口不再被挤出屏幕）。
+      bottomNavigationBar: Consumer<AppState>(
+        builder: (context, appState, _) {
+          final isProcessing = appState.importTaskActive;
+          if (_selectedFiles.isEmpty && !isProcessing) {
+            return const SizedBox.shrink();
+          }
+          return SafeArea(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                border: Border(
+                    top: BorderSide(
+                        color: cs.outlineVariant.withOpacity(0.6))),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 余额提示（选了文件且余额已加载时显示）
+                  if (_selectedFiles.isNotEmpty &&
+                      appState.aiService?.cachedBalance != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Builder(
@@ -210,13 +292,14 @@ class _ImportScreenState extends State<ImportScreen> {
                           return Text(
                             '💰 余额 ¥${appState.aiService!.cachedBalance!.toStringAsFixed(2)}，预估可再导入 ${remaining > 0 ? "~$remaining 题" : "..."}',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant),
+                                fontSize: 13, color: cs.onSurfaceVariant),
                           );
                         },
                       ),
                     ),
 
-                  // 开始导入
+                  // 开始导入（仅选了文件时显示；导入中展示进度）
+                  if (_selectedFiles.isNotEmpty)
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -241,98 +324,72 @@ class _ImportScreenState extends State<ImportScreen> {
                       ),
                       onPressed: isProcessing
                           ? null
-                          : () async {
+                          : () {
                               if (_selectedFiles.isEmpty) {
-                                if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                       content: Text('请先选择文件')),
                                 );
                                 return;
                               }
-                              // v1.0.2: JSON 题库直接分组建库（无需预览）；
-                              // 修复：解析失败展示真实错误，不再误报"导入完成 0 题"；
-                              // 修复：与 docx 混选时 JSON 先入库，docx 继续走 AI 解析
+                              // v1.27 后台导入：JSON 直接入库 + DOCX 走 AI 解析，
+                              // 全部在应用层执行；立即回首页（进度在首页展示、
+                              // 完成弹提示），导入期间可随时离开本页。
                               final jsonFiles = _selectedFiles
                                   .where((f) =>
                                       f.toLowerCase().endsWith('.json'))
                                   .toList();
-                              if (jsonFiles.isNotEmpty) {
-                                final (banks, questions, err, renamed) =
-                                    await appState.importJsonFiles(jsonFiles);
-                                if (!mounted) return;
-                                if (err != null && banks == 0 && questions == 0) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(err),
-                                      backgroundColor: ac.warning,
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'JSON 导入完成：$banks 个题库，$questions 道题'
-                                          '${renamed > 0 ? '（$renamed 个同名题库已自动改名）' : ''}'),
-                                      backgroundColor: ac.success,
-                                    ),
-                                  );
-                                }
-                              }
                               final docxFiles = _selectedFiles
                                   .where((f) =>
                                       f.toLowerCase().endsWith('.docx') ||
                                       f.toLowerCase().endsWith('.doc'))
                                   .toList();
-                              if (docxFiles.isEmpty) {
-                                setState(() => _selectedFiles.clear());
-                                return;
-                              }
-                              if (docxFiles.length > 1) {
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
+                              unawaited(appState.startBackgroundImport(
+                                jsonFiles: jsonFiles,
+                                docxFiles: docxFiles,
+                              ));
+                              setState(() => _selectedFiles.clear());
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
                                     content: Text(
-                                        '已选择 ${docxFiles.length} 个文档，本次仅解析第一个'),
-                                    backgroundColor: cs.onSurfaceVariant,
-                                  ),
-                                );
-                              }
-                              await appState.parseForPreview(docxFiles);
-                              if (appState.previewQuestions.isEmpty) {
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content:
-                                        Text(appState.importStatus),
-                                    backgroundColor: ac.warning,
-                                  ),
-                                );
-                                return;
-                              }
-                              if (!mounted) return;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const ImportPreviewScreen()),
+                                        '导入任务已开始，进度见首页，可先浏览其他页面')),
                               );
+                              Navigator.pop(context);
                             },
                     ),
                   ),
 
-                  // 进度文字
+                  // v1.27 进度展示：精确进度条 + 状态文字（任务在应用层继续，
+                  // 离开本页后首页同步展示）
                   if (isProcessing)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: Text(appState.importStatus,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 13, color: cs.onSurfaceVariant)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: appState.importProgress.clamp(0.0, 1.0),
+                              minHeight: 6,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(appState.importStatus,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 13, color: cs.onSurfaceVariant)),
+                          const SizedBox(height: 4),
+                          Text('可离开本页，导入会继续在后台进行，进度在首页展示',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: cs.onSurfaceVariant.withOpacity(0.8))),
+                        ],
+                      ),
                     ),
-                ] else
-                  const Spacer(),
-              ],
+                ],
+              ),
             ),
           );
         },

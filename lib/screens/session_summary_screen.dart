@@ -4,6 +4,7 @@ import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
 import '../widgets/ai_response_widget.dart';
+import '../utils/responsive.dart';
 import 'quiz_screen.dart';
 
 class SessionSummaryScreen extends StatefulWidget {
@@ -53,7 +54,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
         foregroundColor: cs.onPrimary,
         automaticallyImplyLeading: false,
       ),
-      body: SingleChildScrollView(
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -212,6 +215,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -249,7 +253,7 @@ class _StatChip extends StatelessWidget {
               style: TextStyle(
                   fontSize: 16, fontWeight: FontWeight.bold, color: color)),
           Text(label,
-              style: TextStyle(fontSize: 10, color: onSurfaceVariant)),
+              style: TextStyle(fontSize: 11.5, color: onSurfaceVariant)),
         ],
       ),
     );

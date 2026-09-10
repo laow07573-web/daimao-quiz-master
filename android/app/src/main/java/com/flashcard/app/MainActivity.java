@@ -16,7 +16,12 @@ public class MainActivity extends FlutterActivity {
     private static final String TAMPER_CHANNEL = "com.flashcard.app/tamper";
     private static final String KEEPALIVE_CHANNEL = "com.flashcard.app/keepalive";
     private static final String NOTIFICATION_CHANNEL = "com.flashcard.app/notification";
+    private static final String SYNC_CHANNEL = "com.flashcard.app/sync";
     private static final int REQ_NOTIFICATION_PERMISSION = 2001;
+
+    // 局域网同步（v11）：Wi-Fi 默认丢弃广播/多播 UDP 包，
+    // 持有 MulticastLock 才能收到对端发现信标（需 CHANGE_WIFI_MULTICAST_STATE）
+    private android.net.wifi.WifiManager.MulticastLock multicastLock;
 
     @Override
     public void configureFlutterEngine(FlutterEngine flutterEngine) {
@@ -98,6 +103,39 @@ public class MainActivity extends FlutterActivity {
                                 == PackageManager.PERMISSION_GRANTED);
                     } else {
                         result.success(true);
+                    }
+                } else {
+                    result.notImplemented();
+                }
+            });
+
+        // 局域网同步（v11）：组播/广播锁，保证 Wi-Fi 下能收到对端信标。
+        // 引擎启动时获取、退出时释放；失败时如实报错由 Dart 侧降级处理。
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), SYNC_CHANNEL)
+            .setMethodCallHandler((call, result) -> {
+                if (call.method.equals("acquireMulticastLock")) {
+                    try {
+                        android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager)
+                                getApplicationContext().getSystemService(WIFI_SERVICE);
+                        if (multicastLock == null) {
+                            multicastLock = wm.createMulticastLock("flashcard_sync");
+                            multicastLock.setReferenceCounted(false);
+                        }
+                        if (!multicastLock.isHeld()) {
+                            multicastLock.acquire();
+                        }
+                        result.success(true);
+                    } catch (Exception e) {
+                        result.error("MULTICAST_ERROR", e.getMessage(), null);
+                    }
+                } else if (call.method.equals("releaseMulticastLock")) {
+                    try {
+                        if (multicastLock != null && multicastLock.isHeld()) {
+                            multicastLock.release();
+                        }
+                        result.success(true);
+                    } catch (Exception e) {
+                        result.error("MULTICAST_ERROR", e.getMessage(), null);
                     }
                 } else {
                     result.notImplemented();

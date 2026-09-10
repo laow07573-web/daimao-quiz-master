@@ -10,6 +10,7 @@ import '../services/app_state.dart';
 import '../services/database_service.dart';
 import '../services/debug_log_service.dart';
 import '../services/keepalive_service.dart';
+import '../utils/responsive.dart';
 
 /// 开发者选项（v1.0.2）：密码进入，调试专用
 /// 日志 / 模拟长期使用 / 保活状态 / DB 备份导入导出
@@ -101,11 +102,11 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
               children: [
                 Text('基于当前题库生成过去若干天的使用数据：',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 Text('使用 FSRS 算法全权生成，用于测试每日提醒、连击、首页战绩。',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 12),
                 Text('生成天数：$days 天', style: const TextStyle(fontSize: 13)),
@@ -139,16 +140,16 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                 const SizedBox(height: 4),
                 Text('· 答错的题自动进错题本并建复习卡',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 Text('· 重复执行会先清理上次模拟的数据，可放心多试。',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 if (dueToday)
                   Text('· 错题本的「待复习」数量会全部增加。',
                       style: TextStyle(
-                          fontSize: 12, color: Theme.of(ctx).colorScheme.error)),
+                          fontSize: 13, color: Theme.of(ctx).colorScheme.error)),
               ],
             ),
           ),
@@ -270,7 +271,10 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
             ),
         ],
       ),
-      body: !_unlocked ? _buildLock(cs) : _buildPanel(cs),
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: !_unlocked ? _buildLock(cs) : _buildPanel(cs),
+      ),
     );
   }
 
@@ -425,7 +429,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Text(_status!,
-                style: TextStyle(fontSize: 12, color: cs.primary)),
+                style: TextStyle(fontSize: 13, color: cs.primary)),
           ),
       ],
     );
@@ -473,7 +477,7 @@ class _DevCard extends StatelessWidget {
                   if (subtitle != null)
                     Text(subtitle!,
                         style: TextStyle(
-                            fontSize: 11, color: cs.onSurfaceVariant)),
+                            fontSize: 12.5, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),

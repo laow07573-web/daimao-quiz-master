@@ -7,8 +7,10 @@ import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
 import '../utils/app_constants.dart';
 import '../utils/format_utils.dart';
+import '../utils/responsive.dart';
 import '../widgets/weekly_stats_board.dart';
 import 'bank_manage_screen.dart';
+import 'import_preview_screen.dart';
 import 'import_screen.dart';
 import 'settings_screen.dart';
 import 'quiz_screen.dart';
@@ -29,8 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _weekTotal = 0;
   double _weekAccuracy = 0;
   bool _statsLoaded = false; // 防横幅首帧闪现
-  // v1.0.2 扩展：今日一言（开页面显示）
-  String _hitokoto = '正在加载一言...';
+    // v1.0.2 扩展：今日一言（开页面显示）。
+    // v1.27 PC 加载修复：首帧直接显示缓存/本地一言，不再显示「正在加载一言...」，
+    // 网络结果到达后静默替换；失败也不回退占位文案。
+    String _hitokoto = HitokotoService.immediateText();
   // v1.0.2 七项改进：断点续刷（最新未完成会话 + 已答题数）
   (QuizSession, int)? _unfinished;
 
@@ -47,7 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadHitokoto() async {
     final text = await HitokotoService.fetch();
     if (!mounted) return;
-    setState(() => _hitokoto = text ?? HitokotoService.defaultText);
+    // v1.27：成功更新为网络一言；失败保持首帧的缓存/本地一言，
+    // 不再回退成固定默认句，也不闪「加载中」占位。
+    if (text != null) {
+      setState(() => _hitokoto = text);
+    }
   }
 
   Future<void> _loadWeeklyData(AppState appState) async {
@@ -113,9 +121,25 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              child: Column(
+              // 平板适配：内容限宽居中（手机无影响）；
+              // v1.0.3 宽屏重设计：宽屏双列布局（限宽自动提升至 1080）
+              child: ResponsivePage(
+              child: isWideLayout(context)
+                  ? _buildWideBody(appState, cs)
+                  : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // v1.27 后台导入：导入中进度卡（离开导入页后在此展示）
+                  if (appState.importTaskActive) ...[
+                    _buildImportProgressCard(appState, cs),
+                    const SizedBox(height: 16),
+                  ],
+                  // v1.27 后台导入：AI 解析完成待预览确认入口（入库前保留）
+                  if (!appState.importTaskActive &&
+                      appState.previewQuestions.isNotEmpty) ...[
+                    _buildPreviewConfirmCard(appState, cs),
+                    const SizedBox(height: 16),
+                  ],
                   // 顶部：问候语（第一行）+ 软件图标/名字 + 今日一言
                   _buildHeroCard(appState, cs),
                   const SizedBox(height: 16),
@@ -142,20 +166,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     // v1.0.2 对齐原版：历史报告（近 7 天明细）
                     onHistoryReport: () => _showHistoryReport(appState),
                   ),
-                  const SizedBox(height: 16),
+                  // v1.27 呼吸感：模块间距加大，视线有落脚点。
+                  const SizedBox(height: 20),
                   _buildStatsCards(appState, cs),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                   _buildQuickActions(appState, cs),
                   const SizedBox(height: 24),
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
                       // v1.0.2 修复：版本号统一 v1.26.6.17（与我的页/关于弹窗一致）
+                      // 视觉审查修复：透明度 0.4 → 0.7，深色模式下仍可读
                       '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
-                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.4)),
+                      style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant.withOpacity(0.7)),
                     ),
                   ),
                 ],
+              ),
               ),
             ),
           );
@@ -164,15 +191,93 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// v1.0.3 宽屏重设计：双列布局。左列（flex 5）：Hero/续刷/横幅/本周战绩；
+  /// 右列（flex 4）：统计卡 + 快速操作网格。
+  Widget _buildWideBody(AppState appState, ColorScheme cs) {
+    final left = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // v1.27 后台导入：导入中进度卡 / 待预览确认入口（宽屏左列）
+              if (appState.importTaskActive) ...[
+                _buildImportProgressCard(appState, cs),
+                const SizedBox(height: 16),
+              ],
+              if (!appState.importTaskActive &&
+                  appState.previewQuestions.isNotEmpty) ...[
+                _buildPreviewConfirmCard(appState, cs),
+                const SizedBox(height: 16),
+              ],
+              _buildHeroCard(appState, cs),
+              const SizedBox(height: 16),
+              if (_unfinished != null) _buildResumeCard(appState, cs),
+              if (appState.vacationModeEnabled) _buildVacationBanner(cs),
+              if (_statsLoaded &&
+                  appState.aiService != null &&
+                  appState.aiService!.cachedBalance != null &&
+                  appState.aiService!.cachedBalance! > 0 &&
+                  appState.aiService!.cachedBalance! < 1.0)
+                _buildBalanceWarning(cs),
+              WeeklyStatsBoard(
+                dailyTotals: _yearlyTotals,
+                streakDays: _streakDays,
+                weekTotal: _weekTotal,
+                weekAccuracy: _weekAccuracy,
+                vacationDays: _vacationDays,
+                onHistoryReport: () => _showHistoryReport(appState),
+              ),
+            ],
+          );
+    final right = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // v1.27 呼吸感：宽屏右列模块间距同步加大。
+              _buildStatsCards(appState, cs),
+              const SizedBox(height: 28),
+              _buildQuickActions(appState, cs),
+              const SizedBox(height: 28),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Text(
+                  '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      color: cs.onSurfaceVariant.withOpacity(0.7)),
+                ),
+              ),
+            ],
+          );
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth >= 1100) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: left),
+            // v1.27 呼吸感：双列间距加大。
+            const SizedBox(width: 28),
+            Expanded(flex: 4, child: right),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [left, const SizedBox(height: 16), right],
+      );
+    });
+  }
+
   /// 顶部问候语（第一行）+ 软件图标/名字 + 今日一言
   Widget _buildHeroCard(AppState appState, ColorScheme cs) {
     final nickname = appState.settings.nickname;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      // v1.27 呼吸感：加大内边距，渐变降饱和（透出底色，长时间看不刺眼）
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [cs.primary, cs.primary.withOpacity(0.7)],
+          colors: [
+            cs.primary.withOpacity(0.9),
+            cs.primary.withOpacity(0.7),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -233,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: cs.onPrimary.withOpacity(0.9),
                         height: 1.4,
                       ),
@@ -263,6 +368,8 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
+      // 平板适配：弹窗限宽居中
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
@@ -316,7 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         _accuracyText(d, accByDay),
                         style: TextStyle(
-                            fontSize: 12, color: cs.onSurfaceVariant),
+                            fontSize: 13, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -371,7 +478,8 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: ac.accent.withOpacity(0.5)),
+              // v1.27 呼吸感：续刷卡边框弱化，降低视觉噪音。
+              border: Border.all(color: ac.accent.withOpacity(0.35)),
             ),
             child: Row(
               children: [
@@ -390,7 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         '已答 $answered/${session.totalQuestions} 题 · $modeLabel',
                         style: TextStyle(
-                            fontSize: 12, color: cs.onSurfaceVariant),
+                            fontSize: 13, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -499,16 +607,74 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 4),
         Text(
           '仅统计按「结束」完成的会话时长，中途退出不计',
-          style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+          style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
         ),
       ],
     );
   }
 
-  /// 快速操作列表（v1.0.2 UI 设计稿：5 项，每项带状态文案与真实路由）
+  /// 快速操作列表（v1.0.2 UI 设计稿：4 项，每项带状态文案与真实路由）
   Widget _buildQuickActions(AppState appState, ColorScheme cs) {
     final vacation = appState.vacationModeEnabled;
     final ac = AppThemeColors.of(context);
+    // v1.0.3 宽屏重设计：四个入口提取为列表，窄屏纵列 / 宽屏 2×2 网格
+    final tiles = [
+      // 1. 定向爆破
+      _QuickActionTile(
+        icon: Icons.rocket_launch_rounded,
+        label: '定向爆破',
+        subtitle: appState.selectedBankIds.isEmpty
+            ? '请先选择题库'
+            : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
+        iconColor: ac.accent,
+        cs: cs,
+        onTap: appState.selectedBankIds.isEmpty
+            ? () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('请先在「管理题库」中选择要刷的题库')),
+                );
+              }
+            : () {
+                if (vacation) {
+                  _vacationBlocked(appState);
+                  return;
+                }
+                _showCountPicker(context, appState);
+              },
+      ),
+      // 2. 管理题库 → 题库管理页
+      _QuickActionTile(
+        icon: Icons.library_books_outlined,
+        label: '管理题库',
+        subtitle: '${appState.banks.length} 个题库',
+        iconColor: ac.accent.withOpacity(0.8),
+        cs: cs,
+        onTap: () => _navigateAndRefresh(
+            context, appState, const BankManageScreen()),
+      ),
+      // 3. 错题本 → 错题复习页
+      _QuickActionTile(
+        icon: Icons.replay_rounded,
+        label: '错题本',
+        // v1.0.2 UI 审查修复：文案生硬 → 直白说明功能
+        subtitle: '智能排期，只显示应复习的错题',
+        iconColor: cs.error,
+        cs: cs,
+        onTap: () =>
+            _navigateAndRefresh(context, appState, const ErrorBookScreen()),
+      ),
+      // 4. 导入题库 → 文件导入页（DOCX 走 AI 解析，JSON 直接入库）
+      _QuickActionTile(
+        icon: Icons.upload_file,
+        label: '导入题库',
+        subtitle: 'AI 解析 DOCX，JSON 直接入库',
+        iconColor: cs.tertiary,
+        cs: cs,
+        onTap: () =>
+            _navigateAndRefresh(context, appState, const ImportScreen()),
+      ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -516,71 +682,22 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
         const SizedBox(height: 12),
-        // 1. 定向爆破
-        _QuickActionTile(
-          icon: Icons.rocket_launch_rounded,
-          label: '定向爆破',
-          subtitle: appState.selectedBankIds.isEmpty
-              ? '请先选择题库'
-              : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
-          iconColor: ac.accent,
-          cs: cs,
-          onTap: appState.selectedBankIds.isEmpty
-              ? () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('请先在「管理题库」中选择要刷的题库')),
-                  );
-                }
-              : () {
-                  if (vacation) {
-                    _vacationBlocked(appState);
-                    return;
-                  }
-                  _showCountPicker(context, appState);
-                },
-        ),
-        // 2. 管理题库 → 题库管理页
-        _QuickActionTile(
-          icon: Icons.library_books_outlined,
-          label: '管理题库',
-          subtitle: '${appState.banks.length} 个题库',
-          iconColor: ac.accent.withOpacity(0.8),
-          cs: cs,
-          onTap: () => _navigateAndRefresh(
-              context, appState, const BankManageScreen()),
-        ),
-        // 3. 错题本 → 错题复习页
-        _QuickActionTile(
-          icon: Icons.replay_rounded,
-          label: '错题本',
-          // v1.0.2 UI 审查修复：文案生硬 → 直白说明功能
-          subtitle: '智能排期，只显示应复习的错题',
-          iconColor: cs.error,
-          cs: cs,
-          onTap: () =>
-              _navigateAndRefresh(context, appState, const ErrorBookScreen()),
-        ),
-        // 4. 导入 DOCX → 文件导入页
-        _QuickActionTile(
-          icon: Icons.upload_file,
-          label: '导入 DOCX',
-          subtitle: 'AI 解析题库文档',
-          iconColor: cs.tertiary,
-          cs: cs,
-          onTap: () =>
-              _navigateAndRefresh(context, appState, const ImportScreen()),
-        ),
-        // 5. 题库文件 → 文件导入页（JSON 直接入库）
-        _QuickActionTile(
-          icon: Icons.folder_open,
-          label: '题库文件',
-          subtitle: '导入 Json 题库',
-          iconColor: cs.secondary,
-          cs: cs,
-          onTap: () =>
-              _navigateAndRefresh(context, appState, const ImportScreen()),
-        ),
+        if (isWideLayout(context))
+          // v1.0.3 窗口自适应：按最大单元宽自动决定列数（宽窗 2 列，
+          // 拖窄时自动回 1 列）
+          GridView.extent(
+            maxCrossAxisExtent: 340,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 12,
+            // v1.27 字号放大：取消固定单元高，纵横比放宽自适应，
+            // 副标题多行换行也不溢出。
+            childAspectRatio: 2.0,
+            children: tiles,
+          )
+        else
+          ...tiles,
       ],
     );
   }
@@ -600,6 +717,8 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
+      // 平板适配：弹窗限宽居中
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -619,7 +738,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ChoiceChip(label: const Text('自定义'), selected: false, onSelected: (_) { Navigator.pop(ctx); _showCustomCountDialog(context, appState); }),
             ]),
             const SizedBox(height: 12),
-            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
           ]),
         ),
       ),
@@ -659,6 +778,8 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
+      // 平板适配：弹窗限宽居中
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -684,7 +805,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center),
               const SizedBox(height: 20),
               _ModeOption(
@@ -805,6 +926,101 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
     await _loadWeeklyData(appState);
   }
+
+  /// v1.27 后台导入：首页进度卡（精确进度条 + 当前状态文字）。
+  /// 刷题页是 push 路由，首页不可见，天然满足「刷题中不显示」
+  Widget _buildImportProgressCard(AppState appState, ColorScheme cs) {
+    final progress = appState.importProgress.clamp(0.0, 1.0);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.primary.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: cs.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('正在导入题库，可先去做别的',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface)),
+              ),
+              Text('${(progress * 100).toInt()}%',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.primary)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(appState.importStatus,
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+
+  /// v1.27 后台导入：AI 解析完成、待预览确认入口（确认入库或放弃前常驻）
+  Widget _buildPreviewConfirmCard(AppState appState, ColorScheme cs) {
+    final ac = AppThemeColors.of(context);
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ImportPreviewScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ac.accent.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ac.accent.withOpacity(0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.fact_check_outlined, color: ac.accent),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('已解析 ${appState.previewQuestions.length} 道题，待确认',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: ac.accent)),
+                  const SizedBox(height: 2),
+                  Text('点击查看预览，确认后入库',
+                      style:
+                          TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ac.accent),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {
@@ -844,7 +1060,7 @@ class _StatCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(label,
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
         ],
       ),
     );
@@ -881,10 +1097,11 @@ class _QuickActionTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ac.cardBorder),
+              // v1.27 呼吸感：操作卡边框弱化，依靠间距与底色区分层次。
+              border: Border.all(color: ac.cardBorder.withOpacity(0.6)),
             ),
             child: Row(
               children: [
@@ -909,7 +1126,7 @@ class _QuickActionTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(subtitle,
                           style: TextStyle(
-                              fontSize: 12, color: cs.onSurfaceVariant)),
+                              fontSize: 13, color: cs.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -977,7 +1194,7 @@ class _ModeOption extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(desc,
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),

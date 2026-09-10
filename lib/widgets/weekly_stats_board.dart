@@ -103,7 +103,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                         Text(
                           '历史报告',
                           style: TextStyle(
-                              fontSize: 12, color: cs.onSurfaceVariant),
+                              fontSize: 13, color: cs.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -236,7 +236,7 @@ class _StatBlock extends StatelessWidget {
                   ),
                   TextSpan(
                     text: suffix,
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -244,7 +244,7 @@ class _StatBlock extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
             ),
           ],
         ),

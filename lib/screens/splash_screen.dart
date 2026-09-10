@@ -17,7 +17,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   Timer? _timer;
-  String _hitokoto = '正在加载一言...';
+  // v1.27 PC 加载修复：首帧直接显示缓存/本地一言，网络结果到达后静默替换，
+  // 不再显示「正在加载一言...」占位。
+  String _hitokoto = HitokotoService.immediateText();
 
   @override
   void initState() {
@@ -30,7 +32,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _loadHitokoto() async {
     final text = await HitokotoService.fetch();
     if (!mounted) return;
-    setState(() => _hitokoto = text ?? HitokotoService.defaultText);
+    // v1.27：成功才替换；失败保持首帧的缓存/本地一言。
+    if (text != null) {
+      setState(() => _hitokoto = text);
+    }
   }
 
   void _enterApp() {
@@ -86,7 +91,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // 今日一言
             Text(
               '今日一言',
-              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6)),
+              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.6)),
             ),
             const SizedBox(height: 6),
             Padding(

@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
 import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
+import '../utils/responsive.dart';
 import 'quiz_screen.dart';
 
 /// 错题本（v1.0.2 重写）
@@ -155,6 +156,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
+      // 平板适配：弹窗限宽居中
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
@@ -212,7 +215,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Text(
                                 '下次复习：${relativeDayLabel(card.nextReviewAt)}',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12.5,
                                   color: FSRSService.isDue(
                                           card, DateTime.now())
                                       ? cs.error
@@ -426,7 +429,9 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
           ),
         ],
       ),
-      body: _loading
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _stats == null || _stats!.isEmpty
               ? Center(
@@ -486,7 +491,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                           Text(
                             '收藏 ${_stats!.fold<int>(0, (s, x) => s + ((x['bookmark_count'] as int?) ?? 0))} 题',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant),
+                                fontSize: 13, color: cs.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -519,7 +524,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                   // v1.0.2 对齐里程碑：按知识点分组
                                   Text('按知识点分组',
                                       style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12.5,
                                           color: cs.onSurfaceVariant)),
                                 ],
                               ),
@@ -529,7 +534,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 alignment: Alignment.centerLeft,
                                 child: Text('优先复习知识点',
                                     style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 12.5,
                                         color: cs.onSurfaceVariant)),
                               ),
                               const SizedBox(height: 10),
@@ -560,14 +565,14 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                             Text(
                                               '${kp['kp']}',
                                               style: TextStyle(
-                                                  fontSize: 12,
+                                                  fontSize: 13,
                                                   color: cs.onSurface),
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
                                               '${kp['cnt']} 题',
                                               style: TextStyle(
-                                                  fontSize: 10,
+                                                  fontSize: 11.5,
                                                   color: cs.primary),
                                             ),
                                           ],
@@ -596,7 +601,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Text(
                                 '本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。',
                                 style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12.5,
                                     color: cs.onSurfaceVariant,
                                     height: 1.4),
                               ),
@@ -604,7 +609,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                               Text(
                                 '点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。',
                                 style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12.5,
                                     color: cs.onSurfaceVariant,
                                     height: 1.4),
                               ),
@@ -632,18 +637,17 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                           ),
                         ),
                       ),
-                    // 题库列表
+                    // 题库列表；v1.0.3 宽屏重设计：宽屏 2 列网格，窄屏维持单列
                     Expanded(
                       child: _stats!.isEmpty
                           ? const SizedBox.shrink()
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(14),
-                              itemCount: _stats!.length,
-                              itemBuilder: (context, i) {
+                          : Builder(builder: (context) {
+                              Widget buildCard(int i) {
                                 final s = _stats![i];
                                 final bankId = s['bank_id'] as int;
                                 final due = s['due_count'] as int? ?? 0;
-                                final bookmark = s['bookmark_count'] as int? ?? 0;
+                                final bookmark =
+                                    s['bookmark_count'] as int? ?? 0;
                                 final count = s[_countKey] as int? ?? 0;
                                 final selected =
                                     _selectedBanks.contains(bankId);
@@ -666,8 +670,28 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                     });
                                   },
                                 );
-                              },
-                            ),
+                              }
+
+                              if (isWideLayout(context)) {
+                                return GridView.builder(
+                                  padding: const EdgeInsets.all(14),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 0,
+                                    childAspectRatio: 5.5,
+                                  ),
+                                  itemCount: _stats!.length,
+                                  itemBuilder: (context, i) => buildCard(i),
+                                );
+                              }
+                              return ListView.builder(
+                                padding: const EdgeInsets.all(14),
+                                itemCount: _stats!.length,
+                                itemBuilder: (context, i) => buildCard(i),
+                              );
+                            }),
                     ),
                     // 底部按钮
                     SafeArea(
@@ -689,6 +713,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                     ),
                   ],
                 ),
+      ),
     );
   }
 }
@@ -759,28 +784,28 @@ class _BankErrorCard extends StatelessWidget {
                       if (due > 0)
                         Text('$due 题到期',
                             style: TextStyle(
-                                fontSize: 12, color: cs.error)),
+                                fontSize: 13, color: cs.error)),
                       if (due > 0 && bookmark > 0) ...[
                         const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: cs.onSurfaceVariant)),
                         const SizedBox(width: 8),
                       ],
                       Text('$bookmark 收藏',
                           style: TextStyle(
-                              fontSize: 12, color: cs.secondary)),
+                              fontSize: 13, color: cs.secondary)),
                       // v1.0.2 FSRS 可见化：下次到期（该题库最早到期卡）
                       if (nextDueAt != null) ...[
                         const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
-                                fontSize: 12, color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: cs.onSurfaceVariant)),
                         const SizedBox(width: 8),
                         Text(
                           '下次到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
                           style: TextStyle(
-                              fontSize: 12, color: cs.error),
+                              fontSize: 13, color: cs.error),
                         ),
                       ],
                     ],

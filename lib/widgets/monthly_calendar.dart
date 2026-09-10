@@ -57,11 +57,11 @@ class MonthCalendar extends StatelessWidget {
             children: [
               Text('$month月',
                   style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
+                      fontSize: 13, fontWeight: FontWeight.w600)),
               const Spacer(),
               Text('$year年',
                   style: TextStyle(
-                      fontSize: 10, color: cs.onSurfaceVariant)),
+                      fontSize: 11.5, color: cs.onSurfaceVariant)),
             ],
           ),
         ),
@@ -118,7 +118,7 @@ class MonthCalendar extends StatelessWidget {
           '$day',
           style: TextStyle(
             // v1.0.2 UI 审查修复：10 → 11，三列月历可读性
-            fontSize: 11,
+            fontSize: 12.5,
             fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
             color: isVacation
                 ? cs.onErrorContainer

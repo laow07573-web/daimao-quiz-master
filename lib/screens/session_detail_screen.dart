@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
+import '../utils/responsive.dart';
 
 /// 会话详情（v1.0.2）：answer_records JOIN questions 逐题只读展示
 class SessionDetailScreen extends StatefulWidget {
@@ -73,7 +74,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final s = _session;
     return Scaffold(
       appBar: AppBar(title: const Text('会话详情')),
-      body: _records == null
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: _records == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(14),
@@ -121,6 +124,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 const SizedBox(height: 20),
               ],
             ),
+      ),
     );
   }
 
@@ -149,7 +153,7 @@ class _Info extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: cs.onSurface)),
           Text(label,
-              style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant)),
         ],
       ),
     );
@@ -196,7 +200,7 @@ class _RecordTile extends StatelessWidget {
                 child: Text(
                   isCorrect ? '对' : '错',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                     color: isCorrect ? cs.primary : cs.error,
                   ),
@@ -216,13 +220,13 @@ class _RecordTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '你的答案：${userAnswer.isEmpty ? '（未作答）' : userAnswer}',
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
           ),
           if (correctAnswer.isNotEmpty)
             Text(
               '正确答案：$correctAnswer',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 color: isCorrect ? cs.onSurfaceVariant : cs.error,
               ),
             ),

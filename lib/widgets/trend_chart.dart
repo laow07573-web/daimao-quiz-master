@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../services/theme_service.dart';
 
 /// 近 30 天趋势图（v1.0.2）
 ///
@@ -59,10 +60,13 @@ double niceStep(double raw) {
 }
 
 /// 正确率三档取色（共享：趋势图/排行）
-Color accuracyTierColor(double rate, ColorScheme cs) {
+///
+/// 低正确率档走 danger 语义色（设计红线：判对错不用 cs.error），
+/// 未传时回退 cs.error 保持旧行为兼容。
+Color accuracyTierColor(double rate, ColorScheme cs, [Color? danger]) {
   if (rate >= 80) return cs.primary.withOpacity(0.7);
   if (rate >= 60) return cs.primary.withOpacity(0.45);
-  return cs.error.withOpacity(0.7);
+  return (danger ?? cs.error).withOpacity(0.7);
 }
 
 class _TrendChartState extends State<TrendChart> {
@@ -119,6 +123,8 @@ class _TrendChartState extends State<TrendChart> {
       );
     }
     final cs = Theme.of(context).colorScheme;
+    // 可空取色：测试等裸 MaterialApp 场景未挂载 AppThemeColors 时回退 cs.error
+    final danger = Theme.of(context).extension<AppThemeColors>()?.danger;
     return Column(
       children: [
         SizedBox(
@@ -134,27 +140,84 @@ class _TrendChartState extends State<TrendChart> {
               checkInThreshold: widget.checkInThreshold,
               onDaySelected: widget.onDaySelected,
               colorScheme: cs,
+              danger: danger,
             ),
           ),
         ),
         const SizedBox(height: 6),
+        // v1.0.3 历史数据可查：左右箭头翻页（桌面鼠标无拖拽习惯时必需）；
+        // 页数 ≤ 6 显示可点圆点，>6 页改显当前页日期范围。
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (var i = 0; i < _pages.length; i++)
-              Container(
-                width: 8,
-                height: 4,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(2),
-                  color: i == _page ? cs.primary : cs.outlineVariant,
+            if (_pages.length > 1)
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(Icons.chevron_left,
+                    size: 18,
+                    color: _page > 0 ? cs.primary : cs.outlineVariant),
+                onPressed:
+                    _page > 0 ? () => _controller.animateToPage(_page - 1, duration: const Duration(milliseconds: 250), curve: Curves.easeOut) : null,
+              ),
+            if (_pages.length <= 6) ...[
+              for (var i = 0; i < _pages.length; i++)
+                GestureDetector(
+                  key: ValueKey('trend_dot_$i'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _controller.animateToPage(i, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+                  child: Container(
+                    width: 16,
+                    height: 12,
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 8,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(2),
+                        color: i == _page ? cs.primary : cs.outlineVariant,
+                      ),
+                    ),
+                  ),
                 ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  _pageRangeLabel,
+                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                ),
+              ),
+            if (_pages.length > 1)
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(Icons.chevron_right,
+                    size: 18,
+                    color: _page < _pages.length - 1
+                        ? cs.primary
+                        : cs.outlineVariant),
+                onPressed: _page < _pages.length - 1
+                    ? () => _controller.animateToPage(_page + 1, duration: const Duration(milliseconds: 250), curve: Curves.easeOut)
+                    : null,
               ),
           ],
         ),
       ],
     );
+  }
+
+  /// 当前页日期范围文本（如 3/4 - 3/10）
+  String get _pageRangeLabel {
+    final page = _pages[_page];
+    if (page.isEmpty) return '';
+    String fmt(Map<String, dynamic> d) {
+      final dt = d['date'] as DateTime;
+      return '${dt.month}/${dt.day}';
+    }
+    return '${fmt(page.first)} - ${fmt(page.last)}';
   }
 }
 
@@ -165,6 +228,7 @@ class _TrendPage extends StatefulWidget {
     required this.chartMax,
     required this.checkInThreshold,
     required this.colorScheme,
+    this.danger,
     this.onDaySelected,
   });
 
@@ -172,6 +236,7 @@ class _TrendPage extends StatefulWidget {
   final double chartMax;
   final int checkInThreshold;
   final ColorScheme colorScheme;
+  final Color? danger;
   final ValueChanged<Map<String, dynamic>>? onDaySelected;
 
   @override
@@ -216,6 +281,7 @@ class _TrendPageState extends State<_TrendPage> {
           checkInThreshold: widget.checkInThreshold,
           selectedIndex: _selectedIndex,
           colorScheme: widget.colorScheme,
+          danger: widget.danger,
         ),
       ),
     );
@@ -229,6 +295,7 @@ class _TrendPainter extends CustomPainter {
     required this.checkInThreshold,
     required this.selectedIndex,
     required this.colorScheme,
+    this.danger,
   });
 
   final List<Map<String, dynamic>> days;
@@ -236,6 +303,7 @@ class _TrendPainter extends CustomPainter {
   final int checkInThreshold;
   final int? selectedIndex;
   final ColorScheme colorScheme;
+  final Color? danger;
 
   static const double leftPad = 34;
   static const double rightPad = 30;
@@ -274,7 +342,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: v.toInt().toString(),
-          style: TextStyle(fontSize: 9, color: colorScheme.onSurfaceVariant),
+          style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -327,7 +395,7 @@ class _TrendPainter extends CustomPainter {
       final a1 = (days[i]['accuracy'] as double?) ?? 0;
       final a2 = (days[i + 1]['accuracy'] as double?) ?? 0;
       final paint = Paint()
-        ..color = accuracyTierColor(math.min(a1, a2), colorScheme)
+        ..color = accuracyTierColor(math.min(a1, a2), colorScheme, danger)
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
       canvas.drawLine(
@@ -357,7 +425,7 @@ class _TrendPainter extends CustomPainter {
       text: TextSpan(
         text: '打卡 $checkInThreshold 题',
         style: TextStyle(
-            fontSize: 9, color: colorScheme.onTertiaryContainer),
+            fontSize: 11, color: colorScheme.onTertiaryContainer),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -404,7 +472,7 @@ class _TrendPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: '${date.month}/${date.day} ${total}题 ${acc.toStringAsFixed(0)}%',
-        style: const TextStyle(fontSize: 10, color: Colors.white),
+        style: const TextStyle(fontSize: 11.5, color: Colors.white),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

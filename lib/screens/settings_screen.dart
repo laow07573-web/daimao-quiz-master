@@ -11,7 +11,10 @@ import '../services/debug_log_service.dart';
 import '../services/keepalive_service.dart';
 import '../services/reminder_service.dart';
 import '../models/app_settings.dart';
+import '../services/device_service.dart';
+import '../services/sync/sync_engine.dart';
 import '../services/theme_service.dart';
+import '../utils/responsive.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -113,7 +116,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: const Text('继续编辑')),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('离开', style: TextStyle(color: Colors.red)),
+                child: Text('离开',
+                    style: TextStyle(color: AppThemeColors.of(context).danger)),
               ),
             ],
           ),
@@ -125,11 +129,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         appBar: AppBar(
           title: const Text('设置'),
         ),
-      body: SingleChildScrollView(
+      // 平板适配：内容限宽居中（手机无影响）；
+      // v1.0.3 宽屏重设计：宽屏限宽自动提升至 1080 + 分组双列并排
+      body: ResponsivePage(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: Builder(builder: (context) {
+          final sections = <Widget>[
             // API 配置卡片
             Container(
               padding: const EdgeInsets.all(16),
@@ -152,7 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '默认使用 DeepSeek API，填写你的 API Key 即可使用。也可自定义接口地址和模型。',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
 
@@ -201,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           if (_estimated > 0) ...[
                             const SizedBox(width: 8),
                             Text('≈ ${_estimated} 题',
-                                style: TextStyle(fontSize: 12, color: cs.onPrimaryContainer.withOpacity(0.7))),
+                                style: TextStyle(fontSize: 13, color: cs.onPrimaryContainer.withOpacity(0.7))),
                           ],
                           const Spacer(),
                           _balanceLoading
@@ -234,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Expanded(
                             child: Text('API 余额不足 ¥1，建议尽快充值以免影响使用',
                                 style: TextStyle(
-                                    fontSize: 12, color: cs.error)),
+                                    fontSize: 13, color: cs.error)),
                           ),
                         ],
                       ),
@@ -364,7 +370,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Text('$_untaggedCount 题未打标签',
                               style: TextStyle(
-                                  fontSize: 11, color: cs.error)),
+                                  fontSize: 12.5, color: cs.error)),
                         ),
                     ],
                   ),
@@ -372,12 +378,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // v1.0.2 对齐里程碑：打标签用途说明
                   Text(
                     '用于：根据错题分析薄弱知识点、错题本按章节分组。按知识点统计错题分布，优先攻克薄弱类型',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.4),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '部分错题未打知识点标签，可去设置页「为剩余题目打标签」补齐后精炼更准。',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.4),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -417,7 +423,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('答对/答错时播放提示音', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  Text('答对/答错时播放提示音', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   Consumer<AppState>(
                     builder: (context, appState, _) => SwitchListTile(
@@ -432,6 +438,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 局域网同步（v11：纯本地、无云端，同一局域网设备间同步）
+            Consumer2<AppState, SyncEngine>(
+              builder: (context, appState, sync, _) {
+                final syncSettings = appState.settings;
+                final displayName = syncSettings.deviceName.isEmpty
+                    ? DeviceService.instance.defaultDeviceName
+                    : syncSettings.deviceName;
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.sync, color: cs.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text('局域网同步',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: cs.onSurface)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '同一局域网内的设备自动发现并同步题库、刷题记录、错题与批注，'
+                        '纯本地传输、无云端。批注按设备各自保留，刷题页只显示本机批注。'
+                        '若发现不了设备：确认双方接同一 Wi-Fi、对端应用在前台，'
+                        'Windows 首次运行需在防火墙弹窗中允许本应用联网。',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                            height: 1.4),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                            syncSettings.autoSync ? '自动同步已开启' : '自动同步已关闭',
+                            style:
+                                TextStyle(fontSize: 14, color: cs.onSurface)),
+                        subtitle: Text('开启后接入同一局域网自动发现并同步；'
+                            '关闭时设备仍可互相发现，用「立即同步」手动触发',
+                            style: TextStyle(
+                                fontSize: 12.5, color: cs.onSurfaceVariant)),
+                        value: syncSettings.autoSync,
+                        onChanged: (v) async {
+                          await appState.updateSettings(
+                              syncSettings.copyWith(autoSync: v));
+                          // 引擎未启动（如启动时端口失败）在此补启动；
+                          // 已启动则只切换广播行为，不重启服务。
+                          try {
+                            if (!sync.started) {
+                              await sync.start(autoSync: v);
+                            } else {
+                              await sync.applyAutoSync(v);
+                            }
+                          } catch (_) {}
+                        },
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(Icons.devices_other, size: 20),
+                        title: Text('设备名：$displayName',
+                            style: const TextStyle(fontSize: 14)),
+                        trailing: const Icon(Icons.edit, size: 18),
+                        onTap: () => _editDeviceName(context, displayName),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        sync.syncing
+                            ? '同步中...'
+                            : '已发现 ${sync.peers.length} 台设备'
+                                '${sync.lastSyncAt != null ? ' · 上次同步 ${_fmtTime(sync.lastSyncAt)}' : ''}'
+                                '${sync.statusMessage.isNotEmpty ? '\n${sync.statusMessage}' : ''}',
+                        style: TextStyle(
+                            fontSize: 13, color: cs.onSurfaceVariant, height: 1.5),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonalIcon(
+                          icon: sync.syncing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : const Icon(Icons.sync, size: 16),
+                          label: Text(sync.syncing ? '同步中...' : '立即同步',
+                              style: const TextStyle(fontSize: 13)),
+                          onPressed: sync.syncing ? null : _syncNow,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
 
             const SizedBox(height: 16),
@@ -465,13 +578,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       '作用：开启后暂停每日提醒、错题 FSRS 复习与答题练习，本周战绩日历自动标注假期区间；连击冻结，假期不刷题也不断卡。',
                       style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                          fontSize: 13, color: cs.onSurfaceVariant, height: 1.4),
                     ),
                     // v1.0.2 修复：提示默认区间为当前自然月，需按实际假期调整
                     Text(
                       '默认区间为当前自然月，请开启后按实际假期调整起止日期。',
                       style: TextStyle(
-                          fontSize: 11, color: cs.onSurfaceVariant.withOpacity(0.8)),
+                          fontSize: 12.5, color: cs.onSurfaceVariant.withOpacity(0.8)),
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
@@ -567,7 +680,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // v1.0.2 对齐里程碑：到点会提醒你刷题打卡，保持连胜
                     Text('到点会提醒你刷题打卡，保持连胜',
                         style: TextStyle(
-                            fontSize: 12, color: cs.onSurfaceVariant)),
+                            fontSize: 13, color: cs.onSurfaceVariant)),
                     const SizedBox(height: 8),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -698,20 +811,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     _batteryIgnored ? '电池优化：已豁免' : '电池优化：未豁免',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: _batteryIgnored ? cs.primary : cs.error),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     '允许忽略电池优化，防止系统在后台清理每日提醒服务',
                     style:
-                        TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                        TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.4),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '若仍收不到提醒：最近任务中长按本应用并锁定',
                     style:
-                        TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                        TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.4),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -840,7 +953,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '开启后记录 AI 渲染链路、答案提交等关键数据，帮助排查前端 Bug。',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -1007,8 +1120,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-          ],
-        ),
+          ];
+          // 窄屏：单列（原设计）；宽屏：分组交错分左右两列并排（近似平衡）
+          if (!isWideLayout(context)) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: sections,
+            );
+          }
+          final left = <Widget>[];
+          final right = <Widget>[];
+          for (var i = 0; i < sections.length; i++) {
+            (i.isEven ? left : right).add(sections[i]);
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: left,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: right,
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
       ),
       ),
     );
@@ -1017,6 +1161,81 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _fmtTime(DateTime? t) {
     if (t == null) return '20:00';
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 手动「立即同步」：引擎未启动时先补启动，再对已发现设备逐一同步。
+  /// 未发现设备时如实提示（双方需在同一网段，对端也需开着本应用）
+  Future<void> _syncNow() async {
+    final appState = context.read<AppState>();
+    final engine = context.read<SyncEngine>();
+    if (engine.syncing) return;
+    try {
+      if (!engine.started) {
+        await engine.start(autoSync: appState.settings.autoSync);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('同步服务启动失败：$e')),
+      );
+      return;
+    }
+    if (engine.peers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('未发现其他设备：请确认双方接入同一局域网，'
+                '且对端应用正在前台运行')),      );
+      return;
+    }
+    final (tried, ok) = await engine.manualSync();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok > 0
+            ? '同步完成：$ok/$tried 台设备成功'
+            : '同步失败：请检查对端应用是否在前台运行'),
+        backgroundColor: ok > 0 ? null : Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
+  /// 编辑设备名（空值回落缺省名「猫卷-平台」）
+  Future<void> _editDeviceName(BuildContext context, String current) async {
+    final controller = TextEditingController(text: current);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('设备名'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '如：我的手机 / 平板',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null || !mounted) return;
+    final appState = context.read<AppState>();
+    await appState.updateSettings(
+        appState.settings.copyWith(deviceName: newName));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(newName.isEmpty
+              ? '设备名已恢复缺省值'
+              : '设备名已保存：$newName')),
+    );
   }
 
   /// v1.0.2 对齐里程碑：为剩余题目打标签（进度 + 暂停/继续 + 预览确认）
@@ -1168,7 +1387,7 @@ class _TaggingDialogState extends State<_TaggingDialog> {
                         style: const TextStyle(fontSize: 12)),
                     trailing: Text(kp,
                         style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: failed ? cs.error : cs.primary)),
                   );

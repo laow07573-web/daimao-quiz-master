@@ -8,11 +8,13 @@ import '../models/answer_record.dart';
 import '../models/follow_up_message.dart';
 import '../models/app_settings.dart';
 import 'database_service.dart';
+import 'device_service.dart';
 import 'doc_parser_service.dart';
 import 'bank_file_service.dart';
 import 'reminder_service.dart';
 import 'ai_service.dart';
 import 'quiz_service.dart';
+import 'sample_bank.dart';
 import 'stats_service.dart';
 import 'debug_log_service.dart';
 import 'fsrs_service.dart';
@@ -104,6 +106,23 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   bool _useAiImport = false;
   bool get useAiImport => _useAiImport;
 
+  // v1.27 后台导入：任务在应用层运行，离开导入页不中断；
+  // 首页展示进度卡，完成后经 [pendingImportResult] 弹完成提示。
+  bool _importTaskActive = false;
+  bool get importTaskActive => _importTaskActive;
+  ImportTaskResult? _pendingImportResult;
+  ImportTaskResult? get pendingImportResult => _pendingImportResult;
+  // 当前解析阶段在总进度中的起点/跨度（JSON 与 AI 解析两阶段共存时拼接）
+  double _bgProgressBase = 0;
+  double _bgProgressSpan = 1;
+
+  /// 消费完成提示（主壳弹窗后调用，防重复弹）
+  ImportTaskResult? consumeImportResult() {
+    final r = _pendingImportResult;
+    _pendingImportResult = null;
+    return r;
+  }
+
   void setUseAiImport(bool value) {
     _useAiImport = value;
     notifyListeners();
@@ -169,6 +188,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       final result = await _aiService!.parseQuestionsFromRawText(
           rawText, 0, (d, t) {
         _importStatus = 'AI 解析中 ($d/$t 块)';
+        // v1.27 进度精确化：按分块推进进度条（映射到当前阶段跨度内）
+        _importProgress = (_bgProgressBase +
+                _bgProgressSpan * (t > 0 ? d / t : 0))
+            .clamp(0.0, 1.0);
         notifyListeners();
       });
       _previewQuestions = result.questions;
@@ -232,12 +255,37 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
   }
 
-  /// 从预览中删除单题
+  /// 一键导入内置示例题库（无需文件、无需 AI 解析）：
+  /// 新用户/演示场景快速体验刷题。重名自动加后缀，返回导入题数。
+  Future<int> importSampleBank() async {
+    final now = DateTime.now().toIso8601String();
+    final (uniqueName, _) = await ensureUniqueBankName(sampleBankName);
+    final bankId = await _db.insertBank(QuestionBank(
+      name: uniqueName,
+      createdAt: now,
+    ));
+    final questions = sampleQuestions(bankId: bankId, createdAt: now);
+    await _db.insertQuestions(questions);
+    await _db.updateBankQuestionCount(bankId, questions.length);
+    await _loadBanks();
+    notifyListeners();
+    return questions.length;
+  }
+
+  /// 从预览中删除单题。v1.27：筛选态下按原始序号删除不错位。
   void removePreviewQuestion(int index) {
     if (index >= 0 && index < _previewQuestions.length) {
       _previewQuestions.removeAt(index);
       notifyListeners();
     }
+  }
+  
+  /// 测试注入：直接填充预览题目（预览页交互测试用，跳过 AI 解析）。
+  @visibleForTesting
+  void setPreviewQuestionsForTest(List<Question> qs, {String bankName = '测试题库'}) {
+    _previewQuestions = List.of(qs);
+    _previewBankName = bankName;
+    notifyListeners();
   }
 
   /// 编辑预览中的单题
@@ -305,12 +353,17 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     final model = await _db.getSetting('model') ?? AppSettings.defaultModel;
     final soundEnabled = (await _db.getSetting('sound_enabled') ?? '1') == '1';
     final nickname = await _db.getSetting('nickname') ?? '';
+    // 局域网同步设置（v11）
+    final autoSync = (await _db.getSetting('auto_sync') ?? '0') == '1';
+    final deviceName = await _db.getSetting('device_name') ?? '';
     _settings = AppSettings(
       apiKey: apiKey,
       apiEndpoint: apiEndpoint,
       model: model,
       soundEnabled: soundEnabled,
       nickname: nickname,
+      autoSync: autoSync,
+      deviceName: deviceName,
     );
     // v1.0.2 新增设置
     _vacationModeEnabled = (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
@@ -334,7 +387,20 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _db.setSetting('model', newSettings.model);
     await _db.setSetting('sound_enabled', newSettings.soundEnabled ? '1' : '0');
     await _db.setSetting('nickname', newSettings.nickname);
+    // 局域网同步设置（v11）；设备名同步给 DeviceService（信标广播用）
+    await _db.setSetting('auto_sync', newSettings.autoSync ? '1' : '0');
+    await _db.setSetting('device_name', newSettings.deviceName);
+    if (newSettings.deviceName.isNotEmpty) {
+      await DeviceService.instance.setDeviceName(newSettings.deviceName);
+    }
     _initAIService();
+    notifyListeners();
+  }
+
+  /// 局域网同步落库后刷新（题库列表 + 首页统计；同步引擎回调接入）
+  Future<void> refreshAfterSync() async {
+    await _loadBanks();
+    await _loadHomeStats();
     notifyListeners();
   }
 
@@ -428,10 +494,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     };
   }
 
-  /// 近 30 天趋势数据（含正确率，无记录天占位）
-  Future<List<Map<String, dynamic>>> getTrendData() async {
-    final totals = await _db.getDailyStats(30);
-    final accuracy = await _db.getDailyAccuracy(30);
+  /// 趋势数据（含正确率，无记录天占位）。
+  /// v1.0.3 历史数据可查：窗口参数化，统计页传 365 覆盖一年历史。
+  Future<List<Map<String, dynamic>>> getTrendData({int days = 30}) async {
+    final totals = await _db.getDailyStats(days);
+    final accuracy = await _db.getDailyAccuracy(days);
     final accByDay = <String, Map<String, dynamic>>{
       for (final a in accuracy) a['day'] as String: a,
     };
@@ -613,6 +680,153 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _loadBanks();
     notifyListeners();
     return (banks, questions, firstError, renamed);
+  }
+
+  // ======================== v1.27 后台导入（离开导入页不中断） ========================
+
+  static String _fileName(String path) => path.split('/').last.split('\\').last;
+
+  /// 后台导入：立即返回，任务在应用层继续运行（可离开导入页）。
+  /// [jsonFiles] JSON 题库直接入库（按文件推进进度）；
+  /// [docxFiles] 走 AI 解析（按分块推进进度），解析完成后待预览确认。
+  /// 两者混选时先 JSON 后 AI，总进度按阶段拼接。
+  Future<void> startBackgroundImport({
+    List<String> jsonFiles = const [],
+    List<String> docxFiles = const [],
+  }) async {
+    if (_importTaskActive) return;
+    if (jsonFiles.isEmpty && docxFiles.isEmpty) return;
+    _importTaskActive = true;
+    _importProgress = 0;
+    _importStatus = '准备导入...';
+    _bgProgressBase = 0;
+    _bgProgressSpan = 1;
+    notifyListeners();
+
+    final hasDocx = docxFiles.isNotEmpty;
+    final jsonSpan = hasDocx ? 0.3 : 1.0; // 混选时 JSON 占 0~0.3，AI 解析占 0.3~1
+    var jsonBanks = 0;
+    var jsonQuestions = 0;
+    var jsonRenamed = 0;
+    String? jsonError;
+
+    try {
+      // 阶段一：JSON 题库（按文件数推进，精确）
+      if (jsonFiles.isNotEmpty) {
+        final existingNames =
+            (await _db.getAllBanks()).map((b) => b.name).toSet();
+        for (var i = 0; i < jsonFiles.length; i++) {
+          _importStatus =
+              '正在导入题库 (${i + 1}/${jsonFiles.length})：${_fileName(jsonFiles[i])}';
+          notifyListeners();
+          final (b, q, err, r) = await BankFileService.importJsonFile(
+              jsonFiles[i],
+              existingNames: existingNames);
+          jsonBanks += b;
+          jsonQuestions += q;
+          jsonRenamed += r;
+          jsonError ??= err;
+          _importProgress = jsonSpan * (i + 1) / jsonFiles.length;
+          notifyListeners();
+        }
+        await _loadBanks();
+      }
+
+      // 阶段二：DOCX AI 解析（按分块推进；解析完待预览确认）
+      if (hasDocx) {
+        _bgProgressBase = jsonSpan;
+        _bgProgressSpan = 1 - jsonSpan;
+        if (docxFiles.length > 1) {
+          _importStatus =
+              '已选 ${docxFiles.length} 个文档，本次仅解析第一个：${_fileName(docxFiles.first)}';
+          notifyListeners();
+        }
+        await parseForPreview(docxFiles);
+      }
+    } catch (e) {
+      _importStatus = '导入异常：$e';
+    }
+
+    // 汇总结果（完成提示由主壳在主页弹出）
+    final ImportTaskResult result;
+    if (hasDocx) {
+      if (_previewQuestions.isNotEmpty) {
+        result = ImportTaskResult(
+          kind: ImportTaskKind.docxParse,
+          success: true,
+          message: 'AI 解析完成，共 ${_previewQuestions.length} 道题目，'
+              '请预览确认后入库'
+              '${jsonBanks > 0 ? '\n（JSON 题库已入库：$jsonBanks 个 / $jsonQuestions 道）' : ''}',
+          questionCount: _previewQuestions.length,
+        );
+      } else {
+        result = ImportTaskResult(
+          kind: ImportTaskKind.docxParse,
+          success: false,
+          message: (jsonBanks > 0
+                  ? 'JSON 题库已入库（$jsonBanks 个 / $jsonQuestions 道），'
+                      '但文档解析失败：'
+                  : '解析失败：') +
+              _importStatus,
+          questionCount: 0,
+        );
+      }
+    } else if (jsonBanks > 0 || jsonQuestions > 0) {
+      result = ImportTaskResult(
+        kind: ImportTaskKind.json,
+        success: true,
+        message: 'JSON 导入完成：$jsonBanks 个题库，$jsonQuestions 道题'
+            '${jsonRenamed > 0 ? '（$jsonRenamed 个同名题库已自动改名）' : ''}'
+            '${jsonError != null ? '\n部分文件：$jsonError' : ''}',
+        questionCount: jsonQuestions,
+      );
+    } else {
+      result = ImportTaskResult(
+        kind: ImportTaskKind.json,
+        success: false,
+        message: jsonError ?? _importStatus,
+        questionCount: 0,
+      );
+    }
+
+    _importTaskActive = false;
+    _importProgress = 1;
+    _pendingImportResult = result;
+    _bgProgressBase = 0;
+    _bgProgressSpan = 1;
+    if (jsonFiles.isNotEmpty) {
+      await _loadHomeStats(); // JSON 已入库，首页统计同步刷新。
+    }
+    notifyListeners();
+  }
+
+  /// 后台导入示例题库（一键入口，完成后弹提示引导刷题）
+  Future<void> startBackgroundSampleImport() async {
+    if (_importTaskActive) return;
+    _importTaskActive = true;
+    _importProgress = 0.2;
+    _importStatus = '正在导入示例题库...';
+    notifyListeners();
+    try {
+      final count = await importSampleBank();
+      _importProgress = 1;
+      _pendingImportResult = ImportTaskResult(
+        kind: ImportTaskKind.sample,
+        success: true,
+        message: '示例题库导入完成，共 $count 道题，快去刷题体验吧',
+        questionCount: count,
+      );
+    } catch (e) {
+      _pendingImportResult = ImportTaskResult(
+        kind: ImportTaskKind.sample,
+        success: false,
+        message: '示例题库导入失败：$e',
+        questionCount: 0,
+      );
+    }
+    _importTaskActive = false;
+    await _loadHomeStats();
+    notifyListeners();
   }
 
   /// 模拟长期使用（开发者选项，幂等）
@@ -1099,6 +1313,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     // 复习范围与错题本展示口径一致
     final selectedQuestions = questions;
 
+    // 开始新会话前，清空上一次未完成会话的断档记录（新会话取代旧中断会话）
+    await _db.deleteUnfinishedSessions();
+
     final session = QuizSession(
       bankIds: bankIds?.join(',') ?? 'all',
       mode: kp != null && kp.isNotEmpty ? 'kp_review' : 'error_review',
@@ -1241,4 +1458,23 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _aiService?.dispose();
     super.dispose();
   }
+}
+
+/// 后台导入任务类型（v1.27）
+enum ImportTaskKind { json, sample, docxParse }
+
+/// 后台导入完成结果：主壳据此弹「导入完成」提示（仅一次，
+/// 消费后清除）；docxParse 成功时引导去预览确认页。
+class ImportTaskResult {
+  final ImportTaskKind kind;
+  final bool success;
+  final String message;
+  final int questionCount;
+
+  const ImportTaskResult({
+    required this.kind,
+    required this.success,
+    required this.message,
+    this.questionCount = 0,
+  });
 }

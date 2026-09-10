@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'services/app_state.dart';
 import 'services/database_service.dart';
@@ -7,7 +10,33 @@ import 'services/debug_log_service.dart';
 import 'services/theme_service.dart';
 import 'services/tamper_check.dart';
 import 'services/reminder_service.dart';
+import 'services/sync/sync_engine.dart';
 import 'screens/splash_screen.dart';
+
+/// v1.0.3 单实例锁（桌面）：两个实例同时打开会争抢同一个 SQLite 库，
+/// 导致后启动者查询永久阻塞（统计页卡加载、交互无反应）。
+/// 进程存活期间持有句柄不释放；解锁失败则提示后退出。
+// ignore: unused_element — 赋值即目的：持有锁句柄防 GC 提前释放
+RandomAccessFile? _appLockRaf;
+
+Future<bool> _acquireSingleInstanceLock() async {
+  if (Platform.isAndroid) return true; // 移动端系统已保证单实例前台，无需锁
+  try {
+    final dir = p.join(
+        Platform.environment['LOCALAPPDATA'] ??
+            Platform.environment['HOME'] ??
+            '.',
+        'flashcard_app');
+    await Directory(dir).create(recursive: true);
+    final raf = await File(p.join(dir, 'app.lock')).open(mode: FileMode.write);
+    // 非阻塞语义：拿不到锁（另一实例持有）2 秒即放弃，避免启动卡死
+    await raf.lock(FileLock.exclusive).timeout(const Duration(seconds: 2));
+    _appLockRaf = raf; // 持有到进程退出，防 GC 提前释放锁
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +45,12 @@ void main() async {
   final ok = await TamperCheck.verify();
   if (!ok) {
     runApp(const _TamperedApp());
+    return;
+  }
+
+  // v1.0.3：单实例保护（必须在打开数据库前）
+  if (!await _acquireSingleInstanceLock()) {
+    runApp(const _AlreadyRunningApp());
     return;
   }
 
@@ -44,15 +79,66 @@ void main() async {
     ReminderService.instance.catchUpReminderIfMissed();
   } catch (_) {}
 
+  // 局域网同步（v11）：同步服务端与设备发现启动。
+  // 失败（如端口被占尽/系统限制）不阻塞进入主界面，设置页可手动重试同步。
+  final syncEngine = SyncEngine.instance;
+  syncEngine.onSyncApplied = () {
+    // 落库后刷新题库/统计（防 dispose 竞态，异步回调内部自保）
+    appState.refreshAfterSync();
+  };
+  try {
+    await syncEngine.start(autoSync: appState.settings.autoSync);
+  } catch (e) {
+    DebugLogService.instance.log('SYNC', '同步服务启动失败: $e');
+  }
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: appState),
         ChangeNotifierProvider.value(value: themeService),
+        ChangeNotifierProvider.value(value: syncEngine),
       ],
       child: const FlashcardApp(),
     ),
   );
+}
+
+/// 已有实例运行时的提示页（v1.0.3 单实例保护）
+class _AlreadyRunningApp extends StatelessWidget {
+  const _AlreadyRunningApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.launch, size: 64, color: Colors.blueGrey),
+              const SizedBox(height: 20),
+              const Text('猫卷已在运行',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Text(
+                '同一时间只能打开一个实例（避免数据冲突）。\n请切换到已打开的窗口继续使用。',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.6),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => SystemNavigator.pop(),
+                icon: const Icon(Icons.exit_to_app),
+                label: const Text('退出'),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 签名校验失败时显示的警告页
@@ -115,6 +201,7 @@ class _DbErrorAppState extends State<_DbErrorApp> {
           providers: [
             ChangeNotifierProvider.value(value: appState),
             ChangeNotifierProvider.value(value: themeService),
+            ChangeNotifierProvider.value(value: SyncEngine.instance),
           ],
           child: const FlashcardApp(),
         ),

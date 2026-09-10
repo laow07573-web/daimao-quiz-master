@@ -1,15 +1,22 @@
 ﻿import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../models/follow_up_message.dart';
+import '../models/ink_annotation.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
+import '../services/annotation_service.dart';
 import '../services/quiz_service.dart';
 import '../services/theme_service.dart';
 import '../utils/format_utils.dart';
+import '../utils/responsive.dart';
 import '../widgets/ai_response_widget.dart';
+import '../widgets/annotation_canvas.dart';
+import '../widgets/annotation_controller.dart';
+import '../widgets/annotation_toolbar.dart';
 import '../services/debug_log_service.dart';
 import 'session_summary_screen.dart';
 import '../widgets/answer_sheet_widget.dart';
@@ -45,7 +52,11 @@ class _QuizScreenState extends State<QuizScreen> {
   final List<FocusNode> _fillBlankFocusNodes = [];
   final TextEditingController _textAnswerController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  // v1.0.3 手写批注同期优化：AudioPlayer 懒加载（首次播声音才创建，
+  // 避免静音/测试环境白建 EventChannel）
+  AudioPlayer? _audioPlayerInstance;
+  AudioPlayer get _audioPlayer =>
+      _audioPlayerInstance ??= AudioPlayer();
   bool _showManualAnalysis = false;
   bool _inErrorBook = false;
   int? _lastQuestionId;
@@ -66,8 +77,16 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _modalOpen = false; // 挡路弹窗标记（答题卡/提交确认）
   // v1.0.2 修复：提交防重（双击不产生重复作答记录）
   bool _submitting = false;
-  // v1.0.2 设计审查修复：结束会话防重（双击"完成刷题"不再抛未捕获 StateError）
+  // v1.0.2 设计审查修复：结束会话防重（双击“完成刷题”不再抛未捕获 StateError）
   bool _ending = false;
+  // v1.0.3 PC 鼠标慢速拖动：累计横向位移（速度为 0 时按位移切题，批注态不使用）
+  double _hDragOuter = 0;
+  // v1.0.3 手写批注：交互状态机 + 模式标记
+  // _annoPersistent：false=答题时即时批注（内存态，切题即弃，REQ-002~005）
+  //                 true=答题后持久批注（按题落库，REQ-006~012）
+  final AnnotationController _anno = AnnotationController();
+  bool _annotating = false;
+  bool _annoPersistent = false;
 
   @override
   void initState() {
@@ -132,10 +151,17 @@ class _QuizScreenState extends State<QuizScreen> {
     return remaining > 0 && remaining <= warnSec;
   }
 
+  @override
   void dispose() {
     _practiceTimer?.cancel();
     _elapsedSeconds.dispose();
     _remainingSeconds.dispose();
+    // v1.0.3 手写批注：退出页面时持久批注兑底保存（fire-and-forget；
+    // 正常路径已在切题/完成处保存，此处只覆盖直接退出页面的场景）
+    if (_annoPersistent && _anno.strokes.isNotEmpty && _lastQuestionId != null) {
+      AnnotationService.instance.save(_lastQuestionId!, _anno.strokes);
+    }
+    _anno.dispose();
     _followUpController.dispose();
     for (final c in _fillBlankControllers) { c.dispose(); }
     _fillBlankControllers.clear();
@@ -143,7 +169,7 @@ class _QuizScreenState extends State<QuizScreen> {
     _fillBlankFocusNodes.clear();
     _textAnswerController.dispose();
     _scrollController.dispose();
-    _audioPlayer.dispose();
+    _audioPlayerInstance?.dispose();
     super.dispose();
   }
 
@@ -161,11 +187,44 @@ class _QuizScreenState extends State<QuizScreen> {
         }
 
         final lastRecord = appState.lastAnswerRecord;
-        // v1.0.2 统一重构：练习模式"已答"按练习答案表判断（可随时修改，不判定）
+        // v1.0.2 统一重构：练习模式“已答”按练习答案表判断（可随时修改，不判定）
         final isPractice = widget.quizMode == QuizMode.practice;
         final isAnswered = isPractice
             ? _practiceAnswersMap.containsKey(appState.currentQuestionIndex)
             : lastRecord != null;
+
+        // v1.0.3 画布扩区：宽屏开关 + 持久批注显示条件（答案已展示才回显，REQ-006）
+        final wide = isWideLayout(context);
+        final showPersistCond = !_annoPersistent ||
+            _isMemorizeMode ||
+            widget.quizMode == QuizMode.memorize ||
+            isAnswered;
+
+        // v1.27 需求纠偏：非批注态左右拖动切题（整个答题区域，速度或位移任一达标）；
+        // 批注模式由手势入口直接禁止，不再与画布联动。
+        void doSwipe(DragEndDetails details, double hDrag) {
+          final v = details.primaryVelocity ?? 0.0;
+          // v1.0.2 设计审查修复：提交期间禁止切题（防历史槽位写入错位）
+          if (_submitting) return;
+          // v1.0.3 鼠标慢速拖动：速度或累计位移任一达标即切题（鼠标拖动常无速度）
+          final byVelocity = v.abs() >= 300;
+          final back = v < -300 || (!byVelocity && hDrag < -60);
+          final prev = v > 300 || (!byVelocity && hDrag > 60);
+          if (back) {
+            // 练习自由前进；刷题/背题需已作答才前进
+            if (isPractice || _isMemorizeMode || isAnswered) {
+              _advanceQuestion(appState);
+            }
+          } else if (prev) {
+            if (appState.hasPrevious) {
+              _showAnalysis = false;
+              _showManualAnalysis = false;
+              _followUpController.clear();
+              appState.previousQuestion();
+              _scrollController.jumpTo(0);
+            }
+          }
+        }
 
         if (isPractice && _practiceAnswers.length != appState.quizQuestions.length) {
           _practiceAnswers.clear();
@@ -174,6 +233,18 @@ class _QuizScreenState extends State<QuizScreen> {
           }
         }
         if (appState.currentQuestion?.id != _lastQuestionId) {
+          // v1.0.3 手写批注：切题前保存当前题持久批注（fire-and-forget，
+          // save 幂等），随后退出批注态并清空
+          // （REQ-003/004：即时批注不落库不跨题）
+          if (_annoPersistent &&
+              _anno.strokes.isNotEmpty &&
+              _lastQuestionId != null) {
+            AnnotationService.instance
+                .save(_lastQuestionId!, _anno.strokes);
+          }
+          _annotating = false;
+          _annoPersistent = false;
+          _anno.clearAll();
           // v1.0.2: 切题清空作答残留（多选状态/填空草稿/简答草稿/追问状态）
           _showAnalysis = false;
           _showManualAnalysis = false;
@@ -192,10 +263,21 @@ class _QuizScreenState extends State<QuizScreen> {
                 setState(() => _inErrorBook = inBook);
               }
             });
+            // v1.0.3 手写批注：预载新题持久批注（已答/背题进入即可见，REQ-006；
+            // 渲染条件仍控制未作答时不显示）
+            AnnotationService.instance.load(qid).then((strokes) {
+              if (!mounted || _annotating) return;
+              if (appState.currentQuestion?.id != qid) return; // 又切题了
+              if (strokes.isEmpty) return;
+              setState(() {
+                _annoPersistent = true;
+                _anno.loadFrom(strokes);
+              });
+            });
           }
         }
 
-        return PopScope(
+        final page = PopScope(
           // v1.0.2 修复：系统返回键不再产生未结束的幽灵会话
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
@@ -263,6 +345,15 @@ class _QuizScreenState extends State<QuizScreen> {
                   tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
                   onPressed: () => setState(() => _isMemorizeMode = !_isMemorizeMode),
                 ),
+              // v1.0.3 手写批注（REQ-001/005）：正常刷题与背题模式可入，
+              // 练习模式不显示
+              if (!isPractice)
+                IconButton(
+                  icon: Icon(Icons.draw, size: 20,
+                      color: _annotating ? cs.primary : null),
+                  tooltip: '手写批注',
+                  onPressed: () => _toggleAnnotate(appState),
+                ),
               if (widget.quizMode == QuizMode.memorize)
                 TextButton(
                   onPressed: () => _handleExit(appState),
@@ -273,8 +364,21 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
             ],
           ),
-          body: Column(
+          // 平板适配：内容限宽居中（手机无影响）；
+          // v1.0.3 宽屏重设计：宽屏限宽 920（选项双列后信息密度更合理）
+          body: ResponsivePage(
+            maxWidth: isWideLayout(context) ? 920 : kContentMaxWidth,
+            child: Column(
             children: [
+              // v1.0.3 手写批注：批注模式工具栏（REQ-014）
+              if (_annotating)
+                AnnotationToolbar(
+                  controller: _anno,
+                  persistent: _annoPersistent,
+                  onFinish: () => _finishAnnotate(appState),
+                  // v1.0.3 PC 快捷键：桌面平台按钮提示追快捷键标注
+                  shortcuts: _isDesktop,
+                ),
               // 进度条
               TweenAnimationBuilder<double>(
                 tween: Tween(
@@ -296,29 +400,29 @@ class _QuizScreenState extends State<QuizScreen> {
 
               // 滚动区域
               Expanded(
-                child: GestureDetector(
+                child: Stack(
+                  children: [
+                  GestureDetector(
                   onHorizontalDragEnd: (details) {
-                    if (details.primaryVelocity == null) return;
-                    // v1.0.2 设计审查修复：提交期间禁止切题
-                    // （async gap 竞态：否则 await 后的历史槽位写入会错位）
-                    if (_submitting) return;
-                    if (details.primaryVelocity! < -300) {
-                      // 练习自由前进；刷题/背题需已作答才前进
-                      if (isPractice || _isMemorizeMode || isAnswered) {
-                        _advanceQuestion(appState);
-                      }
-                    } else if (details.primaryVelocity! > 300) {
-                      if (appState.hasPrevious) {
-                        _showAnalysis = false;
-                        _showManualAnalysis = false;
-                        _followUpController.clear();
-                        appState.previousQuestion();
-                        _scrollController.jumpTo(0);
-                      }
-                    }
+                    // v1.27 需求纠偏：批注模式下禁止左右滑动切题（画布接管全部指针）；
+                    // 非批注态整个答题区域（本手势包裹全部滚动内容）均可左右拖动切题。
+                    if (_annotating) return;
+                    // 鼠标慢速拖动：速度为 0 时按累计位移切题（REQ：鼠标左右拖动切题）
+                    final dd = _hDragOuter;
+                    _hDragOuter = 0;
+                    doSwipe(details, dd);
                   },
+                  onHorizontalDragUpdate: (details) {
+                    // 非批注态累计横向位移（批注态上方直接 return，不累计）
+                    if (!_annotating) _hDragOuter += details.delta.dx;
+                  },
+                  onHorizontalDragCancel: () => _hDragOuter = 0,
                   child: SingleChildScrollView(
                   controller: _scrollController,
+                  // v1.0.3 手写批注：批注中锁滚动（画布接管手势）
+                  physics: _annotating
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
                   padding: const EdgeInsets.all(16),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
@@ -331,10 +435,14 @@ class _QuizScreenState extends State<QuizScreen> {
                         child: FadeTransition(opacity: animation, child: child),
                       );
                     },
-                    child: Column(
+                    // v1.0.3 手写批注：渲染条件——持久批注仅答案展示时显示
+                    // （REQ-006）；即时批注本题内持续可见（REQ-004 只约束跨题）
+                    child: Stack(
                       key: ValueKey(question.id),
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         _buildQuestionCard(question, appState, cs),
                         const SizedBox(height: 16),
                         // v1.0.2 统一重构：练习模式选项区恒可修改（不显示判定结果）
@@ -350,7 +458,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               child: Text(
                                 '点击选项提交答案，答对自动进入下一题',
                                 style: TextStyle(
-                                    fontSize: 12, color: cs.onSurfaceVariant),
+                                    fontSize: 13, color: cs.onSurfaceVariant),
                               ),
                             ),
                           ],
@@ -397,22 +505,190 @@ class _QuizScreenState extends State<QuizScreen> {
                             const SizedBox(height: 4),
                             _buildRegenerateButton(appState, cs),
                           ],
-                        ],
+                          ],
+                          ],
+                        ),
+                        // v1.0.3 手写批注：画布叠放题区上方（REQ-002 题目区域标注），
+                        // 随内容滚动（位于滚动区内部）。
+                        // v1.0.3 画布扩区：宽屏下题区层只渲染存量旧笔迹（question 坐标系，只读），
+                        // 交互画布上移到页面层（见滚动区 Stack）；窄屏维持单层全交互。
+                        if (wide
+                            ? (_anno.strokes.any((s) => s.frame == kFrameQuestion) &&
+                                (_annotating || showPersistCond))
+                            : (_annotating ||
+                                (_anno.strokes.isNotEmpty && showPersistCond)))
+                          Positioned.fill(
+                            child: AnnotationCanvas(
+                              controller: _anno,
+                              interactive: _annotating && !wide,
+                              frameFilter: wide ? kFrameQuestion : null,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
+                ),
+                  // v1.0.3 画布扩区（宽屏）：页面层画布覆盖整个滚动区（含题目上下空白），
+                  // 可写范围不再局限于题目卡片；批注中滚动已锁，
+                  // 坐标以可视区为准（进入批注时已归顶，保证回显位置一致）。
+                  if (wide &&
+                      (_annotating ||
+                          (_anno.strokes.any((s) => s.frame == kFramePage) &&
+                              showPersistCond)))
+                    Positioned.fill(
+                      child: AnnotationCanvas(
+                        controller: _anno,
+                        interactive: _annotating,
+                        frameFilter: kFramePage,
+                      ),
+                    ),
+                  ],
+                ),
             ),
-          ),
 
               // 底部按钮：已答或背题模式均显示
               if (isAnswered || widget.quizMode == QuizMode.memorize) _buildBottomBar(appState, cs),
             ],
           ),
+          ),
         ),
       );
+        // v1.0.3 PC 快捷键：桌面平台包 CallbackShortcuts（A/1-4/Q/W/E/R/S/
+        // Delete/Ctrl+Delete/Esc）；手机/平板不包，避免误触发。
+        if (!_isDesktop) return page;
+        return CallbackShortcuts(
+          bindings: _annoShortcuts(appState),
+          child: Focus(autofocus: true, child: page),
+        );
       },
     );
+  }
+
+  /// v1.0.3 手写批注：进入/退出批注模式（REQ-001/002/005）
+  void _toggleAnnotate(AppState appState) {
+    if (_annotating) {
+      _finishAnnotate(appState);
+      return;
+    }
+    // v1.0.3 画布扩区：宽屏新笔迹用页面坐标系（覆盖整个内容区）；
+    // 窄屏维持题区坐标系。宽屏进入时滚动归顶，保证回显位置一致。
+    final wide = isWideLayout(context);
+    _anno.activeFrame = wide ? kFramePage : kFrameQuestion;
+    if (wide && _scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+    final isMemorizeState =
+        _isMemorizeMode || widget.quizMode == QuizMode.memorize;
+    final answered = appState.lastAnswerRecord != null;
+    if (isMemorizeState || answered) {
+      // 答题后批注（持久）：加载该题已存批注（REQ-006~012）
+      _annoPersistent = true;
+      final qid = appState.currentQuestion?.id;
+      if (qid != null) {
+        AnnotationService.instance.load(qid).then((strokes) {
+          if (!mounted || _annotating) return;
+          if (appState.currentQuestion?.id != qid) return; // 已切题
+          _anno.loadFrom(strokes);
+        });
+      }
+    } else {
+      // 答题时批注（即时）：内存态从空白开始，不落库（REQ-002/003）
+      _annoPersistent = false;
+      _anno.clearAll();
+    }
+    setState(() => _annotating = true);
+  }
+
+  /// v1.0.3 手写批注：完成编辑。持久批注立即落库
+  /// （切题与 dispose 另有兑底保存，save 幂等）
+  void _finishAnnotate(AppState appState) {
+    setState(() => _annotating = false);
+    if (_annoPersistent) {
+      final qid = appState.currentQuestion?.id;
+      if (qid != null) {
+        AnnotationService.instance.save(qid, _anno.strokes);
+      }
+    }
+  }
+
+  // ======================== v1.0.3 PC 快捷键（仅桌面平台） ========================
+
+  static final bool _isDesktop =
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+  /// 焦点在可编辑文本框（填空/简答）时快捷键让位，不干扰输入
+  bool _focusInEditable() =>
+      FocusManager.instance.primaryFocus?.context?.widget is EditableText;
+
+  /// Ctrl+Delete 一键清除（弹确认，与工具栏「清全部/清草稿」同逻辑）
+  Future<void> _confirmClearByShortcut() async {
+    final label = _annoPersistent ? '一键清除旧手写批注' : '清空本次草稿';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(label),
+        content: const Text('清除后不可恢复，确定继续吗？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('清除')),
+        ],
+      ),
+    );
+    if (ok == true) _anno.clearAll();
+  }
+
+  /// 批注快捷键映射（A 进入/退出；1-4 颜色；Q/W/E 笔型；R 橡皮；
+  /// S 选择；Delete 删选中；Ctrl+Delete 清除；Esc 完成）
+  Map<ShortcutActivator, VoidCallback> _annoShortcuts(AppState appState) {
+    void guarded(void Function() fn, {bool needAnnotating = true}) {
+      if (_focusInEditable()) return;
+      if (needAnnotating && !_annotating) return;
+      fn();
+    }
+
+    return {
+      const SingleActivator(LogicalKeyboardKey.keyA): () {
+        if (_focusInEditable()) return;
+        _toggleAnnotate(appState);
+      },
+      const SingleActivator(LogicalKeyboardKey.digit1):
+          () => guarded(() => _anno.setColor(kAnnoColors[0])),
+      const SingleActivator(LogicalKeyboardKey.digit2):
+          () => guarded(() => _anno.setColor(kAnnoColors[1])),
+      const SingleActivator(LogicalKeyboardKey.digit3):
+          () => guarded(() => _anno.setColor(kAnnoColors[2])),
+      const SingleActivator(LogicalKeyboardKey.digit4):
+          () => guarded(() => _anno.setColor(kAnnoColors[3])),
+      const SingleActivator(LogicalKeyboardKey.keyQ): () => guarded(() {
+            _anno.setPenType(PenType.fine);
+            _anno.setTool(AnnoTool.pen);
+          }),
+      const SingleActivator(LogicalKeyboardKey.keyW): () => guarded(() {
+            _anno.setPenType(PenType.normal);
+            _anno.setTool(AnnoTool.pen);
+          }),
+      const SingleActivator(LogicalKeyboardKey.keyE): () => guarded(() {
+            _anno.setPenType(PenType.highlighter);
+            _anno.setTool(AnnoTool.pen);
+          }),
+      const SingleActivator(LogicalKeyboardKey.keyR):
+          () => guarded(() => _anno.setTool(AnnoTool.eraser)),
+      const SingleActivator(LogicalKeyboardKey.keyS): () => guarded(() {
+            // 选择工具仅持久批注提供（与工具栏一致）
+            if (_annoPersistent) _anno.setTool(AnnoTool.select);
+          }),
+      const SingleActivator(LogicalKeyboardKey.delete):
+          () => guarded(() => _anno.deleteSelected()),
+      LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.delete):
+          () => guarded(_confirmClearByShortcut),
+      const SingleActivator(LogicalKeyboardKey.escape):
+          () => guarded(() => _finishAnnotate(appState)),
+    };
   }
 
   /// v1.0.2 修复：统一退出路径（系统返回键/结束按钮）。
@@ -482,7 +758,7 @@ class _QuizScreenState extends State<QuizScreen> {
         width: double.infinity, padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: isCorrect ? ac.successContainer : cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? ac.success : cs.outlineVariant)),
         child: Row(children: [
-          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : cs.surfaceContainerHighest, shape: BoxShape.circle), child: Center(child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: cs.onSurfaceVariant)))),
+          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : cs.surfaceContainerHighest, shape: BoxShape.circle), child: Center(child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurfaceVariant)))),
           const SizedBox(width: 12),
           Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : cs.onSurface, height: 1.4))),
         ]),
@@ -512,7 +788,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: Text(
                   // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
                   question.typeLabel,
-                  style: TextStyle(fontSize: 12, color: cs.primary),
+                  style: TextStyle(fontSize: 13, color: cs.primary),
                 ),
               ),
               const Spacer(),
@@ -521,7 +797,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%'
                   // v1.0.2 FSRS 可见化：答完题展示下次复习时间
                   '${appState.currentFsrsCard != null ? ' · 下次复习：${relativeDayLabel(appState.currentFsrsCard!.nextReviewAt)}' : ''}',
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                 ),
             ],
           ),
@@ -612,7 +888,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   child: Center(
                     child: selected
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        ? Icon(Icons.check, size: 16, color: cs.onPrimary)
                         : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary, fontSize: 14)),
                   ),
                 ),
@@ -631,7 +907,7 @@ class _QuizScreenState extends State<QuizScreen> {
     if (isMulti && !isPractice) {
       return Column(
         children: [
-          ...optionWidgets,
+          _arrangeOptionWidgets(optionWidgets),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -653,7 +929,18 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
 
-    return Column(children: optionWidgets);
+    return _arrangeOptionWidgets(optionWidgets);
+  }
+
+  /// v1.0.3 窗口自适应：选项随可用宽度自动排列——
+  /// 宽度足够时自然形成多列，窄窗口自动回到单列，
+  /// 拖动窗口尺寸时连续适配（替代早期硬编码双列）。
+  /// 批注画布覆盖外层 Stack，归一化坐标随排布边界自适应。
+  Widget _arrangeOptionWidgets(List<Widget> optionWidgets) {
+    if (!isWideLayout(context) || optionWidgets.length < 4) {
+      return Column(children: optionWidgets);
+    }
+    return _AdaptiveOptionsColumn(children: optionWidgets);
   }
 
   Widget _buildFillBlankInput(AppState appState, ColorScheme cs) {
@@ -918,6 +1205,8 @@ class _QuizScreenState extends State<QuizScreen> {
     _modalOpen = true;
     showModalBottomSheet(
       context: context,
+      // 平板适配：弹窗限宽居中
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       builder: (_) => AnswerSheetWidget(
         answers: _practiceAnswers,
         currentIndex: appState.currentQuestionIndex,
@@ -1056,8 +1345,7 @@ class _QuizScreenState extends State<QuizScreen> {
     // v1.0.2 UI 审查修复：正确/错误高亮统一 success(绿)/danger(红) 语义色
     final ac = AppThemeColors.of(context);
 
-    return Column(
-      children: options.asMap().entries.map((entry) {
+    final optionWidgets = options.asMap().entries.map((entry) {
         final idx = entry.key;
         final label = String.fromCharCode(65 + idx);
         final isCorrect = correctAnswers.contains(label);
@@ -1095,9 +1383,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: isCorrect ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : isUserWrong ? const Icon(Icons.close, size: 14, color: Colors.white)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: cs.onSurfaceVariant)),
+                    child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent)
+                        : isUserWrong ? Icon(Icons.close, size: 14, color: ac.onAccent)
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurfaceVariant)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1110,8 +1398,8 @@ class _QuizScreenState extends State<QuizScreen> {
             ),
           ),
         );
-      }).toList(),
-    );
+      }).toList();
+    return _arrangeOptionWidgets(optionWidgets);
   }
 
   Widget _buildResultFeedback(AppState appState, Question question, ColorScheme cs) {
@@ -1398,7 +1686,7 @@ class _QuizScreenState extends State<QuizScreen> {
                             child: Center(
                               child: Text('${i + 1}',
                                   style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 11.5,
                                       fontWeight: cur
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -1740,9 +2028,50 @@ class _FollowUpTypingBubble extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text('AI 正在回复...',
-              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
         ],
       ),
     );
+  }
+}
+
+/// v1.0.3 窗口自适应：选项随可用宽度自动排列。
+/// 每个选项固定单元宽（300，含底部间距），宽度足够时自然形成多列，
+/// 窗口拖窄时自动折行回到单列；单元高度取同排最大值，不裁剪长文本。
+class _AdaptiveOptionsColumn extends StatelessWidget {
+  const _AdaptiveOptionsColumn({required this.children});
+
+  final List<Widget> children;
+
+  static const double _cellWidth = 300;
+  static const double _hGap = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final w = constraints.maxWidth;
+      final cols = (w / (_cellWidth + _hGap)).floor().clamp(1, children.length);
+      if (cols <= 1) {
+        return Column(children: children);
+      }
+      final cellW = (w - _hGap * (cols - 1)) / cols;
+      final rows = <Widget>[];
+      for (var i = 0; i < children.length; i += cols) {
+        final row = children.sublist(
+            i, i + cols > children.length ? children.length : i + cols);
+        rows.add(IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var j = 0; j < row.length; j++) ...[
+                if (j > 0) const SizedBox(width: _hGap),
+                SizedBox(width: cellW, child: row[j]),
+              ],
+            ],
+          ),
+        ));
+      }
+      return Column(children: rows);
+    });
   }
 }

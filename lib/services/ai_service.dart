@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/app_settings.dart';
@@ -32,31 +35,128 @@ class AIService {
   AIService(this._settings);
 
   /// 使用 AI 从原始文本中批量解析题目。
-  /// 返回 [AIParseResult]（成功题目 + 失败分块原因），调用方据此显性提示
+  /// 返回 [AIParseResult]（成功题目 + 失败分块原因），调用方据此显性提示。
+  /// v1.27 提速：题目边界感知切块（题干/答案不会被切断）+
+  /// [parseConcurrency] 路并发（块间互不依赖，网络等待时间重叠）
+  static const int parseConcurrency = 3;
+  
   Future<AIParseResult> parseQuestionsFromRawText(
     String rawText,
     int bankId,
     void Function(int done, int total)? onProgress,
   ) async {
-    // 将文本按段落分块，每块控制在合理大小
-    final chunks = _splitTextIntoChunks(rawText, maxChars: 3000);
+    // 题目边界感知切块：每块都是完整的题目集合，不会把题干与答案切开。
+    // v1.27 截断修复：块上限 2000 字——此前 7000 字一块时输出 JSON 过长，
+    // 撞模型 max_tokens 上限被截断，全块报「响应不是合法 JSON」（日志实证：
+    // 失败块输出全部在 ~11000 字符≈ 8K token 处截断）。
+    final chunks = splitTextIntoQuestionChunks(rawText);
     final allQuestions = <Question>[];
     final errors = <String>[];
     final now = DateTime.now().toIso8601String();
-
-    for (int i = 0; i < chunks.length; i++) {
-      onProgress?.call(i, chunks.length);
-      final r = await _parseChunkWithAI(chunks[i], bankId, now);
-      allQuestions.addAll(r.$1);
-      if (r.$2 != null) errors.add('第 ${i + 1} 块：${r.$2}');
+  
+    // 并发受限的 worker 池：结果按块号收集（错误上报顺序稳定）
+    final results =
+        List<(List<Question>, String?)?>.filled(chunks.length, null);
+    var next = 0;
+    var done = 0;
+    Future<void> worker() async {
+      while (true) {
+        final i = next++;
+        if (i >= chunks.length) return;
+        final r = await _parseChunkWithAI(chunks[i], bankId, now);
+        results[i] = r;
+        done++;
+        onProgress?.call(done, chunks.length);
+      }
     }
-
+  
+    final workers = min(parseConcurrency, max(1, chunks.length));
+    await Future.wait(List.generate(workers, (_) => worker()));
+  
+    for (var i = 0; i < chunks.length; i++) {
+      final r = results[i];
+      if (r == null) continue;
+      allQuestions.addAll(r.$1);
+      if (r.$2 != null) {
+        // 内部降级标记不展示给用户。
+        errors.add('第 ${i + 1} 块：${r.$2!.replaceAll(_tokenLimitMarker, '')}');
+      }
+    }
+  
     onProgress?.call(chunks.length, chunks.length);
     return AIParseResult(allQuestions, errors.length, errors);
   }
 
-  /// 将文本按大小分块
-  List<String> _splitTextIntoChunks(String text, {int maxChars = 3000}) {
+  /// 题目起始行判定（与 DocParserService._isQuestionLine 同口径，
+  /// 另兼容【第N题】等括号变体）：边界切块的唯一依据。
+  /// 提升为静态公开：便于单测直接验证切块正确性。
+  static final RegExp _questionStartPattern = RegExp(
+      r'^\s*(?:\d+[\.、．\)）]|第\s*\d+\s*题|[（\(]\s*\d+\s*[）\)]|【\s*第?\s*\d+\s*题\s*】)');
+  
+  static bool _isQuestionStart(String line) =>
+      _questionStartPattern.hasMatch(line);
+  
+  /// 题目边界感知切块（v1.27 提速 + 防切断）：
+  /// 1. 按题目起始行把文本分成完整题目块（题干+选项+答案+解析永不拆散）；
+  /// 2. 完整块贪心装箱到 [maxChars] 内，切点永远落在题目与题目之间；
+  /// 3. 单个题目块超过 maxChars（大题/长解析）独占一块；
+  /// 4. 首个题目之前的文档头（标题/大题说明）并入第一块，保留上下文；
+  /// 5. 无任何题目起始行时退回旧的按段切块（兼容无题号文档）。
+  @visibleForTesting
+  static List<String> splitTextIntoQuestionChunks(String text,
+      {int maxChars = 2000}) {
+    final lines = text.split('\n');
+  
+    // 1. 按题目起始行分组为完整题目块；记录首题之前的文档头。
+    final blocks = <String>[];
+    final header = StringBuffer();
+    final cur = StringBuffer();
+    for (final line in lines) {
+      if (_isQuestionStart(line)) {
+        final s = cur.toString().trim();
+        if (s.isNotEmpty) blocks.add(s);
+        cur.clear();
+        cur.writeln(line);
+      } else if (cur.isEmpty) {
+        header.writeln(line); // 首题之前：文档标题/大题说明等上下文。不单独成块。
+      } else {
+        cur.writeln(line);
+      }
+    }
+    final tail = cur.toString().trim();
+    if (tail.isNotEmpty) blocks.add(tail);
+  
+    // 无题目起始行：退回按段切块（旧行为，兼容无题号文档）
+    if (blocks.isEmpty) {
+      return _splitTextIntoChunks(text, maxChars: maxChars);
+    }
+  
+    // 2. 完整块贪心装箱；单块超限也独占一块（不切碎）。
+    final chunks = <String>[];
+    var buf = '';
+    var headerPending = header.toString().trim();
+    for (final block in blocks) {
+      var candidate = buf.isEmpty ? block : '$buf\n\n$block';
+      // 文档头并入第一块（如「三、判断题」之类的大题说明是解析上下文）
+      if (headerPending.isNotEmpty && chunks.isEmpty && buf.isEmpty) {
+        candidate = '$headerPending\n\n$block';
+      }
+      if (candidate.length > maxChars && buf.isNotEmpty) {
+        chunks.add(buf);
+        buf = block;
+      } else {
+        buf = candidate;
+        if (chunks.isEmpty) headerPending = ''; // 文档头已随第一块消耗。
+      }
+    }
+    if (buf.trim().isNotEmpty) chunks.add(buf.trim());
+    if (headerPending.isNotEmpty) chunks.insert(0, headerPending);
+    return chunks;
+  }
+  
+  /// 将文本按段落分块（无题号文档的退路；题目边界文档请用上面的边界切块）。
+  /// v1.27 截断修复：上限同改 2000 字，防输出 JSON 撞模型输出上限被截断。
+  static List<String> _splitTextIntoChunks(String text, {int maxChars = 2000}) {
     final chunks = <String>[];
     final paragraphs = text.split('\n');
     var current = '';
@@ -75,22 +175,53 @@ class AIService {
     return chunks;
   }
 
-  /// 用 AI 解析一个文本块中的题目（失败自动重试 1 次）。
-  /// 返回 (题目列表, 失败原因)；失败原因非空表示该块解析失败
+  /// v1.27 输出上限逐级降级：不同模型/中转站的输出上限差异很大（
+  /// DeepSeek 8K、OpenAI 系 16K、不少中转站只给 4096/2048）——请求带超过模型上限的
+  /// max_tokens 会被接口直接 400 拒绝，换模型时逐档降级重试避免撞墙。
+  static const List<int> _maxTokensFallbacks = [8192, 4096, 2048];
+  
+  /// 内部标记：错误属于「超过模型输出上限」（可自动降级重试，不展示给用户）。
+  static const String _tokenLimitMarker = '|TOKEN_LIMIT';
+  
+  /// 用 AI 解析一个文本块中的题目（失败自动重试 1 次；
+  /// 输出上限错误按 [​_maxTokensFallbacks] 逐级降级重试）。
+  /// 返回 (题目列表, 失败原因)；失败原因非空表示该块解析失败。
   Future<(List<Question>, String?)> _parseChunkWithAI(
       String chunk, int bankId, String now) async {
-    var result = await _parseChunkOnce(chunk, bankId, now);
-    if (result.$2 != null) {
-      // v1.0.2 设计审查修复：失败块自动重试 1 次（退避 1s），仍失败才上报
+    for (var i = 0; i < _maxTokensFallbacks.length; i++) {
+      final mt = _maxTokensFallbacks[i];
+      var result = await _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
+      if (result.$2 == null) return result;
+      if (result.$2!.contains(_tokenLimitMarker) &&
+          i < _maxTokensFallbacks.length - 1) {
+        // v1.27：超过模型输出上限——自动降级重试（用户换模型/中转站也兼容）。
+        await Future.delayed(const Duration(seconds: 1));
+        continue;
+      }
+      // 其余失败：沿用既有的一次重试（退避 1s）。
       await Future.delayed(const Duration(seconds: 1));
-      result = await _parseChunkOnce(chunk, bankId, now);
+      return _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
     }
-    return result;
+    return (<Question>[], 'AI请求失败: 输出上限降级重试全部失败');
+  }
+  
+  /// 判定错误响应是否为「超过模型输出上限」（max_tokens 超出模型支持）：
+  /// 兼容 OpenAI 兼容接口常见错误文案，供降级重试判定（单测可直接调用）。
+  @visibleForTesting
+  static bool isTokenLimitError(String body) {
+    final s = body.toLowerCase();
+    return s.contains('max_tokens') ||
+        (s.contains('maximum') && s.contains('token')) ||
+        s.contains('too many tokens') ||
+        (s.contains('exceed') && s.contains('token'));
   }
 
-  /// 单次解析一个文本块。失败返回带原因的错误串，不再静默吞掉
+  /// 单次解析一个文本块。失败返回带原因的错误串，不再静默吞掉。
+  /// [maxTokens]：本次请求的输出上限（超模型上限会被接口拒绝，
+  /// 由调用方按降级序列重试）。
   Future<(List<Question>, String?)> _parseChunkOnce(
-      String chunk, int bankId, String now) async {
+      String chunk, int bankId, String now,
+      {int maxTokens = 8192}) async {
     final prompt = '''你是一个专业的题目解析器。请从以下文本中提取所有题目，返回严格的 JSON 格式。
 
 文本内容：
@@ -119,8 +250,9 @@ $chunk
 6. 简答题：question_type="jian_da"，options 为空 []，correct_answer 为参考答案段落
 7. 问答题：question_type="jie_da"，options 为空 []，correct_answer 为参考答案段落
 8. knowledge_point 命名规范：统一用教材章节式命名（如"解剖学""生理学""病理学"），不要用自由短语或长句，控制在10字以内
-9. 原文中的解析内容请保留到 analysis 字段
-10. 只返回 JSON，不要任何其他文字
+9. 原文中的解析内容请保留到 analysis 字段。
+10. 只返回 JSON，不要任何其他文字。
+11. 控制输出长度：题干/选项/答案如实提取即可，不要添加原文没有的冗余描述
 
 请直接返回 JSON：''';
 
@@ -141,7 +273,8 @@ $chunk
             {'role': 'user', 'content': prompt},
           ],
           'temperature': 0.1,
-          'max_tokens': 4096,
+          // v1.27 截断修复：默认放宽到 8192；超模型上限时由降级序列重试。
+          'max_tokens': maxTokens,
           'response_format': {'type': 'json_object'},
         }),
       ).timeout(const Duration(seconds: 60));
@@ -158,12 +291,20 @@ $chunk
         logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
         _trackUsage(data);
 
-        // 解析 JSON 响应（容忍 ```json 围栏等常见模型输出格式）
+        // 解析 JSON 响应（容忍 ```json 围栏等常见模型输出格式）；
+        // v1.27 截断修复：输出撞 max_tokens 被截断时，抢修到最后一个完整题目对象，
+        // 挽救前部完整部分，不再整块作废。
         Map<String, dynamic> parsed;
         try {
           parsed = _extractJson(content);
         } catch (e) {
-          return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON（$e）');
+          final repaired = repairTruncatedJson(content);
+          if (repaired == null) {
+            return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON（$e）');
+          }
+          parsed = repaired;
+          logger.log('PIPE:DECODE',
+              '输出被截断已抢修：挽救前部完整题目（原错：$e）');
         }
         final questionsList = parsed['questions'] as List?;
         if (questionsList == null) {
@@ -189,7 +330,12 @@ $chunk
         }).toList();
         return (questions, null);
       } else {
-        return (<Question>[], 'AI服务返回错误 ($response.statusCode)');
+        // v1.27：识别「输出上限」类错误（用户换模型/中转站上限低时出现），
+        // 加内部标记供降级重试；其余错误如实上报。
+        final bodyText = utf8.decode(response.bodyBytes, allowMalformed: true);
+        final limitSuffix =
+            isTokenLimitError(bodyText) ? _tokenLimitMarker : '';
+        return (<Question>[], 'AI服务返回错误 (${response.statusCode})$limitSuffix');
       }
     } catch (e) {
       return (<Question>[], 'AI请求失败: $e');
@@ -201,16 +347,24 @@ $chunk
     return s;
   }
 
-  /// 解析模型返回的 JSON：剥离 ```json ... ``` 围栏与前后噪音再 decode
+  /// 解析模型返回的 JSON：剥离 ```json ... ``` 围栏与前后噪音再 decode。
   static Map<String, dynamic> _extractJson(String content) {
+    return _extractJsonBody(_stripFence(content));
+  }
+  
+  /// 剥 ```json ``` / ``` ``` 围栏
+  static String _stripFence(String content) {
     var s = content.trim();
-    // 剥 ```json ``` / ``` ``` 围栏
     final fence = RegExp(r'^```(?:json)?\s*([\s\S]*?)\s*```$', caseSensitive: false);
     final fenceMatch = fence.firstMatch(s);
     if (fenceMatch != null) {
       s = fenceMatch.group(1)!.trim();
     }
-    // 剥前后花括号外的散落文本
+    return s;
+  }
+  
+  static Map<String, dynamic> _extractJsonBody(String s) {
+    // 剥前后花括号外的散落文本。
     final first = s.indexOf('{');
     final last = s.lastIndexOf('}');
     if (first >= 0 && last > first) {
@@ -220,6 +374,35 @@ $chunk
     return decoded is Map<String, dynamic>
         ? decoded
         : (decoded is Map ? Map<String, dynamic>.from(decoded) : <String, dynamic>{});
+  }
+  
+  /// v1.27 截断抢修：模型输出撞 max_tokens 被截断时，截到最后一个完整题目对象、
+  /// 补上数组与外层对象的闭合，挽救前部完整部分（避免整块作废）。
+  /// 结构约定：{"questions": [{...}, {...} ...——从后往前逐个 '}' 尝试闭合，
+  /// 最多回溯 30 层；全部失败返回 null（调用方如实上报错误）。
+  @visibleForTesting
+  static Map<String, dynamic>? repairTruncatedJson(String content) {
+    var s = _stripFence(content);
+    final first = s.indexOf('{');
+    if (first < 0) return null;
+    s = s.substring(first);
+  
+    var end = s.length;
+    for (var attempt = 0; attempt < 30; attempt++) {
+      final idx = s.lastIndexOf('}', end - 1);
+      if (idx <= 0) break;
+      end = idx + 1;
+      // 去掉切点后的尾随逗号/空白（截在题目对象后的 ',' 处时）
+      var candidate = s.substring(0, end).replaceFirst(RegExp(r'[\s,]+$'), '');
+      try {
+        final decoded = jsonDecode('$candidate]}');
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } on FormatException {
+        continue; // 可能截在不完整题目内部：回退到上一个 '}' 再试。
+      }
+    }
+    return null;
   }
 
   String _detectType(Map q) {

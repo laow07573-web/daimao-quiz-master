@@ -1,7 +1,7 @@
 ﻿name: flashcard_app
 description: 猫卷 - 本地题库、AI解析、间隔复习的 Android 刷题工具
 publish_to: 'none'
-version: 1.26.6+17
+version: 1.27.0+18
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -60,8 +60,19 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true
   assets:
     - assets/
+  # v1.27 视觉优化：内置 MiSans（小米开源字体），PC/安卓跨端字形一致，
+  # 解决默认微软雅黑小字号发虚观感。只带 Regular + Semibold 两字重（省包体，
+  # w500 自动回落 Regular，观感几乎无差）
+  fonts:
+    - family: MiSans
+      fonts:
+        - asset: fonts/MiSans-Regular.ttf
+        - asset: fonts/MiSans-Semibold.ttf
+          weight: 600

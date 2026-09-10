@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/app_state.dart';
 import '../utils/app_constants.dart';
 import '../utils/format_utils.dart';
+import '../utils/responsive.dart';
 import 'developer_options_screen.dart';
 import 'settings_screen.dart';
 
@@ -21,9 +22,38 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // v1.0.3 宽屏重设计：入口卡片提取为列表，窄屏纵列 / 宽屏三列并排
+    final entries = [
+      _EntryTile(
+        icon: Icons.settings_outlined,
+        title: '设置',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        ),
+      ),
+      _EntryTile(
+        icon: Icons.developer_mode,
+        title: '开发者选项',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const DeveloperOptionsScreen()),
+        ),
+      ),
+      _EntryTile(
+        icon: Icons.info_outline,
+        title: '关于',
+        // v1.0.2 修复：版本号统一（常量 kAppVersion）
+        subtitle: kAppVersion,
+        onTap: () => _showAbout(context),
+      ),
+    ];
     return Scaffold(
       appBar: AppBar(title: const Text('我的')),
-      body: ListView(
+      // 平板适配：内容限宽居中（手机无影响）；宽屏限宽自动提升至 1080
+      body: ResponsivePage(
+        child: ListView(
         padding: const EdgeInsets.all(14),
         children: [
           // 问候语 + 名字
@@ -85,33 +115,25 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
           ),
           const SizedBox(height: 14),
-          // 入口列表
-          _EntryTile(
-            icon: Icons.settings_outlined,
-            title: '设置',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _EntryTile(
-            icon: Icons.developer_mode,
-            title: '开发者选项',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const DeveloperOptionsScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _EntryTile(
-            icon: Icons.info_outline,
-            title: '关于',
-            // v1.0.2 修复：版本号统一（常量 kAppVersion）
-            subtitle: kAppVersion,
-            onTap: () => _showAbout(context),
-          ),
+          // 入口列表：宽屏三列并排，窄屏纵列（原设计）
+          if (isWideLayout(context))
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: entries[0]),
+                const SizedBox(width: 8),
+                Expanded(child: entries[1]),
+                const SizedBox(width: 8),
+                Expanded(child: entries[2]),
+              ],
+            )
+          else ...[
+            entries[0],
+            const SizedBox(height: 8),
+            entries[1],
+            const SizedBox(height: 8),
+            entries[2],
+          ],
           const SizedBox(height: 20),
           // v1.0.2 UI 审查修复：入口下方补产品定位卡，消除下半屏空白
           Container(
@@ -134,7 +156,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 Text(
                   '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧',
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       height: 1.7,
                       color: cs.onSurfaceVariant),
                 ),
@@ -146,10 +168,11 @@ class _ProfileTabState extends State<ProfileTab> {
             child: Text(
               // v1.0.2 对齐里程碑：页脚带版本号
               '本软件由b站：笨蛋鱼坏蛋猫开发|$kAppVersion',
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -212,7 +235,7 @@ class _EntryTile extends StatelessWidget {
             if (subtitle != null)
               Text(subtitle!,
                   style:
-                      TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                      TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
             const SizedBox(width: 4),
             Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
           ],

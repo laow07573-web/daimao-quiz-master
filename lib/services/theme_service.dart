@@ -95,14 +95,14 @@ class ThemeService extends ChangeNotifier {
   // ======================== 5 套主题配色（设计稿） ========================
 
   static AppThemeColors _colorsOf(AppTheme t) => switch (t) {
-        // 主题1（品牌鲜明）：导航栏 #5D5FEF，背景 #F5F6FA，强调色 #5D5FEF
+        // 主题1（品牌鲜明）：医疗/学术深蓝调
         AppTheme.brand => const AppThemeColors(
-            navBar: Color(0xFF5D5FEF),
-            background: Color(0xFFF5F6FA),
-            accent: Color(0xFF5D5FEF),
+            navBar: Color(0xFF1E3A5F),
+            background: Color(0xFFF0F4F8),
+            accent: Color(0xFF2563EB),
             onAccent: Colors.white,
             card: Colors.white,
-            cardBorder: Color(0xFFE8EAF6),
+            cardBorder: Color(0xFFD9E2EC),
           ),
         // 主题2（护眼柔和）：导航栏 #DAE1D4，背景 #FAFAF9，强调色 #4A7A5D
         AppTheme.eyeCare => const AppThemeColors(
@@ -122,14 +122,14 @@ class ThemeService extends ChangeNotifier {
             card: Colors.white,
             cardBorder: Color(0xFFE5EBF0),
           ),
-        // 主题4（星际穿越）：导航栏 #1D1A1A，背景 #E8DDCB，强调色 #E96D39
+        // 主题4（星际穿越）：宇宙紫调浅色版
         AppTheme.starVoyage => const AppThemeColors(
-            navBar: Color(0xFF1D1A1A),
-            background: Color(0xFFE8DDCB),
-            accent: Color(0xFFE96D39),
+            navBar: Color(0xFF1E1B4B),
+            background: Color(0xFFF5F3FF),
+            accent: Color(0xFF7C3AED),
             onAccent: Colors.white,
-            card: Color(0xFFF4EEE2),
-            cardBorder: Color(0xFFD9CDB8),
+            card: Colors.white,
+            cardBorder: Color(0xFFDDD6FE),
           ),
         // 主题5（碧海银河）：导航栏 #1A253E，背景 #F0F4F9，强调色 #4C7CD6
         AppTheme.oceanGalaxy => const AppThemeColors(
@@ -145,15 +145,22 @@ class ThemeService extends ChangeNotifier {
   // ======================== 5 套深色配色（v1.0.2 七项改进：深色模式） ========================
 
   /// 深色变体：深底浅强调色，保证对比度（onAccent 用深色适配浅色强调）
+  ///
+  /// 语义色深色适配：success/danger 提亮为 400 档保证深底可读，
+  /// container 用 900 档深底替代浅色马卡龙底，避免深模式下出现刺眼亮块。
   static AppThemeColors _darkColorsOf(AppTheme t) => switch (t) {
-        // 品牌鲜明-dark：靛蓝强调，深墨蓝底
+        // 品牌鲜明-dark：深海蓝底，亮蓝强调
         AppTheme.brand => const AppThemeColors(
-            navBar: Color(0xFF4344B8),
-            background: Color(0xFF14151F),
-            accent: Color(0xFF8B8CF8),
-            onAccent: Color(0xFF14151F),
-            card: Color(0xFF1F2030),
-            cardBorder: Color(0xFF2C2D42),
+            navBar: Color(0xFF1A2B45),
+            background: Color(0xFF0F172A),
+            accent: Color(0xFF60A5FA),
+            onAccent: Color(0xFF0F172A),
+            card: Color(0xFF1E293B),
+            cardBorder: Color(0xFF334155),
+            success: Color(0xFF4ADE80),
+            successContainer: Color(0xFF14532D),
+            danger: Color(0xFFF87171),
+            dangerContainer: Color(0xFF7F1D1D),
           ),
         // 护眼柔和-dark：暗绿底，柔和绿强调
         AppTheme.eyeCare => const AppThemeColors(
@@ -163,6 +170,10 @@ class ThemeService extends ChangeNotifier {
             onAccent: Color(0xFF131713),
             card: Color(0xFF1B201C),
             cardBorder: Color(0xFF2E362F),
+            success: Color(0xFF4ADE80),
+            successContainer: Color(0xFF14532D),
+            danger: Color(0xFFF87171),
+            dangerContainer: Color(0xFF7F1D1D),
           ),
         // 极简-dark：深青底，青色强调
         AppTheme.minimal => const AppThemeColors(
@@ -172,15 +183,23 @@ class ThemeService extends ChangeNotifier {
             onAccent: Color(0xFF0F1517),
             card: Color(0xFF172023),
             cardBorder: Color(0xFF243034),
+            success: Color(0xFF4ADE80),
+            successContainer: Color(0xFF14532D),
+            danger: Color(0xFFF87171),
+            dangerContainer: Color(0xFF7F1D1D),
           ),
-        // 星际穿越-dark：深棕底，暖橙强调
+        // 星际穿越-dark：深紫宇宙
         AppTheme.starVoyage => const AppThemeColors(
-            navBar: Color(0xFF33241B),
-            background: Color(0xFF1A1410),
-            accent: Color(0xFFF08A52),
-            onAccent: Color(0xFF1A1410),
-            card: Color(0xFF251C14),
-            cardBorder: Color(0xFF3A2C1F),
+            navBar: Color(0xFF0F0720),
+            background: Color(0xFF020617),
+            accent: Color(0xFFC084FC),
+            onAccent: Color(0xFF020617),
+            card: Color(0xFF1E1B4B),
+            cardBorder: Color(0xFF312E81),
+            success: Color(0xFF4ADE80),
+            successContainer: Color(0xFF14532D),
+            danger: Color(0xFFF87171),
+            dangerContainer: Color(0xFF7F1D1D),
           ),
         // 碧海银河-dark：深蓝底，亮蓝强调
         AppTheme.oceanGalaxy => const AppThemeColors(
@@ -190,6 +209,10 @@ class ThemeService extends ChangeNotifier {
             onAccent: Color(0xFF101624),
             card: Color(0xFF182136),
             cardBorder: Color(0xFF26334F),
+            success: Color(0xFF4ADE80),
+            successContainer: Color(0xFF14532D),
+            danger: Color(0xFFF87171),
+            dangerContainer: Color(0xFF7F1D1D),
           ),
       };
 
@@ -213,6 +236,9 @@ class ThemeService extends ChangeNotifier {
             : const Color(0xFF1F2933);
     return base.copyWith(
       brightness: brightness,
+      // v1.27 视觉柔和化：统一 MiSans 字体（全端一致，现代字形），
+      // Material 排版整体放大一档（基础 14→15），降低长时间阅读疲劳。
+      textTheme: _comfortTextTheme(base.textTheme),
       colorScheme: scheme,
       scaffoldBackgroundColor: colors.background,
       appBarTheme: AppBarTheme(
@@ -220,14 +246,18 @@ class ThemeService extends ChangeNotifier {
         foregroundColor: navForeground,
         elevation: 0,
         titleTextStyle: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.bold, color: navForeground),
+            fontFamily: 'MiSans',
+            fontSize: 19,
+            fontWeight: FontWeight.w600,
+            color: navForeground),
       ),
       cardTheme: CardTheme(
         elevation: 0,
         color: colors.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: colors.cardBorder),
+          borderRadius: BorderRadius.circular(16),
+          // v1.27 呼吸感：全局卡片描边弱化，依靠底色与间距区分层次。
+          side: BorderSide(color: colors.cardBorder.withOpacity(0.7)),
         ),
       ),
       extensions: [colors],
@@ -236,16 +266,44 @@ class ThemeService extends ChangeNotifier {
 
   // ========== 各主题基础配置（间距/圆角/卡片样式，色值统一走配色） ==========
 
+  /// v1.27 舒适排版：统一注入 MiSans + 有字号的样式放大一档。
+  /// 逐样式安全处理（基础主题存在 fontSize 为 null 的样式，
+  /// 直接 TextTheme.apply(fontSizeDelta) 会触发断言）。
+  static TextStyle? _comfort(TextStyle? s) => s == null
+      ? null
+      : s.apply(
+          fontFamily: 'MiSans',
+          fontSizeDelta: s.fontSize == null ? 0.0 : 1.0,
+        );
+
+  static TextTheme _comfortTextTheme(TextTheme t) => TextTheme(
+        displayLarge: _comfort(t.displayLarge),
+        displayMedium: _comfort(t.displayMedium),
+        displaySmall: _comfort(t.displaySmall),
+        headlineLarge: _comfort(t.headlineLarge),
+        headlineMedium: _comfort(t.headlineMedium),
+        headlineSmall: _comfort(t.headlineSmall),
+        titleLarge: _comfort(t.titleLarge),
+        titleMedium: _comfort(t.titleMedium),
+        titleSmall: _comfort(t.titleSmall),
+        bodyLarge: _comfort(t.bodyLarge),
+        bodyMedium: _comfort(t.bodyMedium),
+        bodySmall: _comfort(t.bodySmall),
+        labelLarge: _comfort(t.labelLarge),
+        labelMedium: _comfort(t.labelMedium),
+        labelSmall: _comfort(t.labelSmall),
+      );
+
   static final _brand = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorSchemeSeed: const Color(0xFF5D5FEF),
+    colorSchemeSeed: const Color(0xFF2563EB),
     cardTheme: CardTheme(
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFFE8EAF6))),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFD9E2EC))),
     ),
   );
 
@@ -257,7 +315,7 @@ class ThemeService extends ChangeNotifier {
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFFE4E8E0))),
     ),
   );
@@ -270,7 +328,7 @@ class ThemeService extends ChangeNotifier {
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFFE5EBF0))),
     ),
   );
@@ -278,13 +336,13 @@ class ThemeService extends ChangeNotifier {
   static final _starVoyage = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorSchemeSeed: const Color(0xFFE96D39),
+    colorSchemeSeed: const Color(0xFF7C3AED),
     cardTheme: CardTheme(
       elevation: 1,
-      color: const Color(0xFFF4EEE2),
+      color: const Color(0xFFFFFFFF),
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFFD9CDB8))),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFDDD6FE))),
     ),
   );
 
@@ -296,7 +354,7 @@ class ThemeService extends ChangeNotifier {
       elevation: 1,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFFDDE6F2))),
     ),
   );
@@ -324,17 +382,19 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
   final Color cardBorder;
 
   // ===== v1.0.2 设计审查修复：语义色（判定对错/背题高亮等跨主题一致） =====
+  // 视觉审查修复（对比度）：浅色档默认值改用 700 档深绿/深红，
+  // 白底文字对比度达标（≥4.5:1）；深色模式由 _darkColorsOf 覆盖为 400 档亮色。
 
   /// 成功/正确语义色（判题对、背题高亮等）
   final Color success;
 
-  /// 成功语义浅底色
+  /// 成功语义浅底色（深色模式下为深绿底）
   final Color successContainer;
 
   /// 危险/错误语义色（判题错等）
   final Color danger;
 
-  /// 危险语义浅底色
+  /// 危险语义浅底色（深色模式下为深红底）
   final Color dangerContainer;
 
   /// 警告语义色（余额不足、未配置提示等）
@@ -347,11 +407,11 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     required this.onAccent,
     required this.card,
     required this.cardBorder,
-    this.success = const Color(0xFF5CB85C),
-    this.successContainer = const Color(0xFFE8F5E9),
-    this.danger = const Color(0xFFD9534F),
-    this.dangerContainer = const Color(0xFFFDECEA),
-    this.warning = const Color(0xFFF0AD4E),
+    this.success = const Color(0xFF15803D),
+    this.successContainer = const Color(0xFFDCFCE7),
+    this.danger = const Color(0xFFB91C1C),
+    this.dangerContainer = const Color(0xFFFEE2E2),
+    this.warning = const Color(0xFFF59E0B),
   });
 
   @override

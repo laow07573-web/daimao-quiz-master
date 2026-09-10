@@ -3,10 +3,12 @@ import 'dart:io';
 import 'dart:math';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:uuid/uuid.dart';
 import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
+import 'device_service.dart';
 import 'fsrs_service.dart';
 
 class DatabaseService {
@@ -52,7 +54,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 9,
+      version: 11,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -75,6 +77,22 @@ class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_answer_records_answered_at ON answer_records(answered_at)',
       'CREATE INDEX IF NOT EXISTS idx_quiz_sessions_start_time ON quiz_sessions(start_time)',
       'CREATE INDEX IF NOT EXISTS idx_ai_cache_question_id ON ai_cache(question_id)',
+    ];
+    for (final s in indexes) {
+      await db.execute(s);
+    }
+  }
+
+  /// 同步相关索引（uid 唯一 + 批注设备过滤，v11）。幂等，
+  /// onCreate 与 onUpgrade(v11) 共用
+  Future<void> _createSyncIndexes(Database db) async {
+    const indexes = [
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_question_banks_uid ON question_banks(uid)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_questions_uid ON questions(uid)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_quiz_sessions_uid ON quiz_sessions(uid)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_answer_records_uid ON answer_records(uid)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_error_book_uid ON error_book(uid)',
+      'CREATE INDEX IF NOT EXISTS idx_question_annotations_device ON question_annotations(device_id)',
     ];
     for (final s in indexes) {
       await db.execute(s);
@@ -228,6 +246,139 @@ class DatabaseService {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_follow_up_question '
           'ON follow_up_messages(question_id)');
     }
+    if (oldVersion < 10) {
+      // v1.0.3 手写批注：答题后批注按题持久化（即时批注不落库）
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS question_annotations (
+          question_id INTEGER PRIMARY KEY,
+          data TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+        )
+      ''');
+    }
+    if (oldVersion < 11) {
+      // 局域网同步：全局 UID + 设备维度隔离（批注复合主键、错题按题+设备唯一）
+      await _upgradeToV11(db);
+    }
+  }
+
+  /// v10→v11 迁移：同步实体补 uid，批注改复合主键，错题改 (题,设备) 唯一。
+  /// 既有行的 uid 用 uuid v4 回填；既有批注/错题/作答记录的归属设备记为本机。
+  /// SQLite 不支持改主键/唯一约束，error_book 与 question_annotations 重建表。
+  Future<void> _upgradeToV11(Database db) async {
+    final deviceId = await DeviceService.instance.deviceId;
+    const uuid = Uuid();
+
+    Future<void> addCol(String table, String col, String type) async {
+      final cols = (await db.rawQuery('PRAGMA table_info($table)'))
+          .map((r) => r['name'] as String)
+          .toList();
+      if (!cols.contains(col)) {
+        await db.execute('ALTER TABLE $table ADD COLUMN $col $type');
+      }
+    }
+
+    await addCol('question_banks', 'uid', 'TEXT');
+    await addCol('question_banks', 'updated_at', 'TEXT');
+    await addCol('questions', 'uid', 'TEXT');
+    await addCol('questions', 'updated_at', 'TEXT');
+    await addCol('quiz_sessions', 'uid', 'TEXT');
+    await addCol('session_questions', 'question_uid', 'TEXT');
+    await addCol('answer_records', 'uid', 'TEXT');
+    await addCol('answer_records', 'origin_device', 'TEXT');
+
+    // uid 回填（批量）
+    Future<void> backfillUid(String table) async {
+      final rows =
+          await db.rawQuery('SELECT id FROM $table WHERE uid IS NULL');
+      if (rows.isEmpty) return;
+      final batch = db.batch();
+      for (final r in rows) {
+        batch.update(table, {'uid': uuid.v4()},
+            where: 'id = ?', whereArgs: [r['id']]);
+      }
+      await batch.commit(noResult: true);
+    }
+
+    await backfillUid('question_banks');
+    await backfillUid('questions');
+    await backfillUid('quiz_sessions');
+    await backfillUid('answer_records');
+
+    await db.execute(
+        'UPDATE question_banks SET updated_at = created_at WHERE updated_at IS NULL');
+    await db.execute(
+        'UPDATE questions SET updated_at = created_at WHERE updated_at IS NULL');
+    await db.execute(
+        "UPDATE answer_records SET origin_device = ? WHERE origin_device IS NULL OR origin_device = ''",
+        [deviceId]);
+    // session_questions.question_uid 按题目关联回填（悬空引用保持 NULL）
+    await db.execute('''
+      UPDATE session_questions SET question_uid = (
+        SELECT q.uid FROM questions q WHERE q.id = session_questions.question_id
+      ) WHERE question_uid IS NULL
+    ''');
+
+    // 重建 error_book：question_id UNIQUE → (question_id, origin_device) 唯一，
+    // 两端可各有同一题的错题记录，互不覆盖。既有错题归属本机
+    final ebRows =
+        await db.rawQuery('SELECT id, question_id, added_at FROM error_book');
+    await db.execute('DROP TABLE error_book');
+    await db.execute('''
+      CREATE TABLE error_book (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question_id INTEGER NOT NULL,
+        uid TEXT,
+        origin_device TEXT NOT NULL DEFAULT '',
+        added_at TEXT NOT NULL,
+        UNIQUE (question_id, origin_device),
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+    if (ebRows.isNotEmpty) {
+      final batch = db.batch();
+      for (final r in ebRows) {
+        batch.insert('error_book', {
+          'id': r['id'],
+          'question_id': r['question_id'],
+          'uid': uuid.v4(),
+          'origin_device': deviceId,
+          'added_at': r['added_at'],
+        });
+      }
+      await batch.commit(noResult: true);
+    }
+
+    // 重建 question_annotations：单列主键 → (question_id, device_id) 复合，
+    // 批注按设备隔离。既有批注归属本机。
+    final anRows = await db.rawQuery(
+        'SELECT question_id, data, updated_at FROM question_annotations');
+    await db.execute('DROP TABLE question_annotations');
+    await db.execute('''
+      CREATE TABLE question_annotations (
+        question_id INTEGER NOT NULL,
+        device_id TEXT NOT NULL,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (question_id, device_id),
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+    if (anRows.isNotEmpty) {
+      final batch = db.batch();
+      for (final r in anRows) {
+        batch.insert('question_annotations', {
+          'question_id': r['question_id'],
+          'device_id': deviceId,
+          'data': r['data'],
+          'updated_at': r['updated_at'],
+        });
+      }
+      await batch.commit(noResult: true);
+    }
+
+    await _createSyncIndexes(db);
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -237,7 +388,9 @@ class DatabaseService {
         name TEXT NOT NULL,
         file_source TEXT,
         question_count INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        uid TEXT,
+        updated_at TEXT
       )
     ''');
 
@@ -253,6 +406,8 @@ class DatabaseService {
         source TEXT,
         knowledge_point TEXT,
         created_at TEXT NOT NULL,
+        uid TEXT,
+        updated_at TEXT,
         FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
       )
     ''');
@@ -268,7 +423,8 @@ class DatabaseService {
         start_time TEXT NOT NULL,
         end_time TEXT,
         duration_seconds INTEGER DEFAULT 0,
-        source TEXT NOT NULL DEFAULT 'real'
+        source TEXT NOT NULL DEFAULT 'real',
+        uid TEXT
       )
     ''');
 
@@ -283,6 +439,8 @@ class DatabaseService {
         answered_at TEXT NOT NULL,
         hidden INTEGER NOT NULL DEFAULT 0,
         source TEXT NOT NULL DEFAULT 'real',
+        uid TEXT,
+        origin_device TEXT,
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
     ''');
@@ -307,11 +465,15 @@ class DatabaseService {
     // 统一创建索引（幂等，onUpgrade 复用同一份）
     await _createIndexes(db);
 
+    // 局域网同步（v11）：错题按 (题, 来源设备) 唯一，两端同一题错题共存
     await db.execute('''
       CREATE TABLE error_book (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        question_id INTEGER NOT NULL UNIQUE,
+        question_id INTEGER NOT NULL,
+        uid TEXT,
+        origin_device TEXT NOT NULL DEFAULT '',
         added_at TEXT NOT NULL,
+        UNIQUE (question_id, origin_device),
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
     ''');
@@ -328,12 +490,14 @@ class DatabaseService {
       )
     ''');
 
-    // v1.0.2 七项改进：断点续刷（会话题目顺序）+ 会话-题库关联表
+    // v1.0.2 七项改进：断点续刷（会话题目顺序）+ 会话-题库关联表。
+    // v11 同步：question_uid 跨设备关联（断点续刷仍按本地 question_id）
     await db.execute('''
       CREATE TABLE session_questions (
         session_id INTEGER NOT NULL,
         position INTEGER NOT NULL,
         question_id INTEGER NOT NULL,
+        question_uid TEXT,
         PRIMARY KEY (session_id, position),
         FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
       )
@@ -364,13 +528,229 @@ class DatabaseService {
     ''');
     await db.execute('CREATE INDEX idx_follow_up_question '
         'ON follow_up_messages(question_id)');
+
+    // v1.0.3 手写批注：答题后批注按题持久化（即时批注不落库）。
+    // v11 同步：主键改 (question_id, device_id)，批注按设备隔离互不覆盖；
+    // 刷题页只显示本机批注（AnnotationService 按 device_id 过滤）
+    await db.execute('''
+      CREATE TABLE question_annotations (
+        question_id INTEGER NOT NULL,
+        device_id TEXT NOT NULL,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (question_id, device_id),
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // 同步索引（uid 唯一 + 批注设备过滤）
+    await _createSyncIndexes(db);
+  }
+
+  // ======================== 局域网同步 DAO（v11） ========================
+  //
+  // 同步引擎按 uid 合并：新则插、已有按时间取新。批注按 (题,设备) 隔离，
+  // 绝不覆盖他端批注。参数统一收 DatabaseExecutor，便于仓库层包进单事务。
+  // 以下 [row] 均为已完成本地 id 映射后的列集（不含自增 id）。
+
+  /// 按 uid 查本地题库行（不存在返回 null）
+  Future<Map<String, dynamic>?> bankRowByUid(
+      DatabaseExecutor db, String uid) async {
+    final rows = await db.query('question_banks', where: 'uid = ?', whereArgs: [uid]);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 按 uid 查本地题目行（不存在返回 null）
+  Future<Map<String, dynamic>?> questionRowByUid(
+      DatabaseExecutor db, String uid) async {
+    final rows = await db.query('questions', where: 'uid = ?', whereArgs: [uid]);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 按 uid 查本地会话行（不存在返回 null）
+  Future<Map<String, dynamic>?> sessionRowByUid(
+      DatabaseExecutor db, String uid) async {
+    final rows = await db.query('quiz_sessions', where: 'uid = ?', whereArgs: [uid]);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 按 uid upsert 题库：新则插；已有且传入 updated_at 更新则更新名/题数。
+  /// 返回本地 id
+  Future<int> upsertBankByUid(DatabaseExecutor db, Map<String, dynamic> row) async {
+    final existing = await bankRowByUid(db, row['uid'] as String);
+    if (existing == null) {
+      return await db.insert('question_banks', row);
+    }
+    final id = existing['id'] as int;
+    final oldAt = (existing['updated_at'] as String?) ?? '';
+    final newAt = (row['updated_at'] as String?) ?? '';
+    if (newAt.compareTo(oldAt) > 0) {
+      await db.update('question_banks', {
+        'name': row['name'],
+        'file_source': row['file_source'],
+        'question_count': row['question_count'],
+        'updated_at': newAt.isEmpty ? null : newAt,
+      }, where: 'id = ?', whereArgs: [id]);
+    }
+    return id;
+  }
+
+  /// 按 uid upsert 题目：新则插；已有且传入 updated_at 更新则更新内容。
+  /// [row] 的 bank_id 必须已映射为本地 id。返回本地 id；
+  /// bank_id 为 null（对端题库未同步到）返回 -1 表示跳过。
+  Future<int> upsertQuestionByUid(
+      DatabaseExecutor db, Map<String, dynamic> row) async {
+    if (row['bank_id'] == null) return -1;
+    final existing = await questionRowByUid(db, row['uid'] as String);
+    if (existing == null) {
+      return await db.insert('questions', row);
+    }
+    final id = existing['id'] as int;
+    final oldAt = (existing['updated_at'] as String?) ?? '';
+    final newAt = (row['updated_at'] as String?) ?? '';
+    if (newAt.compareTo(oldAt) > 0) {
+      await db.update('questions', {
+        'bank_id': row['bank_id'],
+        'title': row['title'],
+        'options': row['options'],
+        'correct_answer': row['correct_answer'],
+        'analysis': row['analysis'],
+        'question_type': row['question_type'],
+        'source': row['source'],
+        'knowledge_point': row['knowledge_point'],
+        'updated_at': newAt.isEmpty ? null : newAt,
+      }, where: 'id = ?', whereArgs: [id]);
+    }
+    return id;
+  }
+
+  /// 按 uid upsert 会话：新则插；已有则按 (end_time ?? start_time) 取新，
+  /// 会话只在创建设备上完结，取新即收敛。返回本地 id。
+  Future<int> upsertSessionByUid(
+      DatabaseExecutor db, Map<String, dynamic> row) async {
+    final existing = await sessionRowByUid(db, row['uid'] as String);
+    if (existing == null) {
+      return await db.insert('quiz_sessions', row);
+    }
+    final id = existing['id'] as int;
+    String stamp(Map<String, dynamic> r) =>
+        (r['end_time'] as String?) ?? (r['start_time'] as String? ?? '');
+    if (stamp(row).compareTo(stamp(existing)) > 0) {
+      await db.update('quiz_sessions', {
+        'bank_ids': row['bank_ids'],
+        'mode': row['mode'],
+        'total_questions': row['total_questions'],
+        'correct_count': row['correct_count'],
+        'wrong_count': row['wrong_count'],
+        'start_time': row['start_time'],
+        'end_time': row['end_time'],
+        'duration_seconds': row['duration_seconds'],
+        'source': row['source'],
+      }, where: 'id = ?', whereArgs: [id]);
+    }
+    return id;
+  }
+
+  /// 按 uid upsert 作答记录：新则插；已有且 answered_at 更新则更新答案/判定。
+  /// [row] 的 question_id 必须已映射为本地 id；session_id 可为 null
+  Future<void> upsertAnswerRecordByUid(
+      DatabaseExecutor db, Map<String, dynamic> row) async {
+    if (row['question_id'] == null) return; // 对应题目未同步到，丢弃孤儿记录
+    final uid = row['uid'] as String;
+    final rows =
+        await db.query('answer_records', where: 'uid = ?', whereArgs: [uid]);
+    if (rows.isEmpty) {
+      await db.insert('answer_records', row);
+      return;
+    }
+    final oldAt = (rows.first['answered_at'] as String?) ?? '';
+    final newAt = (row['answered_at'] as String?) ?? '';
+    if (newAt.compareTo(oldAt) > 0) {
+      await db.update('answer_records', {
+        'user_answer': row['user_answer'],
+        'is_correct': row['is_correct'],
+        'ai_analysis': row['ai_analysis'],
+        'answered_at': newAt,
+        'hidden': row['hidden'],
+        'session_id': row['session_id'],
+      }, where: 'id = ?', whereArgs: [rows.first['id']]);
+    }
+  }
+
+  /// 按 (question_id, origin_device) upsert 错题：新则插；已有保持最早收藏时间，
+  /// 两端同一题错题共存互不覆盖。重复推送（同 uid）幂等。
+  Future<void> upsertErrorBookEntry(
+      DatabaseExecutor db, Map<String, dynamic> row) async {
+    if (row['question_id'] == null) return;
+    final rows = await db.query('error_book',
+        where: 'question_id = ? AND origin_device = ?',
+        whereArgs: [row['question_id'], row['origin_device']]);
+    if (rows.isEmpty) {
+      await db.insert('error_book', row);
+      return;
+    }
+    // 旧库回填前 uid 可能为空：补上，保证重复推送幂等
+    if (rows.first['uid'] == null && row['uid'] != null) {
+      await db.update('error_book', {'uid': row['uid']},
+          where: 'id = ?', whereArgs: [rows.first['id']]);
+    }
+  }
+
+  /// 按 (question_id, device_id) upsert 批注：他端批注存其 device_id 下，
+  /// 绝不覆盖本机批注；同设备重复推送按 updated_at 取新。
+  Future<void> upsertAnnotationByDevice(
+      DatabaseExecutor db, Map<String, dynamic> row) async {
+    if (row['question_id'] == null) return;
+    final rows = await db.query('question_annotations',
+        where: 'question_id = ? AND device_id = ?',
+        whereArgs: [row['question_id'], row['device_id']]);
+    if (rows.isEmpty) {
+      await db.insert('question_annotations', row);
+      return;
+    }
+    final oldAt = (rows.first['updated_at'] as String?) ?? '';
+    final newAt = (row['updated_at'] as String?) ?? '';
+    if (newAt.compareTo(oldAt) > 0) {
+      await db.update('question_annotations', {
+        'data': row['data'],
+        'updated_at': newAt,
+      }, where: 'question_id = ? AND device_id = ?',
+          whereArgs: [row['question_id'], row['device_id']]);
+    }
+  }
+
+  /// 按设备取某题批注行（刷题页只显示本机；同步拉取他端用全量查询）
+  Future<List<Map<String, dynamic>>> getAnnotationsByDevice(
+      int questionId, String deviceId) async {
+    final db = await database;
+    return await db.query('question_annotations',
+        where: 'question_id = ? AND device_id = ?',
+        whereArgs: [questionId, deviceId]);
+  }
+
+  /// 替换会话题目顺序（同步他端断点续刷数据：先删后插）
+  Future<void> replaceSessionQuestions(DatabaseExecutor db, int sessionId,
+      List<Map<String, dynamic>> entries) async {
+    await db.delete('session_questions',
+        where: 'session_id = ?', whereArgs: [sessionId]);
+    if (entries.isEmpty) return;
+    final batch = db.batch();
+    for (final e in entries) {
+      batch.insert('session_questions', e,
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
   }
 
   // ======================== QuestionBank CRUD ========================
 
   Future<int> insertBank(QuestionBank bank) async {
     final db = await database;
-    return await db.insert('question_banks', bank.toMap());
+    final map = bank.toMap();
+    // v11 同步：新题库自动分配全局 uid（跨设备一致标识）
+    map['uid'] ??= const Uuid().v4();
+    map['updated_at'] ??= bank.createdAt;
+    return await db.insert('question_banks', map);
   }
 
   Future<List<QuestionBank>> getAllBanks() async {
@@ -381,8 +761,11 @@ class DatabaseService {
 
   Future<void> updateBankQuestionCount(int bankId, int count) async {
     final db = await database;
-    await db.update('question_banks', {'question_count': count},
-        where: 'id = ?', whereArgs: [bankId]);
+    await db.update('question_banks', {
+      'question_count': count,
+      // v11 同步：题数变化可被对端按 updated_at 取新合并
+      'updated_at': DateTime.now().toIso8601String(),
+    }, where: 'id = ?', whereArgs: [bankId]);
   }
 
   Future<void> deleteBank(int bankId) async {
@@ -391,6 +774,10 @@ class DatabaseService {
     await db.transaction((txn) async {
       // 显式清理 answer_records（外键级联兜底）
       await txn.delete('answer_records',
+          where: 'question_id IN (SELECT id FROM questions WHERE bank_id = ?)',
+          whereArgs: [bankId]);
+      // v1.0.3 手写批注：随题库删除清理（外键级联兜底，与 answer_records 同模式）
+      await txn.delete('question_annotations',
           where: 'question_id IN (SELECT id FROM questions WHERE bank_id = ?)',
           whereArgs: [bankId]);
       await txn.delete('questions',
@@ -404,11 +791,19 @@ class DatabaseService {
 
   Future<void> insertQuestions(List<Question> questions) async {
     final db = await database;
-    final batch = db.batch();
-    for (final q in questions) {
-      batch.insert('questions', q.toMap());
-    }
-    await batch.commit(noResult: true);
+    // v1.27 导入提速：包显式事务（无事务时每条插入独立 fsync，
+    // 大题库导入慢一个数量级；与 simulateLongTermUse 同策略）
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final q in questions) {
+        final map = q.toMap();
+        // v11 同步：新题自动分配全局 uid；updated_at 缺省同 created_at
+        map['uid'] ??= const Uuid().v4();
+        map['updated_at'] ??= q.createdAt;
+        batch.insert('questions', map);
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<void> updateQuestion(int id, String title, String correctAnswer, String questionType) async {
@@ -417,6 +812,8 @@ class DatabaseService {
       'title': title,
       'correct_answer': correctAnswer,
       'question_type': questionType,
+      // v11 同步：编辑后对端可按 updated_at 取新合并，不被旧数据覆盖
+      'updated_at': DateTime.now().toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
   }
 
@@ -453,7 +850,10 @@ class DatabaseService {
 
   Future<int> insertSession(QuizSession session) async {
     final db = await database;
-    return await db.insert('quiz_sessions', session.toMap());
+    final map = session.toMap();
+    // v11 同步：会话全局 uid（作答记录按会话 uid 跨设备关联）
+    map['uid'] ??= const Uuid().v4();
+    return await db.insert('quiz_sessions', map);
   }
 
   Future<void> updateSession(QuizSession session) async {
@@ -491,11 +891,24 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  /// 写入会话题目顺序（断点续刷恢复用）
+  /// 写入会话题目顺序（断点续刷恢复用）。
+  /// v11 同步：同步写入 question_uid（跨设备关联）
   Future<void> insertSessionQuestions(
       int sessionId, List<Question> questions) async {
     if (questions.isEmpty) return;
     final db = await database;
+    // 预取 uid 映射，避免逐题查库（uid 由 insertQuestions 生成）
+    final ids = questions.where((q) => q.id != null).map((q) => q.id!).toList();
+    final uidMap = <int, String>{};
+    if (ids.isNotEmpty) {
+      final placeholders = List.filled(ids.length, '?').join(',');
+      final rows = await db.rawQuery(
+          'SELECT id, uid FROM questions WHERE id IN ($placeholders)', ids);
+      for (final r in rows) {
+        final uid = r['uid'];
+        if (uid != null) uidMap[r['id'] as int] = uid as String;
+      }
+    }
     final batch = db.batch();
     for (var i = 0; i < questions.length; i++) {
       final q = questions[i];
@@ -504,6 +917,7 @@ class DatabaseService {
         'session_id': sessionId,
         'position': i,
         'question_id': q.id!,
+        'question_uid': uidMap[q.id],
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
@@ -582,6 +996,28 @@ class DatabaseService {
     final session = _sessionFromRow(maps.first);
     final answered = session.correctCount + session.wrongCount;
     return (session, answered);
+  }
+
+  /// 清空全部未完成会话的断档记录（会话行 + 题目顺序 + 题库关联）。
+  /// 开始新会话时调用：上一次未完成的会话被新会话取代，
+  /// 续刷卡片与历史列表不再显示。已落库的作答记录保留，
+  /// 统计/错题本口径不受影响（answer_records.session_id 无外键，容忍悬空）。
+  /// 返回清理的会话数
+  Future<int> deleteUnfinishedSessions() async {
+    final db = await database;
+    final rows = await db.query('quiz_sessions',
+        columns: ['id'],
+        where: "source = 'real' AND (end_time IS NULL OR end_time = '')");
+    if (rows.isEmpty) return 0;
+    final ids = rows.map((r) => r['id'] as int).toList();
+    final placeholders = List.filled(ids.length, '?').join(',');
+    await db.delete('session_questions',
+        where: 'session_id IN ($placeholders)', whereArgs: ids);
+    await db.delete('session_banks',
+        where: 'session_id IN ($placeholders)', whereArgs: ids);
+    await db.delete('quiz_sessions',
+        where: 'id IN ($placeholders)', whereArgs: ids);
+    return ids.length;
   }
 
   /// 会话关联的题库 id（按 session_banks）
@@ -685,7 +1121,11 @@ class DatabaseService {
 
   Future<int> insertAnswerRecord(AnswerRecord record) async {
     final db = await database;
-    return await db.insert('answer_records', record.toMap());
+    final map = record.toMap();
+    // v11 同步：作答记录全局 uid + 来源设备（跨设备统计合并）
+    map['uid'] ??= const Uuid().v4();
+    map['origin_device'] ??= await DeviceService.instance.deviceId;
+    return await db.insert('answer_records', map);
   }
 
   /// 查某会话中某题的作答记录（重新作答用；同一会话同一题只应有一条）
@@ -700,7 +1140,8 @@ class DatabaseService {
     return AnswerRecord.fromMap(maps.first);
   }
 
-  /// 更新一条作答记录的答案与判定结果（重新作答用）
+  /// 更新一条作答记录的答案与判定结果（重新作答用）。
+  /// v11 同步：answered_at 同步刷新，对端可按时间取新合并重答结果
   Future<void> updateAnswerRecordAnswer(
       int id, String userAnswer, bool isCorrect, DateTime answeredAt) async {
     final db = await database;
@@ -849,23 +1290,34 @@ class DatabaseService {
 
   // ======================== 错题本 ========================
 
+  /// 加入错题本（本机维度）。
+  /// v11 同步：记录带来源设备与全局 uid；(题,设备) 唯一，
+  /// 两端同一题错题共存互不覆盖；本机重复收藏幂等。
+  /// 错题复习查询保持全设备并集（题库共享，哪台都能复习）
   Future<void> addToErrorBook(int questionId) async {
     final db = await database;
     await db.insert('error_book', {
       'question_id': questionId,
+      'uid': const Uuid().v4(),
+      'origin_device': await DeviceService.instance.deviceId,
       'added_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
+  /// 移出错题本：只删本机收藏，不动其他设备的错题记录（各自保留）
   Future<void> removeFromErrorBook(int questionId) async {
     final db = await database;
-    await db.delete('error_book', where: 'question_id = ?', whereArgs: [questionId]);
+    await db.delete('error_book',
+        where: 'question_id = ? AND origin_device = ?',
+        whereArgs: [questionId, await DeviceService.instance.deviceId]);
   }
 
+  /// 本机是否已收藏（刷题页收藏状态只反映本机，不误删他端记录）
   Future<bool> isInErrorBook(int questionId) async {
     final db = await database;
     final result = await db.query('error_book',
-        where: 'question_id = ?', whereArgs: [questionId]);
+        where: 'question_id = ? AND origin_device = ?',
+        whereArgs: [questionId, await DeviceService.instance.deviceId]);
     return result.isNotEmpty;
   }
 
@@ -1114,11 +1566,13 @@ class DatabaseService {
     return rows.map((m) => Question.fromMap(m)).toList();
   }
 
-  /// 更新题目知识点标签
+  /// 更新题目知识点标签（v11 同步：同步刷新 updated_at）
   Future<void> updateQuestionKnowledgePoint(int questionId, String kp) async {
     final db = await database;
-    await db.update('questions', {'knowledge_point': kp},
-        where: 'id = ?', whereArgs: [questionId]);
+    await db.update('questions', {
+      'knowledge_point': kp,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, where: 'id = ?', whereArgs: [questionId]);
   }
 
   // ======================== v1.0.2 对齐里程碑：改判 / 隐藏今日记录 ========================
@@ -1634,7 +2088,7 @@ class DatabaseService {
       tmpDb = await databaseFactory.openDatabase(filePath);
       final versionRows = await tmpDb.rawQuery('PRAGMA user_version');
       final version = versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
-      if (version < 1 || version > 9) {
+      if (version < 1 || version > 11) {
         // user_version 0/非法：非本 App 生成或版本被外部重置，导入后会触发
         // onUpgrade(0→8) 破坏性重建清空题目，拒绝导入
         return '文件不是有效的数据库备份（版本信息缺失或非法）';
@@ -1661,6 +2115,13 @@ class DatabaseService {
       final colChecks = <int, Map<String, List<String>>>{
         6: {'answer_records': ['hidden']},
         7: {'answer_records': ['hidden', 'source'], 'quiz_sessions': ['source']},
+        // v11 同步字段：缺列的库导入后由 onUpgrade 补，故只作完整性提示校验
+        11: {
+          'question_banks': ['uid'],
+          'questions': ['uid'],
+          'quiz_sessions': ['uid'],
+          'answer_records': ['uid', 'origin_device'],
+        },
       };
       for (var v = 6; v <= version; v++) {
         final checks = colChecks[v];

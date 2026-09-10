@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/question.dart';
+import '../utils/responsive.dart';
 import '../widgets/answer_sheet_widget.dart';
 import 'quiz_screen.dart';
 
@@ -45,7 +46,7 @@ class PracticeEntryScreen extends StatelessWidget {
               Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 4),
               Text(desc, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-              Text(hint, style: TextStyle(fontSize: 11, color: cs.outline)),
+              Text(hint, style: TextStyle(fontSize: 12.5, color: cs.outline)),
             ])),
             Icon(Icons.chevron_right, color: cs.outline),
           ]),
@@ -57,6 +58,8 @@ class PracticeEntryScreen extends StatelessWidget {
   void _pickMinutes(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      // 平板适配：弹窗限宽居中
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -153,7 +156,9 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('练习结果'), leading: IconButton(icon: const Icon(Icons.home), onPressed: () => Navigator.popUntil(context, (r) => r.isFirst))),
-      body: ListView(controller: _scrollController, padding: const EdgeInsets.all(20), children: [
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: ListView(controller: _scrollController, padding: const EdgeInsets.all(20), children: [
         Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16)),
           child: Column(children: [Text('${widget.accuracy}%', style: const TextStyle(fontSize: 52, fontWeight: FontWeight.bold, color: Colors.white)), const SizedBox(height: 8), Text('正确${widget.correct} · 错误${widget.wrong} · 未答${widget.blank}', style: const TextStyle(fontSize: 16, color: Colors.white70)), const SizedBox(height: 4), Text(widget.timing == PracticeTiming.timed ? '限时${widget.durationMinutes}分钟 · 实际${_fmt(widget.elapsedSeconds)}' : '不限时 · 用时${_fmt(widget.elapsedSeconds)}', style: const TextStyle(fontSize: 13, color: Colors.white54))])),
         const SizedBox(height: 20),
@@ -181,6 +186,7 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
           })],
         if (widget.wrongList.isEmpty) ...[const SizedBox(height: 40), Icon(Icons.celebration, size: 64, color: cs.primary), const SizedBox(height: 12), const Text('全部正确！', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center)],
       ]),
+      ),
     );
   }
 }

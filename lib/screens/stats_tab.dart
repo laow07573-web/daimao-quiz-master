@@ -5,6 +5,7 @@ import '../services/app_state.dart';
 import '../services/theme_service.dart';
 import '../utils/app_constants.dart';
 import '../utils/format_utils.dart';
+import '../utils/responsive.dart';
 import '../widgets/monthly_calendar.dart';
 import '../widgets/trend_chart.dart';
 import 'error_book_screen.dart';
@@ -74,7 +75,7 @@ class StatsTabState extends State<StatsTab> {
     try {
       final appState = context.read<AppState>();
       final yearly = await appState.getYearlyTotals();
-      final trend = await appState.getTrendData();
+      final trend = await appState.getTrendData(days: 365);
       final periodStats = await appState.getPeriodStats(_period);
       final longestStreak = await appState.getPeriodLongestStreak(_period);
       // 周期切换防竞态
@@ -187,7 +188,10 @@ class StatsTabState extends State<StatsTab> {
           ),
         ],
       ),
-      body: _loading
+      // 平板适配：内容限宽居中（手机无影响）；
+      // v1.0.3 宽屏重设计：宽屏限宽自动提升至 1080 + 区块双列并排
+      body: ResponsivePage(
+        child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorView(error: _error!, onRetry: _loadAll)
@@ -195,17 +199,21 @@ class StatsTabState extends State<StatsTab> {
                   onRefresh: _loadAll,
                   child: ListView(
                     padding: const EdgeInsets.all(14),
-                    children: [
+                    children: isWideLayout(context)
+                        ? _buildWideSections(cs)
+                        : [
                       _buildOverview(context),
                       const SizedBox(height: 14),
                       _SectionCard(
                         title: '年度坚持',
                         // v1.0.2 UI 设计稿：横向展示 7/8/9 三个月（以当前月为中心）
+                        // v1.0.3 历史数据可查：季度箭头点击翻页（桌面鼠标友好）
+                        trailing: _QuarterNav(controller: _quarterController),
                         child: _buildQuarterCalendar(cs),
                       ),
                       const SizedBox(height: 14),
                       _SectionCard(
-                        title: '近 30 天趋势',
+                        title: '近一年趋势',
                         child: TrendChart(days: _trendData),
                       ),
                       const SizedBox(height: 14),
@@ -237,7 +245,55 @@ class StatsTabState extends State<StatsTab> {
                     ],
                   ),
                 ),
+      ),
     );
+  }
+
+  /// v1.0.3 宽屏重设计：总览全宽；年度坚持/趋势、排行/错题统计两两并排；
+  /// 历史记录全宽。窄屏维持原单列（见 build）。
+  /// v1.0.3 窗口自适应：并排区块改用 AdaptivePair，窗口拖窄时自动上下堆叠。
+  List<Widget> _buildWideSections(ColorScheme cs) {
+    return [
+      _buildOverview(context),
+      const SizedBox(height: 14),
+      AdaptivePair(
+        first: _SectionCard(
+          title: '年度坚持',
+          // v1.0.3 历史数据可查：季度箭头点击翻页（桌面鼠标友好）
+          trailing: _QuarterNav(controller: _quarterController),
+          child: _buildQuarterCalendar(cs),
+        ),
+        second: _SectionCard(
+          title: '近一年趋势',
+          child: TrendChart(days: _trendData),
+        ),
+      ),
+      const SizedBox(height: 14),
+      AdaptivePair(
+        first: _SectionCard(
+          title: '正确率排行',
+          child: _AccuracyRanking(
+            banks: _bankAccuracy,
+            kps: _kpAccuracy,
+            onLoaded: _loadRankings,
+          ),
+        ),
+        second: _SectionCard(
+          title: '错题统计',
+          child: _ErrorStatsSection(
+            stats: _errorStats,
+            onLoaded: _loadRankings,
+          ),
+        ),
+      ),
+      const SizedBox(height: 14),
+      _SectionCard(
+        title: '历史记录',
+        child: _HistorySection(
+            sessions: _recentSessions, bankNames: _sessionBankNames),
+      ),
+      const SizedBox(height: 20),
+    ];
   }
 
   /// v1.0.2 UI 设计稿：年度坚持 = 三个月一页左右滑动（季度页，初始当前季度）+ 热力图例
@@ -311,7 +367,7 @@ class StatsTabState extends State<StatsTab> {
             ),
             const SizedBox(width: 2),
             Text('今天',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+                style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
           ],
         ),
       ],
@@ -324,7 +380,6 @@ class StatsTabState extends State<StatsTab> {
     if (total < 200) return ac.accent.withOpacity(0.4);
     return ac.accent.withOpacity(0.65);
   }
-
   Widget _buildOverview(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     // v1.0.2 UI 设计稿：统计概览（标签栏切换 本周/本月/全部 + 四指标）
@@ -416,7 +471,7 @@ class _PeriodChips extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: current == value ? cs.primary : cs.onSurfaceVariant,
                     fontWeight:
                         current == value ? FontWeight.w600 : FontWeight.normal,
@@ -455,7 +510,7 @@ class _OverviewStat extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(label,
-            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
       ],
     );
   }
@@ -482,7 +537,7 @@ class _LegendItem extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+        Text(label, style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
         const SizedBox(width: 8),
       ],
     );
@@ -604,7 +659,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          TextStyle(fontSize: 12, color: cs.onSurface),
+                          TextStyle(fontSize: 13, color: cs.onSurface),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -614,14 +669,16 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: accuracyTierColor(
-                          (item['accuracy'] as num?)?.toDouble() ?? 0, cs),
+                          (item['accuracy'] as num?)?.toDouble() ?? 0,
+                          cs,
+                          AppThemeColors.of(context).danger),
                     ),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     '${(item['accuracy'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
                     style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: cs.onSurface),
                   ),
@@ -659,7 +716,7 @@ class _SegBtn extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             color: active ? cs.primary : cs.onSurfaceVariant,
           ),
         ),
@@ -718,11 +775,11 @@ class _ErrorStatsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text('按题库分布', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+        Text('按题库分布', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
         const SizedBox(height: 6),
         if (stats.isEmpty)
           // v1.0.2 UI 设计稿：空状态「0题错题总数」
-          Text('0题错题总数', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant))
+          Text('0题错题总数', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
         else
           for (final s in stats.take(5))
             Padding(
@@ -734,14 +791,14 @@ class _ErrorStatsSection extends StatelessWidget {
                       '${s['bank_name']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: cs.onSurface),
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
                     ),
                   ),
                   Text(
                     '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}'
                     // v1.0.2 FSRS 可见化：该题库最早到期卡
                     '${s['next_due_at'] != null ? ' · 下次到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
-                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -786,7 +843,7 @@ class _ErrorCard extends StatelessWidget {
                     color: color)),
             Text(label,
                 style:
-                    TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+                    TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
           ],
         ),
       ),
@@ -833,7 +890,7 @@ class _HistorySection extends StatelessWidget {
         child: Center(
           // v1.0.2 UI 设计稿：空状态提示
           child: Text('暂无练习记录',
-              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
         ),
       );
     }
@@ -873,7 +930,7 @@ class _HistorySection extends StatelessWidget {
                                   (names.length > 2 ? ' 等${names.length}个' : '');
                             })(),
                             style: TextStyle(
-                                fontSize: 11, color: cs.onSurfaceVariant),
+                                fontSize: 12.5, color: cs.onSurfaceVariant),
                           ),
                         Text(
                           // v1.0.2 修复：未完成会话（异常退出遗留）加标识
@@ -881,14 +938,14 @@ class _HistorySection extends StatelessWidget {
                               ? '${_formatTime(s.startTime)} · 未完成'
                               : _formatTime(s.startTime),
                           style: TextStyle(
-                              fontSize: 11, color: cs.onSurfaceVariant),
+                              fontSize: 12.5, color: cs.onSurfaceVariant),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${s.totalQuestions} 题 · ${s.accuracy.toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.chevron_right,
@@ -929,11 +986,51 @@ class _ErrorView extends StatelessWidget {
           Text(error,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
           const SizedBox(height: 10),
           FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
         ],
       ),
+    );
+  }
+}
+
+/// v1.0.3 历史数据可查：年度坚持季度翻页箭头。
+/// PageView 范围极大（前后 200 年），不做边界禁用。
+class _QuarterNav extends StatelessWidget {
+  const _QuarterNav({required this.controller});
+
+  final PageController controller;
+
+  void _go(int delta) {
+    final cur = (controller.page ?? 0).round();
+    controller.animateToPage(cur + delta,
+        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          tooltip: '上一季度',
+          icon: Icon(Icons.chevron_left, size: 18, color: cs.primary),
+          onPressed: () => _go(-1),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          tooltip: '下一季度',
+          icon: Icon(Icons.chevron_right, size: 18, color: cs.primary),
+          onPressed: () => _go(1),
+        ),
+      ],
     );
   }
 }
