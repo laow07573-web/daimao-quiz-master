@@ -106,27 +106,30 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 /* ── 手机画框 ── */
 .stage{position:relative;display:flex;justify-content:center;align-items:center;min-height:520px;min-width:0;max-width:100%}
 .stage>*{min-width:0}
-.phone{position:relative;width:min(292px,76vw);aspect-ratio:var(--ar,1116/2480);border-radius:46px;
+/* 比例设在「屏幕」内框上（而非外框）：内框比例与截图完全一致 → 零留白、零裁切 */
+.phone{position:relative;width:min(318px,80vw);border-radius:46px;
   background:linear-gradient(160deg,#141A2C,#080B14);padding:9px;
   box-shadow:0 40px 90px rgba(0,0,0,.62),0 0 0 1px rgba(255,255,255,.07);
   animation:floaty 7s ease-in-out infinite}
 @keyframes floaty{0%,100%{transform:translateY(0) rotate(-.35deg)}50%{transform:translateY(-15px) rotate(.35deg)}}
-.phone .notch{position:absolute;top:15px;left:50%;transform:translateX(-50%);width:88px;height:19px;
-  background:#05070D;border-radius:11px;z-index:4}
-.phone .scr{position:relative;width:100%;height:100%;border-radius:38px;overflow:hidden;background:#05070D}
-.phone .scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;
+/* 注：不加假刘海，避免遮盖截图自带的顶部状态栏 */
+/* 白底截图需可见边界：浅色衬底 + 细描边 */
+.phone .scr{position:relative;width:100%;aspect-ratio:var(--ar,1116/2480);border-radius:38px;
+  overflow:hidden;background:#EDF1F7;box-shadow:inset 0 0 0 1px rgba(0,0,0,.10)}
+.phone .scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:top center;
   opacity:0;transition:opacity .85s ease}
 .phone .scr img.on{opacity:1}
 
 /* 桌面/平板窗口画框 */
-.window{position:relative;width:100%;max-width:640px;aspect-ratio:var(--ar,1280/800);border-radius:15px;overflow:hidden;
+.window{position:relative;width:100%;max-width:640px;border-radius:15px;overflow:hidden;
   background:#0A0E18;border:1px solid var(--line);box-shadow:0 34px 80px rgba(0,0,0,.6);
   animation:floaty 8s ease-in-out infinite}
 .window .bar{height:30px;background:#111725;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 12px}
 .window .bar i{width:10px;height:10px;border-radius:50%;background:#2A3346}
 .window .bar i:nth-child(1){background:#FF5F57}.window .bar i:nth-child(2){background:#FEBC2E}.window .bar i:nth-child(3){background:#28C840}
-.window .wbody{position:absolute;inset:30px 0 0 0;overflow:hidden;background:#05070D}
-.window .wbody img{width:100%;height:100%;object-fit:cover;object-position:top center}
+/* 同类：标题栏之外的内容区按截图比例，画面完整不裁切 */
+.window .wbody{position:relative;width:100%;aspect-ratio:var(--ar,1280/800);overflow:hidden;background:#EDF1F7}
+.window .wbody img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:top center}
 
 /* ── 浮动信息卡 ── */
 .chip{position:absolute;padding:11px 15px;border-radius:14px;font-size:12.5px;font-weight:600;
@@ -295,7 +298,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 <!-- ═══ 导航 ═══ -->
 <nav>
   <div class="nav-in">
-    <div class="brand"><img src="assets/logo.jpg" alt="猫卷"><span>猫卷</span></div>
+    <div class="brand"><img src="assets/logo.png" alt="猫卷"><span>猫卷</span></div>
     <div class="nav-links">
       <a href="#pain">为什么做</a>
       <a href="#f1">功能</a>
@@ -341,15 +344,15 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <div class="chip a"><span class="ic">🔒</span> API Key 本地加密</div>
     <div class="chip c"><span class="ic">📶</span> 离线可刷题</div>
     <div class="chip b"><span class="ic">⚡</span> FSRS-5 <span class="v">到期提醒</span></div>
-    <div class="phone" id="hero-phone">
-      <div class="notch"></div>
+    <div class="phone" id="hero-phone" style="--ar:1116/2480;width:min(368px,84vw)">
+      
       <div class="scr" id="hero-scr">
-        <img src="assets/80_splash_new.jpg" alt="猫卷启动页" class="on">
-        <img src="assets/tab_new_home.jpg" alt="首页">
-        <img src="assets/tab_new_quiz.jpg" alt="答题页">
-        <img src="assets/84_analysis_new.jpg" alt="AI 解析">
-        <img src="assets/101_bubbles.jpg" alt="AI 追问">
-        <img src="assets/tab_new_stats.jpg" alt="统计页">
+        <img src="assets/84_analysis_new.webp" alt="AI 题眼破题解析" class="on">
+        <img src="assets/101_bubbles.webp" alt="AI 追问聊天">
+        <img src="assets/57_errorbook.webp" alt="错题本与复习排期">
+        <img src="assets/91_trend_new.webp" alt="统计与趋势">
+        <img src="assets/31_dark_pinpai.webp" alt="深色主题">
+        <img src="assets/80_splash_new.webp" alt="启动页">
       </div>
     </div>
   </div>
@@ -404,9 +407,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" style="--ar:1080/1920;width:min(268px,72vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/demo_17_import_page.jpg" alt="导入页" class="on"></div>
+    <div class="phone" style="--ar:1080/1920;width:min(300px,78vw)">
+      
+      <div class="scr"><img src="assets/demo_17_import_page.webp" alt="导入页" class="on"></div>
     </div>
     <div class="chip b"><span class="ic">🧩</span> 2000 字 / 块</div>
     <div class="chip a" style="top:16%"><span class="ic">⚡</span> 3 路并发</div>
@@ -435,9 +438,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" style="--ar:1080/1920;width:min(268px,72vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/demo_19_bank_manage.jpg" alt="题库管理" class="on"></div>
+    <div class="phone" style="--ar:1080/1920;width:min(300px,78vw)">
+      
+      <div class="scr"><img src="assets/demo_19_bank_manage.webp" alt="题库管理" class="on"></div>
     </div>
     <div class="chip c"><span class="ic">📤</span> 导出可分享</div>
   </div>
@@ -467,12 +470,12 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" id="mode-phone" style="--ar:1600/2560;width:min(272px,74vw)">
-      <div class="notch"></div>
+    <div class="phone" id="mode-phone" style="--ar:1600/2560;width:min(300px,78vw)">
+      
       <div class="scr" id="mode-scr">
-        <img src="assets/tab_new_countsheet.jpg" alt="数量选择" class="on">
-        <img src="assets/tab_new_modesheet.jpg" alt="模式选择">
-        <img src="assets/tab_new_quiz.jpg" alt="刷题中">
+        <img src="assets/tab_new_countsheet.webp" alt="数量选择" class="on">
+        <img src="assets/tab_new_modesheet.webp" alt="模式选择">
+        <img src="assets/tab_new_quiz.webp" alt="刷题中">
       </div>
     </div>
     <div class="chip a" style="top:14%"><span class="ic">🎯</span> 答对自动跳题</div>
@@ -503,9 +506,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual">
-    <div class="phone" style="--ar:1600/2560;width:min(272px,74vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/tab_new_answersheet.jpg" alt="答题卡" class="on"></div>
+    <div class="phone" style="--ar:1600/2560;width:min(300px,78vw)">
+      
+      <div class="scr"><img src="assets/tab_new_answersheet.webp" alt="答题卡" class="on"></div>
     </div>
     <div class="chip b"><span class="ic">✅</span> 7 种题型</div>
   </div>
@@ -535,9 +538,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="phone" style="--ar:1116/2480;width:min(250px,68vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/84_analysis_new.jpg" alt="AI 解析" class="on"></div>
+    <div class="phone" style="--ar:1116/2480;width:min(285px,76vw)">
+      
+      <div class="scr"><img src="assets/84_analysis_new.webp" alt="AI 解析" class="on"></div>
     </div>
     <div class="tech" style="max-width:400px">
       <div class="tech-h">⚙ 解析输出示例</div>
@@ -569,9 +572,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
-    <div class="phone" style="--ar:1080/1920;width:min(250px,68vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/101_bubbles.jpg" alt="追问聊天" class="on"></div>
+    <div class="phone" style="--ar:1116/2480;width:min(318px,80vw)">
+      
+      <div class="scr"><img src="assets/101_bubbles.webp" alt="追问聊天" class="on"></div>
     </div>
     <div class="bubbles" id="chat-demo">
       <div class="bub u">为什么 PaCO₂ 升高就能定性为呼吸性酸中毒？</div>
@@ -606,9 +609,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
-    <div class="phone" style="--ar:1116/2480;width:min(250px,68vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/57_errorbook.jpg" alt="错题本" class="on"></div>
+    <div class="phone" style="--ar:1116/2480;width:min(285px,76vw)">
+      
+      <div class="scr"><img src="assets/57_errorbook.webp" alt="错题本" class="on"></div>
     </div>
     <div class="timeline">
       <div style="font-size:13px;color:var(--tx2);margin-bottom:16px">FSRS-5 复习间隔演进（示意）</div>
@@ -649,13 +652,13 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="phone" style="--ar:1600/2560;width:min(272px,74vw)">
-      <div class="notch"></div>
-      <div class="scr"><img src="assets/tab_new_stats.jpg" alt="统计页" class="on"></div>
+    <div class="phone" style="--ar:1600/2560;width:min(318px,80vw)">
+      
+      <div class="scr"><img src="assets/tab_new_stats.webp" alt="统计页" class="on"></div>
     </div>
-    <div class="window" style="--ar:1280/800;max-width:400px">
+    <div class="window" style="--ar:1280/800;max-width:420px">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody"><img src="assets/91_trend_new.jpg" alt="趋势图" style="object-position:top"></div>
+      <div class="wbody"><img src="assets/wide_07_win_stats.webp" alt="Windows 统计页"></div>
     </div>
   </div>
 </div>
@@ -699,13 +702,13 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       </svg>
     </div>
     <div style="display:flex;gap:12px;align-items:flex-start">
-      <div class="phone" style="--ar:1600/2560;width:min(190px,52vw)">
-        <div class="notch"></div>
-        <div class="scr"><img src="assets/annot_03_done.jpg" alt="批注" class="on"></div>
+      <div class="phone" style="--ar:1600/2560;width:min(210px,56vw)">
+        
+        <div class="scr"><img src="assets/annot_03_done.webp" alt="批注" class="on"></div>
       </div>
-      <div class="phone" style="--ar:1600/2560;width:min(190px,52vw)">
-        <div class="notch"></div>
-        <div class="scr"><img src="assets/annot_18_highlighter.jpg" alt="荧光笔" class="on"></div>
+      <div class="phone" style="--ar:1600/2560;width:min(210px,56vw)">
+        
+        <div class="scr"><img src="assets/annot_18_highlighter.webp" alt="荧光笔" class="on"></div>
       </div>
     </div>
   </div>
@@ -741,14 +744,14 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1E1B4B,#7C3AED)"></div><div class="nm">星际穿越</div></div>
       <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1A253E,#4C7CD6)"></div><div class="nm">碧海银河</div></div>
     </div>
-    <div style="display:flex;gap:14px">
+    <div style="display:flex;gap:14px;align-items:flex-start">
       <div class="phone" style="--ar:1080/1920;width:min(210px,56vw)">
-        <div class="notch"></div>
-        <div class="scr"><img src="assets/demo_07_home_dark.jpg" alt="深色首页" class="on"></div>
+        
+        <div class="scr"><img src="assets/demo_07_home_dark.webp" alt="深色首页" class="on"></div>
       </div>
       <div class="phone" style="--ar:1116/2480;width:min(210px,56vw)">
-        <div class="notch"></div>
-        <div class="scr"><img src="assets/31_dark_pinpai.jpg" alt="深色主题设置" class="on"></div>
+        
+        <div class="scr"><img src="assets/31_dark_pinpai.webp" alt="深色主题设置" class="on"></div>
       </div>
     </div>
   </div>
@@ -777,13 +780,13 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="window" style="--ar:2560/1600">
+    <div class="window" style="--ar:1600/1000">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody"><img src="assets/wide_03_tablet_home.jpg" alt="平板首页"></div>
+      <div class="wbody"><img src="assets/wide_03_tablet_home.webp" alt="平板首页"></div>
     </div>
     <div class="window" style="--ar:1280/800;max-width:470px">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody"><img src="assets/wide_01_win_home.jpg" alt="Windows 首页"></div>
+      <div class="wbody"><img src="assets/wide_01_win_home.webp" alt="Windows 首页"></div>
     </div>
   </div>
 </div>
@@ -813,14 +816,14 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   </div>
   <div class="f-visual">
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">
-      <div class="phone" style="--ar:1080/1920;width:min(190px,52vw)">
-        <div class="notch"></div>
-        <div class="scr"><img src="assets/tab_new_profile.jpg" alt="我的页面" class="on"></div>
+      <div class="phone" style="--ar:1600/2560;width:min(238px,58vw)">
+        
+        <div class="scr"><img src="assets/tab_new_profile.webp" alt="我的页面" class="on"></div>
       </div>
       <div style="font-size:30px;color:var(--c3)">⇄</div>
-      <div class="phone" style="--ar:1600/2560;width:min(190px,52vw)">
-        <div class="notch"></div>
-        <div class="scr"><img src="assets/tab_new_home.jpg" alt="平板首页" class="on"></div>
+      <div class="phone" style="--ar:1600/2560;width:min(238px,58vw)">
+        
+        <div class="scr"><img src="assets/tab_new_home.webp" alt="首页" class="on"></div>
       </div>
     </div>
     <div class="chip b" style="top:8%"><span class="ic">📡</span> UDP 自动发现</div>
@@ -933,7 +936,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
 <!-- ═══ 页脚 ═══ -->
 <footer>
-  <div class="fb"><img src="assets/logo.jpg" alt="猫卷"><span>猫卷</span></div>
+  <div class="fb"><img src="assets/logo.png" alt="猫卷"><span>猫卷</span></div>
   <p>本地优先的 AI 备考刷题平台 · 题库自建 · 数据自有 · 开源免费</p>
   <p>作者：B 站 笨蛋鱼坏蛋猫 · 许可：CC BY-NC-SA 4.0（署名 · 非商业 · 相同方式共享）</p>
   <p style="margin-top:14px;color:#4A5470">本页面为功能展示用途 · 所有界面截图均来自真实 App</p>
