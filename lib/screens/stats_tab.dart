@@ -172,7 +172,7 @@ class StatsTabState extends State<StatsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('统计'),
@@ -200,7 +200,7 @@ class StatsTabState extends State<StatsTab> {
                   child: ListView(
                     padding: const EdgeInsets.all(14),
                     children: isWideLayout(context)
-                        ? _buildWideSections(cs)
+                        ? _buildWideSections(ac)
                         : [
                       _buildOverview(context),
                       const SizedBox(height: 14),
@@ -209,7 +209,7 @@ class StatsTabState extends State<StatsTab> {
                         // v1.0.2 UI 设计稿：横向展示 7/8/9 三个月（以当前月为中心）
                         // v1.0.3 历史数据可查：季度箭头点击翻页（桌面鼠标友好）
                         trailing: _QuarterNav(controller: _quarterController),
-                        child: _buildQuarterCalendar(cs),
+                        child: _buildQuarterCalendar(ac),
                       ),
                       const SizedBox(height: 14),
                       _SectionCard(
@@ -252,7 +252,7 @@ class StatsTabState extends State<StatsTab> {
   /// v1.0.3 宽屏重设计：总览全宽；年度坚持/趋势、排行/错题统计两两并排；
   /// 历史记录全宽。窄屏维持原单列（见 build）。
   /// v1.0.3 窗口自适应：并排区块改用 AdaptivePair，窗口拖窄时自动上下堆叠。
-  List<Widget> _buildWideSections(ColorScheme cs) {
+  List<Widget> _buildWideSections(AppThemeColors ac) {
     return [
       _buildOverview(context),
       const SizedBox(height: 14),
@@ -261,7 +261,7 @@ class StatsTabState extends State<StatsTab> {
           title: '年度坚持',
           // v1.0.3 历史数据可查：季度箭头点击翻页（桌面鼠标友好）
           trailing: _QuarterNav(controller: _quarterController),
-          child: _buildQuarterCalendar(cs),
+          child: _buildQuarterCalendar(ac),
         ),
         second: _SectionCard(
           title: '近一年趋势',
@@ -297,7 +297,7 @@ class StatsTabState extends State<StatsTab> {
   }
 
   /// v1.0.2 UI 设计稿：年度坚持 = 三个月一页左右滑动（季度页，初始当前季度）+ 热力图例
-  Widget _buildQuarterCalendar(ColorScheme cs) {
+  Widget _buildQuarterCalendar(AppThemeColors ac) {
     final ac = AppThemeColors.of(context);
     final now = DateTime.now();
     final todayKey = MonthCalendar.dateKeyOf(now);
@@ -353,9 +353,9 @@ class StatsTabState extends State<StatsTab> {
         // 热力图例：少/达标/多/今天
         Row(
           children: [
-            _LegendItem(color: _heatColor(10, ac, cs), label: '少'),
-            _LegendItem(color: _heatColor(80, ac, cs), label: '达标'),
-            _LegendItem(color: _heatColor(250, ac, cs), label: '多'),
+            _LegendItem(color: _heatColor(10, ac), label: '少'),
+            _LegendItem(color: _heatColor(80, ac), label: '达标'),
+            _LegendItem(color: _heatColor(250, ac), label: '多'),
             const SizedBox(width: 6),
             Container(
               width: 14,
@@ -367,21 +367,21 @@ class StatsTabState extends State<StatsTab> {
             ),
             const SizedBox(width: 2),
             Text('今天',
-                style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+                style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
           ],
         ),
       ],
     );
   }
 
-  Color _heatColor(int total, AppThemeColors ac, ColorScheme cs) {
+  Color _heatColor(int total, AppThemeColors ac) {
     if (total <= 0) return ac.cardBorder;
     if (total < 50) return ac.accent.withOpacity(0.18);
     if (total < 200) return ac.accent.withOpacity(0.4);
     return ac.accent.withOpacity(0.65);
   }
   Widget _buildOverview(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     // v1.0.2 UI 设计稿：统计概览（标签栏切换 本周/本月/全部 + 四指标）
     return _SectionCard(
       title: '统计概览',
@@ -395,7 +395,7 @@ class StatsTabState extends State<StatsTab> {
             child: _OverviewStat(
               label: '刷题量',
               value: '$_periodQuestions',
-              color: cs.primary,
+              color: ac.accent,
             ),
           ),
           Expanded(
@@ -403,14 +403,14 @@ class StatsTabState extends State<StatsTab> {
               label: '正确率',
               value: _periodAccuracy.toStringAsFixed(1),
               suffix: '%',
-              color: cs.primary,
+              color: ac.accent,
             ),
           ),
           Expanded(
             child: _OverviewStat(
               label: '学习时长',
               value: _formatDuration(_periodDuration),
-              color: cs.secondary,
+              color: ac.textSecondary,
             ),
           ),
           Expanded(
@@ -418,7 +418,7 @@ class StatsTabState extends State<StatsTab> {
               label: '最长连击',
               value: '$_longestStreak',
               suffix: ' 天',
-              color: cs.error,
+              color: ac.danger,
             ),
           ),
         ],
@@ -449,7 +449,7 @@ class _PeriodChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -465,14 +465,14 @@ class _PeriodChips extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   color: current == value
-                      ? cs.primary.withOpacity(0.15)
+                      ? ac.accent.withOpacity(0.15)
                       : Colors.transparent,
                 ),
                 child: Text(
                   label,
                   style: TextStyle(
                     fontSize: 13,
-                    color: current == value ? cs.primary : cs.onSurfaceVariant,
+                    color: current == value ? ac.accent : ac.textSecondary,
                     fontWeight:
                         current == value ? FontWeight.w600 : FontWeight.normal,
                   ),
@@ -500,7 +500,7 @@ class _OverviewStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Column(
       children: [
         Text(
@@ -510,7 +510,7 @@ class _OverviewStat extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(label,
-            style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+            style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
       ],
     );
   }
@@ -525,7 +525,7 @@ class _LegendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Row(
       children: [
         Container(
@@ -537,7 +537,7 @@ class _LegendItem extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+        Text(label, style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
         const SizedBox(width: 8),
       ],
     );
@@ -557,11 +557,11 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        color: ac.surfaceAlt.withOpacity(0.5),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -574,7 +574,7 @@ class _SectionCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: cs.onSurface,
+                  color: ac.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -620,7 +620,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     final data = _byBank ? widget.banks : widget.kps;
     return Column(
       children: [
@@ -645,7 +645,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
             padding: const EdgeInsets.symmetric(vertical: 16),
             // v1.0.2 UI 设计稿：空状态提示
             child: Text('暂无数据，刷几道题后再来看看',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                style: TextStyle(color: ac.textSecondary, fontSize: 12)),
           )
         else
           for (final item in data.take(8))
@@ -659,7 +659,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          TextStyle(fontSize: 13, color: cs.onSurface),
+                          TextStyle(fontSize: 13, color: ac.textPrimary),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -670,8 +670,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                       shape: BoxShape.circle,
                       color: accuracyTierColor(
                           (item['accuracy'] as num?)?.toDouble() ?? 0,
-                          cs,
-                          AppThemeColors.of(context).danger),
+                          AppThemeColors.of(context)),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -680,7 +679,7 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: cs.onSurface),
+                        color: ac.textPrimary),
                   ),
                 ],
               ),
@@ -703,7 +702,7 @@ class _SegBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -711,13 +710,13 @@ class _SegBtn extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: active ? cs.primary.withOpacity(0.15) : Colors.transparent,
+          color: active ? ac.accent.withOpacity(0.15) : Colors.transparent,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            color: active ? cs.primary : cs.onSurfaceVariant,
+            color: active ? ac.accent : ac.textSecondary,
           ),
         ),
       ),
@@ -734,7 +733,7 @@ class _ErrorStatsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     final totalCount =
         stats.fold<int>(0, (sum, s) => sum + ((s['all_count'] as int?) ?? 0));
     final dueCount =
@@ -749,7 +748,7 @@ class _ErrorStatsSection extends StatelessWidget {
               child: _ErrorCard(
                 label: '错题总数',
                 value: '$totalCount',
-                color: cs.error,
+                color: ac.danger,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -763,7 +762,7 @@ class _ErrorStatsSection extends StatelessWidget {
               child: _ErrorCard(
                 label: '待复习',
                 value: '$dueCount',
-                color: cs.tertiary,
+                color: ac.accent,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -775,11 +774,11 @@ class _ErrorStatsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text('按题库分布', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+        Text('按题库分布', style: TextStyle(fontSize: 13, color: ac.textSecondary)),
         const SizedBox(height: 6),
         if (stats.isEmpty)
           // v1.0.2 UI 设计稿：空状态「0题错题总数」
-          Text('0题错题总数', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
+          Text('0题错题总数', style: TextStyle(fontSize: 13, color: ac.textSecondary))
         else
           for (final s in stats.take(5))
             Padding(
@@ -791,14 +790,14 @@ class _ErrorStatsSection extends StatelessWidget {
                       '${s['bank_name']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: cs.onSurface),
+                      style: TextStyle(fontSize: 13, color: ac.textPrimary),
                     ),
                   ),
                   Text(
                     '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}'
                     // v1.0.2 FSRS 可见化：该题库最早到期卡
                     '${s['next_due_at'] != null ? ' · 下次到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
-                    style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
                   ),
                 ],
               ),
@@ -823,7 +822,7 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,
@@ -843,7 +842,7 @@ class _ErrorCard extends StatelessWidget {
                     color: color)),
             Text(label,
                 style:
-                    TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+                    TextStyle(fontSize: 12.5, color: ac.textSecondary)),
           ],
         ),
       ),
@@ -883,14 +882,14 @@ class _HistorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     if (sessions.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
           // v1.0.2 UI 设计稿：空状态提示
           child: Text('暂无练习记录',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: ac.textSecondary)),
         ),
       );
     }
@@ -918,7 +917,7 @@ class _HistorySection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: cs.onSurface),
+                              color: ac.textPrimary),
                         ),
                         // v1.0.2 七项改进：会话关联题库名副标题
                         if (s.id != null &&
@@ -930,7 +929,7 @@ class _HistorySection extends StatelessWidget {
                                   (names.length > 2 ? ' 等${names.length}个' : '');
                             })(),
                             style: TextStyle(
-                                fontSize: 12.5, color: cs.onSurfaceVariant),
+                                fontSize: 12.5, color: ac.textSecondary),
                           ),
                         Text(
                           // v1.0.2 修复：未完成会话（异常退出遗留）加标识
@@ -938,18 +937,18 @@ class _HistorySection extends StatelessWidget {
                               ? '${_formatTime(s.startTime)} · 未完成'
                               : _formatTime(s.startTime),
                           style: TextStyle(
-                              fontSize: 12.5, color: cs.onSurfaceVariant),
+                              fontSize: 12.5, color: ac.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${s.totalQuestions} 题 · ${s.accuracy.toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: ac.textSecondary),
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.chevron_right,
-                      size: 16, color: cs.onSurfaceVariant),
+                      size: 16, color: ac.textSecondary),
                 ],
               ),
             ),
@@ -974,19 +973,19 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, color: cs.error, size: 40),
+          Icon(Icons.error_outline, color: ac.danger, size: 40),
           const SizedBox(height: 10),
-          Text('加载失败', style: TextStyle(color: cs.onSurface)),
+          Text('加载失败', style: TextStyle(color: ac.textPrimary)),
           const SizedBox(height: 4),
           Text(error,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 12.5, color: ac.textSecondary)),
           const SizedBox(height: 10),
           FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
         ],
@@ -1010,7 +1009,7 @@ class _QuarterNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1019,7 +1018,7 @@ class _QuarterNav extends StatelessWidget {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: '上一季度',
-          icon: Icon(Icons.chevron_left, size: 18, color: cs.primary),
+          icon: Icon(Icons.chevron_left, size: 18, color: ac.accent),
           onPressed: () => _go(-1),
         ),
         IconButton(
@@ -1027,7 +1026,7 @@ class _QuarterNav extends StatelessWidget {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           tooltip: '下一季度',
-          icon: Icon(Icons.chevron_right, size: 18, color: cs.primary),
+          icon: Icon(Icons.chevron_right, size: 18, color: ac.accent),
           onPressed: () => _go(1),
         ),
       ],

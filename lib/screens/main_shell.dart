@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
+import '../services/theme_service.dart';
+import '../utils/design_tokens.dart';
 import '../utils/responsive.dart';
 import 'home_screen.dart';
 import 'import_preview_screen.dart';
@@ -98,8 +100,10 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    // v1.27 后台导入：监听完成事件，主页栈顶时弹「导入完成」提示。
+    // 后台导入：监听完成事件，主页栈顶时弹「导入完成」提示。
     _maybeShowImportResult(context.watch<AppState>());
+    final ac = AppThemeColors.of(context);
+
     if (isWideLayout(context)) {
       // 宽屏形态：左侧竖向导航 + 右侧内容区（PC / 平板横屏）
       return Scaffold(
@@ -109,12 +113,12 @@ class _MainShellState extends State<MainShell> {
               selectedIndex: _index,
               onDestinationSelected: _select,
               labelType: NavigationRailLabelType.all,
-              // v1.0.3 宽屏重设计：底部设置入口（窄屏在首页 AppBar）
+              // 底部设置入口（窄屏在首页 AppBar）
               trailing: Expanded(
                 child: Align(
                   alignment: Alignment.bottomCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.only(bottom: MaoSpace.md),
                     child: IconButton(
                       icon: const Icon(Icons.settings_outlined),
                       tooltip: '设置',
@@ -145,38 +149,43 @@ class _MainShellState extends State<MainShell> {
                 ),
               ],
             ),
-            const VerticalDivider(width: 1),
+            VerticalDivider(width: 1, color: ac.border),
             Expanded(child: _buildPages()),
           ],
         ),
       );
     }
-    // 窄屏形态：底部三 Tab，原有设计零改动
+
+    // 窄屏形态：底部三 Tab
     return Scaffold(
       body: _buildPages(),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _select,
-        // v1.0.2 UI 设计稿：底部导航三 Tab（首页/统计/我的）
-        // 视觉审查修复：emoji 图标换为 Material 图标（跟随主题、跨机型一致，
-        // 选中态由 NavigationBar indicator 表达）
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: '首页',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: '统计',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: '我的',
-          ),
-        ],
+      bottomNavigationBar: DecoratedBox(
+        // 顶部 hairline，与内容区分层（替代旧版无边界观感）
+        decoration: BoxDecoration(
+          border: Border(
+              top: BorderSide(color: ac.border, width: MaoShadow.hairline)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: _select,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: '首页',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_outlined),
+              selectedIcon: Icon(Icons.bar_chart),
+              label: '统计',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: '我的',
+            ),
+          ],
+        ),
       ),
     );
   }

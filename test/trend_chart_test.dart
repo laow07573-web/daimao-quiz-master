@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flashcard_app/services/theme_service.dart';
 import 'package:flashcard_app/widgets/trend_chart.dart';
 
 List<Map<String, dynamic>> _days(int n, {int Function(int)? totals}) {
@@ -64,12 +65,27 @@ void main() {
   });
 
   group('accuracyTierColor 三档', () {
-    test('>=80 primary 0.7 / >=60 primary 0.45 / <60 error 0.7', () {
-      const cs = ColorScheme.light(primary: Color(0xFF000000), error: Color(0xFFEE0000));
-      expect(accuracyTierColor(90, cs), const Color(0xFF000000).withOpacity(0.7));
-      expect(accuracyTierColor(70, cs), const Color(0xFF000000).withOpacity(0.45));
-      expect(accuracyTierColor(50, cs), const Color(0xFFEE0000).withOpacity(0.7));
-      expect(accuracyTierColor(0, cs), const Color(0xFFEE0000).withOpacity(0.7));
+    test('>=80 accent 0.75 / >=60 accent 0.45 / <60 danger 0.75', () {
+      // v1.28 新设计语言：取色改走 AppThemeColors 语义色
+      const ac = AppThemeColors(
+        background: Color(0xFFFFFFFF),
+        surface: Color(0xFFFFFFFF),
+        surfaceAlt: Color(0xFFF0F0F0),
+        border: Color(0xFFE0E0E0),
+        textPrimary: Color(0xFF000000),
+        textSecondary: Color(0xFF666666),
+        textTertiary: Color(0xFF999999),
+        accent: Color(0xFF000000),
+        accentSoft: Color(0xFFEEEEEE),
+        onAccent: Color(0xFFFFFFFF),
+        navBackground: Color(0xFFFFFFFF),
+        navForeground: Color(0xFF000000),
+        danger: Color(0xFFEE0000),
+      );
+      expect(accuracyTierColor(90, ac), const Color(0xFF000000).withOpacity(0.75));
+      expect(accuracyTierColor(70, ac), const Color(0xFF000000).withOpacity(0.45));
+      expect(accuracyTierColor(50, ac), const Color(0xFFEE0000).withOpacity(0.75));
+      expect(accuracyTierColor(0, ac), const Color(0xFFEE0000).withOpacity(0.75));
     });
   });
 

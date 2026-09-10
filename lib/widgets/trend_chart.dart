@@ -61,12 +61,12 @@ double niceStep(double raw) {
 
 /// 正确率三档取色（共享：趋势图/排行）
 ///
-/// 低正确率档走 danger 语义色（设计红线：判对错不用 cs.error），
-/// 未传时回退 cs.error 保持旧行为兼容。
-Color accuracyTierColor(double rate, ColorScheme cs, [Color? danger]) {
-  if (rate >= 80) return cs.primary.withOpacity(0.7);
-  if (rate >= 60) return cs.primary.withOpacity(0.45);
-  return (danger ?? cs.error).withOpacity(0.7);
+/// 三档统一走强调色不同透明度表达"好/中/差"，最差档用 danger 语义色。
+/// 参数采用 Mao Des 的 [AppThemeColors]（页面已完成迁移）。
+Color accuracyTierColor(double rate, AppThemeColors ac) {
+  if (rate >= 80) return ac.accent.withOpacity(0.75);
+  if (rate >= 60) return ac.accent.withOpacity(0.45);
+  return ac.danger.withOpacity(0.75);
 }
 
 class _TrendChartState extends State<TrendChart> {
@@ -122,7 +122,7 @@ class _TrendChartState extends State<TrendChart> {
         child: Center(child: Text('暂无数据')),
       );
     }
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     // 可空取色：测试等裸 MaterialApp 场景未挂载 AppThemeColors 时回退 cs.error
     final danger = Theme.of(context).extension<AppThemeColors>()?.danger;
     return Column(
@@ -139,7 +139,7 @@ class _TrendChartState extends State<TrendChart> {
               chartMax: _chartMax,
               checkInThreshold: widget.checkInThreshold,
               onDaySelected: widget.onDaySelected,
-              colorScheme: cs,
+              ac: ac,
               danger: danger,
             ),
           ),
@@ -157,7 +157,7 @@ class _TrendChartState extends State<TrendChart> {
                 constraints: const BoxConstraints(),
                 icon: Icon(Icons.chevron_left,
                     size: 18,
-                    color: _page > 0 ? cs.primary : cs.outlineVariant),
+                    color: _page > 0 ? ac.accent : ac.border),
                 onPressed:
                     _page > 0 ? () => _controller.animateToPage(_page - 1, duration: const Duration(milliseconds: 250), curve: Curves.easeOut) : null,
               ),
@@ -176,7 +176,7 @@ class _TrendChartState extends State<TrendChart> {
                       height: 4,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(2),
-                        color: i == _page ? cs.primary : cs.outlineVariant,
+                        color: i == _page ? ac.accent : ac.border,
                       ),
                     ),
                   ),
@@ -186,7 +186,7 @@ class _TrendChartState extends State<TrendChart> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
                   _pageRangeLabel,
-                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
                 ),
               ),
             if (_pages.length > 1)
@@ -197,8 +197,8 @@ class _TrendChartState extends State<TrendChart> {
                 icon: Icon(Icons.chevron_right,
                     size: 18,
                     color: _page < _pages.length - 1
-                        ? cs.primary
-                        : cs.outlineVariant),
+                        ? ac.accent
+                        : ac.border),
                 onPressed: _page < _pages.length - 1
                     ? () => _controller.animateToPage(_page + 1, duration: const Duration(milliseconds: 250), curve: Curves.easeOut)
                     : null,
@@ -227,7 +227,7 @@ class _TrendPage extends StatefulWidget {
     required this.days,
     required this.chartMax,
     required this.checkInThreshold,
-    required this.colorScheme,
+    required this.ac,
     this.danger,
     this.onDaySelected,
   });
@@ -235,7 +235,7 @@ class _TrendPage extends StatefulWidget {
   final List<Map<String, dynamic>> days;
   final double chartMax;
   final int checkInThreshold;
-  final ColorScheme colorScheme;
+  final AppThemeColors ac;
   final Color? danger;
   final ValueChanged<Map<String, dynamic>>? onDaySelected;
 
@@ -280,7 +280,7 @@ class _TrendPageState extends State<_TrendPage> {
           chartMax: widget.chartMax,
           checkInThreshold: widget.checkInThreshold,
           selectedIndex: _selectedIndex,
-          colorScheme: widget.colorScheme,
+          ac: widget.ac,
           danger: widget.danger,
         ),
       ),
@@ -294,7 +294,7 @@ class _TrendPainter extends CustomPainter {
     required this.chartMax,
     required this.checkInThreshold,
     required this.selectedIndex,
-    required this.colorScheme,
+    required this.ac,
     this.danger,
   });
 
@@ -302,7 +302,7 @@ class _TrendPainter extends CustomPainter {
   final double chartMax;
   final int checkInThreshold;
   final int? selectedIndex;
-  final ColorScheme colorScheme;
+  final AppThemeColors ac;
   final Color? danger;
 
   static const double leftPad = 34;
@@ -333,7 +333,7 @@ class _TrendPainter extends CustomPainter {
   void _drawGrid(Canvas canvas) {
     // v1.0.2 UI 设计稿：左侧刻度固定 0-100（每 25 一档）代表刷题量
     final gridPaint = Paint()
-      ..color = colorScheme.outlineVariant.withOpacity(0.5)
+      ..color = ac.border.withOpacity(0.5)
       ..strokeWidth = 0.8;
     for (final v in [0.0, 25.0, 50.0, 75.0, 100.0]) {
       final y = _yFor(v);
@@ -342,7 +342,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: v.toInt().toString(),
-          style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+          style: TextStyle(fontSize: 11, color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -350,7 +350,7 @@ class _TrendPainter extends CustomPainter {
     }
     // 右侧正确率轴 0/50/100%
     final accPaint = Paint()
-      ..color = colorScheme.outlineVariant.withOpacity(0.3)
+      ..color = ac.border.withOpacity(0.3)
       ..strokeWidth = 0.6;
     for (final pct in [0.0, 50.0, 100.0]) {
       final y = _yFor(pct / 100 * chartMax);
@@ -359,7 +359,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${pct.toInt()}%',
-          style: TextStyle(fontSize: 8, color: colorScheme.onSurfaceVariant),
+          style: TextStyle(fontSize: 8, color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -381,7 +381,7 @@ class _TrendPainter extends CustomPainter {
       );
       canvas.drawRRect(
         rect,
-        Paint()..color = colorScheme.primary.withOpacity(0.55),
+        Paint()..color = ac.accent.withOpacity(0.55),
       );
     }
   }
@@ -395,7 +395,7 @@ class _TrendPainter extends CustomPainter {
       final a1 = (days[i]['accuracy'] as double?) ?? 0;
       final a2 = (days[i + 1]['accuracy'] as double?) ?? 0;
       final paint = Paint()
-        ..color = accuracyTierColor(math.min(a1, a2), colorScheme, danger)
+        ..color = accuracyTierColor(math.min(a1, a2), ac)
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
       canvas.drawLine(
@@ -410,7 +410,7 @@ class _TrendPainter extends CustomPainter {
     final y = _yFor(checkInThreshold.toDouble());
     if (y < topPad || y > _size.height - bottomPad) return;
     final dashPaint = Paint()
-      ..color = colorScheme.tertiary.withOpacity(0.6)
+      ..color = ac.warning.withOpacity(0.6)
       ..strokeWidth = 1.2;
     // 虚线
     const dash = 5.0, gap = 4.0;
@@ -425,7 +425,7 @@ class _TrendPainter extends CustomPainter {
       text: TextSpan(
         text: '打卡 $checkInThreshold 题',
         style: TextStyle(
-            fontSize: 11, color: colorScheme.onTertiaryContainer),
+            fontSize: 11, color: ac.textPrimary),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -436,7 +436,7 @@ class _TrendPainter extends CustomPainter {
       Rect.fromLTWH(labelX, labelY, rectW, 15),
       const Radius.circular(8),
     );
-    canvas.drawRRect(rect, Paint()..color = colorScheme.tertiary);
+    canvas.drawRRect(rect, Paint()..color = ac.warning);
     tp.paint(canvas, Offset(labelX + 7, labelY + (15 - tp.height) / 2));
   }
 
@@ -451,7 +451,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${date.month}/${date.day}',
-          style: TextStyle(fontSize: 8, color: colorScheme.onSurfaceVariant),
+          style: TextStyle(fontSize: 8, color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -488,7 +488,7 @@ class _TrendPainter extends CustomPainter {
       Rect.fromLTWH(bubbleX, bubbleY, rectW, rectH),
       const Radius.circular(6),
     );
-    canvas.drawRRect(rect, Paint()..color = colorScheme.primary);
+    canvas.drawRRect(rect, Paint()..color = ac.accent);
     tp.paint(canvas, Offset(bubbleX + 8, bubbleY + (rectH - tp.height) / 2));
   }
 
@@ -497,5 +497,5 @@ class _TrendPainter extends CustomPainter {
       old.days != days ||
       old.chartMax != chartMax ||
       old.selectedIndex != selectedIndex ||
-      old.colorScheme != colorScheme;
+      old.ac != ac;
 }

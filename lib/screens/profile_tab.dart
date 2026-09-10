@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state.dart';
+import '../services/theme_service.dart';
 import '../utils/app_constants.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
@@ -21,7 +22,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     // v1.0.3 宽屏重设计：入口卡片提取为列表，窄屏纵列 / 宽屏三列并排
     final entries = [
       _EntryTile(
@@ -61,7 +62,7 @@ class _ProfileTabState extends State<ProfileTab> {
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [cs.primary, cs.primary.withOpacity(0.7)],
+                colors: [ac.accent, ac.accent.withOpacity(0.7)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -79,7 +80,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         width: 44,
                         height: 44,
                         errorBuilder: (_, __, ___) => Icon(
-                            Icons.school, size: 36, color: cs.onPrimary),
+                            Icons.school, size: 36, color: ac.onAccent),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -92,7 +93,7 @@ class _ProfileTabState extends State<ProfileTab> {
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w600,
-                              color: cs.onPrimary,
+                              color: ac.onAccent,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -103,7 +104,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                 : context.read<AppState>().settings.nickname,
                             style: TextStyle(
                               fontSize: 14,
-                              color: cs.onPrimary.withOpacity(0.85),
+                              color: ac.onAccent.withOpacity(0.85),
                             ),
                           ),
                         ],
@@ -140,9 +141,9 @@ class _ProfileTabState extends State<ProfileTab> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
+              color: ac.surfaceAlt,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant),
+              border: Border.all(color: ac.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,14 +152,14 @@ class _ProfileTabState extends State<ProfileTab> {
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
-                        color: cs.onSurface)),
+                        color: ac.textPrimary)),
                 const SizedBox(height: 6),
                 Text(
                   '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧',
                   style: TextStyle(
                       fontSize: 13,
                       height: 1.7,
-                      color: cs.onSurfaceVariant),
+                      color: ac.textSecondary),
                 ),
               ],
             ),
@@ -168,7 +169,7 @@ class _ProfileTabState extends State<ProfileTab> {
             child: Text(
               // v1.0.2 对齐里程碑：页脚带版本号
               '本软件由b站：笨蛋鱼坏蛋猫开发|$kAppVersion',
-              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 12.5, color: ac.textSecondary),
             ),
           ),
         ],
@@ -212,32 +213,32 @@ class _EntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          color: ac.surfaceAlt.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: cs.primary),
+            Icon(icon, size: 20, color: ac.accent),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(fontSize: 14, color: cs.onSurface),
+                style: TextStyle(fontSize: 14, color: ac.textPrimary),
               ),
             ),
             if (subtitle != null)
               Text(subtitle!,
                   style:
-                      TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                      TextStyle(fontSize: 13, color: ac.textSecondary)),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
+            Icon(Icons.chevron_right, size: 18, color: ac.textSecondary),
           ],
         ),
       ),

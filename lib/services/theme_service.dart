@@ -674,6 +674,33 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     );
   }
 
-  static AppThemeColors of(BuildContext context) =>
-      Theme.of(context).extension<AppThemeColors>()!;
+  /// 便捷取用。若当前 ThemeData 未挂载扩展（如测试里用裸 ThemeData、
+  /// 或第三方页面），回退为按当前 colorScheme 现算的一份配色，
+  /// 保证取色永不返回 null（避免 Null check operator 崩溃）。
+  static AppThemeColors of(BuildContext context) {
+    final theme = Theme.of(context);
+    final ext = theme.extension<AppThemeColors>();
+    if (ext != null) return ext;
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    return AppThemeColors(
+      background: scheme.surface,
+      surface: scheme.surfaceContainerLowest,
+      surfaceAlt: scheme.surfaceContainerHighest,
+      border: scheme.outlineVariant,
+      textPrimary: scheme.onSurface,
+      textSecondary: scheme.onSurfaceVariant,
+      textTertiary: scheme.onSurfaceVariant.withOpacity(0.7),
+      accent: scheme.primary,
+      accentSoft: scheme.primaryContainer,
+      onAccent: scheme.onPrimary,
+      navBackground: theme.appBarTheme.backgroundColor ?? scheme.surface,
+      navForeground: scheme.onSurface,
+      success: dark ? const Color(0xFF4ADE80) : const Color(0xFF15803D),
+      successSoft: dark ? const Color(0xFF14361F) : const Color(0xFFDCFCE7),
+      danger: dark ? const Color(0xFFF87171) : const Color(0xFFB91C1C),
+      dangerSoft: dark ? const Color(0xFF3B1D1D) : const Color(0xFFFEE2E2),
+      warning: dark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+    );
+  }
 }

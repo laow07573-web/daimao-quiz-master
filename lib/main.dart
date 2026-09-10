@@ -12,6 +12,81 @@ import 'services/tamper_check.dart';
 import 'services/reminder_service.dart';
 import 'services/sync/sync_engine.dart';
 import 'screens/splash_screen.dart';
+import 'utils/design_tokens.dart';
+
+/// 启动兜底页（防篡改 / 单实例 / 数据库异常）专用配色。
+///
+/// 这些页面出现在主题服务就绪之前，无法走 `AppThemeColors`，
+/// 因此集中定义一份中性的兜底色，避免散落 `Colors.red/grey` 等硬编码。
+class _Fallback {
+  const _Fallback._();
+  static const Color bg = Color(0xFFF5F7FA);
+  static const Color fg = Color(0xFF111827);
+  static const Color fgSoft = Color(0xFF566072);
+  static const Color neutral = Color(0xFF64748B);
+  static const Color danger = Color(0xFFB91C1C);
+  static const Color warn = Color(0xFFD97706);
+
+  static ThemeData get theme => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: bg,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+        ).copyWith(surface: bg, onSurface: fg),
+      );
+}
+
+/// 兜底页统一外壳（图标 + 标题 + 说明 + 操作区）
+class _FallbackScaffold extends StatelessWidget {
+  const _FallbackScaffold({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.message,
+    required this.actions,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String message;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: _Fallback.theme,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(MaoSpace.xxl),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 68, color: iconColor),
+              const SizedBox(height: MaoSpace.lg),
+              Text(title,
+                  style: MaoType.h1Style.copyWith(color: _Fallback.fg)),
+              const SizedBox(height: MaoSpace.sm),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: MaoType.bodyStyle
+                      .copyWith(color: _Fallback.fgSoft, height: 1.6)),
+              const SizedBox(height: MaoSpace.xl),
+              Wrap(
+                spacing: MaoSpace.sm,
+                runSpacing: MaoSpace.sm,
+                alignment: WrapAlignment.center,
+                children: actions,
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// v1.0.3 单实例锁（桌面）：两个实例同时打开会争抢同一个 SQLite 库，
 /// 导致后启动者查询永久阻塞（统计页卡加载、交互无反应）。
@@ -109,36 +184,19 @@ class _AlreadyRunningApp extends StatelessWidget {
   const _AlreadyRunningApp();
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.launch, size: 64, color: Colors.blueGrey),
-              const SizedBox(height: 20),
-              const Text('猫卷已在运行',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              const Text(
-                '同一时间只能打开一个实例（避免数据冲突）。\n请切换到已打开的窗口继续使用。',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.6),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () => SystemNavigator.pop(),
-                icon: const Icon(Icons.exit_to_app),
-                label: const Text('退出'),
-              ),
-            ]),
+  Widget build(BuildContext context) => _FallbackScaffold(
+        icon: Icons.launch_outlined,
+        iconColor: _Fallback.neutral,
+        title: '猫卷已在运行',
+        message: '同一时间只能打开一个实例（避免数据冲突）。\n请切换到已打开的窗口继续使用。',
+        actions: [
+          FilledButton.icon(
+            onPressed: () => SystemNavigator.pop(),
+            icon: const Icon(Icons.exit_to_app, size: 18),
+            label: const Text('退出'),
           ),
-        ),
-      ),
-    );
-  }
+        ],
+      );
 }
 
 /// 签名校验失败时显示的警告页
@@ -146,28 +204,20 @@ class _TamperedApp extends StatelessWidget {
   const _TamperedApp();
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.warning_amber_rounded, size: 72, color: Colors.red),
-              const SizedBox(height: 24),
-              const Text('安全警告', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              // v1.0.2 设计审查修复：文案如实（本地存储为混淆级，不再宣称防泄露）
-              const Text('检测到应用签名异常，可能是盗版或已被篡改。\n\n请从官方渠道重新下载安装。', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: Colors.grey, height: 1.6)),
-              const SizedBox(height: 32),
-              FilledButton.tonalIcon(onPressed: () => SystemNavigator.pop(), icon: const Icon(Icons.exit_to_app), label: const Text('退出应用')),
-            ]),
+  Widget build(BuildContext context) => _FallbackScaffold(
+        icon: Icons.gpp_maybe_outlined,
+        iconColor: _Fallback.danger,
+        title: '安全警告',
+        // v1.0.2 设计审查修复：文案如实（本地存储为混淆级，不再宣称防泄露）
+        message: '检测到应用签名异常，可能是盗版或已被篡改。\n\n请从官方渠道重新下载安装。',
+        actions: [
+          FilledButton.icon(
+            onPressed: () => SystemNavigator.pop(),
+            icon: const Icon(Icons.exit_to_app, size: 18),
+            label: const Text('退出应用'),
           ),
-        ),
-      ),
-    );
-  }
+        ],
+      );
 }
 
 /// 数据库初始化失败时显示的恢复页（v1.0.2 修复：启动不再黑屏）
@@ -216,45 +266,30 @@ class _DbErrorAppState extends State<_DbErrorApp> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.error_outline, size: 72, color: Colors.deepOrange),
-              const SizedBox(height: 24),
-              const Text('数据初始化失败', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              Text(
-                '本地数据文件可能已损坏。可以重置数据后重新开始（将清空全部题库与记录），\n或退出应用。\n\n错误详情：${widget.error}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.6),
-              ),
-              const SizedBox(height: 32),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                FilledButton.icon(
-                  onPressed: _resetting ? null : _resetAndRetry,
-                  icon: _resetting
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.refresh),
-                  label: Text(_resetting ? '重置中...' : '重置数据并重试'),
-                ),
-                const SizedBox(width: 16),
-                OutlinedButton.icon(
-                  onPressed: () => SystemNavigator.pop(),
-                  icon: const Icon(Icons.exit_to_app),
-                  label: const Text('退出'),
-                ),
-              ]),
-            ]),
+  Widget build(BuildContext context) => _FallbackScaffold(
+        icon: Icons.data_object_outlined,
+        iconColor: _Fallback.warn,
+        title: '数据初始化失败',
+        message: '本地数据文件可能已损坏。可以重置数据后重新开始（将清空全部题库与记录），'
+            '\n或退出应用。\n\n错误详情：${widget.error}',
+        actions: [
+          FilledButton.icon(
+            onPressed: _resetting ? null : _resetAndRetry,
+            icon: _resetting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh, size: 18),
+            label: Text(_resetting ? '重置中...' : '重置数据并重试'),
           ),
-        ),
-      ),
-    );
-  }
+          OutlinedButton.icon(
+            onPressed: () => SystemNavigator.pop(),
+            icon: const Icon(Icons.exit_to_app, size: 18),
+            label: const Text('退出'),
+          ),
+        ],
+      );
 }
 
 class FlashcardApp extends StatelessWidget {
@@ -264,18 +299,18 @@ class FlashcardApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeService = context.watch<ThemeService>();
     final theme = themeService.themeData;
-    // v1.0.2 七项改进：深色模式（light/dark/system）
+    final darkTheme = themeService.darkThemeData;
+    // 深色模式（跟随系统 / 浅色 / 深色）
     final effectiveDark = themeService.themeMode == ThemeMode.dark ||
         (themeService.themeMode == ThemeMode.system &&
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-    // 状态栏图标亮度跟随当前生效主题的导航栏色
-    // （星际穿越/碧海银河深色导航栏下此前深色图标不可见）
+    // 状态栏图标亮度跟随生效主题的导航栏色
     final activeColors = effectiveDark
-        ? themeService.darkThemeData.extension<AppThemeColors>()
+        ? darkTheme.extension<AppThemeColors>()
         : theme.extension<AppThemeColors>();
-    final navBar = activeColors?.navBar;
+    final navBar = activeColors?.navBackground;
     final statusBarIconBrightness =
-        ThemeData.estimateBrightnessForColor(navBar ?? Colors.black) ==
+        ThemeData.estimateBrightnessForColor(navBar ?? _Fallback.bg) ==
                 Brightness.dark
             ? Brightness.light
             : Brightness.dark;
@@ -283,9 +318,9 @@ class FlashcardApp extends StatelessWidget {
       title: '猫卷',
       debugShowCheckedModeBanner: false,
       theme: theme,
-      darkTheme: themeService.darkThemeData,
+      darkTheme: darkTheme,
       themeMode: themeService.themeMode,
-      // v1.0.2 对齐原版设计：启动闪屏页（Logo + 标题 + 今日一言，2 秒进主界面）
+      // 启动闪屏页（Logo + 标题 + 今日一言）
       home: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,

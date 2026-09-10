@@ -6,6 +6,7 @@ import '../services/app_state.dart';
 import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
 import '../utils/app_constants.dart';
+import '../utils/design_tokens.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
 import '../widgets/weekly_stats_board.dart';
@@ -94,12 +95,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       appBar: AppBar(
-        title: const Text('猫卷',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('猫卷'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -120,65 +120,61 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              // 平板适配：内容限宽居中（手机无影响）；
-              // v1.0.3 宽屏重设计：宽屏双列布局（限宽自动提升至 1080）
+              padding: const EdgeInsets.all(MaoSpace.md),
+              // 平板适配：内容限宽居中；宽屏双列布局
               child: ResponsivePage(
               child: isWideLayout(context)
-                  ? _buildWideBody(appState, cs)
+                  ? _buildWideBody(appState, ac)
                   : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // v1.27 后台导入：导入中进度卡（离开导入页后在此展示）
+                  // 后台导入：导入中进度卡（离开导入页后在此展示）
                   if (appState.importTaskActive) ...[
-                    _buildImportProgressCard(appState, cs),
-                    const SizedBox(height: 16),
+                    _buildImportProgressCard(appState, ac),
+                    const SizedBox(height: MaoSpace.md),
                   ],
-                  // v1.27 后台导入：AI 解析完成待预览确认入口（入库前保留）
+                  // 后台导入：AI 解析完成待预览确认入口（入库前保留）
                   if (!appState.importTaskActive &&
                       appState.previewQuestions.isNotEmpty) ...[
-                    _buildPreviewConfirmCard(appState, cs),
-                    const SizedBox(height: 16),
+                    _buildPreviewConfirmCard(appState, ac),
+                    const SizedBox(height: MaoSpace.md),
                   ],
-                  // 顶部：问候语（第一行）+ 软件图标/名字 + 今日一言
-                  _buildHeroCard(appState, cs),
-                  const SizedBox(height: 16),
-                  // v1.0.2 七项改进：断点续刷入口（有未完成会话时显示）
+                  // 顶部：问候语 + 软件图标/名字 + 今日一言
+                  _buildHeroCard(appState, ac),
+                  const SizedBox(height: MaoSpace.md),
+                  // 断点续刷入口（有未完成会话时显示）
                   if (_unfinished != null)
-                    _buildResumeCard(appState, cs),
+                    _buildResumeCard(appState, ac),
                   // 寒暑假模式横幅
                   if (appState.vacationModeEnabled)
-                    _buildVacationBanner(cs),
+                    _buildVacationBanner(ac),
                   // API 余额不足警告（首帧加载完成后才显示，防闪现）
                   if (_statsLoaded &&
                       appState.aiService != null &&
                       appState.aiService!.cachedBalance != null &&
                       appState.aiService!.cachedBalance! > 0 &&
                       appState.aiService!.cachedBalance! < 1.0)
-                    _buildBalanceWarning(cs),
-                  // 本周战绩（v1.0.2 UI 设计稿：双数据块 + 单月打卡日历 + 连续打卡周）
+                    _buildBalanceWarning(ac),
+                  // 本周战绩（双数据块 + 单月打卡日历 + 连续打卡）
                   WeeklyStatsBoard(
                     dailyTotals: _yearlyTotals,
                     streakDays: _streakDays,
                     weekTotal: _weekTotal,
                     weekAccuracy: _weekAccuracy,
                     vacationDays: _vacationDays,
-                    // v1.0.2 对齐原版：历史报告（近 7 天明细）
                     onHistoryReport: () => _showHistoryReport(appState),
                   ),
-                  // v1.27 呼吸感：模块间距加大，视线有落脚点。
-                  const SizedBox(height: 20),
-                  _buildStatsCards(appState, cs),
-                  const SizedBox(height: 28),
-                  _buildQuickActions(appState, cs),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: MaoSpace.md),
+                  _buildStatsCards(appState, ac),
+                  const SizedBox(height: MaoSpace.xl),
+                  _buildQuickActions(appState, ac),
+                  const SizedBox(height: MaoSpace.lg),
                   Align(
                     alignment: Alignment.bottomRight,
                     child: Text(
-                      // v1.0.2 修复：版本号统一 v1.26.6.17（与我的页/关于弹窗一致）
-                      // 视觉审查修复：透明度 0.4 → 0.7，深色模式下仍可读
                       '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
-                      style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant.withOpacity(0.7)),
+                      style: MaoType.captionStyle
+                          .copyWith(color: ac.textTertiary),
                     ),
                   ),
                 ],
@@ -193,30 +189,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// v1.0.3 宽屏重设计：双列布局。左列（flex 5）：Hero/续刷/横幅/本周战绩；
   /// 右列（flex 4）：统计卡 + 快速操作网格。
-  Widget _buildWideBody(AppState appState, ColorScheme cs) {
+  Widget _buildWideBody(AppState appState, AppThemeColors ac) {
     final left = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // v1.27 后台导入：导入中进度卡 / 待预览确认入口（宽屏左列）
               if (appState.importTaskActive) ...[
-                _buildImportProgressCard(appState, cs),
+                _buildImportProgressCard(appState, ac),
                 const SizedBox(height: 16),
               ],
               if (!appState.importTaskActive &&
                   appState.previewQuestions.isNotEmpty) ...[
-                _buildPreviewConfirmCard(appState, cs),
+                _buildPreviewConfirmCard(appState, ac),
                 const SizedBox(height: 16),
               ],
-              _buildHeroCard(appState, cs),
+              _buildHeroCard(appState, ac),
               const SizedBox(height: 16),
-              if (_unfinished != null) _buildResumeCard(appState, cs),
-              if (appState.vacationModeEnabled) _buildVacationBanner(cs),
+              if (_unfinished != null) _buildResumeCard(appState, ac),
+              if (appState.vacationModeEnabled) _buildVacationBanner(ac),
               if (_statsLoaded &&
                   appState.aiService != null &&
                   appState.aiService!.cachedBalance != null &&
                   appState.aiService!.cachedBalance! > 0 &&
                   appState.aiService!.cachedBalance! < 1.0)
-                _buildBalanceWarning(cs),
+                _buildBalanceWarning(ac),
               WeeklyStatsBoard(
                 dailyTotals: _yearlyTotals,
                 streakDays: _streakDays,
@@ -231,9 +227,9 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // v1.27 呼吸感：宽屏右列模块间距同步加大。
-              _buildStatsCards(appState, cs),
+              _buildStatsCards(appState, ac),
               const SizedBox(height: 28),
-              _buildQuickActions(appState, cs),
+              _buildQuickActions(appState, ac),
               const SizedBox(height: 28),
               Align(
                 alignment: Alignment.bottomRight,
@@ -241,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
                   style: TextStyle(
                       fontSize: 12.5,
-                      color: cs.onSurfaceVariant.withOpacity(0.7)),
+                      color: ac.textSecondary.withOpacity(0.7)),
                 ),
               ),
             ],
@@ -266,22 +262,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 顶部问候语（第一行）+ 软件图标/名字 + 今日一言
-  Widget _buildHeroCard(AppState appState, ColorScheme cs) {
+  Widget _buildHeroCard(AppState appState, AppThemeColors ac) {
     final nickname = appState.settings.nickname;
     return Container(
       width: double.infinity,
-      // v1.27 呼吸感：加大内边距，渐变降饱和（透出底色，长时间看不刺眼）
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(MaoSpace.lg),
       decoration: BoxDecoration(
+        // 双色位移渐变（非透明度衰减）——避免旧版"发灰发浊"
         gradient: LinearGradient(
-          colors: [
-            cs.primary.withOpacity(0.9),
-            cs.primary.withOpacity(0.7),
-          ],
+          colors: [ac.accent, Color.lerp(ac.accent, ac.textPrimary, 0.28)!],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: MaoRadius.cardBorder,
+        boxShadow: MaoShadow.level2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,58 +283,47 @@ class _HomeScreenState extends State<HomeScreen> {
           // 第一行：问候语 + 昵称
           Text(
             _greeting,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: cs.onPrimary,
-            ),
+            style: MaoType.h1Style.copyWith(color: ac.onAccent),
           ),
           if (nickname.isNotEmpty) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: MaoSpace.xxs / 2),
             Text(
               nickname,
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onPrimary.withOpacity(0.85),
-              ),
+              style: MaoType.captionStyle
+                  .copyWith(color: ac.onAccent.withOpacity(0.86)),
             ),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: MaoSpace.sm),
           // 软件图标 + 软件名字 + 今日一言
           Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: MaoRadius.smallBorder,
                 child: Image.asset(
                   'assets/app_logo.png',
                   width: 42,
                   height: 42,
                   errorBuilder: (_, __, ___) =>
-                      Icon(Icons.school, size: 36, color: cs.onPrimary),
+                      Icon(Icons.school, size: 34, color: ac.onAccent),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: MaoSpace.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '猫卷',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: cs.onPrimary,
-                      ),
+                      style: MaoType.h3Style.copyWith(color: ac.onAccent),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: MaoSpace.xxs / 2),
                     Text(
                       _hitokoto,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onPrimary.withOpacity(0.9),
-                        height: 1.4,
+                      style: MaoType.captionStyle.copyWith(
+                        color: ac.onAccent.withOpacity(0.9),
+                        height: 1.45,
                       ),
                     ),
                   ],
@@ -357,17 +340,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// v1.0.2 对齐原版：历史报告（近 7 天每日刷题明细）
   Future<void> _showHistoryReport(AppState appState) async {
+    final ac = AppThemeColors.of(context);
     final daily = await appState.getDailyStats(7);
     final acc = await appState.getDailyAccuracy(7);
     final accByDay = <String, Map<String, dynamic>>{
       for (final a in acc) (a['day'] as String): a,
     };
     if (!mounted) return;
-    final cs = Theme.of(context).colorScheme;
     const week = ['一', '二', '三', '四', '五', '六', '日'];
     showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
@@ -386,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant.withOpacity(0.3),
+                      color: ac.textSecondary.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(2)),
                 ),
               ),
@@ -395,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: cs.onSurface)),
+                      color: ac.textPrimary)),
               const SizedBox(height: 12),
               for (final d in daily)
                 Padding(
@@ -409,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           '${(d['date'] as DateTime).day}日 周'
                           '${week[(d['date'] as DateTime).weekday - 1]}',
                           style: TextStyle(
-                              fontSize: 13, color: cs.onSurface),
+                              fontSize: 13, color: ac.textPrimary),
                         ),
                       ),
                       Text('${d['total']} 题',
@@ -417,13 +400,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: (d['total'] as int) > 0
-                                  ? cs.primary
-                                  : cs.onSurfaceVariant)),
+                                  ? ac.accent
+                                  : ac.textSecondary)),
                       const Spacer(),
                       Text(
                         _accuracyText(d, accByDay),
                         style: TextStyle(
-                            fontSize: 13, color: cs.onSurfaceVariant),
+                            fontSize: 13, color: ac.textSecondary),
                       ),
                     ],
                   ),
@@ -448,7 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// v1.0.2 七项改进：断点续刷卡片（最新未完成会话）
-  Widget _buildResumeCard(AppState appState, ColorScheme cs) {
+  Widget _buildResumeCard(AppState appState, AppThemeColors ac) {
     final u = _unfinished;
     if (u == null) return const SizedBox.shrink();
     final (session, answered) = u;
@@ -493,18 +476,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
-                              color: cs.onSurface)),
+                              color: ac.textPrimary)),
                       const SizedBox(height: 2),
                       Text(
                         '已答 $answered/${session.totalQuestions} 题 · $modeLabel',
                         style: TextStyle(
-                            fontSize: 13, color: cs.onSurfaceVariant),
+                            fontSize: 13, color: ac.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 Icon(Icons.chevron_right,
-                    size: 20, color: cs.onSurfaceVariant),
+                    size: 20, color: ac.textSecondary),
               ],
             ),
           ),
@@ -514,24 +497,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 寒暑假模式横幅
-  Widget _buildVacationBanner(ColorScheme cs) {
+  Widget _buildVacationBanner(AppThemeColors ac) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: cs.error.withOpacity(0.1),
+        color: ac.danger.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.error.withOpacity(0.4)),
+        border: Border.all(color: ac.danger.withOpacity(0.4)),
       ),
       child: Row(
         children: [
-          Icon(Icons.beach_access, color: cs.error, size: 20),
+          Icon(Icons.beach_access, color: ac.danger, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '寒暑假模式已开启，答题功能暂停，错题本仍可浏览',
-              style: TextStyle(fontSize: 13, color: cs.error),
+              style: TextStyle(fontSize: 13, color: ac.danger),
             ),
           ),
         ],
@@ -539,25 +522,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBalanceWarning(ColorScheme cs) {
+  Widget _buildBalanceWarning(AppThemeColors ac) {
     // v1.0.2 UI 设计稿：警告色走主题 tertiary（无硬编码色值）
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: cs.tertiaryContainer.withOpacity(0.5),
+        color: ac.accentSoft.withOpacity(0.5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.tertiary.withOpacity(0.5)),
+        border: Border.all(color: ac.accent.withOpacity(0.5)),
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber, color: cs.tertiary),
+          Icon(Icons.warning_amber, color: ac.accent),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'API 余额不足 ¥1，建议尽快充值以免影响使用',
-              style: TextStyle(fontSize: 13, color: cs.onTertiaryContainer),
+              style: TextStyle(fontSize: 13, color: ac.textPrimary),
             ),
           ),
         ],
@@ -565,9 +548,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsCards(AppState appState, ColorScheme cs) {
+  Widget _buildStatsCards(AppState appState, AppThemeColors ac) {
     final stats = appState.homeStats;
-    final ac = AppThemeColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -578,43 +560,40 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.timer_outlined,
                 label: '累计刷题时长',
                 value: stats?.formattedDuration ?? '0 h 0 m',
-                color: ac.accent,
-                cs: cs,
+                ac: ac,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: MaoSpace.sm),
             Expanded(
               child: _StatCard(
                 icon: Icons.quiz_outlined,
                 label: '总刷题量',
                 value: '${stats?.totalQuestions ?? 0} 题',
-                color: ac.accent.withOpacity(0.8),
-                cs: cs,
+                ac: ac,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: MaoSpace.sm),
             Expanded(
               child: _StatCard(
                 icon: Icons.trending_up,
                 label: '平均正确率',
                 value: stats?.formattedAccuracy ?? '0%',
-                color: cs.secondary,
-                cs: cs,
+                ac: ac,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: MaoSpace.xs),
         Text(
           '仅统计按「结束」完成的会话时长，中途退出不计',
-          style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
         ),
       ],
     );
   }
 
   /// 快速操作列表（v1.0.2 UI 设计稿：4 项，每项带状态文案与真实路由）
-  Widget _buildQuickActions(AppState appState, ColorScheme cs) {
+  Widget _buildQuickActions(AppState appState, AppThemeColors ac) {
     final vacation = appState.vacationModeEnabled;
     final ac = AppThemeColors.of(context);
     // v1.0.3 宽屏重设计：四个入口提取为列表，窄屏纵列 / 宽屏 2×2 网格
@@ -627,7 +606,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ? '请先选择题库'
             : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
         iconColor: ac.accent,
-        cs: cs,
         onTap: appState.selectedBankIds.isEmpty
             ? () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -649,7 +627,6 @@ class _HomeScreenState extends State<HomeScreen> {
         label: '管理题库',
         subtitle: '${appState.banks.length} 个题库',
         iconColor: ac.accent.withOpacity(0.8),
-        cs: cs,
         onTap: () => _navigateAndRefresh(
             context, appState, const BankManageScreen()),
       ),
@@ -659,8 +636,7 @@ class _HomeScreenState extends State<HomeScreen> {
         label: '错题本',
         // v1.0.2 UI 审查修复：文案生硬 → 直白说明功能
         subtitle: '智能排期，只显示应复习的错题',
-        iconColor: cs.error,
-        cs: cs,
+        iconColor: ac.danger,
         onTap: () =>
             _navigateAndRefresh(context, appState, const ErrorBookScreen()),
       ),
@@ -669,8 +645,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.upload_file,
         label: '导入题库',
         subtitle: 'AI 解析 DOCX，JSON 直接入库',
-        iconColor: cs.tertiary,
-        cs: cs,
+        iconColor: ac.accent,
         onTap: () =>
             _navigateAndRefresh(context, appState, const ImportScreen()),
       ),
@@ -680,7 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Text('快速操作',
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
+                fontSize: 16, fontWeight: FontWeight.bold, color: ac.textPrimary)),
         const SizedBox(height: 12),
         if (isWideLayout(context))
           // v1.0.3 窗口自适应：按最大单元宽自动决定列数（宽窗 2 列，
@@ -713,10 +688,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showCountPicker(BuildContext context, AppState appState) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -724,9 +699,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurfaceVariant.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: ac.textSecondary.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 20),
-            Text('选择刷题数量', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface), textAlign: TextAlign.center),
+            Text('选择刷题数量', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ac.textPrimary), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             Wrap(spacing: 12, runSpacing: 12, alignment: WrapAlignment.center, children: [
               ...[10, 20, 30, 50, 80, 100].map((n) => ChoiceChip(
@@ -738,7 +713,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ChoiceChip(label: const Text('自定义'), selected: false, onSelected: (_) { Navigator.pop(ctx); _showCustomCountDialog(context, appState); }),
             ]),
             const SizedBox(height: 12),
-            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: 13, color: ac.textSecondary), textAlign: TextAlign.center),
           ]),
         ),
       ),
@@ -774,10 +749,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showQuizModePicker(BuildContext context, AppState appState) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
@@ -794,26 +769,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Container(
                   width: 40, height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurfaceVariant.withOpacity(0.3),
+                    color: ac.textSecondary.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
               Text('选择刷题模式',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ac.textPrimary),
                   textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: 13, color: ac.textSecondary),
                   textAlign: TextAlign.center),
               const SizedBox(height: 20),
               _ModeOption(
                 icon: Icons.flash_on_rounded,
                 label: '正常刷题',
                 desc: '答完即判，立刻校对解析',
-                color: cs.primary,
-                cs: cs,
+                color: ac.accent,
                 onTap: () {
                   Navigator.pop(ctx);
                   _startQuiz(context, appState);
@@ -824,8 +798,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.edit_square,
                 label: '练习',
                 desc: '答题卡模式，限时/不限时，统一批改',
-                color: cs.secondary,
-                cs: cs,
+                color: ac.textSecondary,
                 onTap: () {
                   Navigator.pop(ctx);
                   _startPractice(context, appState);
@@ -836,8 +809,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.visibility_rounded,
                 label: '背题模式',
                 desc: '直接展示答案，快速浏览记忆',
-                color: cs.tertiary,
-                cs: cs,
+                color: ac.accent,
                 onTap: () {
                   Navigator.pop(ctx);
                   _startMemorize(context, appState);
@@ -929,14 +901,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// v1.27 后台导入：首页进度卡（精确进度条 + 当前状态文字）。
   /// 刷题页是 push 路由，首页不可见，天然满足「刷题中不显示」
-  Widget _buildImportProgressCard(AppState appState, ColorScheme cs) {
+  Widget _buildImportProgressCard(AppState appState, AppThemeColors ac) {
     final progress = appState.importProgress.clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: ac.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.primary.withOpacity(0.35)),
+        border: Border.all(color: ac.accent.withOpacity(0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -947,7 +919,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: cs.primary),
+                    strokeWidth: 2, color: ac.accent),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -955,13 +927,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: cs.onSurface)),
+                        color: ac.textPrimary)),
               ),
               Text('${(progress * 100).toInt()}%',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: cs.primary)),
+                      color: ac.accent)),
             ],
           ),
           const SizedBox(height: 10),
@@ -974,14 +946,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 6),
           Text(appState.importStatus,
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: ac.textSecondary)),
         ],
       ),
     );
   }
 
   /// v1.27 后台导入：AI 解析完成、待预览确认入口（确认入库或放弃前常驻）
-  Widget _buildPreviewConfirmCard(AppState appState, ColorScheme cs) {
+  Widget _buildPreviewConfirmCard(AppState appState, AppThemeColors ac) {
     final ac = AppThemeColors.of(context);
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -1011,7 +983,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 2),
                   Text('点击查看预览，确认后入库',
                       style:
-                          TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                          TextStyle(fontSize: 13, color: ac.textSecondary)),
                 ],
               ),
             ),
@@ -1027,53 +999,55 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final Color color;
-  final ColorScheme cs;
+  final AppThemeColors ac;
 
   const _StatCard({
     required this.icon,
     required this.label,
     required this.value,
-    required this.color,
-    required this.cs,
+    required this.ac,
   });
 
   @override
   Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: MaoSpace.xs, vertical: MaoSpace.sm + 2),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: ac.background,
+        borderRadius: MaoRadius.controlBorder,
+        border: Border.all(color: ac.border, width: MaoShadow.hairline),
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 8),
+          Icon(icon, color: ac.accent, size: 24),
+          const SizedBox(height: MaoSpace.xs),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+            duration: MaoMotion.normal,
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
             child: Text(value,
                 key: ValueKey(value),
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+                textAlign: TextAlign.center,
+                style: MaoType.h3Style.copyWith(color: ac.textPrimary)),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: MaoSpace.xxs),
           Text(label,
-              style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+              textAlign: TextAlign.center,
+              style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
         ],
       ),
     );
   }
 }
 
-/// 快速操作列表项（v1.0.2 UI 设计稿：图标 + 标题 + 状态副标题 + 跳转）
+/// 快速操作列表项（图标 + 标题 + 状态副标题 + 跳转）
 class _QuickActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
   final Color iconColor;
-  final ColorScheme cs;
   final VoidCallback onTap;
 
   const _QuickActionTile({
@@ -1081,7 +1055,6 @@ class _QuickActionTile extends StatelessWidget {
     required this.label,
     required this.subtitle,
     required this.iconColor,
-    required this.cs,
     required this.onTap,
   });
 
@@ -1089,48 +1062,50 @@ class _QuickActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: MaoSpace.sm - 2),
       child: Material(
-        color: ac.card,
-        borderRadius: BorderRadius.circular(12),
+        color: ac.background,
+        borderRadius: MaoRadius.controlBorder,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: MaoRadius.controlBorder,
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            padding: const EdgeInsets.symmetric(
+                horizontal: MaoSpace.md, vertical: MaoSpace.sm + 2),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              // v1.27 呼吸感：操作卡边框弱化，依靠间距与底色区分层次。
-              border: Border.all(color: ac.cardBorder.withOpacity(0.6)),
+              borderRadius: MaoRadius.controlBorder,
+              border: Border.all(color: ac.border, width: MaoShadow.hairline),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: iconColor.withOpacity(0.12),
-                    shape: BoxShape.circle,
+                    borderRadius: MaoRadius.smallBorder,
                   ),
-                  child: Icon(icon, color: iconColor, size: 22),
+                  child: Icon(icon, color: iconColor, size: 20),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: MaoSpace.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(label,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: cs.onSurface)),
-                      const SizedBox(height: 2),
+                          style: MaoType.h3Style.copyWith(
+                              color: ac.textPrimary, fontSize: 15)),
+                      const SizedBox(height: MaoSpace.xxs / 2),
                       Text(subtitle,
-                          style: TextStyle(
-                              fontSize: 13, color: cs.onSurfaceVariant)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: MaoType.captionStyle
+                              .copyWith(color: ac.textSecondary)),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+                Icon(Icons.chevron_right_rounded,
+                    color: ac.textTertiary, size: 20),
               ],
             ),
           ),
@@ -1145,7 +1120,6 @@ class _ModeOption extends StatelessWidget {
   final String label;
   final String desc;
   final Color color;
-  final ColorScheme cs;
   final VoidCallback onTap;
 
   const _ModeOption({
@@ -1153,20 +1127,20 @@ class _ModeOption extends StatelessWidget {
     required this.label,
     required this.desc,
     required this.color,
-    required this.cs,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
+          color: ac.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.outlineVariant),
+          border: Border.all(color: ac.border),
         ),
         child: Row(
           children: [
@@ -1189,16 +1163,16 @@ class _ModeOption extends StatelessWidget {
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
-                              color: cs.onSurface)),
+                              color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(desc,
-                      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                      style: TextStyle(fontSize: 13, color: ac.textSecondary)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
+            Icon(Icons.chevron_right, color: ac.textSecondary, size: 20),
           ],
         ),
       ),

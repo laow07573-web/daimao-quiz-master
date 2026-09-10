@@ -177,7 +177,7 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
-        final cs = Theme.of(context).colorScheme;
+        final ac = AppThemeColors.of(context);
         final question = appState.currentQuestion;
         if (question == null) {
           return Scaffold(
@@ -284,7 +284,7 @@ class _QuizScreenState extends State<QuizScreen> {
             if (!didPop) _handleExit(appState);
           },
           child: Scaffold(
-            backgroundColor: cs.surface,
+            backgroundColor: ac.background,
           appBar: AppBar(
             title: Text(
                 '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
@@ -306,7 +306,7 @@ class _QuizScreenState extends State<QuizScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: warn ? cs.error : cs.primary.withOpacity(0.2),
+                              color: warn ? ac.danger : ac.accent.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -316,7 +316,7 @@ class _QuizScreenState extends State<QuizScreen> {
                               style: TextStyle(
                                 fontSize: warn ? 14 : 12,
                                 fontWeight: FontWeight.bold,
-                                color: warn ? Colors.white : cs.onSurface,
+                                color: warn ? Colors.white : ac.textPrimary,
                               ),
                             ),
                           ),
@@ -335,7 +335,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 IconButton(
                   icon: const Icon(Icons.list_alt, size: 20),
                   tooltip: '答题卡',
-                  onPressed: () => _showAnswerSheet(context, appState, cs),
+                  onPressed: () => _showAnswerSheet(context, appState, ac),
                 ),
               // v1.0.2 设计审查修复：仅正常刷题可切背题
               // （练习模式切背题高亮答案属作弊路径）
@@ -350,7 +350,7 @@ class _QuizScreenState extends State<QuizScreen> {
               if (!isPractice)
                 IconButton(
                   icon: Icon(Icons.draw, size: 20,
-                      color: _annotating ? cs.primary : null),
+                      color: _annotating ? ac.accent : null),
                   tooltip: '手写批注',
                   onPressed: () => _toggleAnnotate(appState),
                 ),
@@ -391,8 +391,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 builder: (context, value, _) {
                   return LinearProgressIndicator(
                     value: value,
-                    backgroundColor: cs.surfaceContainerHighest,
-                    color: cs.primary,
+                    backgroundColor: ac.surfaceAlt,
+                    color: ac.accent,
                     minHeight: 4,
                   );
                 },
@@ -443,13 +443,13 @@ class _QuizScreenState extends State<QuizScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                        _buildQuestionCard(question, appState, cs),
+                        _buildQuestionCard(question, appState, ac),
                         const SizedBox(height: 16),
                         // v1.0.2 统一重构：练习模式选项区恒可修改（不显示判定结果）
                         if (_isMemorizeMode)
-                          _buildMemorizeOptions(question, cs, appState)
+                          _buildMemorizeOptions(question, ac, appState)
                         else if (isPractice || !isAnswered) ...[
-                          _buildOptionsArea(appState, question, cs),
+                          _buildOptionsArea(appState, question, ac),
                           // v1.0.2 UI 审查修复：未作答时下方大片空白，
                           // 加轻提示引导答题
                           if (!isPractice && !isAnswered) ...[
@@ -458,15 +458,15 @@ class _QuizScreenState extends State<QuizScreen> {
                               child: Text(
                                 '点击选项提交答案，答对自动进入下一题',
                                 style: TextStyle(
-                                    fontSize: 13, color: cs.onSurfaceVariant),
+                                    fontSize: 13, color: ac.textSecondary),
                               ),
                             ),
                           ],
                         ]
                         else ...[
-                          _buildAnsweredResult(appState, question, cs),
+                          _buildAnsweredResult(appState, question, ac),
                           const SizedBox(height: 12),
-                          _buildResultFeedback(appState, question, cs),
+                          _buildResultFeedback(appState, question, ac),
                           // v1.0.2 完善：已答题目可重新作答（更新原记录，不新增）
                           if (isAnswered &&
                               widget.quizMode != QuizMode.memorize &&
@@ -480,7 +480,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                     style: TextStyle(fontSize: 12)),
                                 style: TextButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
-                                  foregroundColor: cs.onSurfaceVariant,
+                                  foregroundColor: ac.textSecondary,
                                 ),
                                 onPressed: () {
                                   if (_submitting) return; // 提交期间禁重做
@@ -498,12 +498,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           ],
                           const SizedBox(height: 8),
                           if (_showAnalysis || appState.currentAnalysis != null)
-                            _buildAnalysisArea(appState, question, cs)
+                            _buildAnalysisArea(appState, question, ac)
                           else
-                            _buildShowAnalysisButton(appState, cs),
+                            _buildShowAnalysisButton(appState, ac),
                           if (appState.currentAnalysis != null) ...[
                             const SizedBox(height: 4),
-                            _buildRegenerateButton(appState, cs),
+                            _buildRegenerateButton(appState, ac),
                           ],
                           ],
                           ],
@@ -548,7 +548,7 @@ class _QuizScreenState extends State<QuizScreen> {
             ),
 
               // 底部按钮：已答或背题模式均显示
-              if (isAnswered || widget.quizMode == QuizMode.memorize) _buildBottomBar(appState, cs),
+              if (isAnswered || widget.quizMode == QuizMode.memorize) _buildBottomBar(appState, ac),
             ],
           ),
           ),
@@ -739,7 +739,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   /// 背题模式：选项中高亮正确选项
-  Widget _buildMemorizeOptions(Question question, ColorScheme cs, AppState appState) {
+  Widget _buildMemorizeOptions(Question question, AppThemeColors ac, AppState appState) {
     // v1.0.2 设计审查修复：硬编码绿色 → 主题语义色（success 系列）
     final ac = AppThemeColors.of(context);
     final options = question.questionType == 'true_false' ? ['对', '错'] : question.options;
@@ -756,22 +756,22 @@ class _QuizScreenState extends State<QuizScreen> {
       final isCorrect = correctSet.contains(question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : label);
       return Padding(padding: const EdgeInsets.only(bottom: 8), child: Container(
         width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: isCorrect ? ac.successContainer : cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? ac.success : cs.outlineVariant)),
+        decoration: BoxDecoration(color: isCorrect ? ac.successContainer : ac.surfaceAlt, borderRadius: BorderRadius.circular(10), border: Border.all(color: isCorrect ? ac.success : ac.border)),
         child: Row(children: [
-          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : cs.surfaceContainerHighest, shape: BoxShape.circle), child: Center(child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurfaceVariant)))),
+          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : ac.surfaceAlt, shape: BoxShape.circle), child: Center(child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ac.textSecondary)))),
           const SizedBox(width: 12),
-          Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : cs.onSurface, height: 1.4))),
+          Expanded(child: Text(options[i], style: TextStyle(fontSize: 14, color: isCorrect ? ac.success : ac.textPrimary, height: 1.4))),
         ]),
       ));
     }));
   }
 
-  Widget _buildQuestionCard(Question question, AppState appState, ColorScheme cs) {
+  Widget _buildQuestionCard(Question question, AppState appState, AppThemeColors ac) {
     final stats = appState.currentQuestionStats;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: ac.surfaceAlt,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -782,13 +782,13 @@ class _QuizScreenState extends State<QuizScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(0.12),
+                  color: ac.accent.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
                   question.typeLabel,
-                  style: TextStyle(fontSize: 13, color: cs.primary),
+                  style: TextStyle(fontSize: 13, color: ac.accent),
                 ),
               ),
               const Spacer(),
@@ -797,28 +797,28 @@ class _QuizScreenState extends State<QuizScreen> {
                   '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%'
                   // v1.0.2 FSRS 可见化：答完题展示下次复习时间
                   '${appState.currentFsrsCard != null ? ' · 下次复习：${relativeDayLabel(appState.currentFsrsCard!.nextReviewAt)}' : ''}',
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: 13, color: ac.textSecondary),
                 ),
             ],
           ),
           const SizedBox(height: 12),
           Text(question.title,
-              style: TextStyle(fontSize: 16, height: 1.6, fontWeight: FontWeight.w500, color: cs.onSurface)),
+              style: TextStyle(fontSize: 16, height: 1.6, fontWeight: FontWeight.w500, color: ac.textPrimary)),
         ],
       ),
     );
   }
 
-  Widget _buildOptionsArea(AppState appState, Question question, ColorScheme cs) {
+  Widget _buildOptionsArea(AppState appState, Question question, AppThemeColors ac) {
     final qt = question.questionType;
     if (qt == 'fill_blank') {
-      return _buildFillBlankInput(appState, cs);
+      return _buildFillBlankInput(appState, ac);
     }
     if (qt == 'true_false') {
-      return _buildTrueFalseButtons(appState, cs);
+      return _buildTrueFalseButtons(appState, ac);
     }
     if (qt == 'ming_jie' || qt == 'jian_da' || qt == 'jie_da') {
-      return _buildTextAnswerInput(appState, cs, qt);
+      return _buildTextAnswerInput(appState, ac, qt);
     }
     final options = question.options;
     final isMulti = question.questionType == 'multi_choice';
@@ -869,10 +869,10 @@ class _QuizScreenState extends State<QuizScreen> {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: selected ? cs.primary.withOpacity(0.08) : cs.surfaceContainerHighest,
+              color: selected ? ac.accent.withOpacity(0.08) : ac.surfaceAlt,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? cs.primary : cs.outlineVariant,
+                color: selected ? ac.accent : ac.border,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -882,19 +882,19 @@ class _QuizScreenState extends State<QuizScreen> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: selected ? cs.primary : cs.primary.withOpacity(0.12),
+                    color: selected ? ac.accent : ac.accent.withOpacity(0.12),
                     shape: isMulti ? BoxShape.rectangle : BoxShape.circle,
                     borderRadius: isMulti ? BorderRadius.circular(4) : null,
                   ),
                   child: Center(
                     child: selected
-                        ? Icon(Icons.check, size: 16, color: cs.onPrimary)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary, fontSize: 14)),
+                        ? Icon(Icons.check, size: 16, color: ac.onAccent)
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: ac.accent, fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(option, style: TextStyle(fontSize: 15, height: 1.4, color: cs.onSurface)),
+                  child: Text(option, style: TextStyle(fontSize: 15, height: 1.4, color: ac.textPrimary)),
                 ),
               ],
             ),
@@ -915,8 +915,8 @@ class _QuizScreenState extends State<QuizScreen> {
               icon: const Icon(Icons.check_circle),
               label: Text('确认提交 (已选${_selectedOptions.length}项)', style: const TextStyle(fontSize: 15)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedOptions.isEmpty ? cs.surfaceContainerHighest : cs.primary,
-                foregroundColor: _selectedOptions.isEmpty ? cs.onSurfaceVariant : cs.onPrimary,
+                backgroundColor: _selectedOptions.isEmpty ? ac.surfaceAlt : ac.accent,
+                foregroundColor: _selectedOptions.isEmpty ? ac.textSecondary : ac.onAccent,
               ),
               onPressed: _selectedOptions.isEmpty ? null : () {
                 final answer = _selectedOptions.toList()..sort();
@@ -943,7 +943,7 @@ class _QuizScreenState extends State<QuizScreen> {
     return _AdaptiveOptionsColumn(children: optionWidgets);
   }
 
-  Widget _buildFillBlankInput(AppState appState, ColorScheme cs) {
+  Widget _buildFillBlankInput(AppState appState, AppThemeColors ac) {
     final title = appState.currentQuestion?.title ?? '';
     // v1.0.2 设计审查修复：识别单个下划线（此前 _{2,} 漏掉 "_"）
     final blankCount = RegExp(r'_{1,}|（\s*）|\(\s*\)').allMatches(title).length;
@@ -980,7 +980,7 @@ class _QuizScreenState extends State<QuizScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               prefixIcon: const Icon(Icons.edit),
             ),
-            style: TextStyle(fontSize: 15, color: cs.onSurface),
+            style: TextStyle(fontSize: 15, color: ac.textPrimary),
             // v1.0.2 完善：回车跳到下一空，最后一空提交
             onSubmitted: (v) {
               if (i < n - 1) {
@@ -1005,7 +1005,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildTextAnswerInput(AppState appState, ColorScheme cs, String type) {
+  Widget _buildTextAnswerInput(AppState appState, AppThemeColors ac, String type) {
     // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
     final label = appState.currentQuestion?.typeLabel ?? '题目';
     final isPractice = widget.quizMode == QuizMode.practice;
@@ -1019,7 +1019,7 @@ class _QuizScreenState extends State<QuizScreen> {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             alignLabelWithHint: true,
           ),
-          style: TextStyle(fontSize: 15, color: cs.onSurface),
+          style: TextStyle(fontSize: 15, color: ac.textPrimary),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1044,7 +1044,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildTrueFalseButtons(AppState appState, ColorScheme cs) {
+  Widget _buildTrueFalseButtons(AppState appState, AppThemeColors ac) {
     final isPractice = widget.quizMode == QuizMode.practice;
     final ac = AppThemeColors.of(context);
     final cur = _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
@@ -1064,7 +1064,7 @@ class _QuizScreenState extends State<QuizScreen> {
               decoration: BoxDecoration(
                 color: isPractice && cur == '对'
                     ? ac.successContainer
-                    : cs.surfaceContainerHighest,
+                    : ac.surfaceAlt,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: isPractice && cur == '对' ? ac.success : ac.success),
@@ -1095,7 +1095,7 @@ class _QuizScreenState extends State<QuizScreen> {
               decoration: BoxDecoration(
                 color: isPractice && cur == '错'
                     ? ac.dangerContainer
-                    : cs.surfaceContainerHighest,
+                    : ac.surfaceAlt,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: ac.danger),
               ),
@@ -1201,7 +1201,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  void _showAnswerSheet(BuildContext context, AppState appState, ColorScheme cs) {
+  void _showAnswerSheet(BuildContext context, AppState appState, AppThemeColors ac) {
     _modalOpen = true;
     showModalBottomSheet(
       context: context,
@@ -1273,7 +1273,7 @@ class _QuizScreenState extends State<QuizScreen> {
     _scrollController.jumpTo(0);
   }
 
-  Widget _buildAnsweredResult(AppState appState, Question question, ColorScheme cs) {
+  Widget _buildAnsweredResult(AppState appState, Question question, AppThemeColors ac) {
     final qt = question.questionType;
     // v1.0.2 UI 审查修复：对/错反馈统一用语义色 success(绿)/danger(红)，
     // 原 tertiary/error 在部分主题下呈现粉紫/橙，与"绿对红错"心智不符
@@ -1328,10 +1328,10 @@ class _QuizScreenState extends State<QuizScreen> {
         ),
       );
     }
-    return _buildAnsweredOptions(appState, question, cs);
+    return _buildAnsweredOptions(appState, question, ac);
   }
 
-  Widget _buildAnsweredOptions(AppState appState, Question question, ColorScheme cs) {
+  Widget _buildAnsweredOptions(AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     final userAnswer = lastRecord?.userAnswer ?? '';
     final correctAnswer = question.correctAnswer.toUpperCase().trim();
@@ -1351,9 +1351,9 @@ class _QuizScreenState extends State<QuizScreen> {
         final isCorrect = correctAnswers.contains(label);
         final isUserWrong = !isCorrect && userAnswers.contains(label);
 
-        Color bgColor = cs.surfaceContainerHighest;
-        Color textColor = cs.onSurface;
-        Color borderColor = cs.outlineVariant;
+        Color bgColor = ac.surfaceAlt;
+        Color textColor = ac.textPrimary;
+        Color borderColor = ac.border;
         if (isCorrect) {
           bgColor = ac.successContainer;
           textColor = ac.success;
@@ -1379,13 +1379,13 @@ class _QuizScreenState extends State<QuizScreen> {
                 Container(
                   width: 26, height: 26,
                   decoration: BoxDecoration(
-                    color: isCorrect ? ac.success : isUserWrong ? ac.danger : cs.outlineVariant,
+                    color: isCorrect ? ac.success : isUserWrong ? ac.danger : ac.border,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent)
                         : isUserWrong ? Icon(Icons.close, size: 14, color: ac.onAccent)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurfaceVariant)),
+                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ac.textSecondary)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1402,7 +1402,7 @@ class _QuizScreenState extends State<QuizScreen> {
     return _arrangeOptionWidgets(optionWidgets);
   }
 
-  Widget _buildResultFeedback(AppState appState, Question question, ColorScheme cs) {
+  Widget _buildResultFeedback(AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     if (lastRecord == null) return const SizedBox.shrink();
     final correct = question.correctAnswer;
@@ -1424,7 +1424,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildShowAnalysisButton(AppState appState, ColorScheme cs) {
+  Widget _buildShowAnalysisButton(AppState appState, AppThemeColors ac) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -1438,14 +1438,14 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildRegenerateButton(AppState appState, ColorScheme cs) {
+  Widget _buildRegenerateButton(AppState appState, AppThemeColors ac) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.refresh, size: 16),
         label: const Text('重新生成解析', style: TextStyle(fontSize: 13)),
         style: OutlinedButton.styleFrom(
-          foregroundColor: cs.onSurfaceVariant,
+          foregroundColor: ac.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -1465,7 +1465,7 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildAnalysisArea(AppState appState, Question question, ColorScheme cs) {
+  Widget _buildAnalysisArea(AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     final isCorrect = lastRecord?.isCorrect ?? false;
 
@@ -1487,17 +1487,17 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
+            color: ac.surfaceAlt,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.outlineVariant),
+            border: Border.all(color: ac.border),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.lightbulb_outline, color: cs.onSurfaceVariant, size: 18),
+              Icon(Icons.lightbulb_outline, color: ac.textSecondary, size: 18),
               const SizedBox(width: 8),
               Text('查看AI解析',
-                  style: TextStyle(color: cs.primary, fontSize: 14)),
+                  style: TextStyle(color: ac.accent, fontSize: 14)),
             ],
           ),
         ),
@@ -1507,7 +1507,7 @@ class _QuizScreenState extends State<QuizScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: ac.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1516,19 +1516,19 @@ class _QuizScreenState extends State<QuizScreen> {
           Row(
             children: [
               Icon(Icons.psychology_outlined,
-                  color: cs.primary, size: 20),
+                  color: ac.accent, size: 20),
               const SizedBox(width: 8),
               Text('AI解析',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
-                      color: cs.primary)),
+                      color: ac.accent)),
               const Spacer(),
               if (appState.analysisLoading)
                 SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: ac.accent)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1536,10 +1536,10 @@ class _QuizScreenState extends State<QuizScreen> {
             AiResponseWidget(text: appState.currentAnalysis!)
           else if (appState.analysisLoading)
             Text('正在生成AI解析...',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14))
+                style: TextStyle(color: ac.textSecondary, fontSize: 14))
           else
             Text('解析生成失败',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
+                style: TextStyle(color: ac.textSecondary, fontSize: 14)),
 
           if (appState.currentAnalysis != null &&
               appState.currentAnalysis!.isNotEmpty) ...[
@@ -1551,7 +1551,6 @@ class _QuizScreenState extends State<QuizScreen> {
             // ignore: use_build_context_synchronously
             ...appState.followUpHistory.map((m) => _FollowUpBubble(
                   message: m,
-                  cs: Theme.of(context).colorScheme,
                   ac: AppThemeColors.of(context),
                 )),
             // AI 回复中
@@ -1623,7 +1622,7 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
-  Widget _buildBottomBar(AppState appState, ColorScheme cs) {
+  Widget _buildBottomBar(AppState appState, AppThemeColors ac) {
     // v1.0.2 统一重构：练习模式底部栏（自由跳题 + 提交练习）
     if (widget.quizMode == QuizMode.practice) {
       final answered = _practiceAnswersMap.length;
@@ -1631,10 +1630,10 @@ class _QuizScreenState extends State<QuizScreen> {
       return Container(
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: ac.background,
           boxShadow: [
             BoxShadow(
-                color: cs.shadow.withOpacity(0.08),
+                color: ac.border.withOpacity(0.08),
                 blurRadius: 10,
                 offset: const Offset(0, -2)),
           ],
@@ -1675,12 +1674,12 @@ class _QuizScreenState extends State<QuizScreen> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: cur
-                                  ? cs.primary
+                                  ? ac.accent
                                   : ans
-                                      ? cs.primary.withOpacity(0.35)
-                                      : cs.surfaceContainerHighest,
+                                      ? ac.accent.withOpacity(0.35)
+                                      : ac.surfaceAlt,
                               border: cur
-                                  ? Border.all(color: cs.onPrimary, width: 2)
+                                  ? Border.all(color: ac.onAccent, width: 2)
                                   : null,
                             ),
                             child: Center(
@@ -1691,8 +1690,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                           ? FontWeight.bold
                                           : FontWeight.normal,
                                       color: cur
-                                          ? cs.onPrimary
-                                          : cs.onSurface)),
+                                          ? ac.onAccent
+                                          : ac.textPrimary)),
                             ),
                           ),
                         );
@@ -1728,10 +1727,10 @@ class _QuizScreenState extends State<QuizScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: ac.background,
         boxShadow: [
           BoxShadow(
-              color: cs.shadow.withOpacity(0.08),
+              color: ac.border.withOpacity(0.08),
               blurRadius: 10,
               offset: const Offset(0, -2)),
         ],
@@ -1786,7 +1785,7 @@ class _QuizScreenState extends State<QuizScreen> {
                       label: const Text('上一题',
                           maxLines: 1, softWrap: false, style: TextStyle(fontSize: 14)),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: cs.onSurfaceVariant,
+                        foregroundColor: ac.textSecondary,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         visualDensity: VisualDensity.compact,
                       ),
@@ -1955,10 +1954,9 @@ class _QuizScreenState extends State<QuizScreen> {
 /// 追问对话气泡（用户右 / AI 左）
 class _FollowUpBubble extends StatelessWidget {
   final FollowUpMessage message;
-  final ColorScheme cs;
   final AppThemeColors ac;
 
-  const _FollowUpBubble({required this.message, required this.cs, required this.ac});
+  const _FollowUpBubble({required this.message, required this.ac});
 
   @override
   Widget build(BuildContext context) {
@@ -1977,7 +1975,7 @@ class _FollowUpBubble extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isUser ? ac.accent : cs.surfaceContainerHighest,
+                  color: isUser ? ac.accent : ac.surfaceAlt,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(12),
                     topRight: const Radius.circular(12),
@@ -2005,12 +2003,12 @@ class _FollowUpTypingBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: ac.surfaceAlt,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(12),
           topRight: Radius.circular(12),
@@ -2024,11 +2022,11 @@ class _FollowUpTypingBubble extends StatelessWidget {
           SizedBox(
             width: 12,
             height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+            child: CircularProgressIndicator(strokeWidth: 2, color: ac.accent),
           ),
           const SizedBox(width: 8),
           Text('AI 正在回复...',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: ac.textSecondary)),
         ],
       ),
     );
