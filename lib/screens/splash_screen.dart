@@ -1,9 +1,9 @@
-import '../utils/design_tokens.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
+import '../utils/design_tokens.dart';
 import 'main_shell.dart';
 
 /// 启动闪屏页（v1.0.2 对齐原版设计：App Logo + 标题 + 今日一言 + 加载圈）
@@ -54,68 +54,69 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // v1.0.2 UI 审查修复：浅色主题下白底闪屏与白底 logo 融合不可辨，
-    // 改为导航色深底 + 浅色文字；浅色导航主题（护眼/极简）向黑加深
+    // Mao Des：闪屏用强调色双色位移渐变（品牌感），配白色文字。
+    // 旧版用「导航色向黑插值」在浅色导航下会变成脏灰（#A5A5A5），已废弃。
     final ac = AppThemeColors.of(context);
-    final nav = ac.navBar;
-    final bg = ThemeData.estimateBrightnessForColor(nav) == Brightness.light
-        ? Color.lerp(nav, Colors.black, 0.35)!
-        : nav;
+    final bgGradient = LinearGradient(
+      colors: [ac.accent, Color.lerp(ac.accent, ac.textPrimary, 0.32)!],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
     return Scaffold(
-      backgroundColor: bg,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // App Logo（圆角 22px 图片）
-            ClipRRect(
-              borderRadius: BorderRadius.circular(MaoRadius.large),
-              child: Image.asset(
-                'assets/app_logo.png',
-                width: 96,
-                height: 96,
-                errorBuilder: (_, __, ___) =>
-                    Icon(Icons.school, size: 88, color: Colors.white),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // 软件名字
-            Text(
-              '猫卷',
-              style: TextStyle(
-                fontSize: MaoType.display,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // 今日一言
-            Text(
-              '今日一言',
-              style: TextStyle(fontSize: MaoType.body, color: Colors.white.withOpacity(0.6)),
-            ),
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 48),
-              child: Text(
-                _hitokoto,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: MaoType.body,
-                  color: Colors.white.withOpacity(0.85),
-                  height: 1.5,
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: bgGradient),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // App Logo（大圆角卡片）
+              ClipRRect(
+                borderRadius: BorderRadius.circular(MaoRadius.large),
+                child: Image.asset(
+                  'assets/app_logo.png',
+                  width: 96,
+                  height: 96,
+                  errorBuilder: (_, __, ___) =>
+                      Icon(Icons.school, size: 84, color: ac.onAccent),
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
-            const SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
-            ),
-          ],
+              const SizedBox(height: MaoSpace.lg),
+              // 软件名字
+              Text(
+                '猫卷',
+                style: MaoType.displayStyle.copyWith(
+                    fontSize: 26, color: ac.onAccent),
+              ),
+              const SizedBox(height: MaoSpace.sm),
+              // 今日一言
+              Text(
+                '今日一言',
+                style: MaoType.captionStyle
+                    .copyWith(color: ac.onAccent.withOpacity(0.7)),
+              ),
+              const SizedBox(height: MaoSpace.xxs + 2),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 48),
+                child: Text(
+                  _hitokoto,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: MaoType.bodyStyle.copyWith(
+                    color: ac.onAccent.withOpacity(0.92),
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: MaoSpace.xxl),
+              SizedBox(
+                width: 26,
+                height: 26,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.6, color: ac.onAccent.withOpacity(0.9)),
+              ),
+            ],
+          ),
         ),
       ),
     );
