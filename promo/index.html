@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猫卷 · 本地优先的 AI 备考刷题平台</title>
+<meta name="description" content="猫卷 —— 题库自建、数据自有、AI 讲透、算法记住。离线可用的医学备考刷题 App，开源免费，无广告无会员。">
+<!--
+  ═══════════════════════════════════════════════════════════════
+  猫卷 · 功能展示页（自包含，无外部依赖，可离线打开）
+  ───────────────────────────────────────────────────────────────
+  · 素材目录：promo/assets/（真实 App 截图）
+  · 下载按钮：见下方 id="dl-apk" / id="dl-win" 两个 <a>，按需改 href
+  · 部署：整个 promo 文件夹直接丢到任意静态服务器 / Pages 即可
+  ═══════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  --bg:#070A14; --bg2:#0C1120; --surface:rgba(255,255,255,.035);
+  --surface2:rgba(255,255,255,.06); --line:rgba(255,255,255,.09);
+  --tx:#EEF2FA; --tx2:#9AA6BF; --tx3:#6B7794;
+  --c1:#2563EB;  /* 品牌鲜明 */
+  --c2:#4A7A5D;  /* 护眼柔和 */
+  --c3:#2DA8A6;  /* 极简 */
+  --c4:#7C3AED;  /* 星际穿越 */
+  --c5:#4C7CD6;  /* 碧海银河 */
+  --ok:#22C55E; --warn:#F59E0B; --dan:#EF4444;
+  --r:20px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--tx);
+  font-family:"MiSans","PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+  line-height:1.7; overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(37,99,235,.4)}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+
+/* ── 背景光晕 ── */
+.bg-glow{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bg-glow i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.20;animation:drift 22s ease-in-out infinite}
+.bg-glow i:nth-child(1){width:520px;height:520px;background:var(--c1);top:-140px;left:-100px}
+.bg-glow i:nth-child(2){width:420px;height:420px;background:var(--c4);top:34%;right:-120px;animation-delay:-7s}
+.bg-glow i:nth-child(3){width:460px;height:460px;background:var(--c3);bottom:6%;left:18%;animation-delay:-13s;opacity:.13}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.12)}66%{transform:translate(-40px,50px) scale(.94)}}
+.grid-lines{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 78%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 78%);
+}
+.wrap{position:relative;z-index:1}
+
+/* ── 导航 ── */
+nav{position:sticky;top:0;z-index:60;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  background:rgba(7,10,20,.72);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1200px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.3px}
+.brand img{width:32px;height:32px;border-radius:9px}
+.nav-links{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.nav-links a{padding:7px 13px;border-radius:9px;font-size:13.5px;color:var(--tx2);transition:.22s}
+.nav-links a:hover{color:var(--tx);background:var(--surface2)}
+.nav-cta{padding:8px 17px;border-radius:10px;font-size:13.5px;font-weight:600;
+  background:linear-gradient(135deg,var(--c1),var(--c4));color:#fff;
+  box-shadow:0 6px 20px rgba(37,99,235,.35);transition:.25s}
+.nav-cta:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(37,99,235,.5)}
+
+/* ── 通用 ── */
+section{max-width:1200px;margin:0 auto;padding:96px 24px}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--c3);padding:6px 13px;border-radius:999px;
+  background:rgba(45,168,166,.1);border:1px solid rgba(45,168,166,.24);margin-bottom:18px}
+h2{font-size:clamp(26px,3.6vw,40px);line-height:1.24;font-weight:800;letter-spacing:-.5px;margin-bottom:14px}
+h2 em{font-style:normal;background:linear-gradient(135deg,var(--c1),var(--c4) 60%,var(--c3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.lead{font-size:16.5px;color:var(--tx2);max-width:660px}
+
+/* ── Hero ── */
+#hero{padding:76px 24px 60px;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;
+  max-width:1200px;margin:0 auto}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2);
+  padding:7px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);margin-bottom:22px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:pulse 2.2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+h1{font-size:clamp(34px,5.4vw,62px);line-height:1.1;font-weight:900;letter-spacing:-1.6px;margin-bottom:20px}
+h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:17.5px;color:var(--tx2);max-width:560px;margin-bottom:14px}
+.hero-slogan{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 30px}
+.slogan-chip{font-size:13.5px;padding:8px 15px;border-radius:11px;background:var(--surface);
+  border:1px solid var(--line);color:var(--tx);transition:.25s}
+.slogan-chip:hover{background:var(--surface2);transform:translateY(-3px);border-color:rgba(37,99,235,.45)}
+.btn-row{display:flex;gap:13px;flex-wrap:wrap;align-items:center}
+.btn{padding:14px 27px;border-radius:13px;font-size:15px;font-weight:650;display:inline-flex;align-items:center;gap:9px;transition:.26s;cursor:pointer}
+.btn-p{background:linear-gradient(135deg,var(--c1),var(--c4));color:#fff;box-shadow:0 10px 30px rgba(37,99,235,.4)}
+.btn-p:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(37,99,235,.55)}
+.btn-g{background:var(--surface);border:1px solid var(--line);color:var(--tx)}
+.btn-g:hover{background:var(--surface2);transform:translateY(-3px)}
+.hero-meta{display:flex;gap:22px;margin-top:30px;flex-wrap:wrap}
+.hero-meta div{font-size:12.5px;color:var(--tx3)}
+.hero-meta b{display:block;font-size:21px;color:var(--tx);font-weight:800;letter-spacing:-.4px}
+
+/* ── 手机画框 ── */
+.stage{position:relative;display:flex;justify-content:center;align-items:center;min-height:520px;min-width:0;max-width:100%}
+.stage>*{min-width:0}
+.phone{position:relative;width:min(292px,76vw);aspect-ratio:var(--ar,1116/2480);border-radius:46px;
+  background:linear-gradient(160deg,#141A2C,#080B14);padding:9px;
+  box-shadow:0 40px 90px rgba(0,0,0,.62),0 0 0 1px rgba(255,255,255,.07);
+  animation:floaty 7s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0) rotate(-.35deg)}50%{transform:translateY(-15px) rotate(.35deg)}}
+.phone .notch{position:absolute;top:15px;left:50%;transform:translateX(-50%);width:88px;height:19px;
+  background:#05070D;border-radius:11px;z-index:4}
+.phone .scr{position:relative;width:100%;height:100%;border-radius:38px;overflow:hidden;background:#05070D}
+.phone .scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;
+  opacity:0;transition:opacity .85s ease}
+.phone .scr img.on{opacity:1}
+
+/* 桌面/平板窗口画框 */
+.window{position:relative;width:100%;max-width:640px;aspect-ratio:var(--ar,1280/800);border-radius:15px;overflow:hidden;
+  background:#0A0E18;border:1px solid var(--line);box-shadow:0 34px 80px rgba(0,0,0,.6);
+  animation:floaty 8s ease-in-out infinite}
+.window .bar{height:30px;background:#111725;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 12px}
+.window .bar i{width:10px;height:10px;border-radius:50%;background:#2A3346}
+.window .bar i:nth-child(1){background:#FF5F57}.window .bar i:nth-child(2){background:#FEBC2E}.window .bar i:nth-child(3){background:#28C840}
+.window .wbody{position:absolute;inset:30px 0 0 0;overflow:hidden;background:#05070D}
+.window .wbody img{width:100%;height:100%;object-fit:cover;object-position:top center}
+
+/* ── 浮动信息卡 ── */
+.chip{position:absolute;padding:11px 15px;border-radius:14px;font-size:12.5px;font-weight:600;
+  background:rgba(16,21,36,.9);border:1px solid var(--line);backdrop-filter:blur(12px);
+  box-shadow:0 14px 34px rgba(0,0,0,.45);display:flex;align-items:center;gap:8px;white-space:nowrap;z-index:5}
+.chip .ic{font-size:15px}
+.chip.a{top:11%;left:-4%;animation:floaty 6s ease-in-out infinite}
+.chip.b{top:44%;right:-6%;animation:floaty 7.4s ease-in-out infinite reverse}
+.chip.c{bottom:13%;left:-6%;animation:floaty 6.8s ease-in-out infinite .6s}
+.chip .v{color:var(--ok);font-weight:800}
+
+/* ── 滚动出现 ── */
+.reveal{opacity:0;transform:translateY(38px);transition:opacity .85s cubic-bezier(.22,1,.36,1),transform .85s cubic-bezier(.22,1,.36,1)}
+.reveal.in{opacity:1;transform:none}
+
+/* ── 痛点卡 ── */
+.pains{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+.pain{padding:28px 24px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);transition:.3s}
+.pain:hover{background:var(--surface2);transform:translateY(-5px);border-color:rgba(239,68,68,.34)}
+.pain .em{font-size:26px;margin-bottom:13px}
+.pain h3{font-size:17px;font-weight:750;margin-bottom:8px}
+.pain p{font-size:14px;color:var(--tx2);line-height:1.72}
+
+/* ── 功能区块 ── */
+.feat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:center;padding:82px 24px;max-width:1200px;margin:0 auto;position:relative}
+.feat>*{min-width:0}   /* 防 Grid 子项被长代码串撑破 → 手机端横向溢出 */
+.feat:nth-child(even) .f-visual{order:-1}
+.f-visual{position:relative;display:flex;justify-content:center;align-items:center;min-height:440px;flex-wrap:wrap}
+.f-visual>*{min-width:0;max-width:100%}   /* flex 子项防撑破（窄屏溢出根治） */
+.f-no{font-size:12.5px;font-weight:800;letter-spacing:2px;color:var(--tx3);margin-bottom:10px}
+.feat h3{font-size:clamp(21px,2.6vw,29px);font-weight:800;letter-spacing:-.6px;margin-bottom:14px;line-height:1.3}
+.feat h3 em{font-style:normal;color:var(--c3)}
+.f-desc{font-size:15.5px;color:var(--tx2);margin-bottom:20px}
+.f-list{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:24px}
+.f-list li{font-size:14.5px;color:var(--tx2);padding-left:24px;position:relative}
+.f-list li::before{content:"";position:absolute;left:4px;top:9.5px;width:7px;height:7px;border-radius:50%;
+  background:linear-gradient(135deg,var(--c1),var(--c4))}
+.f-list li b{color:var(--tx);font-weight:650}
+
+/* ── 技术实现盒 ── */
+.tech{border-radius:16px;padding:19px 21px;background:linear-gradient(150deg,rgba(37,99,235,.09),rgba(124,58,237,.05));
+  border:1px solid rgba(37,99,235,.24);position:relative;overflow:hidden}
+.tech::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--c1),var(--c4))}
+.tech-h{font-size:12.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#8FB0FF;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.tech dl{display:flex;flex-direction:column;gap:9px}
+.tech dt{font-size:12.5px;font-weight:700;color:var(--c3);letter-spacing:.3px}
+.tech dd{font-size:13.8px;color:var(--tx2);line-height:1.68;margin-top:2px}
+.tech code{font-family:"JetBrains Mono",Consolas,Monaco,monospace;font-size:12.5px;color:#B9CCFF;
+  background:rgba(255,255,255,.06);padding:1.5px 6px;border-radius:5px;border:1px solid rgba(255,255,255,.07);
+  overflow-wrap:anywhere;word-break:break-word}   /* 长代码串可断行，防窄屏溢出 */
+
+/* ── 打字机 ── */
+.typing{font-size:13.5px;color:var(--tx2);min-height:74px;line-height:1.75}
+.typing .cur{display:inline-block;width:8px;height:15px;background:var(--c3);vertical-align:-2px;animation:blink .9s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.typing b{color:#7DD3FC}
+
+/* ── AI 聊天气泡 ── */
+.bubbles{display:flex;flex-direction:column;gap:11px;width:100%;max-width:400px}
+.bub{max-width:82%;padding:12px 15px;border-radius:16px;font-size:13.4px;line-height:1.65;
+  opacity:0;transform:translateY(18px) scale(.96);transition:.6s cubic-bezier(.22,1,.36,1)}
+.bub.in{opacity:1;transform:none}
+.bub.u{align-self:flex-end;background:linear-gradient(135deg,var(--c1),var(--c5));color:#fff;border-bottom-right-radius:5px}
+.bub.a{align-self:flex-start;background:var(--surface2);border:1px solid var(--line);border-bottom-left-radius:5px}
+.bub.a b{color:#7DD3FC}
+
+/* ── FSRS 时间轴 ── */
+.timeline{width:100%;max-width:430px;padding:26px 22px;border-radius:18px;background:var(--surface);border:1px solid var(--line)}
+.tl-row{display:flex;align-items:center;gap:0;margin-bottom:6px}
+.tl-dot{width:15px;height:15px;border-radius:50%;background:linear-gradient(135deg,var(--c1),var(--c4));flex-shrink:0;
+  box-shadow:0 0 0 4px rgba(37,99,235,.16);opacity:0;transform:scale(.3);transition:.5s cubic-bezier(.34,1.56,.64,1)}
+.tl-dot.in{opacity:1;transform:none}
+.tl-line{flex:1;height:2px;background:linear-gradient(90deg,var(--c1),rgba(37,99,235,.15))}
+.tl-labels{display:flex;justify-content:space-between;margin-top:9px;font-size:11.5px;color:var(--tx3)}
+.tl-note{font-size:12.8px;color:var(--tx2);margin-top:16px;padding-top:15px;border-top:1px dashed var(--line)}
+.tl-note b{color:var(--ok)}
+
+/* ── 主题色板 ── */
+.themes{display:flex;gap:11px;flex-wrap:wrap;justify-content:center;margin-bottom:26px;
+  width:100%;min-width:0;max-width:100%}   /* 防被固定宽色卡撑破父容器 */
+.th{width:78px;flex:0 0 auto;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--surface);transition:.3s;cursor:default}
+.th:hover{transform:translateY(-6px) scale(1.05)}
+.th .sw{height:52px}
+.th .nm{font-size:11px;text-align:center;padding:8px 3px;color:var(--tx2);font-weight:600}
+
+/* ── 批注演示 ── */
+.ink-demo{position:relative;width:100%;max-width:380px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#F7F9FC}
+.ink-demo svg{display:block;width:100%;height:auto}
+.ink-path{fill:none;stroke:#E53935;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:900;stroke-dashoffset:900;animation:draw 3.4s cubic-bezier(.5,0,.2,1) infinite}
+@keyframes draw{0%{stroke-dashoffset:900}45%{stroke-dashoffset:0}82%{stroke-dashoffset:0}100%{stroke-dashoffset:-900}}
+.ink-hi{fill:rgba(124,58,237,.30)}
+.ink-hi2{fill:rgba(45,168,166,.32)}
+
+/* ── 统计数字 ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:40px}
+.stat{padding:26px 20px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);text-align:center;transition:.3s}
+.stat:hover{background:var(--surface2);transform:translateY(-5px)}
+.stat .n{font-size:clamp(28px,3.6vw,42px);font-weight:900;letter-spacing:-1.4px;
+  background:linear-gradient(135deg,var(--c1),var(--c4));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat .l{font-size:13px;color:var(--tx2);margin-top:5px}
+
+/* ── 技术栈 ── */
+.stack{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:13px;margin-top:40px}
+.sk{padding:17px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line);transition:.28s}
+.sk:hover{transform:translateY(-4px);border-color:rgba(45,168,166,.4);background:var(--surface2)}
+.sk .t{font-size:14px;font-weight:700;margin-bottom:4px}
+.sk .d{font-size:12.4px;color:var(--tx3);line-height:1.6}
+
+/* ── 下载区 ── */
+.dl-wrap{position:relative;border-radius:26px;padding:52px 40px;text-align:center;overflow:hidden;
+  background:linear-gradient(150deg,rgba(37,99,235,.14),rgba(124,58,237,.09));border:1px solid rgba(37,99,235,.3)}
+.dl-wrap::after{content:"";position:absolute;width:400px;height:400px;border-radius:50%;
+  background:radial-gradient(circle,rgba(45,168,166,.22),transparent 68%);top:-160px;right:-110px;pointer-events:none}
+.dl-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:30px 0 20px}
+.dl-note{font-size:13px;color:var(--tx3);position:relative;z-index:1}
+
+/* ── 页脚 ── */
+footer{border-top:1px solid var(--line);padding:44px 24px 56px;text-align:center}
+footer .fb{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px;font-weight:700}
+footer .fb img{width:28px;height:28px;border-radius:8px}
+footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
+
+/* ── 响应式 ── */
+@media (max-width:1000px){
+  #hero{grid-template-columns:1fr;gap:46px;text-align:center;padding-top:56px}
+  .hero-sub,.lead{margin-left:auto;margin-right:auto}
+  .hero-slogan,.btn-row,.hero-meta{justify-content:center}
+  .feat{grid-template-columns:1fr;gap:42px;padding:64px 24px}
+  .feat:nth-child(even) .f-visual{order:0}
+  .f-visual{min-height:auto}
+  .pains{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .nav-links{display:none}
+  .chip.a{left:0}.chip.b{right:0}.chip.c{left:0}
+}
+@media (max-width:520px){
+  .chip{font-size:11.5px;padding:9px 12px}
+  .dl-wrap{padding:38px 22px}
+  .tech{padding:16px 17px}
+  .themes{gap:8px}
+  .th{width:64px}
+  .bubbles{max-width:100%}
+  .timeline{padding:20px 16px}
+  .pains,.feat,.feat>*{min-width:0}
+  .f-list li,.f-desc,.tech dd,.tech dt{overflow-wrap:anywhere}
+}
+@media (max-width:380px){
+  .feat{padding:56px 16px}
+  section{padding:72px 16px}
+  .stage .chip{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition-duration:.01ms!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-glow"><i></i><i></i><i></i></div>
+<div class="grid-lines"></div>
+
+<div class="wrap">
+
+<!-- ═══ 导航 ═══ -->
+<nav>
+  <div class="nav-in">
+    <div class="brand"><img src="assets/logo.jpg" alt="猫卷"><span>猫卷</span></div>
+    <div class="nav-links">
+      <a href="#pain">为什么做</a>
+      <a href="#f1">功能</a>
+      <a href="#tech-stack">技术栈</a>
+      <a href="#quality">工程质量</a>
+      <a href="#download">下载</a>
+    </div>
+    <a class="nav-cta" href="#download">免费下载</a>
+  </div>
+</nav>
+
+<!-- ═══ Hero ═══ -->
+<section id="hero">
+  <div>
+    <div class="hero-tag"><span class="dot"></span> 开源免费 · 无广告 · 无会员 · 无账号</div>
+    <h1>题库自己建<br><span class="grad">数据自己管</span><br>AI 讲透，算法记住</h1>
+    <p class="hero-sub">
+      猫卷是一款<strong>本地优先</strong>的 AI 备考刷题 App。题库、错题、复习进度全部存在你自己的设备里，
+      离线可用、随时备份迁移；AI 逐题讲解由你自持的 API Key 直连，学习数据不经过任何第三方服务器。
+    </p>
+    <div class="hero-slogan">
+      <span class="slogan-chip">📥 DOCX / JSON 一键建库</span>
+      <span class="slogan-chip">🧠 AI 题眼破题法讲解</span>
+      <span class="slogan-chip">🔁 FSRS-5 间隔复习</span>
+      <span class="slogan-chip">✍️ 手写批注</span>
+      <span class="slogan-chip">📊 学习数据可视化</span>
+      <span class="slogan-chip">🌙 5 套主题 + 深色</span>
+    </div>
+    <div class="btn-row">
+      <a class="btn btn-p" href="#download">📱 立即下载体验</a>
+      <a class="btn btn-g" href="#f1">查看功能详情</a>
+    </div>
+    <div class="hero-meta">
+      <div><b>7</b>种题型</div>
+      <div><b>3</b>种刷题模式</div>
+      <div><b>5</b>套主题</div>
+      <div><b>178</b>项自动化测试</div>
+      <div><b>0</b>广告 / 0 会员</div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="chip a"><span class="ic">🔒</span> API Key 本地加密</div>
+    <div class="chip c"><span class="ic">📶</span> 离线可刷题</div>
+    <div class="chip b"><span class="ic">⚡</span> FSRS-5 <span class="v">到期提醒</span></div>
+    <div class="phone" id="hero-phone">
+      <div class="notch"></div>
+      <div class="scr" id="hero-scr">
+        <img src="assets/80_splash_new.jpg" alt="猫卷启动页" class="on">
+        <img src="assets/tab_new_home.jpg" alt="首页">
+        <img src="assets/tab_new_quiz.jpg" alt="答题页">
+        <img src="assets/84_analysis_new.jpg" alt="AI 解析">
+        <img src="assets/101_bubbles.jpg" alt="AI 追问">
+        <img src="assets/tab_new_stats.jpg" alt="统计页">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 痛点 ═══ -->
+<section id="pain">
+  <div class="reveal">
+    <div class="eyebrow">为什么做猫卷</div>
+    <h2>备考工具的三个老问题，<em>我们换了个解法</em></h2>
+    <p class="lead">不是再做一个题库 App，而是把"学习资产的所有权"还给备考的人。</p>
+  </div>
+  <div class="pains">
+    <div class="pain reveal">
+      <div class="em">💸</div>
+      <h3>订阅太贵，内容还锁死</h3>
+      <p>主流考试平台按科目收费、年费数百到数千元，题库内容封闭；停止续费后，学习记录也带不走。</p>
+    </div>
+    <div class="pain reveal" style="transition-delay:.1s">
+      <div class="em">🔐</div>
+      <h3>数据在别人服务器上</h3>
+      <p>错题、笔记、学习轨迹全部锁在云端账号里。平台改规则、下架题库，你的努力就可能归零。</p>
+    </div>
+    <div class="pain reveal" style="transition-delay:.2s">
+      <div class="em">🧱</div>
+      <h3>通用工具门槛太高</h3>
+      <p>Anki 类工具制卡繁琐、缺考试题型和题目讲解；通用 AI 问答又没有错题管理和复习排期。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 1. 智能建库 ═══ -->
+<div class="feat" id="f1">
+  <div class="f-text reveal">
+    <div class="f-no">功能 01</div>
+    <h3>丢一份文档进去，<em>自动变成题库</em></h3>
+    <p class="f-desc">不用一题一题手工录入。选择 DOCX 或 JSON 文件，猫卷自动识别题目、选项、答案与解析，生成可编辑的预览，确认后入库。</p>
+    <ul class="f-list">
+      <li><b>DOCX / JSON 双通道</b>：Word 文档直接导入，也支持结构化 JSON 题库</li>
+      <li><b>AI 智能分块</b>：长文档按题目边界切块，并发解析，不阻塞界面</li>
+      <li><b>可视化校对</b>：入库前逐题预览、编辑、删除，AI 打的知识点标签一并保留</li>
+      <li><b>开放格式</b>：题库可导出为标准 JSON，在同学之间自由流转</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>Dart <code>Isolate</code> 独立线程做文档解析；<code>archive</code> 解包 DOCX（本质是 ZIP）、<code>xml</code> 解析 <code>word/document.xml</code> 提取段落文本；AI 解析走 OpenAI 兼容的 Chat Completions 接口。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>题目边界感知切块</b>：识别 <code>1.</code>、<code>第N题</code>、<code>（1）</code> 等题号起始行，把完整题目装进一个块（上限 2000 字），切点永远落在题目之间，绝不切断一道题；② <b>3 路并发 worker 池</b>解析各块，结果按块号稳定回收；③ <b>逐级降采样重试</b>：输出超限时把 token 上限从 8192 → 4096 → 2048 逐级下调重试；④ <b>截断 JSON 抢修</b>：解析失败时从尾部回溯补 <code>}</code> 闭合，挽救前面已完整的题目；⑤ 失败的块会<b>明确报出原因</b>，不谎报"解析完成 0 题"。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual">
+    <div class="phone" style="--ar:1080/1920;width:min(268px,72vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/demo_17_import_page.jpg" alt="导入页" class="on"></div>
+    </div>
+    <div class="chip b"><span class="ic">🧩</span> 2000 字 / 块</div>
+    <div class="chip a" style="top:16%"><span class="ic">⚡</span> 3 路并发</div>
+  </div>
+</div>
+
+<!-- ═══ 2. 题库管理 ═══ -->
+<div class="feat" id="f2">
+  <div class="f-text reveal">
+    <div class="f-no">功能 02</div>
+    <h3>题库是一个个<em>独立的文件</em>，随你管理</h3>
+    <p class="f-desc">多题库并存、按需勾选、随时导出。每个题库的题量、正确率一目了然，重名会自动编号避免混淆。</p>
+    <ul class="f-list">
+      <li><b>多库并存</b>：考研、执医、规培各自成库，可单独或组合刷题</li>
+      <li><b>导出即分享</b>：一键导出 JSON 题库文件，同学导入即可用</li>
+      <li><b>级联删除</b>：删题库时相关题目、记录、批注一并清理，不留脏数据</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>SQLite（<code>sqflite</code>）作为唯一数据源，题目/会话/记录分表存储，外键开启 <code>PRAGMA foreign_keys=ON</code> 实现级联删除。</dd>
+        <dt>怎么做</dt>
+        <dd>题库以 <code>question_banks</code> 表为根，题目挂在 <code>questions.bank_id</code> 外键上；删除题库时由数据库外键级联清理题目、作答记录、错题、复习卡与批注，避免出现"孤儿数据"污染统计。导出时组装 <code>{format, name, count, questions}</code> 结构，带格式标记 <code>maojuan-quiz-questions</code>，导入端校验通过才入库，形成闭环。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual">
+    <div class="phone" style="--ar:1080/1920;width:min(268px,72vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/demo_19_bank_manage.jpg" alt="题库管理" class="on"></div>
+    </div>
+    <div class="chip c"><span class="ic">📤</span> 导出可分享</div>
+  </div>
+</div>
+
+<!-- ═══ 3. 刷题三模式 ═══ -->
+<div class="feat" id="f3">
+  <div class="f-text reveal">
+    <div class="f-no">功能 03</div>
+    <h3>三种模式，<em>对应三种学习状态</em></h3>
+    <p class="f-desc">正常刷题用来检测、练习模式用来模考、背题模式用来快速过题。同一套题目，三种节奏。</p>
+    <ul class="f-list">
+      <li><b>正常刷题</b>：答完即判，立刻看解析，答对自动跳下一题</li>
+      <li><b>练习模式</b>：限时（15–120 分钟）或不限时，答题卡漫游、统一交卷批改</li>
+      <li><b>背题模式</b>：高亮正确答案、不记统计，适合考前快速过一遍</li>
+      <li><b>数量自由</b>：10/20/30/50/80/100/全部/自定义</li>
+      <li><b>断点续刷</b>：中途退出进度保留，下次从首页继续，不丢一道题</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>Flutter 单页承载三种模式（<code>QuizMode</code> 枚举驱动），抽题走 SQL <code>ORDER BY RANDOM()</code> 随机；会话与题序落库到 <code>quiz_sessions</code> + <code>session_questions</code> 表。</dd>
+        <dt>怎么做</dt>
+        <dd>① 抽题时数量<b>下推给 SQL</b> 用 <code>LIMIT</code> 完成，避免全量取回再截断；② 会话落库保存<b>题目顺序</b>，实现断点续刷的精确还原；③ 练习模式答案先收集在内存 <code>Map</code>、<b>零落库</b>，交卷时才批量判定写库；④ 背题模式 <code>persistSession:false</code>，全程不产生任何统计污染；⑤ 限时归零先关弹窗防竞态，再自动交卷。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual">
+    <div class="phone" id="mode-phone" style="--ar:1600/2560;width:min(272px,74vw)">
+      <div class="notch"></div>
+      <div class="scr" id="mode-scr">
+        <img src="assets/tab_new_countsheet.jpg" alt="数量选择" class="on">
+        <img src="assets/tab_new_modesheet.jpg" alt="模式选择">
+        <img src="assets/tab_new_quiz.jpg" alt="刷题中">
+      </div>
+    </div>
+    <div class="chip a" style="top:14%"><span class="ic">🎯</span> 答对自动跳题</div>
+    <div class="chip c"><span class="ic">⏸</span> 随时暂停续刷</div>
+  </div>
+</div>
+
+<!-- ═══ 4. 七种题型 ═══ -->
+<div class="feat" id="f4">
+  <div class="f-text reveal">
+    <div class="f-no">功能 04</div>
+    <h3>七种题型，<em>每种都有对应的判定逻辑</em></h3>
+    <p class="f-desc">不只是选择题。判断题、填空题、名词解释、简答题、问答题都能练，而且判分不是简单的字符串相等。</p>
+    <ul class="f-list">
+      <li><b>单选 / 多选 / 判断</b>：多选忽略顺序与分隔符；判断题自动归一化各种写法</li>
+      <li><b>填空</b>：按空拆分，逐空去标点比对</li>
+      <li><b>名解 / 简答 / 问答</b>：语义包含匹配，答到关键点即可</li>
+      <li><b>重新作答</b>：答错可重做，更新原记录而不新增，不污染刷题量</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>统一的 <code>judgeAnswer</code> 判定函数按题型分派，刷题与练习共用同一套逻辑，保证判分一致。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>判断题归一化</b>：<code>不正确/不对/错误/×/X/F/FALSE</code> → 错，<code>正确/对/√/T/TRUE</code> → 对，其中否定词<b>优先匹配</b>，避免"不对"被当成"对"；② <b>多选题</b>：按中英文逗号、顿号、分号、空格拆分后转大写去重，<b>集合比较</b>忽略顺序；③ <b>填空题</b>：按分号拆空、逐空去标点比对，空数不一致直接判错；④ <b>主观题</b>：去标点后做<b>双向包含匹配</b>，且对 3 字以内答案（如"细胞壁"）改为精确相等并豁免"过短判错"。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual">
+    <div class="phone" style="--ar:1600/2560;width:min(272px,74vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/tab_new_answersheet.jpg" alt="答题卡" class="on"></div>
+    </div>
+    <div class="chip b"><span class="ic">✅</span> 7 种题型</div>
+  </div>
+</div>
+
+<!-- ═══ 5. AI 解析 ═══ -->
+<div class="feat" id="f5">
+  <div class="f-text reveal">
+    <div class="f-no">功能 05</div>
+    <h3>不是给你答案，是教你<em>题眼怎么破</em></h3>
+    <p class="f-desc">每一道题的解析都按"题眼破题法"四步拆解，模拟一个老师在旁边讲题的过程，而不是甩一段标准答案。</p>
+    <ul class="f-list">
+      <li><b>抓题眼，定性</b>：第一句点出决定答案的关键数据或特征</li>
+      <li><b>理逻辑，拆选项</b>：讲透正确项推理，也说明错误项为什么错</li>
+      <li><b>指坑点，防踩雷</b>：精准指出最容易掉的陷阱与鉴别点</li>
+      <li><b>给结论，划重点</b>：一句口诀或大白话总结得分要点</li>
+      <li><b>只看一次的钱</b>：解析本地缓存，同一道题不重复消耗 Token</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>DeepSeek <code>deepseek-chat</code>（OpenAI 兼容接口），请求走 <code>json_object</code> 结构化输出、<code>temperature 0.1</code> 保证解析稳定；结果落 <code>ai_cache</code> 表，<code>question_id</code> 唯一。</dd>
+        <dt>怎么做</dt>
+        <dd>Prompt 固定输出五段结构（答案 / 题眼 / 解析 / 避坑指南 / 一句话记忆），把"讲题方法论"固化进提示词而不是靠模型自由发挥；调用前<b>先查缓存</b>，命中直接返回、零 Token 消耗；异常或错误响应（<code>isAiError</code>）<b>绝不入缓存</b>，防止一次断网把"请求失败"永久固化成解析结果；解析支持一键重新生成。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:18px">
+    <div class="phone" style="--ar:1116/2480;width:min(250px,68vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/84_analysis_new.jpg" alt="AI 解析" class="on"></div>
+    </div>
+    <div class="tech" style="max-width:400px">
+      <div class="tech-h">⚙ 解析输出示例</div>
+      <div class="typing" data-type="**答案**：C&#10;**题眼**：看到 PaCO₂ 升高 → 锁定呼吸性酸中毒&#10;**解析**：① 定性…② 排除法…&#10;**避坑**：别把代偿性升高当原发&#10;**记忆**：CO₂ 升、pH 降 = 呼酸"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 6. 追问聊天 ═══ -->
+<div class="feat" id="f6">
+  <div class="f-text reveal">
+    <div class="f-no">功能 06</div>
+    <h3>看不懂？<em>直接追问，像聊天一样</em></h3>
+    <p class="f-desc">解析里哪一句没懂，就接着问。你的提问和 AI 的回答以对话气泡呈现，一问一答都留在题目旁边，下次打开还在。</p>
+    <ul class="f-list">
+      <li><b>对话式交互</b>：你的提问在右、AI 回复在左，一路聊到底</li>
+      <li><b>按题保存</b>：每道题的追问历史独立存储，换题不串、重启不丢</li>
+      <li><b>富文本回复</b>：支持加粗、列表、表格，长解析也读得清楚</li>
+      <li><b>自动滚到底</b>：内容变长时输入框跟随对话下移，不用手动找</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>独立数据表 <code>follow_up_messages</code>（question_id / role / content / created_at），按题查询升序最多 50 条；回复渲染用<b>自研轻量富文本渲染器</b>。</dd>
+        <dt>怎么做</dt>
+        <dd>① Prompt 里带上原题、选项、正确答案、已有解析与你的追问，让 AI 在上下文里作答；② 用户消息<b>先即时上屏</b>再等回复，交互不卡顿；③ 发送中<b>防重复提交</b>；④ <b>切题竞态保护</b>：追问过程中切到别的题，回复仍会按原题号入库，不会插到当前题上；⑤ 渲染器自己解析加粗、列表、Markdown 表格，替换掉对第三方 Markdown 包的依赖。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:16px">
+    <div class="phone" style="--ar:1080/1920;width:min(250px,68vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/101_bubbles.jpg" alt="追问聊天" class="on"></div>
+    </div>
+    <div class="bubbles" id="chat-demo">
+      <div class="bub u">为什么 PaCO₂ 升高就能定性为呼吸性酸中毒？</div>
+      <div class="bub a">因为 <b>PaCO₂ 是呼吸性指标</b>：它由肺泡通气量决定，升高说明 CO₂ 排出受阻，属呼吸性因素；而 HCO₃⁻ 才是代谢性指标。</div>
+      <div class="bub u">那代偿性升高怎么区分？</div>
+      <div class="bub a">看 <b>pH 与变化幅度</b>：原发改变决定 pH 方向，代偿不会"矫枉过正"。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 7. FSRS 错题本 ═══ -->
+<div class="feat" id="f7">
+  <div class="f-text reveal">
+    <div class="f-no">功能 07</div>
+    <h3>错题不是收藏起来，<em>是排好期再练</em></h3>
+    <p class="f-desc">错题本内置 FSRS-5 间隔重复算法：按你的遗忘曲线计算每道错题的下次复习时间，到期的才出现，避免"反复刷已经会的"。</p>
+    <ul class="f-list">
+      <li><b>自动排期</b>：答完自动更新复习卡，不需要你手动设置"几天后再看"</li>
+      <li><b>只显示到期</b>：打开错题本，看到的都是此刻该复习的题</li>
+      <li><b>反应时间参与评分</b>：答得又快又对 → 判定为"简单"，间隔拉得更长</li>
+      <li><b>知识点标签云</b>：按知识点聚合错误，一眼看出薄弱章节，可一键专项复习</li>
+      <li><b>薄弱诊断</b>：结合统计数据生成学习建议</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>FSRS-5 算法（19 个默认权重），目标记忆保留率设 0.9；复习卡存 <code>fsrs_cards</code> 表，以 <code>question_id</code> 为主键。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>遗忘曲线建模</b>：可提取性按 <code>R = exp(ln(0.9) × 已过天数 / 稳定性)</code> 计算，据此更新每张卡的"稳定性"与"难度"两个核心参数；② <b>行为自动评分</b>：答错 → Again；答对且 &lt;3 秒 → Easy；3–10 秒 → Good；≥10 秒 → Hard，用户无需手动打分；③ <b>间隔计算</b>：下一次间隔约为 <code>稳定性 × (9/难度 − 1)</code> 天，向上取整至少 1 天，稳定性与难度分别 clamp 在合理区间防极端值；④ <b>改判补记</b>：修正历史作答时，在同一事务内同步更新复习卡，保证算法状态与记录一致。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:16px">
+    <div class="phone" style="--ar:1116/2480;width:min(250px,68vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/57_errorbook.jpg" alt="错题本" class="on"></div>
+    </div>
+    <div class="timeline">
+      <div style="font-size:13px;color:var(--tx2);margin-bottom:16px">FSRS-5 复习间隔演进（示意）</div>
+      <div class="tl-row">
+        <div class="tl-dot" data-dot></div><div class="tl-line"></div>
+        <div class="tl-dot" data-dot></div><div class="tl-line"></div>
+        <div class="tl-dot" data-dot></div><div class="tl-line"></div>
+        <div class="tl-dot" data-dot></div><div class="tl-line"></div>
+        <div class="tl-dot" data-dot></div>
+      </div>
+      <div class="tl-labels"><span>今天</span><span>+1天</span><span>+3天</span><span>+8天</span><span>+21天</span></div>
+      <div class="tl-note">答对越快、间隔越长 —— <b>把时间花在快忘的题上</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 8. 数据可视化 ═══ -->
+<div class="feat" id="f8">
+  <div class="f-text reveal">
+    <div class="f-no">功能 08</div>
+    <h3>努力看得见，<em>进步有据可查</em></h3>
+    <p class="f-desc">刷题量、正确率、学习时长、连续打卡、错题分布……所有数据在本地实时计算，用图表讲清楚你的学习状态。</p>
+    <ul class="f-list">
+      <li><b>近 30 天趋势</b>：柱状题量 + 分层正确率双轴对照</li>
+      <li><b>年度热力图</b>：季度翻页的打卡日历，累计努力一眼可见</li>
+      <li><b>正确率排行</b>：按题库 / 按知识点两个维度，定位薄弱环节</li>
+      <li><b>错题统计</b>：总数、待复习、按题库分布与下次到期时间</li>
+      <li><b>历史会话</b>：每一轮练习都可回看，支持改判修正</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>趋势图与热力日历均用 Flutter <code>CustomPainter</code> <b>自绘</b>（无图表库依赖），数据由 SQL 聚合查询在设备端完成。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>双 Y 轴自绘</b>：左轴题量、右轴正确率，柱形与分层折线叠画，支持点击气泡查看单日明细、按周分页；② <b>Y 轴自适应</b>：轴上限按数据最大值动态计算（下限 20），避免刷题量小时柱子被压成一条线；③ <b>热力图色阶</b>：按当日题量分四档着色，今天高亮描边、假期置灰；④ 统计口径统一排除"隐藏记录"与"模拟数据"，保证真实作答才进入指标。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:18px">
+    <div class="phone" style="--ar:1600/2560;width:min(272px,74vw)">
+      <div class="notch"></div>
+      <div class="scr"><img src="assets/tab_new_stats.jpg" alt="统计页" class="on"></div>
+    </div>
+    <div class="window" style="--ar:1280/800;max-width:400px">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="wbody"><img src="assets/91_trend_new.jpg" alt="趋势图" style="object-position:top"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 9. 手写批注 ═══ -->
+<div class="feat" id="f9">
+  <div class="f-text reveal">
+    <div class="f-no">功能 09</div>
+    <h3>纸上怎么划重点，<em>屏幕上就怎么划</em></h3>
+    <p class="f-desc">直接在题目上圈关键词、划重点、写推导。笔迹按题目保存，切题、重启、换设备都不会丢。</p>
+    <ul class="f-list">
+      <li><b>三种笔型</b>：细笔 / 普通笔 / 荧光笔，支持压感调宽</li>
+      <li><b>四色可选</b>：红、蓝、绿、黑，颜色记忆偏好</li>
+      <li><b>橡皮与选择</b>：整笔擦除，或选中笔迹后平移 / 删除</li>
+      <li><b>跨设备适配</b>：手机、平板、桌面尺寸不同，笔迹位置保持一致</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd><code>CustomPaint</code> + <code>Listener</code> 捕获指针事件；笔迹数据存 <code>question_annotations</code> 表，复合主键 <code>(question_id, device_id)</code>。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>坐标归一化</b>：所有点位换算成 0–1 的相对坐标存储，因此同一份笔迹在任意屏幕尺寸下都能还原到相同位置；② <b>曲线平滑</b>：用<b>二次贝塞尔中点法</b>把采样点连成顺滑曲线（而非折线），笔帽笔接用圆角；③ <b>流畅度优化</b>：点距过近的采样点直接抽稀丢弃，压感取均值映射到 0.5–1.5 倍笔宽；④ <b>按设备隔离</b>：批注以 (题目, 设备) 为键，多端同步时各端笔迹共存不互相覆盖；⑤ 数据损坏时按"无批注"降级，不阻塞刷题。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:18px">
+    <div class="ink-demo">
+      <svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
+        <rect width="400" height="240" fill="#F7F9FC"/>
+        <rect x="24" y="26" width="352" height="1.5" fill="#DDE3EC"/>
+        <rect x="24" y="62" width="352" height="1.5" fill="#DDE3EC"/>
+        <rect x="24" y="98" width="300" height="1.5" fill="#DDE3EC"/>
+        <rect x="24" y="134" width="330" height="1.5" fill="#DDE3EC"/>
+        <rect x="24" y="170" width="270" height="1.5" fill="#DDE3EC"/>
+        <rect x="24" y="206" width="310" height="1.5" fill="#DDE3EC"/>
+        <rect class="ink-hi" x="118" y="52" width="104" height="20" rx="4"/>
+        <rect class="ink-hi2" x="60" y="124" width="150" height="20" rx="4"/>
+        <path class="ink-path" d="M36 118 C 70 96, 96 150, 132 116 S 186 92, 214 128 S 268 108, 300 136"/>
+        <path class="ink-path" style="animation-delay:.5s" d="M320 190 C 348 176, 356 206, 372 194"/>
+      </svg>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div class="phone" style="--ar:1600/2560;width:min(190px,52vw)">
+        <div class="notch"></div>
+        <div class="scr"><img src="assets/annot_03_done.jpg" alt="批注" class="on"></div>
+      </div>
+      <div class="phone" style="--ar:1600/2560;width:min(190px,52vw)">
+        <div class="notch"></div>
+        <div class="scr"><img src="assets/annot_18_highlighter.jpg" alt="荧光笔" class="on"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 10. 主题 ═══ -->
+<div class="feat" id="f10">
+  <div class="f-text reveal">
+    <div class="f-no">功能 10</div>
+    <h3>五套主题，<em>加上各自的深色版</em></h3>
+    <p class="f-desc">长时间刷题，界面得顺眼。五套配色风格各配一套深色变体，可跟随系统自动切换。</p>
+    <ul class="f-list">
+      <li><b>五种风格</b>：品牌鲜明 / 护眼柔和 / 极简 / 星际穿越 / 碧海银河</li>
+      <li><b>深色模式</b>：每套主题都有深色变体，跟随系统 / 手动切换</li>
+      <li><b>全局统一</b>：切换即时生效，所有页面同步换肤</li>
+      <li><b>语义色体系</b>：对错用固定的成功 / 危险色，任何主题下判断一致</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>Flutter Material 3 的 <code>ColorScheme.fromSeed</code> 以强调色为种子生成完整配色；主题扩展 <code>ThemeExtension&lt;AppThemeColors&gt;</code> 承载语义色；选择持久化到 <code>SharedPreferences</code>。</dd>
+        <dt>怎么做</dt>
+        <dd>① 5 套主题 × 浅色/深色 = <b>10 套色板</b>，各自定义导航色、背景、强调色、卡片与描边；② 页面<b>禁止硬编码色值</b>，一律通过语义取色（导航、背景、强调、成功、危险、警告），从根本上杜绝"换了主题某处看不清楚"；③ 判断题的对错用固定的成功/危险语义色，<b>不随主题偏移</b>，保证"绿对红错"的认知一致；④ 深色变体由种子色自动派生，配色关系可控。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:22px">
+    <div class="themes">
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1E3A5F,#2563EB)"></div><div class="nm">品牌鲜明</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#DAE1D4,#4A7A5D)"></div><div class="nm">护眼柔和</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#E4ECF3,#2DA8A6)"></div><div class="nm">极简</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1E1B4B,#7C3AED)"></div><div class="nm">星际穿越</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#1A253E,#4C7CD6)"></div><div class="nm">碧海银河</div></div>
+    </div>
+    <div style="display:flex;gap:14px">
+      <div class="phone" style="--ar:1080/1920;width:min(210px,56vw)">
+        <div class="notch"></div>
+        <div class="scr"><img src="assets/demo_07_home_dark.jpg" alt="深色首页" class="on"></div>
+      </div>
+      <div class="phone" style="--ar:1116/2480;width:min(210px,56vw)">
+        <div class="notch"></div>
+        <div class="scr"><img src="assets/31_dark_pinpai.jpg" alt="深色主题设置" class="on"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 11. 多端适配 ═══ -->
+<div class="feat" id="f11">
+  <div class="f-text reveal">
+    <div class="f-no">功能 11</div>
+    <h3>手机、平板、电脑，<em>同一份题库接着刷</em></h3>
+    <p class="f-desc">大屏不是简单拉伸。窗口够宽时界面自动变成左右并排布局，题区、解析、列表各就各位。</p>
+    <ul class="f-list">
+      <li><b>自适应断点</b>：平板、宽屏各有独立布局策略</li>
+      <li><b>双栏布局</b>：宽屏下题目与解析左右并排，减少滚动</li>
+      <li><b>内容限宽</b>：大屏不会把文字拉成超长行，阅读舒适</li>
+      <li><b>拖动即重排</b>：桌面端改变窗口大小，布局实时响应</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd><code>LayoutBuilder</code> 实时监听可用宽度；断点参照 Material 窗口尺寸分类；同一套 Flutter 代码构建 Android 与 Windows。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>两档断点</b>：最短边 ≥600dp 判定为平板、窗口宽 ≥840dp 判定为宽屏布局；② <code>AdaptivePair</code> 组件在可用宽 ≥900 时自动左右并排、否则上下堆叠，拖动窗口即时重排；③ <b>内容限宽</b>：普通内容最大 640、宽屏二级页最大 1200，底部弹窗最大 480，避免大屏出现超长文本行；④ 页面用统一的自适应容器居中限宽，无需每个页面各自处理。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual" style="flex-direction:column;gap:18px">
+    <div class="window" style="--ar:2560/1600">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="wbody"><img src="assets/wide_03_tablet_home.jpg" alt="平板首页"></div>
+    </div>
+    <div class="window" style="--ar:1280/800;max-width:470px">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="wbody"><img src="assets/wide_01_win_home.jpg" alt="Windows 首页"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 12. 局域网同步 ═══ -->
+<div class="feat" id="f12">
+  <div class="f-text reveal">
+    <div class="f-no">功能 12</div>
+    <h3>同一个 Wi-Fi 下，<em>手机和平板自动对上</em></h3>
+    <p class="f-desc">没有云账号，也能多设备用。两台设备连同一个 Wi-Fi，自动发现彼此并交换题库与刷题进度，全程在局域网内完成。</p>
+    <ul class="f-list">
+      <li><b>自动发现</b>：同一 Wi-Fi 下设备自动出现在列表里，无需填 IP</li>
+      <li><b>一次请求双向同步</b>：互相交换快照并合并，双方都拿到对方数据</li>
+      <li><b>智能合并</b>：新增内容按全局 ID 去重，已有的按时间取新</li>
+      <li><b>批注互不覆盖</b>：各设备的笔迹共存，谁的批注都不丢</li>
+      <li><b>不经过云</b>：数据只在你的两台设备之间直接传输</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>纯 Dart <code>dart:io</code> 实现，无第三方网络框架：<b>UDP 三通道发现</b> + 本机 <code>HttpServer</code> 交换数据；Android 侧申请 <code>MulticastLock</code> 保证能收到广播包。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>三通道发现</b>互为兜底：子网单播扫描（属出站流量，不受入站防火墙限制，最可靠）+ 多播组 + 子网广播；② 信标是 JSON，带应用魔数、协议版本、设备 ID 与端口，收到对方信标即单播应答，实现双向可见；③ 设备按 ID 去重、超时自动剔除；④ <b>一次请求完成双向同步</b>：POST 快照的同时响应本机快照；⑤ <b>合并策略</b>：题库/题目/会话/作答记录按全局 <code>uid</code> upsert，批注与错题按"（题目, 设备）"隔离共存绝不覆盖，外键按 uid 映射到本地自增 ID；⑥ 自动同步带冷却时间，也可手动"立即同步"。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual">
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">
+      <div class="phone" style="--ar:1080/1920;width:min(190px,52vw)">
+        <div class="notch"></div>
+        <div class="scr"><img src="assets/tab_new_profile.jpg" alt="我的页面" class="on"></div>
+      </div>
+      <div style="font-size:30px;color:var(--c3)">⇄</div>
+      <div class="phone" style="--ar:1600/2560;width:min(190px,52vw)">
+        <div class="notch"></div>
+        <div class="scr"><img src="assets/tab_new_home.jpg" alt="平板首页" class="on"></div>
+      </div>
+    </div>
+    <div class="chip b" style="top:8%"><span class="ic">📡</span> UDP 自动发现</div>
+    <div class="chip c"><span class="ic">🔒</span> 仅局域网内传输</div>
+  </div>
+</div>
+
+<!-- ═══ 13. 安全与数据主权 ═══ -->
+<div class="feat" id="f13">
+  <div class="f-text reveal">
+    <div class="f-no">功能 13</div>
+    <h3>你的数据，<em>真正属于你</em></h3>
+    <p class="f-desc">没有账号体系，不采集个人信息。题库、错题、进度、批注全部存在本机 SQLite 数据库里，一键导出备份，换手机原样恢复。</p>
+    <ul class="f-list">
+      <li><b>本地存储</b>：全部数据在设备内，离线可用，卸载即彻底删除</li>
+      <li><b>完整备份</b>：一键导出数据库，换设备导入即可原样恢复</li>
+      <li><b>API Key 加密</b>：密钥经 AES-256-GCM 加密，优先存入系统安全容器</li>
+      <li><b>BYOK 直连</b>：AI 请求由你的 Key 直连模型服务商，项目方不接触你的数据</li>
+      <li><b>防篡改</b>：App 签名锁定，被二次打包会直接拒绝启动</li>
+    </ul>
+    <div class="tech">
+      <div class="tech-h">⚙ 技术实现</div>
+      <dl>
+        <dt>用什么</dt>
+        <dd>API Key 用 <code>pointycastle</code> 的 <b>AES-256-GCM</b> 加密（密文自描述前缀 + base64）；Android 侧用 <code>flutter_secure_storage</code> 存入系统 Keystore；防篡改通过 MethodChannel 取 APK 真实签名比对；发布构建开启代码混淆。</dd>
+        <dt>怎么做</dt>
+        <dd>① <b>加密格式</b>：nonce 12 字节 + 密文 + GCM 认证标签 16 字节，密钥由固定盐经 SHA-256 迭代 1000 轮派生；② <b>向后兼容回退链</b>：解密依次尝试 当前版本 → 上一版盐 → 旧版算法 → 明文，保证历史数据与改名前的旧备份都能读；③ <b>备份校验</b>：导入前校验文件魔数、数据库版本号区间、核心表与关键列存在性，防伪造文件；④ <b>原子恢复</b>：先复制到临时文件二次校验，通过后旧库改名留底再替换，失败自动回滚；⑤ <b>防篡改 fail-closed</b>：签名校验放在编译期常量比对（不依赖可被清除的本地存储），校验异常一律拒绝启动；⑥ 导出前执行 WAL 检查点，确保拿到一致性的数据库快照。</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="f-visual">
+    <div style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center">
+      <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.22),transparent 68%);animation:floaty 6s ease-in-out infinite"></div>
+      <div style="position:relative;width:172px;height:172px;border-radius:44px;background:linear-gradient(150deg,rgba(37,99,235,.24),rgba(124,58,237,.14));border:1px solid rgba(37,99,235,.42);display:flex;align-items:center;justify-content:center;font-size:70px;box-shadow:0 22px 56px rgba(37,99,235,.28)">
+        🛡️
+      </div>
+    </div>
+    <div class="chip a" style="top:20%;left:-2%"><span class="ic">🔐</span> AES-256-GCM</div>
+    <div class="chip b" style="top:52%"><span class="ic">💾</span> 本地 SQLite</div>
+    <div class="chip c" style="bottom:16%"><span class="ic">🚫</span> 无账号 · 不采集</div>
+  </div>
+</div>
+
+<!-- ═══ 技术栈 ═══ -->
+<section id="tech-stack">
+  <div class="reveal" style="text-align:center">
+    <div class="eyebrow">技术栈</div>
+    <h2>用什么<em>把它做出来</em></h2>
+    <p class="lead" style="margin:0 auto">Flutter 单代码库覆盖 Android 与 Windows，所有 AI 与数据能力都在设备端与用户自持的 API 之间完成。</p>
+  </div>
+  <div class="stack">
+    <div class="sk reveal"><div class="t">Flutter</div><div class="d">单代码库跨 Android / Windows，自绘图表与画布</div></div>
+    <div class="sk reveal"><div class="t">SQLite</div><div class="d">本地数据层，外键级联、索引优化、事务一致性</div></div>
+    <div class="sk reveal"><div class="t">DeepSeek API</div><div class="d">OpenAI 兼容接口，结构化输出解析题目与讲解</div></div>
+    <div class="sk reveal"><div class="t">FSRS-5</div><div class="d">间隔重复算法，19 权重 + 遗忘曲线建模</div></div>
+    <div class="sk reveal"><div class="t">AES-256-GCM</div><div class="d">pointycastle 加密密钥，SHA-256 迭代派生</div></div>
+    <div class="sk reveal"><div class="t">Android Keystore</div><div class="d">flutter_secure_storage 系统级安全存储</div></div>
+    <div class="sk reveal"><div class="t">UDP + HTTP</div><div class="d">局域网设备发现与点对点数据同步</div></div>
+    <div class="sk reveal"><div class="t">CustomPainter</div><div class="d">趋势图、热力日历与手写笔迹自绘渲染</div></div>
+    <div class="sk reveal"><div class="t">Archive + XML</div><div class="d">解包 DOCX 并解析文档结构提取题目</div></div>
+    <div class="sk reveal"><div class="t">Isolate</div><div class="d">文档解析与重任务放独立线程，界面不卡顿</div></div>
+    <div class="sk reveal"><div class="t">Local Notifications</div><div class="d">本地时区排程 + 前台服务保活的每日提醒</div></div>
+    <div class="sk reveal"><div class="t">Flutter Test</div><div class="d">178 项自动化测试 + 集成测试保障回归</div></div>
+  </div>
+</section>
+
+<!-- ═══ 工程质量 ═══ -->
+<section id="quality">
+  <div class="reveal" style="text-align:center">
+    <div class="eyebrow">工程质量</div>
+    <h2>看得见的承诺，<em>用数字说话</em></h2>
+    <p class="lead" style="margin:0 auto">免费不等于将就。每一项改动都经过自动化测试与发布前校验，保证你手上的版本行为稳定、可追溯。</p>
+  </div>
+  <div class="stats-grid">
+    <div class="stat reveal"><div class="n"><span class="num" data-to="178">0</span></div><div class="l">项自动化测试</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="11">0</span></div><div class="l">张数据表（schema v11）</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="7">0</span></div><div class="l">种题型判定</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="5">0</span></div><div class="l">套主题 × 深浅 = 10 套色板</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="4">0</span></div><div class="l">维发布基线校验</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="0">0</span></div><div class="l">广告 / 会员 / 账号</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="100">0</span>%</div><div class="l">数据本地存储</div></div>
+    <div class="stat reveal"><div class="n">∞</div><div class="l">免费使用</div></div>
+  </div>
+  <div class="tech reveal" style="margin-top:28px">
+    <div class="tech-h">⚙ 发布流程</div>
+    <p style="font-size:14px;color:var(--tx2);margin-top:2px">
+      每次发版依次执行：静态分析（0 问题）→ 全量自动化测试（178 项）→ 混淆构建 → <b>组件 / 权限 / 文案 / 资源四维基线对照校验</b> → 签名校验。
+      其中基线校验会把当前版本与原版 APK 逐项比对，任何未审阅的差异都会被拦下，确保发出去的包可溯源、可回退。
+    </p>
+  </div>
+</section>
+
+<!-- ═══ 下载 ═══ -->
+<section id="download">
+  <div class="dl-wrap reveal">
+    <div class="eyebrow" style="margin-bottom:16px">免费下载</div>
+    <h2 style="margin-bottom:10px">现在就把题库<em>搬进自己手机</em></h2>
+    <p class="lead" style="margin:0 auto 8px">无需注册，下载即用。导入一份文档，就能开始你的第一轮刷题。</p>
+    <div class="dl-btns">
+      <!-- ↓↓↓ 部署时把 href 换成你的实际下载地址（或把 APK 放进 promo 目录） ↓↓↓ -->
+      <a class="btn btn-p" id="dl-apk" href="../dist/猫卷_v1.27.0_导入截断修复_20260901.apk" download>⬇️ Android 版 APK</a>
+      <a class="btn btn-g" id="dl-win" href="../dist/猫卷-Setup-1.27.0-Windows-x64.exe" download>🖥️ Windows 桌面版</a>
+    </div>
+    <div class="dl-note">
+      Android 7.0 及以上 · 安装包约 38 MB · 完全离线可用<br>
+      需要 AI 讲解功能时，在设置中填入你自己的 DeepSeek API Key 即可（基础刷题功能无需联网）
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 页脚 ═══ -->
+<footer>
+  <div class="fb"><img src="assets/logo.jpg" alt="猫卷"><span>猫卷</span></div>
+  <p>本地优先的 AI 备考刷题平台 · 题库自建 · 数据自有 · 开源免费</p>
+  <p>作者：B 站 笨蛋鱼坏蛋猫 · 许可：CC BY-NC-SA 4.0（署名 · 非商业 · 相同方式共享）</p>
+  <p style="margin-top:14px;color:#4A5470">本页面为功能展示用途 · 所有界面截图均来自真实 App</p>
+</footer>
+
+</div>
+
+<script>
+/* ────────── 滚动出现 ────────── */
+(function(){
+  var els = document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in')}); return; }
+  var io = new IntersectionObserver(function(list){
+    list.forEach(function(en){
+      if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+    });
+  },{threshold:.14, rootMargin:'0px 0px -60px 0px'});
+  els.forEach(function(e){ io.observe(e); });
+  // 兜底：任何原因导致未触发时，2.5 秒后强制显示（内容永不丢失）
+  setTimeout(function(){ els.forEach(function(e){ e.classList.add('in'); }); }, 2500);
+})();
+
+/* ────────── 手机轮播（Hero / 模式） ────────── */
+function cycle(id, ms){
+  var scr = document.getElementById(id);
+  if(!scr) return;
+  var imgs = scr.querySelectorAll('img');
+  if(imgs.length < 2) return;
+  var i = 0;
+  setInterval(function(){
+    imgs[i].classList.remove('on');
+    i = (i + 1) % imgs.length;
+    imgs[i].classList.add('on');
+  }, ms);
+}
+cycle('hero-scr', 2600);
+cycle('mode-scr', 2400);
+
+/* ────────── 数字滚动 ────────── */
+(function(){
+  var nums = document.querySelectorAll('.num');
+  function run(el){
+    var to = parseFloat(el.getAttribute('data-to')) || 0;
+    var t0 = null, dur = 1400;
+    function step(ts){
+      if(!t0) t0 = ts;
+      var p = Math.min((ts - t0)/dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(to * eased);
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  if(!('IntersectionObserver' in window)){ nums.forEach(run); return; }
+  var io = new IntersectionObserver(function(list){
+    list.forEach(function(en){
+      if(en.isIntersecting){ run(en.target); io.unobserve(en.target); }
+    });
+  },{threshold:.5});
+  nums.forEach(function(e){ io.observe(e); });
+  // 兜底：3 秒后仍未触发的计数器直接补上终值（防观察器失效/快速跳过）
+  setTimeout(function(){
+    nums.forEach(function(e){
+      if(e.textContent === '0'){
+        e.textContent = e.getAttribute('data-to');
+        io.unobserve(e);
+      }
+    });
+  }, 3000);
+})();
+
+/* ────────── 打字机 ────────── */
+(function(){
+  var box = document.querySelector('.typing');
+  if(!box) return;
+  var raw = box.getAttribute('data-type') || '';
+  var html = raw.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  var done = false;
+  function type(){
+    if(done) return; done = true;
+    var i = 0, step = 2;
+    function tick(){
+      i = Math.min(i + step, html.length);
+      box.innerHTML = html.slice(0, i) + (i < html.length ? '<span class="cur"></span>' : '<span class="cur"></span>');
+      if(i < html.length) setTimeout(tick, 26);
+    }
+    tick();
+  }
+  if(!('IntersectionObserver' in window)){ type(); return; }
+  var io = new IntersectionObserver(function(list){
+    list.forEach(function(en){ if(en.isIntersecting){ type(); io.unobserve(en.target); } });
+  },{threshold:.4});
+  io.observe(box);
+})();
+
+/* ────────── 聊天气泡依次出现 ────────── */
+(function(){
+  var box = document.getElementById('chat-demo');
+  if(!box) return;
+  var bubs = box.querySelectorAll('.bub');
+  function play(){
+    bubs.forEach(function(b,i){
+      setTimeout(function(){ b.classList.add('in'); }, i * 620 + 200);
+    });
+  }
+  if(!('IntersectionObserver' in window)){ play(); return; }
+  var io = new IntersectionObserver(function(list){
+    list.forEach(function(en){ if(en.isIntersecting){ play(); io.unobserve(en.target); } });
+  },{threshold:.3});
+  io.observe(box);
+})();
+
+/* ────────── FSRS 时间轴点亮 ────────── */
+(function(){
+  var dots = document.querySelectorAll('[data-dot]');
+  if(!dots.length) return;
+  function play(){
+    dots.forEach(function(d,i){ setTimeout(function(){ d.classList.add('in'); }, i * 260 + 150); });
+  }
+  if(!('IntersectionObserver' in window)){ play(); return; }
+  var io = new IntersectionObserver(function(list){
+    list.forEach(function(en){ if(en.isIntersecting){ play(); io.unobserve(en.target); } });
+  },{threshold:.4});
+  io.observe(dots[0].parentNode);
+})();
+
+/* ────────── Hero 轻视差 ────────── */
+(function(){
+  var stage = document.querySelector('#hero .stage');
+  if(!stage || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  window.addEventListener('scroll', function(){
+    var y = window.scrollY;
+    if(y < 900) stage.style.transform = 'translateY(' + (y * -0.045) + 'px)';
+  }, {passive:true});
+})();
+</script>
+</body>
+</html>
