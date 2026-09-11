@@ -45,13 +45,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   Future<void> _rejudge(int recordId, bool newCorrect) async {
     if (_rejudging) return;
     _rejudging = true;
+    // 先同步捕获 AppState，避免多次 await 之间反复使用 context
+    final appState = context.read<AppState>();
     try {
-      await context.read<AppState>().rejudgeAnswerRecord(recordId, newCorrect);
+      await appState.rejudgeAnswerRecord(recordId, newCorrect);
       if (!mounted) return;
       // v1.0.2 修复：按 sessionId 局部刷新概览，不再受 getRecentSessions(200) 限制
-      final records =
-          await context.read<AppState>().getSessionDetail(widget.session.id!);
-      final updated = await context.read<AppState>().getSessionById(widget.session.id!);
+      final records = await appState.getSessionDetail(widget.session.id!);
+      final updated = await appState.getSessionById(widget.session.id!);
       if (!mounted) return;
       setState(() {
         _records = records;

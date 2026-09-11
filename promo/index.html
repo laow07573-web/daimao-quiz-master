@@ -12,11 +12,44 @@
   · 界面渲染：**纯代码矢量重绘**（HTML/CSS/JS），非截图、非位图
     —— 任意缩放清晰、永不裁切，且能做真实动画
   · 素材：promo/assets/logo.png（页面 Logo；界面全部为代码绘制）
-  · 下载按钮：见下方 id="dl-apk" / id="dl-win" / id="dl-repo" 三个 <a>，
-    托管后把 href 换成 GitHub Releases / 仓库地址即可
+  · 下载地址：全部集中在下方 window.MAOJUAN 配置块 —— 发新版只改那里
   · 部署：整个 promo 文件夹直接丢到任意静态服务器 / Pages 即可
+    （Windows 安装包放在 promo/download/，随页面一起上传，同源直链下载）
   ═══════════════════════════════════════════════════════════════
 -->
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   下载配置（唯一改地址的地方 —— 发新版只改这一个块）
+   ──────────────────────────────────────────────────────────────────
+   android         : Android APK 的下载地址。APK 34.7MB 超过 Cloudflare
+                     Pages 的 25MB 单文件上限，故放国内网盘（蓝奏云等），
+                     填分享页链接即可。
+   windowsSetup    : Windows 安装包，随页面上传，同源直链（相对路径）。
+   windowsPortable : Windows 绿色版 zip，同上。
+   githubRelease   : GitHub Releases 兜底地址（有梯子的用户 / 网盘失效时用）。
+   repo            : 源码仓库地址。
+   ══════════════════════════════════════════════════════════════════ */
+window.MAOJUAN = {
+  version:         "1.28.0",
+  buildDate:       "20260910",
+  /* Android：arm64 版 20.4MB，通用版 34.7MB —— 直接随页面同源分发。
+     GitHub Pages 单文件上限 100MB，两者都放得下，因此不需要网盘。
+     （若将来改用 Cloudflare Pages（单文件 25MB 上限），把 android 换成
+       国内网盘分享链接，并把本文件里的 download/ 路径保留给 Windows 包。） */
+  android:          "download/MaoJuan-v1.28.0-android-arm64.apk",
+  androidUniversal: "download/MaoJuan-v1.28.0-android-universal.apk",
+  windowsSetup:     "download/MaoJuan-v1.28.0-windows-setup.exe",
+  windowsPortable:  "download/MaoJuan-v1.28.0-windows-portable.zip",
+  githubRelease:    "https://github.com/laow07573-web/daimao-quiz-master/releases/tag/v1.28.0",
+  repo:             "https://github.com/laow07573-web/daimao-quiz-master",
+  sha256: {
+    apk:      "f40155d5b00fab8edd7290efcee5839c63133fefe7fefc65960072d3848146c0",
+    apkUniv:  "b9ccb34bfd1956dc83cc2cdc55adaefd328c1b19eef296b502c2f56bb7ac1979",
+    setup:    "44f65b7475c5fd0867d6cf7ce51d6d2a132ca1ec4537c2bcb4173e445365a3be",
+    portable: "f16578477056b4a2b865e748ab5541684926a4c6aaf943c57184dc56d7a66025"
+  }
+};
+</script>
 <style>
 :root{
   --bg:#070A14; --bg2:#0C1120; --surface:rgba(255,255,255,.035);
@@ -359,10 +392,36 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
   background:linear-gradient(150deg,rgba(37,99,235,.14),rgba(124,58,237,.09));border:1px solid rgba(37,99,235,.3)}
 .dl-wrap::after{content:"";position:absolute;width:400px;height:400px;border-radius:50%;
   background:radial-gradient(circle,rgba(45,168,166,.22),transparent 68%);top:-160px;right:-110px;pointer-events:none}
-.dl-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:30px 0 20px}
+.dl-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:30px 0 14px}
 .dl-note{font-size:13px;color:var(--tx3);position:relative;z-index:1}
 .hash{font-family:Consolas,Monaco,monospace;font-size:11.5px;color:#4A5470;word-break:break-all;margin-top:8px;
   position:relative;z-index:1}
+/* 下载按钮里的版本号小字 */
+.dl-ver{font-size:.82em;font-weight:500;opacity:.85;margin-left:6px}
+/* 主按钮上的体积提示 */
+.dl-size{font-size:.78em;font-weight:400;opacity:.72;margin-left:6px}
+/* 备用下载行 */
+.dl-alt{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+  font-size:13px;color:var(--tx3);margin-bottom:20px;position:relative;z-index:1}
+.dl-alt a{color:#8FB0FF;text-decoration:underline;text-underline-offset:3px;transition:.2s}
+.dl-alt a:hover{color:var(--c4)}
+.dl-sep{color:var(--tx3);opacity:.6}
+/* 校验值折叠块 */
+.dl-hash{margin-top:18px;font-size:12.5px;color:var(--tx3);position:relative;z-index:1;
+  text-align:left;max-width:640px;margin-left:auto;margin-right:auto}
+.dl-hash summary{cursor:pointer;color:var(--tx2);list-style:none;padding:6px 0;text-align:center;
+  transition:.2s;user-select:none}
+.dl-hash summary::-webkit-details-marker{display:none}
+.dl-hash summary:hover{color:var(--c4)}
+.dl-hash summary::before{content:"▸ ";display:inline-block;transition:transform .2s}
+.dl-hash[open] summary::before{content:"▾ "}
+.dl-hash #dl-hash-body{margin-top:8px;padding:12px 14px;border-radius:12px;
+  background:rgba(0,0,0,.18);border:1px solid var(--line)}
+.dl-hash .hrow{display:flex;flex-direction:column;gap:2px;padding:6px 0}
+.dl-hash .hrow+.hrow{border-top:1px solid rgba(255,255,255,.05)}
+.dl-hash .hrow b{font-size:12px;color:var(--tx2);font-weight:600}
+.dl-hash .hrow code{font-family:Consolas,Monaco,monospace;font-size:11px;color:#7E8AA6;
+  word-break:break-all;line-height:1.55}
 
 /* ── 使用说明（尾页动画） ── */
 .guide-wrap{display:grid;grid-template-columns:minmax(0,.94fr) minmax(0,1.06fr);gap:52px;align-items:center;margin-top:44px}
@@ -1626,16 +1685,41 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     <div class="eyebrow" style="margin-bottom:16px">免费下载</div>
     <h2 style="margin-bottom:10px">现在就把题库<em>搬进自己手机</em></h2>
     <p class="lead" style="margin:0 auto 8px">无需注册，下载即用。导入一份文档，就能开始你的第一轮刷题。</p>
+
+    <!-- 主渠道 -->
     <div class="dl-btns">
-      <!-- ↓↓↓ 版本发布后，把 href 换成 GitHub Releases 的下载地址 ↓↓↓ -->
-      <a class="btn btn-p" id="dl-apk" href="https://github.com/laow07573-web/daimao-quiz-master/releases" target="_blank" rel="noopener">⬇️ Android 版 APK · v1.28.0</a>
-      <a class="btn btn-g" id="dl-win" href="https://github.com/laow07573-web/daimao-quiz-master/releases" target="_blank" rel="noopener">🖥️ Windows 桌面版 · v1.28.0</a>
-      <a class="btn btn-g" id="dl-repo" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">📦 在 GitHub 查看源码</a>
+      <a class="btn btn-p" id="dl-apk" data-cfg="android"
+         href="https://github.com/laow07573-web/daimao-quiz-master/releases" download>⬇️ Android 版 APK<span class="dl-ver"></span><span class="dl-size">20.4 MB</span></a>
+      <a class="btn btn-p" id="dl-win" data-cfg="windowsSetup"
+         href="https://github.com/laow07573-web/daimao-quiz-master/releases" download>🖥️ Windows 安装包<span class="dl-ver"></span></a>
+      <a class="btn btn-g" id="dl-win-portable" data-cfg="windowsPortable"
+         href="https://github.com/laow07573-web/daimao-quiz-master/releases" download>📦 Windows 绿色版<span class="dl-ver"></span></a>
     </div>
+
+    <!-- 备用渠道 -->
+    <div class="dl-alt">
+      <span class="dl-alt-lb">其他下载：</span>
+      <a id="dl-apk-univ" data-cfg="androidUniversal"
+         href="https://github.com/laow07573-web/daimao-quiz-master/releases" download title="含全部 CPU 架构，不确定机型时用（34.7 MB）">通用版 APK（老机型）</a>
+      <span class="dl-sep">·</span>
+      <a id="dl-backup" data-cfg="githubRelease"
+         href="https://github.com/laow07573-web/daimao-quiz-master/releases" target="_blank" rel="noopener">GitHub Releases</a>
+      <span class="dl-sep">·</span>
+      <a id="dl-repo" data-cfg="repo"
+         href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">查看源码</a>
+    </div>
+
     <div class="dl-note">
-      Android 7.0 及以上 · 完全离线可用 · 源码与安装包均在 GitHub 开源发布<br>
-      Windows 版为绿色免安装 / 安装包两种形态；需要 AI 讲解时在设置中填入你自己的 API Key（基础刷题无需联网）
+      Android 7.0 及以上 · 完全离线可用 · 不需要账号，也不需要联网<br>
+      推荐用 arm64 版（20.4 MB，2017 年后绝大多数手机）；不确定机型就下「通用版 APK」<br>
+      Windows 版提供「安装包」与「绿色免安装」两种形态；需要 AI 讲解时在设置中填入你自己的 API Key
     </div>
+
+    <!-- 校验值（可折叠，避免干扰普通用户） -->
+    <details class="dl-hash">
+      <summary>下载后核对完整性（SHA-256）</summary>
+      <div id="dl-hash-body"></div>
+    </details>
   </div>
 </section>
 
@@ -1644,13 +1728,77 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="fb"><img src="assets/logo.png" alt="猫卷"><span>猫卷</span></div>
   <p>本地优先的 AI 备考刷题平台 · 题库自建 · 数据自有 · 开源免费</p>
   <p>作者：B 站 笨蛋鱼坏蛋猫 · 许可：CC BY-NC-SA 4.0（署名 · 非商业 · 相同方式共享）</p>
-  <p>开源仓库：<a href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener" style="color:#8FB0FF">github.com/laow07573-web/daimao-quiz-master</a></p>
+  <p>开源仓库：<a id="foot-repo" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener" style="color:#8FB0FF">github.com/laow07573-web/daimao-quiz-master</a></p>
   <p style="margin-top:14px;color:#4A5470">本页面为功能展示用途 · 界面均由代码矢量重绘，可任意缩放</p>
 </footer>
 
 </div>
 
 <script>
+/* ────────── 下载链接：由 window.MAOJUAN 配置块驱动 ──────────
+   渐进增强：HTML 里的 href 已是 GitHub Releases 兜底地址，
+   即使本段脚本出错，用户依然点得动、下得了。 */
+(function(){
+  var cfg = window.MAOJUAN;
+  if(!cfg) return;
+  var q = function(id){ return document.getElementById(id); };
+
+  // 1) 填版本号（所有带 .dl-ver 的按钮）
+  var ver = ' · v' + cfg.version;
+  document.querySelectorAll('.dl-ver').forEach(function(e){ e.textContent = ver; });
+
+  // 2) 填各按钮地址
+  var map = {
+    'dl-apk':          cfg.android,
+    'dl-apk-univ':     cfg.androidUniversal,
+    'dl-win':          cfg.windowsSetup,
+    'dl-win-portable': cfg.windowsPortable,
+    'dl-backup':       cfg.githubRelease,
+    'dl-repo':         cfg.repo
+  };
+  Object.keys(map).forEach(function(id){
+    var el = q(id), url = map[id];
+    if(!el || !url) return;
+    el.setAttribute('href', url);
+    // 站外链接新窗口打开；同源文件（download/）走下载
+    if(/^https?:/i.test(url)){
+      el.setAttribute('target','_blank');
+      el.setAttribute('rel','noopener');
+      el.removeAttribute('download');
+    }
+  });
+
+  // 3) 开发历程区「查看提交记录」与页脚仓库链接
+  var repoLink = q('repo-link');
+  if(repoLink && cfg.repo) repoLink.setAttribute('href', cfg.repo);
+  var footRepo = q('foot-repo');
+  if(footRepo && cfg.repo){
+    footRepo.setAttribute('href', cfg.repo);
+    footRepo.textContent = cfg.repo.replace(/^https?:\/\//,'');
+  }
+
+  // 4) 校验值折叠块
+  var body = q('dl-hash-body');
+  if(body && cfg.sha256){
+    var items = [
+      ['Android APK（arm64，推荐）', cfg.sha256.apk],
+      ['Android APK（通用版）', cfg.sha256.apkUniv],
+      ['Windows 安装包', cfg.sha256.setup],
+      ['Windows 绿色版', cfg.sha256.portable]
+    ];
+    body.innerHTML = items.filter(function(it){ return it[1]; }).map(function(it){
+      return '<div class="hrow"><b>' + it[0] + '</b><code>' + it[1] + '</code></div>';
+    }).join('');
+  }
+
+  // 5) 同源文件标注体积
+  var sizes = { 'dl-win': '约 21 MB', 'dl-win-portable': '约 23.5 MB' };
+  Object.keys(sizes).forEach(function(id){
+    var el = q(id);
+    if(el) el.setAttribute('title', '同源直链下载，' + sizes[id]);
+  });
+})();
+
 /* ────────── 后台打开兜底：禁过渡，避免卡在起始态 ────────── */
 (function(){
   var root = document.documentElement;

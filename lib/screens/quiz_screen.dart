@@ -1747,7 +1747,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   if (widget.quizMode == QuizMode.memorize) {
                     _handleExit(appState);
                   } else {
-                    _handleEndSession(context, appState);
+                    _handleEndSession(appState);
                   }
                 },
                 child: Text(
@@ -1910,8 +1910,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   /// v1.0.2 设计审查修复：结束会话防重（_ending 标志）+ 保存失败提示重试/放弃
   /// （此前双击会因会话已 reset 抛未捕获 StateError）
-  Future<void> _handleEndSession(
-      BuildContext context, AppState appState) async {
+  Future<void> _handleEndSession(AppState appState) async {
     if (_ending) return;
     _ending = true;
     try {
@@ -1943,7 +1942,7 @@ class _QuizScreenState extends State<QuizScreen> {
       if (!mounted) return;
       if (retry == true) {
         _ending = false;
-        await _handleEndSession(context, appState);
+        await _handleEndSession(appState);
       } else {
         Navigator.pop(context);
       }

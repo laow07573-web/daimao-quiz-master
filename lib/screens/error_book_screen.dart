@@ -317,15 +317,17 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     final path = await appState.exportErrorQuestionsJson(_filter,
         bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
     if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     if (path == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('当前筛选下暂无错题')),
       );
       return;
     }
     final count = await appState.getFullErrorCount(_filter,
         bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    messenger.showSnackBar(
       SnackBar(
         content: Text('（共 $count 题）已导出为 .json 文件。'),
         backgroundColor: AppThemeColors.of(context).warning,
@@ -337,7 +339,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('分享失败：$e')),
       );
     }

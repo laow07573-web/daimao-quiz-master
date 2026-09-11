@@ -790,7 +790,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: ac.accent,
                 onTap: () {
                   Navigator.pop(ctx);
-                  _startQuiz(context, appState);
+                  _startQuiz(appState);
                 },
               ),
               const SizedBox(height: 10),
@@ -801,7 +801,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: ac.textSecondary,
                 onTap: () {
                   Navigator.pop(ctx);
-                  _startPractice(context, appState);
+                  _startPractice(appState);
                 },
               ),
               const SizedBox(height: 10),
@@ -812,7 +812,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: ac.accent,
                 onTap: () {
                   Navigator.pop(ctx);
-                  _startMemorize(context, appState);
+                  _startMemorize(appState);
                 },
               ),
               const SizedBox(height: 12),
@@ -823,7 +823,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _startQuiz(BuildContext context, AppState appState) async {
+  Future<void> _startQuiz(AppState appState) async {
     if (_vacationBlocked(appState)) return;
     // v1.0.2 修复：刷题不再强制要求 API Key（AI 解析/追问内部单独提示）
 
@@ -846,7 +846,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadWeeklyData(appState);
   }
 
-  Future<void> _startPractice(BuildContext context, AppState appState) async {
+  Future<void> _startPractice(AppState appState) async {
     if (_vacationBlocked(appState)) return;
     if (appState.selectedBankIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -870,7 +870,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadWeeklyData(appState);
   }
 
-  Future<void> _startMemorize(BuildContext context, AppState appState) async {
+  Future<void> _startMemorize(AppState appState) async {
     if (_vacationBlocked(appState)) return;
     // v1.0.2 修复：背题无需 API Key；不落会话行（背题不计统计）
     if (appState.selectedBankIds.isEmpty) {

@@ -63,3 +63,7 @@ android/key.properties
 
 # 发布校验报告为本地生成物
 tools/reference_check/reference_check_report.txt
+
+# 推广页的安装包副本与部署暂存目录（由 tools/deploy_promo.ps1 生成）
+promo/download/
+/build/promo_deploy/

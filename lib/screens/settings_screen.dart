@@ -254,6 +254,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       canPop: !dirty,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        // 先同步取 Navigator，避免 await 之后跨异步使用 context
+        final nav = Navigator.of(context);
         final leave = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -272,7 +274,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         );
-        if (leave == true && mounted) Navigator.of(context).pop();
+        if (leave == true && mounted) nav.pop();
       },
       child: Scaffold(
         backgroundColor: ac.background,
@@ -793,15 +795,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         keywordHighlight: _keywordHighlight,
                       );
                   // v1.0.2 修复：等待保存完成再提示/返回（此前 fire-and-forget）
+                  // 先同步取 messenger / navigator，避免 await 之后跨异步使用 context
+                  final messenger = ScaffoldMessenger.of(context);
+                  final nav = Navigator.of(context);
                   await context.read<AppState>().updateSettings(newSettings);
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: const Text('设置已保存'),
                       backgroundColor: ac.accent,
                     ),
                   );
-                  Navigator.pop(context);
+                  nav.pop();
                 },
                 child: const Text('保存设置', style: TextStyle(fontSize: MaoType.h3)),
               ),
@@ -865,7 +870,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: const TextStyle(fontSize: MaoType.body)),
                       onPressed: (_untaggedCount > 0 &&
                               context.read<AppState>().settings.isConfigured)
-                          ? () => _startTagging(context)
+                          ? () => _startTagging()
                           : null,
                     ),
                   ),
@@ -983,7 +988,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: Text('设备名：$displayName',
                             style: const TextStyle(fontSize: MaoType.body)),
                         trailing: const Icon(Icons.edit, size: 18),
-                        onTap: () => _editDeviceName(context, displayName),
+                        onTap: () => _editDeviceName(displayName),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1159,6 +1164,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               TextStyle(fontSize: MaoType.body, color: ac.textPrimary)),
                       value: appState.reminderEnabled,
                       onChanged: (v) async {
+                        // 先同步取 messenger，避免 await 之后跨异步使用 context
+                        final messenger = ScaffoldMessenger.of(context);
                         // v1.0.2 修复：开启提醒前请求 Android 13+ 通知运行时权限
                         if (v) {
                           await ReminderService.instance
@@ -1169,7 +1176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               .hasNotificationPermission();
                           if (!mounted) return;
                           if (!granted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               const SnackBar(
                                   content: Text('通知权限未开启：提醒将不可见。'
                                       '请到系统设置中允许本应用的通知权限。')),
@@ -1220,13 +1227,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: const Icon(Icons.notifications_active, size: 16),
                         label: const Text('发送测试通知', style: TextStyle(fontSize: MaoType.body)),
                         onPressed: () async {
+                          // 先同步取 messenger，避免 await 之后跨异步使用 context
+                          final messenger = ScaffoldMessenger.of(context);
                           // v1.0.2 修复：Android 13+ 先请求通知权限，再发测试通知
                           await ReminderService.instance
                               .requestNotificationPermission();
                           final sent = await ReminderService.instance
                               .sendTestNotification();
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             SnackBar(
                                 content: Text(sent
                                     ? '测试通知已发送，下拉通知栏查看'
@@ -1465,13 +1474,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             visualDensity: VisualDensity.compact,
                           ),
                           onPressed: () async {
+                            // 先同步取 messenger，避免 await 之后跨异步使用 context
+                            final messenger = ScaffoldMessenger.of(context);
                             try {
                               if (!DebugLogService.instance.enabled) {
                                 DebugLogService.instance.enable();
                               }
                               final file = await DebugLogService.instance.exportToFile();
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text('日志已导出到: ${file.path}'),
                                     backgroundColor: ac.accent,
@@ -1481,7 +1492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               }
                             } catch (e) {
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text('导出失败: $e'),
                                     backgroundColor: ac.danger,
@@ -1517,6 +1528,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         label: const Text('分享', style: TextStyle(fontSize: MaoType.body)),
                         style: OutlinedButton.styleFrom(foregroundColor: ac.accent),
                         onPressed: () async {
+                          // 先同步取 messenger，避免 await 之后跨异步使用 context
+                          final messenger = ScaffoldMessenger.of(context);
                           try {
                             if (!DebugLogService.instance.enabled) {
                               DebugLogService.instance.enable();
@@ -1529,7 +1542,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              messenger.showSnackBar(
                                 SnackBar(content: Text('分享失败: $e'), backgroundColor: ac.danger),
                               );
                             }
@@ -1638,6 +1651,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _syncNow() async {
     final appState = context.read<AppState>();
     final engine = context.read<SyncEngine>();
+    // 先同步取 messenger 与错误色，避免多次 await 之后跨异步使用 context
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
     if (engine.syncing) return;
     try {
       if (!engine.started) {
@@ -1645,13 +1661,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('同步服务启动失败：$e')),
       );
       return;
     }
     if (engine.peers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
             content: Text('未发现其他设备：请确认双方接入同一局域网，'
                 '且对端应用正在前台运行')),      );
@@ -1659,19 +1675,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final (tried, ok) = await engine.manualSync();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
         content: Text(ok > 0
             ? '同步完成：$ok/$tried 台设备成功'
             : '同步失败：请检查对端应用是否在前台运行'),
-        backgroundColor: ok > 0 ? null : Theme.of(context).colorScheme.error,
+        backgroundColor: ok > 0 ? null : errorColor,
       ),
     );
   }
 
   /// 编辑设备名（空值回落缺省名「猫卷-平台」）
-  Future<void> _editDeviceName(BuildContext context, String current) async {
+  Future<void> _editDeviceName(String current) async {
     final controller = TextEditingController(text: current);
+    // 先同步取 messenger，避免 await 之后跨异步使用 context
+    final messenger = ScaffoldMessenger.of(context);
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1700,7 +1718,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await appState.updateSettings(
         appState.settings.copyWith(deviceName: newName));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
           content: Text(newName.isEmpty
               ? '设备名已恢复缺省值'
@@ -1709,10 +1727,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// v1.0.2 对齐里程碑：为剩余题目打标签（进度 + 暂停/继续 + 预览确认）
-  Future<void> _startTagging(BuildContext context) async {
+  Future<void> _startTagging() async {
     final appState = context.read<AppState>();
     final ai = appState.aiService;
     if (ai == null) return;
+    // 先同步取 messenger 与三次色，避免多次 await 之后跨异步使用 context
+    final messenger = ScaffoldMessenger.of(context);
+    final tertiaryColor = Theme.of(context).colorScheme.tertiary;
     final questions = await appState.getUntaggedErrorQuestions();
     if (!mounted || questions.isEmpty) return;
     final applied = await showDialog<({int applied, int skipped})>(
@@ -1728,10 +1749,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? '已应用 ${applied.applied} 道标签，跳过 ${applied.skipped} 道失败标记'
           // v1.0.2 对齐里程碑：全部题目已打标签完成
           : '全部题目已打标签完成';
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(msg),
-          backgroundColor: Theme.of(context).colorScheme.tertiary,
+          backgroundColor: tertiaryColor,
         ),
       );
     }

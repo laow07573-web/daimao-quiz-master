@@ -160,30 +160,32 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消')),
-            FilledButton(
-                onPressed: () async {
-                  // 对齐里程碑：设为今天到期前二次确认
-                  if (dueToday) {
-                    final sure = await showDialog<bool>(
-                      context: ctx,
-                      builder: (c2) => AlertDialog(
-                        title: const Text('确认操作'),
-                        content: const Text('确定把所有复习卡设为今天到期吗？\n错题本的「待复习」数量会全部增加。'),
-                        actions: [
-                          TextButton(
-                              onPressed: () => Navigator.pop(c2, false),
-                              child: const Text('取消')),
-                          FilledButton(
-                              onPressed: () => Navigator.pop(c2, true),
-                              child: const Text('确定')),
-                        ],
-                      ),
-                    );
-                    if (sure != true) return;
-                  }
-                  Navigator.pop(ctx, true);
-                },
-                child: const Text('开始模拟')),
+                FilledButton(
+                    onPressed: () async {
+                      // 对齐里程碑：设为今天到期前二次确认
+                      // 先取 Navigator（同步），避免 await 之后再用 ctx 触发跨异步告警
+                      final rootNav = Navigator.of(ctx);
+                      if (dueToday) {
+                        final sure = await showDialog<bool>(
+                          context: ctx,
+                          builder: (c2) => AlertDialog(
+                            title: const Text('确认操作'),
+                            content: const Text('确定把所有复习卡设为今天到期吗？\n错题本的「待复习」数量会全部增加。'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(c2, false),
+                                  child: const Text('取消')),
+                              FilledButton(
+                                  onPressed: () => Navigator.pop(c2, true),
+                                  child: const Text('确定')),
+                            ],
+                          ),
+                        );
+                        if (sure != true) return;
+                      }
+                      rootNav.pop(true);
+                    },
+                    child: const Text('开始模拟')),
           ],
         ),
       ),
@@ -232,6 +234,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
     if (result == null || result.files.isEmpty) return;
     final path = result.files.first.path;
     if (path == null) return;
+    if (!mounted) return;
     // v1.0.2 对齐里程碑：导入前确认（覆盖当前所有数据）
     final sure = await showDialog<bool>(
       context: context,

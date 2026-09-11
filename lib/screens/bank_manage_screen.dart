@@ -81,7 +81,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
                       isSelected: isSelected,
                       onTap: () => appState.toggleBankSelection(bank.id!),
                       onDelete: () => _confirmDelete(context, appState, bank),
-                      onExport: () => _exportBank(context, bank),
+                      onExport: () => _exportBank(bank),
                     );
                   }
 
@@ -196,22 +196,22 @@ class _BankManageScreenState extends State<BankManageScreen> {
   }
 
   /// v1.0.2 扩展：导出题库（含打标签/解析的整理后字段）为 .json 并分享
-  Future<void> _exportBank(BuildContext context, QuestionBank bank) async {
+  Future<void> _exportBank(QuestionBank bank) async {
     final dir = Directory.systemTemp.createTempSync('bank_export');
     final path =
         '${dir.path}/${bank.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}.json';
     final result = await BankFileService.exportBank(bank.id!, bank.name, path);
     if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     if (result == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('该题库没有题目，无法导出')),
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
         content: Text('已导出 ${bank.questionCount} 道题目为 .json 文件'),
-        backgroundColor: Theme.of(context).colorScheme.tertiary,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -220,7 +220,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('分享失败：$e')),
       );
     }
