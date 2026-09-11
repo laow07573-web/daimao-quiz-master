@@ -1020,6 +1020,18 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
   }
 
+  /// 供独立「AI 对话页」主动拉取当前题历史（页面进入时调用）
+  Future<void> loadFollowUpHistory() => _loadFollowUpHistory();
+
+  /// 清空当前题的追问历史（对话页右上角「清空对话」）
+  Future<void> clearFollowUpHistory() async {
+    final q = currentQuestion;
+    if (q?.id == null) return;
+    await _db.deleteFollowUpMessages(q!.id!);
+    _followUpHistory = [];
+    notifyListeners();
+  }
+
   /// 重新生成解析（清除缓存）
   Future<void> regenerateAnalysis() async {
     if (_aiService == null || currentQuestion == null) return;

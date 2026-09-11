@@ -962,6 +962,13 @@ class DatabaseService {
     );
   }
 
+  /// 清空某题的追问历史（用户主动"清空对话"）
+  Future<void> deleteFollowUpMessages(int questionId) async {
+    final db = await database;
+    await db.delete('follow_up_messages',
+        where: 'question_id = ?', whereArgs: [questionId]);
+  }
+
   /// 某会话的全部作答记录（question_id → 记录，断点续刷恢复历史用）
   Future<Map<int, AnswerRecord>> getAnswerRecordsBySession(
       int sessionId) async {

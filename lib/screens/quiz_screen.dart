@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
-import '../models/follow_up_message.dart';
 import '../models/ink_annotation.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
@@ -19,6 +18,7 @@ import '../widgets/annotation_canvas.dart';
 import '../widgets/annotation_controller.dart';
 import '../widgets/annotation_toolbar.dart';
 import '../services/debug_log_service.dart';
+import 'ai_chat_screen.dart';
 import 'session_summary_screen.dart';
 import '../widgets/answer_sheet_widget.dart';
 import '../widgets/question_edit_dialog.dart';
@@ -1544,83 +1544,86 @@ class _QuizScreenState extends State<QuizScreen> {
 
           if (appState.currentAnalysis != null &&
               appState.currentAnalysis!.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: MaoSpace.sm + 2),
             const Divider(),
-            const SizedBox(height: 8),
-            // v1.0.2 聊天气泡式追问：历史消息（用户右/AI 左），
-            // 按题持久化，切题重新打开后仍可见
-            // ignore: use_build_context_synchronously
-            ...appState.followUpHistory.map((m) => _FollowUpBubble(
-                  message: m,
-                  ac: AppThemeColors.of(context),
-                )),
-            // AI 回复中
-            if (appState.followUpLoading)
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [Flexible(child: _FollowUpTypingBubble())],
-              ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _followUpController,
-                    decoration: InputDecoration(
-                      hintText: '追问AI相关问题...',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(MaoRadius.small)),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      isDense: true,
-                    ),
-                    style: const TextStyle(fontSize: MaoType.body),
-                    onSubmitted: (_) => _sendFollowUp(appState),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.send, size: 16),
-                  label: const Text('发送', style: TextStyle(fontSize: MaoType.body)),
-                  onPressed: () => _sendFollowUp(appState),
-                ),
-              ],
-            ),
+            const SizedBox(height: MaoSpace.xs),
+            // v1.28：追问改为独立全屏对话页（旧版嵌在解析卡里空间局促）
+            _buildChatEntry(appState, ac),
           ],
         ],
       ),
     );
   }
 
-  /// 发送追问（聊天气泡式）：配置拦截 → 入历史 → AI 回复 → 滚到底部
-  Future<void> _sendFollowUp(AppState appState) async {
-    if (!appState.settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: const Text('请先在设置中配置 API Key 后再追问。'),
-            backgroundColor: AppThemeColors.of(context).warning),
-      );
-      return;
-    }
-    final q = _followUpController.text.trim();
-    if (q.isEmpty) return;
-    _followUpController.clear();
-    _scrollToFollowUpBottom();
-    await appState.sendFollowUp(q);
-    if (!mounted) return;
-    _scrollToFollowUpBottom();
-  }
-
-  /// 追问内容增长后自动滚动到对话末尾（输入框随消息下移）
-  void _scrollToFollowUpBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    });
+  /// AI 对话入口（v1.28）：进入独立全屏对话页
+  ///
+  /// 旧版把追问聊天嵌在解析卡内，空间局促、要滚很久才看得到。
+  /// 现在解析卡下方只放一个入口，点进去是全屏对话页。
+  Widget _buildChatEntry(AppState appState, AppThemeColors ac) {
+    final count = appState.followUpHistory.length;
+    final hasHistory = count > 0;
+    return Material(
+      color: ac.surface,
+      borderRadius: MaoRadius.controlBorder,
+      child: InkWell(
+        borderRadius: MaoRadius.controlBorder,
+        onTap: () async {
+          if (!appState.settings.isConfigured) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: const Text('请先在设置中配置 API Key 后再追问。'),
+                  backgroundColor: ac.warning),
+            );
+            return;
+          }
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiChatScreen()),
+          );
+          if (mounted) setState(() {}); // 返回后刷新入口上的历史条数
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: MaoSpace.sm + 2, vertical: MaoSpace.sm + 2),
+          decoration: BoxDecoration(
+            borderRadius: MaoRadius.controlBorder,
+            border: Border.all(color: ac.border, width: MaoShadow.hairline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: ac.accentSoft,
+                  borderRadius: MaoRadius.smallBorder,
+                ),
+                child: Icon(Icons.forum_outlined, size: 18, color: ac.accent),
+              ),
+              const SizedBox(width: MaoSpace.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('向 AI 追问',
+                        style: MaoType.h3Style.copyWith(
+                            color: ac.textPrimary, fontSize: 15)),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasHistory ? '已有 $count 条对话记录' : '没看懂？直接问，对话式讲解',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: MaoType.captionStyle.copyWith(color: ac.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 20, color: ac.textTertiary),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildBottomBar(AppState appState, AppThemeColors ac) {
@@ -1952,87 +1955,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
 
 
-/// 追问对话气泡（用户右 / AI 左）
-class _FollowUpBubble extends StatelessWidget {
-  final FollowUpMessage message;
-  final AppThemeColors ac;
 
-  const _FollowUpBubble({required this.message, required this.ac});
-
-  @override
-  Widget build(BuildContext context) {
-    final isUser = message.role == 'user';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          Flexible(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 280),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isUser ? ac.accent : ac.surfaceAlt,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(MaoRadius.control),
-                    topRight: const Radius.circular(MaoRadius.control),
-                    bottomLeft: Radius.circular(isUser ? 12 : 4),
-                    bottomRight: Radius.circular(isUser ? 4 : 12),
-                  ),
-                ),
-                child: isUser
-                    ? Text(message.content,
-                        style: TextStyle(
-                            fontSize: MaoType.body, color: ac.onAccent, height: 1.5))
-                    : AiResponseWidget(text: message.content, fontSize: MaoType.caption),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// AI 回复中的提示气泡
-class _FollowUpTypingBubble extends StatelessWidget {
-  const _FollowUpTypingBubble();
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: ac.surfaceAlt,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(MaoRadius.control),
-          topRight: Radius.circular(MaoRadius.control),
-          bottomLeft: Radius.circular(MaoRadius.control),
-          bottomRight: Radius.circular(MaoRadius.chip),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2, color: ac.accent),
-          ),
-          const SizedBox(width: 8),
-          Text('AI 正在回复...',
-              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
-        ],
-      ),
-    );
-  }
-}
 
 /// v1.0.3 窗口自适应：选项随可用宽度自动排列。
 /// 每个选项固定单元宽（300，含底部间距），宽度足够时自然形成多列，
