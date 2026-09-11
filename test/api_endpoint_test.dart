@@ -121,15 +121,22 @@ void main() {
       expect(kApiPresets.length, greaterThanOrEqualTo(6));
     });
 
-    test('每条预设都有端点/模型/hint，且端点 Unique', () {
+    test('每条预设都有端点/模型/hint，且端点 Unique（自定义除外）', () {
       final endpoints = <String>{};
       for (final p in kApiPresets) {
+        expect(p.hint, isNotEmpty);
+        // 「自定义」预设刻意留空，由用户手填，不参与该不变量
+        if (p.isCustom) {
+          expect(p.endpoint, isEmpty);
+          continue;
+        }
         expect(p.endpoint, isNotEmpty);
         expect(p.model, isNotEmpty);
-        expect(p.hint, isNotEmpty);
         expect(endpoints.add(p.endpoint), isTrue,
             reason: '端点不应重复：${p.endpoint}');
       }
+      // 至少有一个「自定义」入口
+      expect(kApiPresets.any((p) => p.isCustom), isTrue);
     });
   });
   group('AIService.testConnection 输入校验（不发网络请求）', () {

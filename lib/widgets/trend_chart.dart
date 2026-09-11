@@ -387,8 +387,19 @@ class _TrendPainter extends CustomPainter {
     }
   }
 
+  /// 某天是否有记录；有则返回其正确率折线上的坐标，否则 null
+  Offset? _accPointAt(int i) {
+    if (i < 0 || i >= days.length) return null;
+    final t = (days[i]['total'] as int?) ?? 0;
+    if (t <= 0) return null;
+    final a = (days[i]['accuracy'] as double?) ?? 0;
+    return Offset(_x(i), _yFor(a / 100 * chartMax));
+  }
+
   void _drawAccuracyLine(Canvas canvas) {
-    // 只连有记录的天；段色 = accuracyTierColor(min(两端 rate))
+    // 只连有记录的天；段色 = accuracyTierColor(min(两端 rate))。
+    // 逐点画曲线：相邻两点用三次贝塞尔相连（Catmull-Rom 转 Bézier），
+    // 控制点限制在该段包围盒内，避免过冲产生假峰谷。
     for (var i = 0; i < days.length - 1; i++) {
       final t1 = (days[i]['total'] as int?) ?? 0;
       final t2 = (days[i + 1]['total'] as int?) ?? 0;
@@ -398,12 +409,15 @@ class _TrendPainter extends CustomPainter {
       final paint = Paint()
         ..color = accuracyTierColor(math.min(a1, a2), ac)
         ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
-      canvas.drawLine(
-        Offset(_x(i), _yFor(a1 / 100 * chartMax)),
-        Offset(_x(i + 1), _yFor(a2 / 100 * chartMax)),
-        paint,
-      );
+
+      final p1 = Offset(_x(i), _yFor(a1 / 100 * chartMax));
+      final p2 = Offset(_x(i + 1), _yFor(a2 / 100 * chartMax));
+      final p0 = _accPointAt(i - 1) ?? p1;
+      final p3 = _accPointAt(i + 2) ?? p2;
+      canvas.drawPath(smoothSegment(p1, p2, p0, p3), paint);
     }
   }
 
@@ -499,4 +513,22 @@ class _TrendPainter extends CustomPainter {
       old.chartMax != chartMax ||
       old.selectedIndex != selectedIndex ||
       old.ac != ac;
+}
+
+/// 用三次贝塞尔连接 p1→p2，控制点由 Catmull-Rom（p0→p1→p2→p3）推得，
+/// 并收进本段包围盒内，保证曲线平滑、单调、不过冲。
+///
+/// 抽成纯函数便于单测（绘制本身难以断言）。
+Path smoothSegment(Offset p1, Offset p2, Offset p0, Offset p3) {
+  var c1 = p1 + (p2 - p0) / 6;
+  var c2 = p2 - (p3 - p1) / 6;
+  final loY = math.min(p1.dy, p2.dy);
+  final hiY = math.max(p1.dy, p2.dy);
+  final loX = math.min(p1.dx, p2.dx);
+  final hiX = math.max(p1.dx, p2.dx);
+  c1 = Offset(c1.dx.clamp(loX, hiX), c1.dy.clamp(loY, hiY));
+  c2 = Offset(c2.dx.clamp(loX, hiX), c2.dy.clamp(loY, hiY));
+  return Path()
+    ..moveTo(p1.dx, p1.dy)
+    ..cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, p2.dx, p2.dy);
 }

@@ -89,6 +89,42 @@ void main() {
     });
   });
 
+  group('正确率平滑曲线（Catmull-Rom → 三次贝塞尔）', () {
+    test('曲线包含三次贝塞尔段（非直线）', () {
+      final path = smoothSegment(
+        const Offset(0, 100), const Offset(10, 20),
+        const Offset(0, 100), const Offset(20, 30),
+      );
+      final metrics = path.computeMetrics().toList();
+      expect(metrics, isNotEmpty);
+      // 贝塞尔段长度 > 直线距离（曲线比直线长），可证明它在弯曲
+      final straight = (const Offset(10, 20) - const Offset(0, 100)).distance;
+      expect(metrics.first.length, greaterThan(straight));
+    });
+
+    test('控制点收在段包围盒内：曲线不过冲', () {
+      // 三段起伏数据，中点应落在两端 y 之间，不冲出
+      final p1 = const Offset(0, 50);
+      final p2 = const Offset(10, 50);
+      final p0 = const Offset(-10, 0);   // 上一段在上方 → 会拉高控制点
+      final p3 = const Offset(20, 100);  // 下一段在下方
+      final path = smoothSegment(p1, p2, p0, p3);
+      final bounds = path.getBounds();
+      // 包围盒不应超出 p1/p2 的 y 范围（50~50）
+      expect(bounds.top, greaterThanOrEqualTo(49.9));
+      expect(bounds.bottom, lessThanOrEqualTo(50.1));
+    });
+
+    test('平坦数据得到水平直线', () {
+      final path = smoothSegment(
+        const Offset(0, 30), const Offset(10, 30),
+        const Offset(0, 30), const Offset(10, 30),
+      );
+      final b = path.getBounds();
+      expect(b.height, lessThan(0.01));
+    });
+  });
+
   group('TrendChart 交互', () {
     testWidgets('渲染 30 天数据无异常，页码指示器存在', (tester) async {
       await tester.pumpWidget(

@@ -2,7 +2,7 @@
 library;
 
 /// 版本号（首页页脚 / 我的页入口 / 关于弹窗共用，发布时只改这里）
-const String kAppVersion = 'v1.27.0.18';
+const String kAppVersion = 'v1.28.0.19';
 
 /// 刷题数量「全部」哨兵值（9999）
 const int kQuestionCountAll = 9999;

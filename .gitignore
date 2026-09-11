@@ -57,3 +57,6 @@ docs/ui_review_assets/
 android/key.properties
 **/*.jks
 **/*.keystore
+
+# 发布校验报告为本地生成物
+tools/reference_check/reference_check_report.txt

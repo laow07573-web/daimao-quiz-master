@@ -8,6 +8,10 @@ import '../services/debug_log_service.dart';
 /// v1.0.2 UI 审查修复：flutter_markdown 0.7.1 对「中文全角标点紧跟闭合
 /// 星号」解析失败（**定性/计算**： 原样显示），改为自研 span 渲染器。
 /// v1.0.2 用户反馈修复：补充 Markdown 表格块级渲染。
+/// v1.28 用户反馈增强：
+///  1. 结构色 —— 答案(绿)/题眼(蓝)/避坑指南(红+浅底)/一句话记忆(蓝+浅底)
+///  2. 关键词标记 —— `==关键词==` 蓝、`!!关键词!!` 红（AI 按提示输出）
+///  标记均容错：未闭合时按普通文本原样显示。
 class AiResponseWidget extends StatelessWidget {
   final String text;
   final double fontSize;
@@ -85,6 +89,16 @@ class AiResponseWidget extends StatelessWidget {
   }
 
   _TextLine _parseTextLine(String line) {
+    // 结构标签：答案 / 题眼 / 解析 / 避坑指南 / 一句话记忆
+    // 兼容 `**答案：** B`、`**答案：B**`、`答案：B` 三种写法
+    final sec = RegExp(r'^\*{0,2}(答案|题眼|解析|避坑指南|一句话记忆)：\*{0,2}\s*')
+        .firstMatch(line);
+    if (sec != null) {
+      final name = sec.group(1)!;
+      final rest = line.substring(sec.end).replaceAll('**', '');
+      return _TextLine('$name：', 0, rest.trimRight(), name);
+    }
+
     var leading = '';
     var headingLevel = 0;
     if (line.startsWith('### ')) {
@@ -150,7 +164,7 @@ class AiResponseWidget extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                   child: Text.rich(TextSpan(
                     style: cellBase,
-                    children: _inline(cell, cellBase),
+                    children: _inline(cell, cellBase, ac),
                   )),
                 );
               }).toList(),
@@ -170,58 +184,95 @@ class AiResponseWidget extends StatelessWidget {
               : L.headingLevel == 3
                   ? fontSize + 2
                   : fontSize;
+      // v1.28：结构色 —— 按标签给整行上色/加底
+      final sec = _sectionStyle(L.section, ac);
       final TextStyle ls = base.copyWith(
         fontSize: sz,
-        fontWeight: L.headingLevel > 0 ? FontWeight.bold : null,
+        fontWeight: L.headingLevel > 0 || sec.bold ? FontWeight.bold : null,
+        color: sec.color ?? base.color,
+        backgroundColor: sec.background,
       );
       spans.add(TextSpan(style: ls, children: [
         if (L.leading.isNotEmpty) TextSpan(text: L.leading),
-        ..._inline(L.content, ls),
+        ..._inline(L.content, ls, ac),
       ]));
       spans.add(TextSpan(text: '\n'));
     }
     return Text.rich(TextSpan(children: spans));
   }
 
-  /// 行内解析：**加粗** 与 `代码` 交替扫描。
-  List<InlineSpan> _inline(String s, TextStyle base) {
+  /// 结构标签 → 颜色/字重/底色（v1.28）
+  /// 答案=绿、题眼=蓝、避坑指南=红+浅红底、一句话记忆=蓝+浅蓝底
+  _SectionStyle _sectionStyle(String? section, AppThemeColors ac) {
+    switch (section) {
+      case '答案':
+        return _SectionStyle(color: ac.success, bold: true);
+      case '题眼':
+        return _SectionStyle(color: ac.accent, bold: true);
+      case '解析':
+        return const _SectionStyle(bold: true);
+      case '避坑指南':
+        return _SectionStyle(
+            color: ac.danger, bold: true, background: ac.dangerSoft);
+      case '一句话记忆':
+        return _SectionStyle(
+            color: ac.accent, bold: true, background: ac.accentSoft);
+      default:
+        return const _SectionStyle();
+    }
+  }
+
+  /// 行内解析：**加粗**、`代码`、==蓝关键词==、!!红关键词!! 交替扫描。
+  /// 任一标记未闭合时，剩余内容按普通文本原样输出（容错）。
+  List<InlineSpan> _inline(String s, TextStyle base, AppThemeColors ac) {
     final spans = <InlineSpan>[];
     var i = 0;
+    // 按优先级寻找最早的标记起点
+    int? findNext(int from) {
+      final cands = <int>[
+        s.indexOf('**', from),
+        s.indexOf('`', from),
+        s.indexOf('==', from),
+        s.indexOf('!!', from),
+      ].where((p) => p != -1).toList();
+      if (cands.isEmpty) return null;
+      cands.sort();
+      return cands.first;
+    }
+
     while (i < s.length) {
-      final bold = s.indexOf('**', i);
-      final code = s.indexOf('`', i);
-      int next;
-      bool isBold;
-      if (bold == -1 && code == -1) {
+      final next = findNext(i);
+      if (next == null) {
         spans.add(TextSpan(text: s.substring(i)));
         break;
-      } else if (bold == -1) {
-        next = code;
-        isBold = false;
-      } else if (code == -1) {
-        next = bold;
-        isBold = true;
-      } else if (bold < code) {
-        next = bold;
-        isBold = true;
-      } else {
-        next = code;
-        isBold = false;
       }
       if (next > i) spans.add(TextSpan(text: s.substring(i, next)));
-      final close = s.indexOf(isBold ? '**' : '`', next + (isBold ? 2 : 1));
+
+      final isBold = s.startsWith('**', next);
+      final isCode = !isBold && s.startsWith('`', next);
+      final isBlueKw = !isBold && !isCode && s.startsWith('==', next);
+      // 其余为 !! 红关键词
+      final markerLen = isCode ? 1 : 2;
+      final closeMarker = isBold
+          ? '**'
+          : isCode
+              ? '`'
+              : isBlueKw
+                  ? '=='
+                  : '!!';
+      final close = s.indexOf(closeMarker, next + markerLen);
       if (close == -1) {
+        // 未闭合 → 原样输出剩余文本
         spans.add(TextSpan(text: s.substring(next)));
         break;
       }
-      final content = s.substring(next + (isBold ? 2 : 1), close);
+      final content = s.substring(next + markerLen, close);
       if (isBold) {
         spans.add(TextSpan(
           text: content,
           style: base.copyWith(fontWeight: FontWeight.bold),
         ));
-        i = close + 2;
-      } else {
+      } else if (isCode) {
         spans.add(TextSpan(
           text: content,
           style: base.copyWith(
@@ -230,8 +281,20 @@ class AiResponseWidget extends StatelessWidget {
             backgroundColor: base.color!.withOpacity(0.08),
           ),
         ));
-        i = close + 1;
+      } else if (isBlueKw) {
+        // ==关键词== → 强调蓝（保留外层底色，仅换字色+加粗）
+        spans.add(TextSpan(
+          text: content,
+          style: base.copyWith(color: ac.accent, fontWeight: FontWeight.bold),
+        ));
+      } else {
+        // !!关键词!! → 警示红
+        spans.add(TextSpan(
+          text: content,
+          style: base.copyWith(color: ac.danger, fontWeight: FontWeight.bold),
+        ));
       }
+      i = close + closeMarker.length;
     }
     return spans;
   }
@@ -263,10 +326,21 @@ class _TextLine {
   final String leading;
   final int headingLevel;
   final String content;
-  _TextLine(this.leading, this.headingLevel, this.content);
+
+  /// 结构标签（答案/题眼/解析/避坑指南/一句话记忆），null 表示普通行
+  final String? section;
+  _TextLine(this.leading, this.headingLevel, this.content, [this.section]);
 }
 
 class _TableBlock extends _Block {
   final List<List<String>> rows;
   _TableBlock(this.rows);
+}
+
+/// 结构标签的样式描述（v1.28）
+class _SectionStyle {
+  final Color? color;
+  final Color? background;
+  final bool bold;
+  const _SectionStyle({this.color, this.background, this.bold = false});
 }

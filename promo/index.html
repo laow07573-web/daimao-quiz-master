@@ -7,10 +7,13 @@
 <meta name="description" content="猫卷 —— 题库自建、数据自有、AI 讲透、算法记住。离线可用的医学备考刷题 App，开源免费，无广告无会员。">
 <!--
   ═══════════════════════════════════════════════════════════════
-  猫卷 · 功能展示页（自包含，无外部依赖，可离线打开）
+  猫卷 · 功能展示页（自包含，无外部依赖，可直接双击打开）
   ───────────────────────────────────────────────────────────────
-  · 素材目录：promo/assets/（真实 App 截图）
-  · 下载按钮：见下方 id="dl-apk" / id="dl-win" 两个 <a>，按需改 href
+  · 界面渲染：**纯代码矢量重绘**（HTML/CSS/JS），非截图、非位图
+    —— 任意缩放清晰、永不裁切，且能做真实动画
+  · 素材：promo/assets/logo.png（页面 Logo；界面全部为代码绘制）
+  · 下载按钮：见下方 id="dl-apk" / id="dl-win" / id="dl-repo" 三个 <a>，
+    托管后把 href 换成 GitHub Releases / 仓库地址即可
   · 部署：整个 promo 文件夹直接丢到任意静态服务器 / Pages 即可
   ═══════════════════════════════════════════════════════════════
 -->
@@ -116,9 +119,6 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 /* 白底截图需可见边界：浅色衬底 + 细描边 */
 .phone .scr{position:relative;width:100%;aspect-ratio:var(--ar,1116/2480);border-radius:38px;
   overflow:hidden;background:#EDF1F7;box-shadow:inset 0 0 0 1px rgba(0,0,0,.10)}
-.phone .scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:top center;
-  opacity:0;transition:opacity .85s ease}
-.phone .scr img.on{opacity:1}
 
 /* 桌面/平板窗口画框 */
 .window{position:relative;width:100%;max-width:640px;border-radius:15px;overflow:hidden;
@@ -215,15 +215,6 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 .th .sw{height:52px}
 .th .nm{font-size:11px;text-align:center;padding:8px 3px;color:var(--tx2);font-weight:600}
 
-/* ── 批注演示 ── */
-.ink-demo{position:relative;width:100%;max-width:380px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#F7F9FC}
-.ink-demo svg{display:block;width:100%;height:auto}
-.ink-path{fill:none;stroke:#E53935;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;
-  stroke-dasharray:900;stroke-dashoffset:900;animation:draw 3.4s cubic-bezier(.5,0,.2,1) infinite}
-@keyframes draw{0%{stroke-dashoffset:900}45%{stroke-dashoffset:0}82%{stroke-dashoffset:0}100%{stroke-dashoffset:-900}}
-.ink-hi{fill:rgba(124,58,237,.30)}
-.ink-hi2{fill:rgba(45,168,166,.32)}
-
 /* ── 统计数字 ── */
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:40px}
 .stat{padding:26px 20px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);text-align:center;transition:.3s}
@@ -239,6 +230,130 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 .sk .t{font-size:14px;font-weight:700;margin-bottom:4px}
 .sk .d{font-size:12.4px;color:var(--tx3);line-height:1.6}
 
+/* ── 开发历程：三阶段总览 ── */
+.phase-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:40px}
+.phase{padding:20px 20px 18px;border-radius:16px;background:var(--surface);border:1px solid var(--line);
+  position:relative;overflow:hidden;transition:.3s}
+.phase:hover{background:var(--surface2);transform:translateY(-4px);border-color:rgba(37,99,235,.4)}
+.phase::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:linear-gradient(180deg,var(--c3),var(--c1))}
+.phase .ph-d{font-size:11.5px;font-weight:700;letter-spacing:.3px;color:var(--c3);margin-bottom:7px}
+.phase .ph-t{font-size:15.5px;font-weight:750;margin-bottom:5px}
+.phase .ph-s{font-size:12.8px;color:var(--tx3);line-height:1.55}
+
+/* ── 开发历程 ── */
+.commit-card{border-radius:20px;padding:24px 26px;margin-top:40px;
+  background:var(--surface);border:1px solid var(--line)}
+.commit-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.commit-head b{font-size:15px;font-weight:750}
+.commit-head span{font-size:12.5px;color:var(--tx3)}
+.commit-bars{display:flex;align-items:stretch;gap:14px;height:150px}
+.commit-bars .cb{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.commit-bars .cb .bararea{flex:1;width:100%;min-height:0;display:flex;align-items:flex-end;justify-content:center}
+.commit-bars .cb .bar{width:100%;max-width:74px;border-radius:8px 8px 3px 3px;height:0;
+  background:linear-gradient(180deg,var(--c4),var(--c1));
+  transition:height 1s cubic-bezier(.22,1,.36,1);position:relative;cursor:default}
+.commit-bars .cb .bar:hover{filter:brightness(1.18)}
+.commit-bars .cb .bar span{position:absolute;top:-19px;left:50%;transform:translateX(-50%);
+  font-size:11.5px;font-weight:700;color:var(--tx);white-space:nowrap;opacity:0;transition:opacity .25s}
+.commit-bars .cb:hover .bar span{opacity:1}
+.commit-bars .cb .d{font-size:11px;color:var(--tx3);white-space:nowrap}
+.commit-legend{font-size:11.5px;color:var(--tx3);margin-top:14px;display:flex;align-items:center;gap:6px}
+.commit-legend i{width:11px;height:11px;border-radius:3px;background:linear-gradient(180deg,var(--c4),var(--c1));display:inline-block}
+
+.dtl-wrap{position:relative;margin-top:52px;padding-left:34px}
+.dtl-line{position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--line);border-radius:1px}
+.dtl-line i{display:block;width:100%;height:0;border-radius:1px;
+  background:linear-gradient(180deg,var(--c3),var(--c1));transition:height 1.6s ease}
+.dtl-list{display:flex;flex-direction:column;gap:22px}
+.dtl-item{position:relative;padding:20px 22px;border-radius:16px;background:var(--surface);
+  border:1px solid var(--line);opacity:0;transform:translateY(24px);transition:.55s cubic-bezier(.22,1,.36,1)}
+.dtl-item::before{content:"";position:absolute;left:-34px;top:26px;width:20px;height:20px;
+  border-radius:50%;background:var(--bg2);border:2px solid var(--line);transition:.4s}
+.dtl-item.in{opacity:1;transform:none;border-color:rgba(37,99,235,.36)}
+.dtl-item.in::before{border-color:var(--c3);background:var(--c3);box-shadow:0 0 0 5px rgba(45,168,166,.16)}
+.dtl-item .tl-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.dtl-item .ph-tag{font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:999px;
+  background:rgba(45,168,166,.14);color:var(--c3);border:1px solid rgba(45,168,166,.3)}
+.dtl-item .ver{font-size:12px;font-weight:800;letter-spacing:.4px;padding:3px 10px;border-radius:999px;
+  background:rgba(37,99,235,.15);color:#93B4FF;border:1px solid rgba(37,99,235,.3)}
+.dtl-item .date{font-size:12px;color:var(--tx3)}
+.dtl-item h4{font-size:16.5px;font-weight:750;margin-bottom:7px}
+.dtl-item p{font-size:13.8px;color:var(--tx2);line-height:1.7}
+.dtl-item .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.dtl-item .chips span{font-size:11.5px;padding:3px 9px;border-radius:7px;
+  background:var(--surface2);border:1px solid var(--line);color:var(--tx2)}
+.dtl-cta{text-align:center;margin-top:38px}
+
+/* —— 题库管理行 —— */
+.mbank{display:flex;align-items:center;gap:11px;background:var(--m-card);border:1px solid var(--m-bd);
+  border-radius:13px;padding:12px 13px;margin-top:8px;transition:.4s}
+.mbank.on{border-color:var(--m-accent);background:color-mix(in srgb,var(--m-accent) 7%,var(--m-card))}
+.mbank .cbx{width:20px;height:20px;border-radius:6px;border:1.6px solid var(--m-bd);flex:0 0 20px;
+  display:grid;place-items:center;color:#fff;font-size:12px;transition:.3s}
+.mbank.on .cbx{background:var(--m-accent);border-color:var(--m-accent)}
+.mbank .nm{flex:1;min-width:0}
+.mbank .nm b{display:block;font-size:14px;font-weight:650}
+.mbank .nm em{font-size:11.5px;color:var(--m-fg2);font-style:normal}
+.mbank .pc{font-size:12.5px;font-weight:700;color:var(--m-accent)}
+
+/* —— 批注叠加（在渲染出的题目上画实时笔迹） —— */
+.ink-wrap{position:relative;width:100%;max-width:330px;margin:0 auto}
+.ink-wrap svg.ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ink-wrap .ink-p{fill:none;stroke:#E53935;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:420;stroke-dashoffset:420;animation:inkdraw 3.6s cubic-bezier(.5,0,.2,1) infinite}
+.ink-wrap .ink-p.hl{stroke:#7C3AED;stroke-width:11;opacity:.26}
+.ink-wrap .ink-p.d2{animation-delay:.6s}
+@keyframes inkdraw{0%{stroke-dashoffset:420}42%{stroke-dashoffset:0}80%{stroke-dashoffset:0}100%{stroke-dashoffset:-420}}
+
+/* —— 宽屏布局示意（代码渲染） —— */
+.wmock{--m-accent:#2563EB;--m-bd:#E2E8F0;--m-bg:#F5F7FA;--m-card:#FFFFFF;--m-s2:#EDF1F7;
+  --m-fg:#111827;--m-fg2:#566072;--m-fg3:#8A94A6;
+  width:100%;max-width:560px;border-radius:12px;overflow:hidden;background:#F5F7FA;
+  border:1px solid rgba(0,0,0,.10);display:flex;height:300px;
+  font-family:"MiSans","PingFang SC",system-ui,sans-serif}
+.wmock .rail{flex:0 0 62px;background:#fff;border-right:1px solid #E2E8F0;
+  display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0}
+.wmock .rail .ri{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+  color:#8A94A6;font-size:16px}
+.wmock .rail .ri.on{background:#E8EFFE;color:#2563EB}
+.wmock .rail .sp{flex:1}
+.wmock .main{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.wmock .main .hd{font-size:15px;font-weight:700;color:#111827}
+.wmock .cols{display:flex;gap:12px;flex:1;min-width:0}
+.wmock .col{flex:1;min-width:0;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:12px}
+.wmock .col .t{font-size:12px;font-weight:700;color:#2563EB;margin-bottom:8px}
+.wmock .col .ln{height:8px;border-radius:4px;background:#EDF1F7;margin-bottom:7px}
+.wmock .col .ln.s{width:64%}
+.wmock .col .ln.m{width:84%}
+.wmock .opts{display:flex;flex-direction:column;gap:7px}
+.wmock .op{display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;
+  background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;padding:8px 10px}
+.wmock .op i{width:18px;height:18px;border-radius:50%;background:#E8EFFE;color:#2563EB;
+  display:grid;place-items:center;font-size:10px;font-weight:700;font-style:normal;flex:0 0 18px}
+.wmock .op.ok{background:#DCFCE7;border-color:#15803D;color:#166534}
+.wmock .op.ok i{background:#15803D;color:#fff}
+.wmock .note{font-size:11px;color:#6B7280;line-height:1.5}
+
+/* —— 局域网同步示意 —— */
+.sync-schem{position:relative;display:flex;align-items:center;justify-content:center;gap:20px;
+  width:100%;max-width:400px;margin:0 auto;padding:26px 0}
+.sync-dev{width:88px;flex:0 0 88px}
+.sync-dev .frame{border-radius:16px;background:linear-gradient(160deg,#141A2C,#080B14);padding:5px}
+.sync-dev .scr2{border-radius:12px;background:#F5F7FA;height:126px;padding:8px;
+  display:flex;flex-direction:column;gap:5px}
+.sync-dev .scr2 i{display:block;height:7px;border-radius:3px;background:#E2E8F0}
+.sync-dev .scr2 i.w1{width:70%;background:#BFDBFE}
+.sync-dev .scr2 i.w2{width:88%}
+.sync-dev .scr2 i.w3{width:55%}
+.sync-dev .lb{text-align:center;font-size:11px;color:var(--tx3);margin-top:7px}
+.sync-link{position:relative;flex:1;max-width:96px;height:2px;border-radius:1px;
+  background:linear-gradient(90deg,rgba(45,168,166,.25),rgba(45,168,166,.85),rgba(45,168,166,.25))}
+.sync-link .pkt{position:absolute;top:-4px;left:0;width:10px;height:10px;border-radius:50%;
+  background:var(--c3);box-shadow:0 0 10px rgba(45,168,166,.9);animation:pkt 2.2s linear infinite}
+.sync-link .pkt.rev{animation-direction:reverse;background:var(--c4);box-shadow:0 0 10px rgba(91,155,255,.9)}
+@keyframes pkt{0%{left:-2%;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:98%;opacity:0}}
+
 /* ── 下载区 ── */
 .dl-wrap{position:relative;border-radius:26px;padding:52px 40px;text-align:center;overflow:hidden;
   background:linear-gradient(150deg,rgba(37,99,235,.14),rgba(124,58,237,.09));border:1px solid rgba(37,99,235,.3)}
@@ -246,6 +361,40 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
   background:radial-gradient(circle,rgba(45,168,166,.22),transparent 68%);top:-160px;right:-110px;pointer-events:none}
 .dl-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:30px 0 20px}
 .dl-note{font-size:13px;color:var(--tx3);position:relative;z-index:1}
+.hash{font-family:Consolas,Monaco,monospace;font-size:11.5px;color:#4A5470;word-break:break-all;margin-top:8px;
+  position:relative;z-index:1}
+
+/* ── 使用说明（尾页动画） ── */
+.guide-wrap{display:grid;grid-template-columns:minmax(0,.94fr) minmax(0,1.06fr);gap:52px;align-items:center;margin-top:44px}
+.steps{display:flex;flex-direction:column;gap:8px}
+.step{display:flex;gap:13px;align-items:flex-start;padding:13px 15px;border-radius:14px;
+  background:var(--surface);border:1px solid var(--line);transition:.35s;cursor:pointer;opacity:.5}
+.step:hover{background:var(--surface2)}
+.step.on{opacity:1;background:linear-gradient(120deg,rgba(37,99,235,.16),rgba(45,168,166,.07));
+  border-color:rgba(37,99,235,.5);transform:translateX(5px)}
+.step .no{flex:0 0 26px;height:26px;border-radius:8px;display:grid;place-items:center;
+  font-size:12px;font-weight:800;background:var(--surface2);color:var(--tx3);transition:.35s}
+.step.on .no{background:linear-gradient(135deg,var(--c1),var(--c4));color:#fff}
+.step.done .no{background:rgba(34,197,94,.22);color:var(--ok)}
+.step .tx b{display:block;font-size:14.5px;font-weight:700}
+.step .tx em{font-size:12.8px;color:var(--tx3);font-style:normal;line-height:1.55}
+.guide-bar{display:flex;align-items:center;gap:12px;margin-top:18px}
+.guide-track{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.09);overflow:hidden}
+.guide-track i{display:block;height:100%;width:0;border-radius:2px;
+  background:linear-gradient(90deg,var(--c1),var(--c3));transition:width .35s ease}
+.guide-btn{padding:8px 15px;border-radius:10px;font-size:13px;font-weight:650;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--tx);transition:.22s}
+.guide-btn:hover{background:var(--surface2)}
+.guide-btn.primary{background:linear-gradient(135deg,var(--c1),var(--c4));border-color:transparent;color:#fff}
+.guide-caption{font-size:13.5px;color:var(--tx2);margin-top:14px;min-height:46px;line-height:1.65}
+.guide-caption b{color:var(--tx)}
+
+/* 使用说明的画框切换动画 */
+.guide-stage{position:relative}
+.guide-stage .phone{animation:none}
+.guide-stage .scr{background:#EDF1F7}
+.guide-stage .scr .mscr.swap{animation:swapIn .5s cubic-bezier(.22,1,.36,1)}
+@keyframes swapIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 
 /* ── 页脚 ── */
 footer{border-top:1px solid var(--line);padding:44px 24px 56px;text-align:center}
@@ -264,6 +413,8 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   .pains{grid-template-columns:1fr}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .nav-links{display:none}
+  .guide-wrap{grid-template-columns:1fr;gap:34px}
+  .phase-row{grid-template-columns:1fr;gap:12px}
   .chip.a{left:0}.chip.b{right:0}.chip.c{left:0}
 }
 @media (max-width:520px){
@@ -286,14 +437,23 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   *{animation:none!important;transition-duration:.01ms!important}
   .reveal{opacity:1;transform:none}
 }
+/* 页面在后台/被遮挡时打开：CSS 过渡与动画不会推进，元素会卡在起始态（
+   opacity:0 / scale(.3) / height:0）。此时直接禁用过渡，让 JS 施加的
+   最终状态立即生效，杜绝"空白"。回到前台后移除该类即可恢复过渡。 */
+html.no-motion *,html.no-motion *::before,html.no-motion *::after{
+  transition:none!important;animation:none!important}
 
 /* ════════════════════════════════════════════════════════════════
    重绘 App 界面（纯 HTML/CSS 矢量渲染 —— 无位图，任意缩放不糊、永不裁切）
    设计基准宽度 390px；--ratio = 该界面宽高比；运行时用 --s 缩放到画框
    ════════════════════════════════════════════════════════════════ */
-[data-mock]{position:absolute;inset:0;opacity:0;transition:opacity .85s ease}
+/* 宿主只负责铺满（.phone .scr 自身 position/比例仍生效） */
+[data-mock]{position:absolute;inset:0}
 [data-mock].on{opacity:1}
-.mscr{position:absolute;inset:0;overflow:hidden;background:var(--m-bg,#F0F4F8)}
+/* 可见性由内部 .mscr 承担：JS 往 .mscr 上挂 .on（轮播与单屏一致） */
+.mscr{position:absolute;inset:0;overflow:hidden;background:var(--m-bg,#F0F4F8);
+  opacity:0;transition:opacity .85s ease}
+.mscr.on{opacity:1}
 /* 3 套主题 token（Mao Des，取自 lib/services/theme_service.dart） */
 .mscr[data-t="clear"]{--m-nav:#FFFFFF;--m-bg:#F5F7FA;--m-accent:#2563EB;--m-card:#FFFFFF;--m-bd:#E2E8F0;--m-s2:#EDF1F7;--m-navfg:#111827;--m-fg:#111827;--m-fg2:#566072;--m-fg3:#8A94A6}
 .mscr[data-t="sage"]{--m-nav:#FFFFFF;--m-bg:#F6F8F5;--m-accent:#2F7D5B;--m-card:#FFFFFF;--m-bd:#E1E8DF;--m-s2:#EDF2EC;--m-navfg:#1A211C;--m-fg:#1A211C;--m-fg2:#556057;--m-fg3:#8A948C}
@@ -384,6 +544,24 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .mstreak{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;font-weight:600}
 .mstreak svg{color:var(--m-accent)}
 
+/* —— 年度坚持：GitHub 贡献热力图 —— */
+.mheat{margin-top:10px;font-size:9px;color:var(--m-fg2)}
+.mheat .months{display:flex;gap:1.5px;margin-left:11px;margin-bottom:3px;height:11px}
+.mheat .months span{font-size:8px;color:var(--m-fg3);white-space:nowrap;overflow:visible;flex:1;min-width:0}
+.mheat .row{display:flex;gap:1.5px;align-items:flex-start}
+.mheat .wl{display:flex;flex-direction:column;gap:1.5px;width:9px;flex:0 0 9px;
+  font-size:8px;line-height:1;color:var(--m-fg3)}
+.mheat .wl span{height:7px;display:flex;align-items:center}
+.mheat .cols{display:flex;gap:1.5px;flex:1;min-width:0}
+.mheat .col{display:flex;flex-direction:column;gap:1.5px;flex:1;min-width:0}
+.mheat .col i{width:100%;aspect-ratio:1;border-radius:1.5px;background:var(--m-bd);display:block}
+.mheat .col i.e{background:transparent}
+.mheat .col i.l1{background:color-mix(in srgb,var(--m-accent) 34%,#fff)}
+.mheat .col i.l2{background:color-mix(in srgb,var(--m-accent) 62%,#fff)}
+.mheat .col i.l3{background:var(--m-accent)}
+.mheat .col i.td{box-shadow:inset 0 0 0 1.2px var(--m-accent)}
+.mheat .col i.vc{background:color-mix(in srgb,var(--m-bad) 22%,transparent)}
+
 /* —— 三指标 —— */
 .m3{display:flex;gap:10px}
 .m3>div{flex:1;background:var(--m-card);border:1px solid var(--m-bd);border-radius:14px;padding:12px 10px;text-align:center}
@@ -449,6 +627,15 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 .maih .sp{flex:1}
 .mtxt{font-size:13px;line-height:1.6;margin-top:10px;color:var(--m-fg)}
 .mtxt .k{font-weight:600}
+/* v1.28 结构色 + 关键词标记（与 App 的 ai_response_widget 一致） */
+.mtxt .sec-ans{color:var(--m-ok);font-weight:700}
+.mtxt .sec-eye{color:var(--m-accent);font-weight:700}
+.mtxt .sec-pit{color:var(--m-bad);font-weight:700;background:color-mix(in srgb,var(--m-bad) 12%,transparent);
+  border-radius:4px;padding:0 3px}
+.mtxt .sec-mem{color:var(--m-accent);font-weight:700;background:color-mix(in srgb,var(--m-accent) 12%,transparent);
+  border-radius:4px;padding:0 3px}
+.mtxt .kw-blue{color:var(--m-accent);font-weight:700}
+.mtxt .kw-red{color:var(--m-bad);font-weight:700}
 .mtxt ul{margin:2px 0 0;padding:0;list-style:none}
 .mtxt li{padding-left:14px;position:relative}
 .mtxt li::before{content:"•";position:absolute;left:2px}
@@ -619,7 +806,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   <div class="mbody">
     <div class="mai">
       <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>AI解析<span class="sp"></span></div>
-      <div class="mtxt" id="ai-typing" data-type="**答案：** D&#10;**题眼：** 看到「黏膜变薄、血管透见」→ 直接锁定萎缩性胃炎&#10;**解析：**&#10;- **定性/计算**：正常胃黏膜厚度均匀、血管不可见；黏膜变薄伴血管透见是腺体萎缩的典型内镜表现&#10;- **排除法**：A/C 急性胃炎与胃溃疡均为黏膜充血水肿或溃疡凹陷，不会变薄透见血管&#10;**避坑指南：** 别把「血管透见」与「充血发红」混淆，前者提示萎缩、后者提示急性炎症&#10;**一句话记忆：** 薄到透血管 = 萎缩"></div>
+      <div class="mtxt" id="ai-typing" data-type="**答案：** D&#10;**题眼：** 看到「黏膜变薄、血管透见」→ 直接锁定 ==萎缩性胃炎==&#10;**解析：**&#10;- **定性/计算**：正常胃黏膜厚度均匀、==血管不可见==；黏膜变薄伴血管透见是腺体萎缩的典型内镜表现&#10;- **排除法**：A/C 急性胃炎与胃溃疡均为黏膜充血水肿或溃疡凹陷，不会变薄透见血管&#10;**避坑指南：** 别把「血管透见」与「充血发红」混淆，前者提示萎缩、后者提示急性炎症。!!注意!!「最可能」提示选典型表现&#10;**一句话记忆：** ==薄到透血管 = 萎缩=="></div>
     </div>
     <div class="mcard" style="padding:12px">
       <div class="mbubs" id="ai-chat">
@@ -654,13 +841,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       </div>
     </div>
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">年度坚持</b><span class="sp"></span><span class="lk"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
-      <div style="display:flex;gap:10px;margin-top:10px">
-        <div class="mcal" style="flex:1;margin:0" data-y="2026" data-m="7" data-h="0,2,1,0,3,2,0,1,2,0,0,3,1,2,0,1,3,2,0,0,1,2,3,0,2,1,0,0,3,1,2"></div>
-        <div class="mcal" style="flex:1;margin:0" data-y="2026" data-m="8" data-today="11" data-h="0,0,3,2,1,0,0,2,3,1,0,0,1,2,3,3,2,0,0,1,2,1,0,0,3,2,2,1,3,0,0"></div>
-        <div class="mcal" style="flex:1;margin:0" data-y="2026" data-m="9" data-h="1,2,0,0,3,2,1,0,2,3,0,0,1,2,0,1,3,2,0,2,1,0,0,3,1,2,0,1,2,0"></div>
-      </div>
-      <div class="mlegend"><i style="background:color-mix(in srgb,var(--m-accent) 28%,#fff)"></i>少<i style="background:color-mix(in srgb,var(--m-accent) 52%,#fff)"></i>达标<i style="background:color-mix(in srgb,var(--m-accent) 85%,#000)"></i>多<i style="border:1.5px solid var(--m-accent)"></i>今天</div>
+      <div class="mch"><b style="font-size:14px">年度坚持</b><span class="sp"></span><span class="lk" style="font-size:11px">全年 53 周</span></div>
+      <div class="mheat" data-year="2026" data-today="2026-09-11"></div>
+      <div class="mlegend" style="margin-top:9px"><i style="background:color-mix(in srgb,var(--m-accent) 30%,#fff)"></i>少<i style="background:color-mix(in srgb,var(--m-accent) 58%,#fff)"></i>达标<i style="background:var(--m-accent)"></i>多<i style="border:1.5px solid var(--m-accent)"></i>今天<span style="margin-left:auto">共 211 题 · 68 天有记录</span></div>
     </div>
     <div class="mcard" style="padding:13px">
       <div class="mch"><b style="font-size:14px">近一年趋势</b></div>
@@ -816,6 +999,54 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 </div>
 </template>
 
+<!-- 题库管理 -->
+<template id="tpl-banks">
+<div class="mscr" data-t="clear" data-compact="1">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><b style="font-size:18px">题库管理</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></div>
+  <div class="mbody">
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">共 3 个题库</b><span class="sp"></span><span class="lk">已选 1 个 · 10 题</span></div>
+      <div class="mbank on"><span class="cbx">✓</span><span class="nm"><b>内科学</b><em>320 题 · DOCX 导入</em></span><span class="pc">84.2%</span></div>
+      <div class="mbank"><span class="cbx"></span><span class="nm"><b>病理学</b><em>180 题 · JSON 导入</em></span><span class="pc">71.5%</span></div>
+      <div class="mbank"><span class="cbx"></span><span class="nm"><b>解剖学</b><em>96 题 · 手动录入</em></span><span class="pc">52.8%</span></div>
+    </div>
+    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">开始刷题（10 题）</div>
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><b style="font-size:14px">题库文件</b></div>
+      <div class="mhist" style="gap:9px;margin-top:9px">
+        <div class="h"><span class="t"><b>内科学复习题.json</b><em>可分享给同学，导入即用</em></span><span class="v">导出</span></div>
+        <div class="h"><span class="t"><b>病理学.json</b><em>1.2 MB · 180 道题</em></span><span class="v">导出</span></div>
+      </div>
+    </div>
+  </div>
+ </div>
+</div>
+</template>
+
+<!-- 手写批注（在渲染出的题目上叠加实时笔迹） -->
+<template id="tpl-annot">
+<div class="mscr" data-t="clear" data-compact="1">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp"><span class="cnt">第 9/10 题</span><span class="sp"></span><span class="pill">批注中</span></div>
+  <div class="mprog"><i style="width:90%"></i></div>
+  <div class="mbody">
+    <div class="mqcard">
+      <span class="mtag">单选</span>
+      <div class="mstem">患者，男，46 岁。因“反复上腹痛 3 年，加重 2 周”就诊。胃镜检查示胃窦部黏膜变薄，血管透见。最可能的诊断是？</div>
+    </div>
+    <div class="mopts">
+      <div class="mopt"><span class="n">A</span><span class="tx">急性胃炎</span></div>
+      <div class="mopt sel"><span class="n"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="tx">慢性萎缩性胃炎</span></div>
+    </div>
+    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">完成 (Esc)</div>
+  </div>
+ </div>
+</div>
+</template>
+
 <!-- ═══ 导航 ═══ -->
 <nav>
   <div class="nav-in">
@@ -823,8 +1054,8 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <div class="nav-links">
       <a href="#pain">为什么做</a>
       <a href="#f1">功能</a>
-      <a href="#tech-stack">技术栈</a>
-      <a href="#quality">工程质量</a>
+      <a href="#timeline">开发历程</a>
+      <a href="#guide">使用说明</a>
       <a href="#download">下载</a>
     </div>
     <a class="nav-cta" href="#download">免费下载</a>
@@ -834,7 +1065,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 <!-- ═══ Hero ═══ -->
 <section id="hero">
   <div>
-    <div class="hero-tag"><span class="dot"></span> 开源免费 · 无广告 · 无会员 · 无账号</div>
+    <div class="hero-tag"><span class="dot"></span> 2026 年 6 月动工 · 开源免费 · 无广告 · 无会员 · 无账号</div>
     <h1>题库自己建<br><span class="grad">数据自己管</span><br>AI 讲透，算法记住</h1>
     <p class="hero-sub">
       猫卷是一款<strong>本地优先</strong>的 AI 备考刷题 App。题库、错题、复习进度全部存在你自己的设备里，
@@ -843,6 +1074,7 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <div class="hero-slogan">
       <span class="slogan-chip">📥 DOCX / JSON 一键建库</span>
       <span class="slogan-chip">🧠 AI 题眼破题法讲解</span>
+      <span class="slogan-chip">🎨 关键词彩色标记</span>
       <span class="slogan-chip">🔁 FSRS-5 间隔复习</span>
       <span class="slogan-chip">✍️ 手写批注</span>
       <span class="slogan-chip">📊 学习数据可视化</span>
@@ -855,8 +1087,8 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <div class="hero-meta">
       <div><b>7</b>种题型</div>
       <div><b>3</b>种刷题模式</div>
-      <div><b>5</b>套主题</div>
-      <div><b>178</b>项自动化测试</div>
+      <div><b>3</b>套主题 / 6 色板</div>
+      <div><b>221</b>项自动化测试</div>
       <div><b>0</b>广告 / 0 会员</div>
     </div>
   </div>
@@ -909,15 +1141,6 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>可视化校对</b>：入库前逐题预览、编辑、删除，AI 打的知识点标签一并保留</li>
       <li><b>开放格式</b>：题库可导出为标准 JSON，在同学之间自由流转</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>Dart <code>Isolate</code> 独立线程做文档解析；<code>archive</code> 解包 DOCX（本质是 ZIP）、<code>xml</code> 解析 <code>word/document.xml</code> 提取段落文本；AI 解析走 OpenAI 兼容的 Chat Completions 接口。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>题目边界感知切块</b>：识别 <code>1.</code>、<code>第N题</code>、<code>（1）</code> 等题号起始行，把完整题目装进一个块（上限 2000 字），切点永远落在题目之间，绝不切断一道题；② <b>3 路并发 worker 池</b>解析各块，结果按块号稳定回收；③ <b>逐级降采样重试</b>：输出超限时把 token 上限从 8192 → 4096 → 2048 逐级下调重试；④ <b>截断 JSON 抢修</b>：解析失败时从尾部回溯补 <code>}</code> 闭合，挽救前面已完整的题目；⑤ 失败的块会<b>明确报出原因</b>，不谎报"解析完成 0 题"。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual">
     <div class="phone" style="--ar:390/867;width:min(300px,78vw)">
@@ -940,20 +1163,10 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>导出即分享</b>：一键导出 JSON 题库文件，同学导入即可用</li>
       <li><b>级联删除</b>：删题库时相关题目、记录、批注一并清理，不留脏数据</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>SQLite（<code>sqflite</code>）作为唯一数据源，题目/会话/记录分表存储，外键开启 <code>PRAGMA foreign_keys=ON</code> 实现级联删除。</dd>
-        <dt>怎么做</dt>
-        <dd>题库以 <code>question_banks</code> 表为根，题目挂在 <code>questions.bank_id</code> 外键上；删除题库时由数据库外键级联清理题目、作答记录、错题、复习卡与批注，避免出现"孤儿数据"污染统计。导出时组装 <code>{format, name, count, questions}</code> 结构，带格式标记 <code>maojuan-quiz-questions</code>，导入端校验通过才入库，形成闭环。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual">
-    <div class="phone" style="--ar:1080/1920;width:min(300px,78vw)">
-      
-      <div class="scr"><img src="assets/demo_19_bank_manage.webp" alt="题库管理" class="on"></div>
+    <div class="phone" style="--ar:390/867;width:min(300px,78vw)">
+      <div class="scr" data-mock="banks"></div>
     </div>
     <div class="chip c"><span class="ic">📤</span> 导出可分享</div>
   </div>
@@ -972,15 +1185,6 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>数量自由</b>：10/20/30/50/80/100/全部/自定义</li>
       <li><b>断点续刷</b>：中途退出进度保留，下次从首页继续，不丢一道题</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>Flutter 单页承载三种模式（<code>QuizMode</code> 枚举驱动），抽题走 SQL <code>ORDER BY RANDOM()</code> 随机；会话与题序落库到 <code>quiz_sessions</code> + <code>session_questions</code> 表。</dd>
-        <dt>怎么做</dt>
-        <dd>① 抽题时数量<b>下推给 SQL</b> 用 <code>LIMIT</code> 完成，避免全量取回再截断；② 会话落库保存<b>题目顺序</b>，实现断点续刷的精确还原；③ 练习模式答案先收集在内存 <code>Map</code>、<b>零落库</b>，交卷时才批量判定写库；④ 背题模式 <code>persistSession:false</code>，全程不产生任何统计污染；⑤ 限时归零先关弹窗防竞态，再自动交卷。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual">
     <div class="phone" id="mode-phone" style="--ar:390/867;width:min(300px,78vw)">
@@ -1004,15 +1208,6 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>名解 / 简答 / 问答</b>：语义包含匹配，答到关键点即可</li>
       <li><b>重新作答</b>：答错可重做，更新原记录而不新增，不污染刷题量</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>统一的 <code>judgeAnswer</code> 判定函数按题型分派，刷题与练习共用同一套逻辑，保证判分一致。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>判断题归一化</b>：<code>不正确/不对/错误/×/X/F/FALSE</code> → 错，<code>正确/对/√/T/TRUE</code> → 对，其中否定词<b>优先匹配</b>，避免"不对"被当成"对"；② <b>多选题</b>：按中英文逗号、顿号、分号、空格拆分后转大写去重，<b>集合比较</b>忽略顺序；③ <b>填空题</b>：按分号拆空、逐空去标点比对，空数不一致直接判错；④ <b>主观题</b>：去标点后做<b>双向包含匹配</b>，且对 3 字以内答案（如"细胞壁"）改为精确相等并豁免"过短判错"。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual">
     <div class="phone" style="--ar:390/867;width:min(300px,78vw)">
@@ -1028,32 +1223,21 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   <div class="f-text reveal">
     <div class="f-no">功能 05</div>
     <h3>不是给你答案，是教你<em>题眼怎么破</em></h3>
-    <p class="f-desc">每一道题的解析都按"题眼破题法"四步拆解，模拟一个老师在旁边讲题的过程，而不是甩一段标准答案。</p>
+    <p class="f-desc">每一道题的解析都按"题眼破题法"四步拆解，模拟一个老师在旁边讲题的过程。回答篇幅可选三档，关键词用颜色标出来。</p>
     <ul class="f-list">
       <li><b>抓题眼，定性</b>：第一句点出决定答案的关键数据或特征</li>
       <li><b>理逻辑，拆选项</b>：讲透正确项推理，也说明错误项为什么错</li>
       <li><b>指坑点，防踩雷</b>：精准指出最容易掉的陷阱与鉴别点</li>
       <li><b>给结论，划重点</b>：一句口诀或大白话总结得分要点</li>
+      <li><b>篇幅三档</b>：简洁（≤150 字）/ 标准（≤300 字）/ 详细，设置里随时切换</li>
+      <li><b>关键词高亮</b>：答案绿、题眼蓝、避坑红，关键依据与易错否定词单独着色</li>
       <li><b>只看一次的钱</b>：解析本地缓存，同一道题不重复消耗 Token</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>DeepSeek <code>deepseek-chat</code>（OpenAI 兼容接口），请求走 <code>json_object</code> 结构化输出、<code>temperature 0.1</code> 保证解析稳定；结果落 <code>ai_cache</code> 表，<code>question_id</code> 唯一。</dd>
-        <dt>怎么做</dt>
-        <dd>Prompt 固定输出五段结构（答案 / 题眼 / 解析 / 避坑指南 / 一句话记忆），把"讲题方法论"固化进提示词而不是靠模型自由发挥；调用前<b>先查缓存</b>，命中直接返回、零 Token 消耗；异常或错误响应（<code>isAiError</code>）<b>绝不入缓存</b>，防止一次断网把"请求失败"永久固化成解析结果；解析支持一键重新生成。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
     <div class="phone" style="--ar:390/867;width:min(285px,76vw)">
       
       <div class="scr" data-mock="ai"></div>
-    </div>
-    <div class="tech" style="max-width:400px">
-      <div class="tech-h">⚙ 解析输出示例</div>
-      <div class="typing" data-type="**答案**：C&#10;**题眼**：看到 PaCO₂ 升高 → 锁定呼吸性酸中毒&#10;**解析**：① 定性…② 排除法…&#10;**避坑**：别把代偿性升高当原发&#10;**记忆**：CO₂ 升、pH 降 = 呼酸"></div>
     </div>
   </div>
 </div>
@@ -1070,15 +1254,6 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>富文本回复</b>：支持加粗、列表、表格，长解析也读得清楚</li>
       <li><b>自动滚到底</b>：内容变长时输入框跟随对话下移，不用手动找</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>独立数据表 <code>follow_up_messages</code>（question_id / role / content / created_at），按题查询升序最多 50 条；回复渲染用<b>自研轻量富文本渲染器</b>。</dd>
-        <dt>怎么做</dt>
-        <dd>① Prompt 里带上原题、选项、正确答案、已有解析与你的追问，让 AI 在上下文里作答；② 用户消息<b>先即时上屏</b>再等回复，交互不卡顿；③ 发送中<b>防重复提交</b>；④ <b>切题竞态保护</b>：追问过程中切到别的题，回复仍会按原题号入库，不会插到当前题上；⑤ 渲染器自己解析加粗、列表、Markdown 表格，替换掉对第三方 Markdown 包的依赖。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
     <div class="phone" style="--ar:390/867;width:min(318px,80vw)">
@@ -1107,15 +1282,6 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>知识点标签云</b>：按知识点聚合错误，一眼看出薄弱章节，可一键专项复习</li>
       <li><b>薄弱诊断</b>：结合统计数据生成学习建议</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>FSRS-5 算法（19 个默认权重），目标记忆保留率设 0.9；复习卡存 <code>fsrs_cards</code> 表，以 <code>question_id</code> 为主键。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>遗忘曲线建模</b>：可提取性按 <code>R = exp(ln(0.9) × 已过天数 / 稳定性)</code> 计算，据此更新每张卡的"稳定性"与"难度"两个核心参数；② <b>行为自动评分</b>：答错 → Again；答对且 &lt;3 秒 → Easy；3–10 秒 → Good；≥10 秒 → Hard，用户无需手动打分；③ <b>间隔计算</b>：下一次间隔约为 <code>稳定性 × (9/难度 − 1)</code> 天，向上取整至少 1 天，稳定性与难度分别 clamp 在合理区间防极端值；④ <b>改判补记</b>：修正历史作答时，在同一事务内同步更新复习卡，保证算法状态与记录一致。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
     <div class="phone" style="--ar:390/867;width:min(285px,76vw)">
@@ -1145,29 +1311,37 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <p class="f-desc">刷题量、正确率、学习时长、连续打卡、错题分布……所有数据在本地实时计算，用图表讲清楚你的学习状态。</p>
     <ul class="f-list">
       <li><b>近 30 天趋势</b>：柱状题量 + 分层正确率双轴对照</li>
-      <li><b>年度热力图</b>：季度翻页的打卡日历，累计努力一眼可见</li>
+      <li><b>年度热力图</b>：GitHub 贡献图样式，一整年 53 周 × 7 天，累计努力一眼可见</li>
       <li><b>正确率排行</b>：按题库 / 按知识点两个维度，定位薄弱环节</li>
       <li><b>错题统计</b>：总数、待复习、按题库分布与下次到期时间</li>
       <li><b>历史会话</b>：每一轮练习都可回看，支持改判修正</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>趋势图与热力日历均用 Flutter <code>CustomPainter</code> <b>自绘</b>（无图表库依赖），数据由 SQL 聚合查询在设备端完成。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>双 Y 轴自绘</b>：左轴题量、右轴正确率，柱形与分层折线叠画，支持点击气泡查看单日明细、按周分页；② <b>Y 轴自适应</b>：轴上限按数据最大值动态计算（下限 20），避免刷题量小时柱子被压成一条线；③ <b>热力图色阶</b>：按当日题量分四档着色，今天高亮描边、假期置灰；④ 统计口径统一排除"隐藏记录"与"模拟数据"，保证真实作答才进入指标。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
     <div class="phone" style="--ar:390/867;width:min(318px,80vw)">
       
       <div class="scr" data-mock="stats"></div>
     </div>
-    <div class="window" style="--ar:1280/800;max-width:420px">
+    <div class="window" style="--ar:1200/620;max-width:440px">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody"><img src="assets/wide_07_win_stats.webp" alt="Windows 统计页"></div>
+      <div class="wbody" style="background:#F5F7FA">
+        <div class="wmock" style="height:260px">
+          <div class="rail">
+            <div class="ri">⌂</div><div class="ri on">▤</div><div class="ri">◔</div>
+            <div class="sp"></div><div class="ri">⚙</div>
+          </div>
+          <div class="main">
+            <div class="hd">统计 · 近一年趋势</div>
+            <div class="mchart" data-d="12,38,55,42,60,88,72,45,30,66,92,58,40,76"></div>
+            <div class="cols" style="margin-top:4px">
+              <div class="col"><div class="t">年度坚持</div>
+                <div class="note">GitHub 贡献图 · 一整年 53 周</div></div>
+              <div class="col"><div class="t">正确率排行</div>
+                <div class="ln m"></div><div class="ln s"></div><div class="ln m"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1184,42 +1358,19 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>橡皮与选择</b>：整笔擦除，或选中笔迹后平移 / 删除</li>
       <li><b>跨设备适配</b>：手机、平板、桌面尺寸不同，笔迹位置保持一致</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd><code>CustomPaint</code> + <code>Listener</code> 捕获指针事件；笔迹数据存 <code>question_annotations</code> 表，复合主键 <code>(question_id, device_id)</code>。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>坐标归一化</b>：所有点位换算成 0–1 的相对坐标存储，因此同一份笔迹在任意屏幕尺寸下都能还原到相同位置；② <b>曲线平滑</b>：用<b>二次贝塞尔中点法</b>把采样点连成顺滑曲线（而非折线），笔帽笔接用圆角；③ <b>流畅度优化</b>：点距过近的采样点直接抽稀丢弃，压感取均值映射到 0.5–1.5 倍笔宽；④ <b>按设备隔离</b>：批注以 (题目, 设备) 为键，多端同步时各端笔迹共存不互相覆盖；⑤ 数据损坏时按"无批注"降级，不阻塞刷题。</dd>
-      </dl>
-    </div>
   </div>
-  <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="ink-demo">
-      <svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
-        <rect width="400" height="240" fill="#F7F9FC"/>
-        <rect x="24" y="26" width="352" height="1.5" fill="#DDE3EC"/>
-        <rect x="24" y="62" width="352" height="1.5" fill="#DDE3EC"/>
-        <rect x="24" y="98" width="300" height="1.5" fill="#DDE3EC"/>
-        <rect x="24" y="134" width="330" height="1.5" fill="#DDE3EC"/>
-        <rect x="24" y="170" width="270" height="1.5" fill="#DDE3EC"/>
-        <rect x="24" y="206" width="310" height="1.5" fill="#DDE3EC"/>
-        <rect class="ink-hi" x="118" y="52" width="104" height="20" rx="4"/>
-        <rect class="ink-hi2" x="60" y="124" width="150" height="20" rx="4"/>
-        <path class="ink-path" d="M36 118 C 70 96, 96 150, 132 116 S 186 92, 214 128 S 268 108, 300 136"/>
-        <path class="ink-path" style="animation-delay:.5s" d="M320 190 C 348 176, 356 206, 372 194"/>
+  <div class="f-visual" style="flex-direction:column;gap:16px">
+    <div class="ink-wrap">
+      <div class="phone" style="--ar:390/867;width:100%">
+        <div class="scr" data-mock="annot"></div>
+      </div>
+      <svg class="ink" viewBox="0 0 390 844" preserveAspectRatio="none">
+        <path class="ink-p hl" d="M70 300 L300 300"/>
+        <path class="ink-p" d="M64 332 C 96 314, 120 352, 160 326 S 220 306, 260 336"/>
+        <path class="ink-p d2" d="M74 406 C 104 392, 128 424, 168 402"/>
       </svg>
     </div>
-    <div style="display:flex;gap:12px;align-items:flex-start">
-      <div class="phone" style="--ar:1600/2560;width:min(210px,56vw)">
-        
-        <div class="scr"><img src="assets/annot_03_done.webp" alt="批注" class="on"></div>
-      </div>
-      <div class="phone" style="--ar:1600/2560;width:min(210px,56vw)">
-        
-        <div class="scr"><img src="assets/annot_18_highlighter.webp" alt="荧光笔" class="on"></div>
-      </div>
-    </div>
+    <div class="chip b"><span class="ic">🖊</span> 细笔 / 荧光笔 / 橡皮</div>
   </div>
 </div>
 
@@ -1228,22 +1379,13 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   <div class="f-text reveal">
     <div class="f-no">功能 10</div>
     <h3>三套主题，<em>每套都有深色版</em></h3>
-    <p class="f-desc">长时间刷题，界面得顺眼。五套配色风格各配一套深色变体，可跟随系统自动切换。</p>
+    <p class="f-desc">长时间刷题，界面得顺眼。三套配色风格各配一套深色变体，可跟随系统自动切换。</p>
     <ul class="f-list">
       <li><b>三种风格</b>：清蓝（清爽专业）/ 松绿（护眼低疲劳）/ 墨黑（深色优先）</li>
       <li><b>深色模式</b>：每套主题都有深色变体，跟随系统 / 手动切换</li>
       <li><b>全局统一</b>：切换即时生效，所有页面同步换肤</li>
       <li><b>语义色体系</b>：对错用固定的成功 / 危险色，任何主题下判断一致</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>Flutter Material 3 的 <code>ColorScheme.fromSeed</code> 以强调色为种子生成完整配色；主题扩展 <code>ThemeExtension&lt;AppThemeColors&gt;</code> 承载语义色；选择持久化到 <code>SharedPreferences</code>。</dd>
-        <dt>怎么做</dt>
-        <dd>① 每套主题<b>显式定义 12 个语义色位</b>（背景/表面/描边/三级文字/强调/语义色），不再依赖 Material 自动生成 —— 从根上消除"色相过载"；② 页面<b>禁止硬编码色值</b>，一律语义取色，杜绝"换主题某处看不清"；③ 判断题对错用固定的成功/危险色，<b>不随主题偏移</b>，保证"绿对红错"认知一致；④ 全套组件（按钮/输入框/弹窗/导航/卡片）统一组件主题，视觉语言一致。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:22px">
     <div class="themes">
@@ -1253,11 +1395,9 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     </div>
     <div style="display:flex;gap:14px;align-items:flex-start">
       <div class="phone" style="--ar:390/867;width:min(210px,56vw)">
-        
-        <div class="scr" data-mock="home-dark"></div>
+        <div class="scr" data-mock="home"></div>
       </div>
       <div class="phone" style="--ar:390/867;width:min(210px,56vw)">
-        
         <div class="scr" data-mock="home-dark"></div>
       </div>
     </div>
@@ -1269,32 +1409,47 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   <div class="f-text reveal">
     <div class="f-no">功能 11</div>
     <h3>手机、平板、电脑，<em>同一份题库接着刷</em></h3>
-    <p class="f-desc">大屏不是简单拉伸。窗口够宽时界面自动变成左右并排布局，题区、解析、列表各就各位。</p>
+    <p class="f-desc">大屏不是简单拉伸。窗口够宽时界面自动变成左侧导航加左右并排布局，题区、解析、列表各就各位。</p>
     <ul class="f-list">
-      <li><b>自适应断点</b>：平板、宽屏各有独立布局策略</li>
+      <li><b>自适应断点</b>：手机用底部导航，宽屏自动换成左侧竖向导航</li>
       <li><b>双栏布局</b>：宽屏下题目与解析左右并排，减少滚动</li>
       <li><b>内容限宽</b>：大屏不会把文字拉成超长行，阅读舒适</li>
       <li><b>拖动即重排</b>：桌面端改变窗口大小，布局实时响应</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd><code>LayoutBuilder</code> 实时监听可用宽度；断点参照 Material 窗口尺寸分类；同一套 Flutter 代码构建 Android 与 Windows。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>两档断点</b>：最短边 ≥600dp 判定为平板、窗口宽 ≥840dp 判定为宽屏布局；② <code>AdaptivePair</code> 组件在可用宽 ≥900 时自动左右并排、否则上下堆叠，拖动窗口即时重排；③ <b>内容限宽</b>：普通内容最大 640、宽屏二级页最大 1200，底部弹窗最大 480，避免大屏出现超长文本行；④ 页面用统一的自适应容器居中限宽，无需每个页面各自处理。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
-    <div class="window" style="--ar:1600/1000">
+    <div class="window" style="--ar:1200/620;width:100%">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody"><img src="assets/wide_03_tablet_home.webp" alt="平板首页"></div>
+      <div class="wbody" style="background:#F5F7FA">
+        <div class="wmock">
+          <div class="rail">
+            <div class="ri on">⌂</div><div class="ri">▤</div><div class="ri">◔</div>
+            <div class="sp"></div><div class="ri">⚙</div>
+          </div>
+          <div class="main">
+            <div class="hd">第 9/10 题 · 单选</div>
+            <div class="cols">
+              <div class="col">
+                <div class="t">题目</div>
+                <div class="ln m"></div><div class="ln"></div><div class="ln s"></div>
+                <div class="opts" style="margin-top:9px">
+                  <div class="op"><i>A</i>急性胃炎</div>
+                  <div class="op ok"><i>B</i>慢性萎缩性胃炎</div>
+                  <div class="op"><i>C</i>胃溃疡</div>
+                </div>
+              </div>
+              <div class="col">
+                <div class="t">AI 解析</div>
+                <div class="note"><b style="color:#15803D">答案：</b>B<br>
+                <b style="color:#2563EB">题眼：</b>黏膜变薄、血管透见<br>
+                <b style="color:#B91C1C">避坑：</b>别把血管透见与充血发红混淆</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="window" style="--ar:1280/800;max-width:470px">
-      <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody"><img src="assets/wide_01_win_home.webp" alt="Windows 首页"></div>
-    </div>
+    <div class="chip b"><span class="ic">🖥</span> 宽屏自动双栏</div>
   </div>
 </div>
 
@@ -1311,29 +1466,23 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>批注互不覆盖</b>：各设备的笔迹共存，谁的批注都不丢</li>
       <li><b>不经过云</b>：数据只在你的两台设备之间直接传输</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>纯 Dart <code>dart:io</code> 实现，无第三方网络框架：<b>UDP 三通道发现</b> + 本机 <code>HttpServer</code> 交换数据；Android 侧申请 <code>MulticastLock</code> 保证能收到广播包。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>三通道发现</b>互为兜底：子网单播扫描（属出站流量，不受入站防火墙限制，最可靠）+ 多播组 + 子网广播；② 信标是 JSON，带应用魔数、协议版本、设备 ID 与端口，收到对方信标即单播应答，实现双向可见；③ 设备按 ID 去重、超时自动剔除；④ <b>一次请求完成双向同步</b>：POST 快照的同时响应本机快照；⑤ <b>合并策略</b>：题库/题目/会话/作答记录按全局 <code>uid</code> upsert，批注与错题按"（题目, 设备）"隔离共存绝不覆盖，外键按 uid 映射到本地自增 ID；⑥ 自动同步带冷却时间，也可手动"立即同步"。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual">
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">
-      <div class="phone" style="--ar:1600/2560;width:min(238px,58vw)">
-        
-        <div class="scr"><img src="assets/tab_new_profile.webp" alt="我的页面" class="on"></div>
+    <div class="sync-schem">
+      <div class="sync-dev">
+        <div class="frame"><div class="scr2"><i class="w1"></i><i class="w2"></i><i class="w3"></i><i class="w2"></i></div></div>
+        <div class="lb">手机 · 猫卷-Android</div>
       </div>
-      <div style="font-size:30px;color:var(--c3)">⇄</div>
-      <div class="phone" style="--ar:390/867;width:min(238px,58vw)">
-        
-        <div class="scr" data-mock="home"></div>
+      <div class="sync-link">
+        <div class="pkt"></div>
+        <div class="pkt rev" style="animation-delay:1.1s"></div>
+      </div>
+      <div class="sync-dev">
+        <div class="frame"><div class="scr2"><i class="w2"></i><i class="w1"></i><i class="w2"></i><i class="w3"></i></div></div>
+        <div class="lb">平板 · 猫卷-Tablet</div>
       </div>
     </div>
-    <div class="chip b" style="top:8%"><span class="ic">📡</span> UDP 自动发现</div>
+    <div class="chip b" style="top:8%"><span class="ic">📡</span> 自动发现</div>
     <div class="chip c"><span class="ic">🔒</span> 仅局域网内传输</div>
   </div>
 </div>
@@ -1351,15 +1500,6 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
       <li><b>BYOK 直连</b>：AI 请求由你的 Key 直连模型服务商，项目方不接触你的数据</li>
       <li><b>防篡改</b>：App 签名锁定，被二次打包会直接拒绝启动</li>
     </ul>
-    <div class="tech">
-      <div class="tech-h">⚙ 技术实现</div>
-      <dl>
-        <dt>用什么</dt>
-        <dd>API Key 用 <code>pointycastle</code> 的 <b>AES-256-GCM</b> 加密（密文自描述前缀 + base64）；Android 侧用 <code>flutter_secure_storage</code> 存入系统 Keystore；防篡改通过 MethodChannel 取 APK 真实签名比对；发布构建开启代码混淆。</dd>
-        <dt>怎么做</dt>
-        <dd>① <b>加密格式</b>：nonce 12 字节 + 密文 + GCM 认证标签 16 字节，密钥由固定盐经 SHA-256 迭代 1000 轮派生；② <b>向后兼容回退链</b>：解密依次尝试 当前版本 → 上一版盐 → 旧版算法 → 明文，保证历史数据与改名前的旧备份都能读；③ <b>备份校验</b>：导入前校验文件魔数、数据库版本号区间、核心表与关键列存在性，防伪造文件；④ <b>原子恢复</b>：先复制到临时文件二次校验，通过后旧库改名留底再替换，失败自动回滚；⑤ <b>防篡改 fail-closed</b>：签名校验放在编译期常量比对（不依赖可被清除的本地存储），校验异常一律拒绝启动；⑥ 导出前执行 WAL 检查点，确保拿到一致性的数据库快照。</dd>
-      </dl>
-    </div>
   </div>
   <div class="f-visual">
     <div style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center">
@@ -1374,52 +1514,109 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   </div>
 </div>
 
-<!-- ═══ 技术栈 ═══ -->
-<section id="tech-stack">
-  <div class="reveal" style="text-align:center">
-    <div class="eyebrow">技术栈</div>
-    <h2>用什么<em>把它做出来</em></h2>
-    <p class="lead" style="margin:0 auto">Flutter 单代码库覆盖 Android 与 Windows，所有 AI 与数据能力都在设备端与用户自持的 API 之间完成。</p>
-  </div>
-  <div class="stack">
-    <div class="sk reveal"><div class="t">Flutter</div><div class="d">单代码库跨 Android / Windows，自绘图表与画布</div></div>
-    <div class="sk reveal"><div class="t">SQLite</div><div class="d">本地数据层，外键级联、索引优化、事务一致性</div></div>
-    <div class="sk reveal"><div class="t">DeepSeek API</div><div class="d">OpenAI 兼容接口，结构化输出解析题目与讲解</div></div>
-    <div class="sk reveal"><div class="t">FSRS-5</div><div class="d">间隔重复算法，19 权重 + 遗忘曲线建模</div></div>
-    <div class="sk reveal"><div class="t">AES-256-GCM</div><div class="d">pointycastle 加密密钥，SHA-256 迭代派生</div></div>
-    <div class="sk reveal"><div class="t">Android Keystore</div><div class="d">flutter_secure_storage 系统级安全存储</div></div>
-    <div class="sk reveal"><div class="t">UDP + HTTP</div><div class="d">局域网设备发现与点对点数据同步</div></div>
-    <div class="sk reveal"><div class="t">CustomPainter</div><div class="d">趋势图、热力日历与手写笔迹自绘渲染</div></div>
-    <div class="sk reveal"><div class="t">Archive + XML</div><div class="d">解包 DOCX 并解析文档结构提取题目</div></div>
-    <div class="sk reveal"><div class="t">Isolate</div><div class="d">文档解析与重任务放独立线程，界面不卡顿</div></div>
-    <div class="sk reveal"><div class="t">Local Notifications</div><div class="d">本地时区排程 + 前台服务保活的每日提醒</div></div>
-    <div class="sk reveal"><div class="t">Flutter Test</div><div class="d">178 项自动化测试 + 集成测试保障回归</div></div>
-  </div>
-</section>
-
 <!-- ═══ 工程质量 ═══ -->
 <section id="quality">
   <div class="reveal" style="text-align:center">
     <div class="eyebrow">工程质量</div>
-    <h2>看得见的承诺，<em>用数字说话</em></h2>
-    <p class="lead" style="margin:0 auto">免费不等于将就。每一项改动都经过自动化测试与发布前校验，保证你手上的版本行为稳定、可追溯。</p>
+    <h2>看得见的坚持，<em>用数字说话</em></h2>
+    <p class="lead" style="margin:0 auto">免费不等于将就。每一轮改动都经过自动化测试与发布前校验，保证你手上的版本行为稳定、可追溯。</p>
   </div>
   <div class="stats-grid">
-    <div class="stat reveal"><div class="n"><span class="num" data-to="178">0</span></div><div class="l">项自动化测试</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="220">0</span></div><div class="l">项自动化测试</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="11">0</span></div><div class="l">张数据表（schema v11）</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="7">0</span></div><div class="l">种题型判定</div></div>
-    <div class="stat reveal"><div class="n"><span class="num" data-to="5">0</span></div><div class="l">套主题 × 深浅 = 10 套色板</div></div>
-    <div class="stat reveal"><div class="n"><span class="num" data-to="4">0</span></div><div class="l">维发布基线校验</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="3">0</span></div><div class="l">套主题 × 深浅 = 6 色板</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="9">0</span></div><div class="l">轮里程碑迭代</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="0">0</span></div><div class="l">广告 / 会员 / 账号</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="100">0</span>%</div><div class="l">数据本地存储</div></div>
     <div class="stat reveal"><div class="n">∞</div><div class="l">免费使用</div></div>
   </div>
-  <div class="tech reveal" style="margin-top:28px">
-    <div class="tech-h">⚙ 发布流程</div>
-    <p style="font-size:14px;color:var(--tx2);margin-top:2px">
-      每次发版依次执行：静态分析（0 问题）→ 全量自动化测试（178 项）→ 混淆构建 → <b>组件 / 权限 / 文案 / 资源四维基线对照校验</b> → 签名校验。
-      其中基线校验会把当前版本与原版 APK 逐项比对，任何未审阅的差异都会被拦下，确保发出去的包可溯源、可回退。
-    </p>
+</section>
+
+<!-- ═══ 开发历程 ═══ -->
+<section id="timeline">
+  <div class="reveal" style="text-align:center">
+    <div class="eyebrow">开发历程</div>
+    <h2>从六月的一个念头，<em>到 1.28</em></h2>
+    <p class="lead" style="margin:0 auto">2026 年 6 月 15 日动工，前后近三个月、跨三个阶段：从「呆猫刷题宝」初版，到 v1.0.2 打磨，再到接手后的 UI 重做与 AI 能力扩展。</p>
+  </div>
+
+  <!-- 三阶段总览 -->
+  <div class="phase-row reveal">
+    <div class="phase">
+      <div class="ph-d">2026-06-15 → 06-25</div>
+      <div class="ph-t">起于「呆猫刷题宝」</div>
+      <div class="ph-s">初版 v1.0 → v1.26.6.24</div>
+    </div>
+    <div class="phase">
+      <div class="ph-d">2026-08-07 → 08-09</div>
+      <div class="ph-t">v1.0.x 打磨封存</div>
+      <div class="ph-s">42 项修复 + AES 加密</div>
+    </div>
+    <div class="phase">
+      <div class="ph-d">2026-08-10 → 09-11</div>
+      <div class="ph-t">接手重建与 1.28</div>
+      <div class="ph-s">全新 UI + AI 能力扩展</div>
+    </div>
+  </div>
+
+  <!-- 提交活跃图（真实数据：按工作日的提交数） -->
+  <div class="commit-card reveal">
+    <div class="commit-head">
+      <b>提交活跃度</b>
+      <span>第三阶段（2026-08-10 → 09-11）· 7 个工作日 61 次提交</span>
+    </div>
+    <div class="commit-bars" id="commit-bars"></div>
+    <div class="commit-legend"><i></i>方块高度 = 当天提交数 · 悬停查看（仅统计有 git 记录的第三阶段）</div>
+  </div>
+
+  <div class="dtl-wrap">
+    <div class="dtl-line"><i id="tl-progress"></i></div>
+    <div class="dtl-list" id="dtl-list"></div>
+  </div>
+
+  <div class="dtl-cta reveal">
+    <a class="btn btn-g" href="https://github.com/laow07573-web/daimao-quiz-master" id="repo-link" target="_blank" rel="noopener">在 GitHub 查看提交记录 →</a>
+  </div>
+</section>
+
+<!-- ═══ 使用说明（尾页动画演示） ═══ -->
+<section id="guide">
+  <div class="reveal">
+    <div class="eyebrow">动画使用说明</div>
+    <h2>从装好到上手，<em>八步走完</em></h2>
+    <p class="lead">下面这套演示按顺序播放每一步操作对应的界面（全部由代码实时矢量绘制，非截图）。点「重播」可再看一遍，点任意一步可跳到那一步。</p>
+  </div>
+
+  <div class="guide-wrap">
+    <div>
+      <div class="steps" id="guide-steps"></div>
+      <div class="guide-bar">
+        <button class="guide-btn primary" id="guide-play">⏸ 暂停</button>
+        <button class="guide-btn" id="guide-replay">↺ 重播</button>
+        <div class="guide-track"><i id="guide-progress"></i></div>
+        <span style="font-size:12.5px;color:var(--tx3)" id="guide-count">1 / 8</span>
+      </div>
+      <div class="guide-caption" id="guide-caption"></div>
+    </div>
+
+    <div style="display:flex;justify-content:center" class="guide-stage">
+      <div class="phone" style="--ar:390/867;width:min(332px,84vw)">
+        <div class="scr" id="guide-scr">
+          <div class="mscr on" data-t="clear">
+            <div class="mroot" style="--ratio:0.45">
+              <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+              <div class="mapp"><b>猫卷</b><span class="sp"></span></div>
+              <div class="mbody" style="align-items:center;justify-content:center">
+                <div style="font-size:13px;color:var(--m-fg2);text-align:center;line-height:1.8">
+                  正在准备演示…<br><span style="font-size:11px;color:var(--m-fg3)">下方步骤会自动切换界面</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -1430,13 +1627,14 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     <h2 style="margin-bottom:10px">现在就把题库<em>搬进自己手机</em></h2>
     <p class="lead" style="margin:0 auto 8px">无需注册，下载即用。导入一份文档，就能开始你的第一轮刷题。</p>
     <div class="dl-btns">
-      <!-- ↓↓↓ 部署时把 href 换成你的实际下载地址（或把 APK 放进 promo 目录） ↓↓↓ -->
-      <a class="btn btn-p" id="dl-apk" href="../dist/猫卷_v1.27.0_导入截断修复_20260901.apk" download>⬇️ Android 版 APK</a>
-      <a class="btn btn-g" id="dl-win" href="../dist/猫卷-Setup-1.27.0-Windows-x64.exe" download>🖥️ Windows 桌面版</a>
+      <!-- ↓↓↓ 版本发布后，把 href 换成 GitHub Releases 的下载地址 ↓↓↓ -->
+      <a class="btn btn-p" id="dl-apk" href="https://github.com/laow07573-web/daimao-quiz-master/releases" target="_blank" rel="noopener">⬇️ Android 版 APK · v1.28.0</a>
+      <a class="btn btn-g" id="dl-win" href="https://github.com/laow07573-web/daimao-quiz-master/releases" target="_blank" rel="noopener">🖥️ Windows 桌面版 · v1.28.0</a>
+      <a class="btn btn-g" id="dl-repo" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">📦 在 GitHub 查看源码</a>
     </div>
     <div class="dl-note">
-      Android 7.0 及以上 · 安装包约 38 MB · 完全离线可用<br>
-      需要 AI 讲解功能时，在设置中填入你自己的 DeepSeek API Key 即可（基础刷题功能无需联网）
+      Android 7.0 及以上 · 完全离线可用 · 源码与安装包均在 GitHub 开源发布<br>
+      Windows 版为绿色免安装 / 安装包两种形态；需要 AI 讲解时在设置中填入你自己的 API Key（基础刷题无需联网）
     </div>
   </div>
 </section>
@@ -1446,16 +1644,39 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   <div class="fb"><img src="assets/logo.png" alt="猫卷"><span>猫卷</span></div>
   <p>本地优先的 AI 备考刷题平台 · 题库自建 · 数据自有 · 开源免费</p>
   <p>作者：B 站 笨蛋鱼坏蛋猫 · 许可：CC BY-NC-SA 4.0（署名 · 非商业 · 相同方式共享）</p>
-  <p style="margin-top:14px;color:#4A5470">本页面为功能展示用途 · 所有界面截图均来自真实 App</p>
+  <p>开源仓库：<a href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener" style="color:#8FB0FF">github.com/laow07573-web/daimao-quiz-master</a></p>
+  <p style="margin-top:14px;color:#4A5470">本页面为功能展示用途 · 界面均由代码矢量重绘，可任意缩放</p>
 </footer>
 
 </div>
 
 <script>
+/* ────────── 后台打开兜底：禁过渡，避免卡在起始态 ────────── */
+(function(){
+  var root = document.documentElement;
+  if(document.hidden){ root.classList.add('no-motion'); }
+  // 回到前台：先保持禁过渡让最终态落实，下一帧再恢复，之后动画正常
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden){
+      root.classList.add('no-motion');
+    } else if(root.classList.contains('no-motion')){
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){ root.classList.remove('no-motion'); });
+      });
+    }
+  });
+})();
+
 /* ────────── 滚动出现 ────────── */
 (function(){
   var els = document.querySelectorAll('.reveal');
-  if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in')}); return; }
+  // 页面在后台打开时 IntersectionObserver 与定时器都可能被节流：直接显示，避免空白
+  if(!('IntersectionObserver' in window) || document.hidden){
+    document.querySelectorAll('.reveal,.dtl-item').forEach(function(e){
+      e.classList.add('in');
+    });
+    return;
+  }
   var io = new IntersectionObserver(function(list){
     list.forEach(function(en){
       if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
@@ -1474,6 +1695,17 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     var tpl = document.getElementById('tpl-' + kind);
     if(!tpl) return null;
     return tpl.content.firstElementChild.cloneNode(true);
+  }
+
+  /* 显形：先禁用过渡再挂 .on，保证首屏/单屏在任何环境下都立即可见
+     （后台或被遮挡的标签页不会推进 CSS 过渡，只靠过渡会出现"空白"） */
+  function revealNow(m){
+    m.style.transition = 'none';
+    m.classList.add('on');
+    // 下一帧恢复过渡，让后续轮播切换仍有淡入效果
+    requestAnimationFrame(function(){ m.style.transition = ''; });
+    // 兜底：即便 rAF 不执行，也延迟清一次
+    setTimeout(function(){ m.style.transition = ''; }, 600);
   }
 
   /* 月历：按 data-h 数据生成 7 列网格（真实日期与今天高亮） */
@@ -1499,6 +1731,83 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     for(var k = 0; k < tail; k++) html += '<i class="e"></i>';
     html += '</div>';
     box.innerHTML = html;
+  }
+
+  /* 年度坚持：GitHub 贡献图（周为列、星期为行，一年 53 周）
+     真实引擎与 lib/widgets/year_heatmap.dart 同一算法：
+     - 1/1 回溯到所在周的周一，逐周推进到 12/31
+     - 每列首个属于本年的日期决定月份标签
+     - 色阶：0 / <50 / <200 / >=200 → l0..l3 */
+  function buildHeat(box){
+    var year = +box.dataset.year || new Date().getFullYear();
+    var todayKey = box.dataset.today || '';
+    // 用确定性伪随机生成一年的练习分布（演示用，无需真实数据）
+    var seed = year * 2654435761 % 2147483647;
+    function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
+    var daily = {};
+    var d = new Date(year, 0, 1);
+    while(d.getFullYear() === year){
+      var r = rnd();
+      // 约 1/4 的日子休息；其余 8~260 题（覆盖三档色阶）
+      if(r > 0.25){
+        var t = rnd();
+        daily[keyOf(d)] = t < 0.45 ? 5 + Math.floor(rnd()*44)
+                       : t < 0.85 ? 55 + Math.floor(rnd()*140)
+                       : 205 + Math.floor(rnd()*120);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    function keyOf(dt){
+      var mm = String(dt.getMonth()+1).padStart(2,'0');
+      var dd = String(dt.getDate()).padStart(2,'0');
+      return dt.getFullYear() + '-' + mm + '-' + dd;
+    }
+
+    // 起始：包含 1/1 的那一周的周一（JS getDay: 0=周日）
+    var jan1 = new Date(year, 0, 1);
+    var firstMon = new Date(jan1);
+    firstMon.setDate(jan1.getDate() - ((jan1.getDay() + 6) % 7));
+
+    var weeks = [], cursor = new Date(firstMon), prevMonth = null;
+    var dec31 = new Date(year, 11, 31);
+    while(cursor <= dec31){
+      var days = [], label = null;
+      for(var i = 0; i < 7; i++){
+        var dd = new Date(cursor); dd.setDate(cursor.getDate() + i);
+        if(dd.getFullYear() !== year){ days.push(null); continue; }
+        days.push(keyOf(dd));
+      }
+      var firstIn = days.filter(function(x){ return x; })[0];
+      if(firstIn){
+        var m = +firstIn.split('-')[1];
+        if(prevMonth !== m){ label = m + '月'; prevMonth = m; }
+      }
+      weeks.push({days: days, label: label});
+      cursor.setDate(cursor.getDate() + 7);
+    }
+
+    var months = '<div class="months">';
+    for(var s = 0; s < weeks.length; s++){
+      months += '<span>' + (weeks[s].label || '') + '</span>';
+    }
+    months += '</div>';
+
+    var cols = '';
+    for(var w = 0; w < weeks.length; w++){
+      cols += '<div class="col">';
+      for(var k = 0; k < 7; k++){
+        var key = weeks[w].days[k];
+        if(!key){ cols += '<i class="e"></i>'; continue; }
+        var t = daily[key] || 0;
+        var cls = t <= 0 ? '' : t < 50 ? 'l1' : t < 200 ? 'l2' : 'l3';
+        if(key === todayKey) cls += ' td';
+        cols += '<i class="' + cls.trim() + '" title="' + key + '　' + t + ' 题"></i>';
+      }
+      cols += '</div>';
+    }
+    box.innerHTML = months +
+      '<div class="row"><div class="wl"><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span><span></span></div>' +
+      '<div class="cols">' + cols + '</div></div>';
   }
 
   /* 趋势图：自绘 SVG 柱状 + 正确率折线（矢量） */
@@ -1530,12 +1839,29 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
            '" height="' + h.toFixed(1) + '" rx="2" fill="var(--m-accent)" fill-opacity=".55"/>';
       acc.push(Math.min(100, 40 + (v / max) * 55));
     });
-    // 正确率折线
+    // 正确率曲线：Catmull-Rom 转三次贝塞尔（平滑，且控制点收在本段包围盒内防过冲）
     var pts = acc.map(function(a, i){
-      return [(padL + i * bw + bw / 2).toFixed(1), (padT + ih - (a / 100) * ih).toFixed(1)];
+      return [padL + i * bw + bw / 2, padT + ih - (a / 100) * ih];
     });
-    s += '<polyline points="' + pts.map(function(p){ return p.join(','); }).join(' ') +
-         '" fill="none" stroke="var(--m-accent)" stroke-width="1.6" stroke-opacity=".85" stroke-linejoin="round"/>';
+    if(pts.length > 1){
+      var d = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+      for(var k = 0; k < pts.length - 1; k++){
+        var p0 = pts[k - 1] || pts[k];
+        var p1 = pts[k];
+        var p2 = pts[k + 1];
+        var p3 = pts[k + 2] || p2;
+        var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+        var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+        var loY = Math.min(p1[1], p2[1]), hiY = Math.max(p1[1], p2[1]);
+        c1x = Math.max(p1[0], Math.min(p2[0], c1x)); c1y = Math.max(loY, Math.min(hiY, c1y));
+        c2x = Math.max(p1[0], Math.min(p2[0], c2x)); c2y = Math.max(loY, Math.min(hiY, c2y));
+        d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1) + ' ' +
+                    c2x.toFixed(1) + ',' + c2y.toFixed(1) + ' ' +
+                    p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+      }
+      s += '<path d="' + d + '" fill="none" stroke="var(--m-accent)" stroke-width="1.6"' +
+           ' stroke-opacity=".85" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
     // X 轴
     s += '<line x1="' + padL + '" y1="' + (padT + ih) + '" x2="' + (W - padR) + '" y2="' + (padT + ih) +
          '" stroke="#D9E2EC" stroke-width="1"/>';
@@ -1543,26 +1869,79 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
   }
 
   /* 打字机（AI 解析正文） */
+  /* AI 正文渲染：**加粗** + ==蓝关键词== + !!红关键词!! + 结构标签着色
+     与 App 自研渲染器（lib/widgets/ai_response_widget.dart）同一套约定。 */
+  var escHtml = function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+
+  /* 结构标签：命中则返回 [已转义的标签前缀HTML, 余下正文]，否则 null。
+     兼容 `答案：`、`**答案：**`、`**答案：** 内容` 三种写法。
+     标签整行着色：答案绿 / 题眼蓝 / 避坑红底 / 记忆蓝底 / 解析加粗。 */
+  function splitStructure(line){
+    var m = line.match(/^(\s*)\*{0,2}(答案|题眼|避坑指南|一句话记忆|解析)：\*{0,2}\s*/);
+    if(!m) return null;
+    var cls = { '答案':'sec-ans', '题眼':'sec-eye', '避坑指南':'sec-pit',
+                '一句话记忆':'sec-mem', '解析':'k' }[m[2]];
+    var prefix = '<span class="' + cls + '">' + escHtml(m[2] + '：') + '</span>';
+    return [prefix, line.slice(m[0].length)];
+  }
+
+  /* 行内：**粗** / `码` / ==蓝== / !!红!!；未闭合容错为纯文本 */
+  function inlineFmt(s){
+    var out = '', i = 0;
+    function next(from){
+      var c = [s.indexOf('**',from), s.indexOf('`',from), s.indexOf('==',from), s.indexOf('!!',from)]
+        .filter(function(p){ return p !== -1; });
+      return c.length ? Math.min.apply(null, c) : -1;
+    }
+    while(i < s.length){
+      var n = next(i);
+      if(n === -1){ out += escHtml(s.slice(i)); break; }
+      if(n > i) out += escHtml(s.slice(i, n));
+      var isBold = s.substr(n,2) === '**';
+      var isCode = !isBold && s.charAt(n) === '`';
+      var isBlue = !isBold && !isCode && s.substr(n,2) === '==';
+      var mk = isCode ? '`' : '**';
+      if(!isBold && !isCode) mk = isBlue ? '==' : '!!';
+      var close = s.indexOf(mk, n + mk.length);
+      if(close === -1){ out += escHtml(s.slice(n)); break; }   // 未闭合 → 原样
+      var inner = escHtml(s.slice(n + mk.length, close));
+      if(isBold) out += '<span class="k">' + inner + '</span>';
+      else if(isCode) out += '<span class="k">' + inner + '</span>';
+      else if(isBlue) out += '<span class="kw-blue">' + inner + '</span>';
+      else out += '<span class="kw-red">' + inner + '</span>';
+      i = close + mk.length;
+    }
+    return out;
+  }
+
+  function aiToHtml(plain){
+    return plain.split('\n').map(function(line){
+      var lead = '';
+      var m = line.match(/^\s*[-*]\s+/);
+      if(m){ lead = '• '; line = line.slice(m[0].length); }
+      else {
+        var om = line.match(/^\s*(\d+)\.\s+/);
+        if(om){ lead = om[1] + '. '; line = line.slice(om[0].length); }
+      }
+      var sec = splitStructure(line);
+      if(sec) return escHtml(lead) + sec[0] + ' ' + inlineFmt(sec[1]);
+      return escHtml(lead) + inlineFmt(line);
+    }).join('<br>');
+  }
+
   /* AI 正文：默认就显示完整内容（保证任何情况下都能看到），
      进入视口时再用「时间驱动」的打字动画重播一遍（后台标签 timer 节流也不影响最终结果） */
   function renderFull(box){
-    var plain = (box.dataset.type || '').replace(/\*\*(.+?)\*\*/g, '$1');
-    var esc = function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-    var html = esc(plain).replace(/\*\*([^*]+)\*\*/g, '<span class="k">$1</span>')
-                         .replace(/\*\*(.+)$/, '<span class="k">$1</span>');
-    box.innerHTML = html.replace(/\n/g, '<br>');
+    box.innerHTML = aiToHtml(box.dataset.type || '');
   }
 
   function typeInto(box){
     if(box._running) return;
     box._running = true;
-    var plain = (box.dataset.type || '').replace(/\*\*(.+?)\*\*/g, '$1');
-    var esc = function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var plain = box.dataset.type || '';
     var render = function(n){
-      var html = esc(plain.slice(0, n));
-      html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="k">$1</span>');
-      html = html.replace(/\*\*(.+)$/, '<span class="k">$1</span>');
-      return html.replace(/\n/g, '<br>');
+      // 只截纯文本再渲染，避免切断 HTML 标签（未闭合标记按纯文本容错）
+      return aiToHtml(plain.slice(0, n));
     };
     var start = Date.now(), DURATION = 1500;      // 1.5 秒打完全文（时间驱动，不受帧率影响）
     (function tick(){
@@ -1668,12 +2047,13 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     // 生成月历/图表 + 预渲染 AI 正文（保证内容始终可见）
     screens.forEach(function(m){
       m.querySelectorAll('.mcal').forEach(buildCal);
+      m.querySelectorAll('.mheat').forEach(buildHeat);
       m.querySelectorAll('.mchart').forEach(buildChart);
       m.querySelectorAll('.mtxt[data-type]').forEach(renderFull);
     });
 
     var i = 0;
-    screens[0].classList.add('on');
+    revealNow(screens[0]);
     // 首屏立即激活（不等观察器），保证动画与滚动一定启动
     activate(screens[0]);
     if(screens.length > 1){
@@ -1697,6 +2077,10 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
 
   document.querySelectorAll('[data-mocks]').forEach(initHost);
 
+  /* wmock（宽屏示意）里的图表：静态 DOM，不在 data-mock 宿主内，单独构建一次 */
+  document.querySelectorAll('.wmock .mchart').forEach(buildChart);
+  document.querySelectorAll('.wmock .mheat').forEach(buildHeat);
+
   /* 非轮播的独立 mock（如功能区块里的单屏）：进入视口时激活动画 */
   document.querySelectorAll('[data-mock]').forEach(function(host){
     var kinds = (host.dataset.mock || '').split(',').filter(Boolean);
@@ -1712,9 +2096,10 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     window.addEventListener('resize', fit);
     if(window.ResizeObserver){ new ResizeObserver(fit).observe(host); }
     m.querySelectorAll('.mcal').forEach(buildCal);
+    m.querySelectorAll('.mheat').forEach(buildHeat);
     m.querySelectorAll('.mchart').forEach(buildChart);
     m.querySelectorAll('.mtxt[data-type]').forEach(renderFull);   // 预渲染，内容始终可见
-    m.classList.add('on');
+    revealNow(m);
     // 关键：进入视口才播放（首屏立即，其他滚动到时播放；离开再进入时重播）
     visible(m, function(){ activate(m, true); });
   });
@@ -1733,22 +2118,336 @@ footer p{font-size:13px;color:var(--tx3);margin-bottom:6px}
     // 兜底：无论如何 3.5s 内必播放一次（防止观察器失效导致内容静止）
     setTimeout(once, 3500);
   }
+
+  // 暴露给「使用说明」区块复用同一套绘制/动画能力（避免重复实现）
+  window.__maojuanMock = {
+    makeMock: makeMock,
+    buildCal: buildCal,
+    buildHeat: buildHeat,
+    buildChart: buildChart,
+    renderFull: renderFull,
+    typeInto: typeInto,
+    playBubbles: playBubbles,
+    revealNow: revealNow
+  };
 })();
 
-/* ────────── 兼容旧轮播（剩余真实截图区块） ────────── */
-function cycle(id, ms){
-  var scr = document.getElementById(id);
-  if(!scr) return;
-  var imgs = scr.querySelectorAll('img');
-  if(imgs.length < 2) return;
-  var i = 0;
-  setInterval(function(){
-    imgs[i].classList.remove('on');
-    i = (i + 1) % imgs.length;
-    imgs[i].classList.add('on');
-  }, ms);
-}
-cycle('mode-scr', 2400);
+/* ══════════════════════════════════════════════════════════════
+   开发历程：三阶段总览 + 提交活跃图 + 九个里程碑时间线
+   数据来自项目真实 git 历史（按工作日提交数）与交付版本号
+   ══════════════════════════════════════════════════════════════ */
+(function(){
+  // 真实提交数：7 个工作日共 61 次
+  var COMMITS = [
+    { d:'8/10', n:19, v:'v1.0.2' },
+    { d:'8/14', n:6,  v:'v1.0.2' },
+    { d:'8/20', n:5,  v:'v1.0.2' },
+    { d:'8/22', n:7,  v:'v1.0.2' },
+    { d:'8/25', n:1,  v:'v1.27'  },
+    { d:'9/10', n:8,  v:'v1.27→28' },
+    { d:'9/11', n:15, v:'v1.28'  }
+  ];
+
+  var barsBox = document.getElementById('commit-bars');
+  if(barsBox){
+    var max = Math.max.apply(null, COMMITS.map(function(c){ return c.n; }));
+    COMMITS.forEach(function(c){
+      var el = document.createElement('div');
+      el.className = 'cb';
+      el.innerHTML = '<div class="bararea"><div class="bar" data-h="' +
+        Math.round(c.n / max * 100) + '"><span>' + c.n + ' 次</span></div></div>' +
+        '<div class="d">' + c.d + '</div>';
+      barsBox.appendChild(el);
+    });
+    // 先落到最终高度（保证任何情况下都看得见），进入视口再重播一次生长动画
+    barsBox.querySelectorAll('.bar').forEach(function(b){
+      b.style.height = b.getAttribute('data-h') + '%';
+    });
+    var grew = false;
+    function grow(){
+      if(grew) return; grew = true;
+      var bars = barsBox.querySelectorAll('.bar');
+      bars.forEach(function(b, i){
+        b.style.height = '0';
+        setTimeout(function(){ b.style.height = b.getAttribute('data-h') + '%'; }, i * 80 + 60);
+      });
+      // 兜底：定时器被节流也一定回到最终高度
+      setTimeout(function(){
+        bars.forEach(function(b){ b.style.height = b.getAttribute('data-h') + '%'; });
+      }, bars.length * 80 + 700);
+    }
+    if(!('IntersectionObserver' in window)){ grow(); }
+    else {
+      var io = new IntersectionObserver(function(l){
+        l.forEach(function(e){ if(e.isIntersecting){ grow(); io.disconnect(); } });
+      }, {threshold:.3});
+      io.observe(barsBox);
+      setTimeout(grow, 3000);
+    }
+  }
+
+  // 九个里程碑（按真实版本与开发记录归纳，覆盖 2026-06-15 ~ 2026-09-11）
+  var ROUNDS = [
+    { phase:'第一阶段', ver:'2026-06-15 动工', date:'初版 v1.0',
+      title:'一个人的第一个版本',
+      desc:'从零起步：DOCX 导入、AI 题眼破题法解析、错题本跑通。「呆猫刷题宝」这个名字，也来自那时候想做医学检验方向的定位。',
+      chips:['DOCX 导入','AI 解析','错题本'] },
+    { phase:'第一阶段', ver:'v1.26.6.17', date:'2026-06',
+      title:'三模式与余额查询',
+      desc:'把刷题拆成正常 / 背题 / 快刷三种节奏，接上 API 余额查询，题库与解析开始形成完整闭环。',
+      chips:['三模式','API 余额','题型覆盖'] },
+    { phase:'第一阶段', ver:'v1.26.6.24', date:'2026-06',
+      title:'练习模式 · 五套主题 · 安全加固',
+      desc:'练习模式（限时/不限时 + 答题卡 + 统一批改）落地，五套主题可切换；API Key 加密与 APK 签名防篡改也在这一轮加进来。',
+      chips:['练习模式','五套主题','签名校验'] },
+    { phase:'第二阶段', ver:'v1.0.0 → v1.0.2', date:'2026-08-08',
+      title:'42 项 UI 逻辑修复',
+      desc:'一轮密集打磨：统计页重构成六大板块，修掉一批交互与逻辑问题，把版本从 1.26.6 收敛到 1.0.x。',
+      chips:['统计页重构','42 项修复','语义一致'] },
+    { phase:'第二阶段', ver:'v1.0.2 封存', date:'2026-08-09',
+      title:'密钥加密升级 + 开发包封存',
+      desc:'API Key 换成 AES-256-GCM 加密；随后把技术文档、源码快照与 18 个历史安装包整理成开发包，交到接手的人手上。',
+      chips:['AES-256-GCM','开发包交付','18 个历史包'] },
+    { phase:'第三阶段', ver:'v1.0.2 重建', date:'2026-08-10',
+      title:'环境重建，代码重新跑起来',
+      desc:'开发环境已不存在，从源码快照重建 Flutter + JDK + Android SDK 工具链，逐模块把 42 项修复补齐，测试从 1 个补到 62 个。',
+      chips:['环境重建','基线对照','62 项测试'] },
+    { phase:'第三阶段', ver:'v1.0.2', date:'2026-08-14~22',
+      title:'七项改进 · 改名猫卷 · 新 logo',
+      desc:'深色模式、断点续刷、Keystore 安全存储等七项改进落地；软件更名为「猫卷」，定位从医学检验收敛到医学备考，并换上新手写 logo。',
+      chips:['深色模式','断点续刷','更名猫卷'] },
+    { phase:'第三阶段', ver:'v1.27', date:'2026-08-26 ~ 09-01',
+      title:'批注 · 同步 · 宽屏',
+      desc:'手写批注（笔迹按题目+设备隔离存储）、局域网自动发现与双向同步、手机/平板/桌面三端自适应；顺手修掉长文档导入被截断的问题。',
+      chips:['手写批注','局域网同步','三端自适应'] },
+    { phase:'第三阶段', ver:'v1.27 → v1.28', date:'2026-09-10~11',
+      title:'全新 UI 与 AI 能力扩展',
+      desc:'整套 UI 换成新的设计语言（字号/间距/圆角/阴影全部令牌化，3 套主题 × 深浅）；追问改成独立全屏对话页，年度坚持做成贡献热力图，AI 回答支持篇幅三档与关键词彩色标记，接口层兼容任意 OpenAI 兼容服务。',
+      chips:['Mao Des 设计语言','AI 对话页','关键词高亮','第三方 API 兼容'] }
+  ];
+
+  var list = document.getElementById('dtl-list');
+  if(list){
+    ROUNDS.forEach(function(r){
+      var el = document.createElement('div');
+      el.className = 'dtl-item';
+      el.innerHTML = '<div class="tl-top"><span class="ph-tag">' + r.phase + '</span>' +
+        '<span class="ver">' + r.ver + '</span>' +
+        '<span class="date">' + r.date + '</span></div>' +
+        '<h4>' + r.title + '</h4><p>' + r.desc + '</p>' +
+        '<div class="chips">' + r.chips.map(function(c){ return '<span>' + c + '</span>'; }).join('') + '</div>';
+      list.appendChild(el);
+    });
+    var items = [].slice.call(list.children);
+    var prog = document.getElementById('tl-progress');
+    function revealAll(){
+      items.forEach(function(it, i){
+        setTimeout(function(){
+          it.classList.add('in');
+          if(prog) prog.style.height = Math.round((i + 1) / items.length * 100) + '%';
+        }, i * 260);
+      });
+    }
+    function showAll(){
+      items.forEach(function(it){ it.classList.add('in'); });
+      if(prog) prog.style.height = '100%';
+    }
+    // 页面在后台打开：IO 与定时器都会被节流，直接落到最终态
+    if(document.hidden || !('IntersectionObserver' in window)){ showAll(); return; }
+    else {
+      var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(e.isIntersecting){ revealAll(); io.disconnect(); }
+        });
+      }, {threshold:.08});
+      io.observe(list);
+      setTimeout(revealAll, 3500);
+    }
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   使用说明：8 步动画演示
+   每一步把「代码绘制的界面」切换到对应页，并高亮步骤 / 推进进度条。
+   界面复用上面的 tpl-* 重绘模板，与功能分区展示的完全一致。
+   ══════════════════════════════════════════════════════════════ */
+(function(){
+  var scr = document.getElementById('guide-scr');
+  var box = document.getElementById('guide-steps');
+  if(!scr || !box) return;
+
+  // mock: [模板名, 可选的主题覆盖]
+  var STEPS = [
+    { label:'导入题库',       desc:'选择 DOCX 或 JSON，AI 自动识别题目、选项与答案',
+      mock:'import',   ms:5200 },
+    { label:'题库管理',       desc:'多题库并存，勾选想要的库，可单独或组合刷题',
+      mock:'home',     ms:4400 },
+    { label:'开始刷题',       desc:'选好题量与模式，答完立刻判定对错',
+      mock:'quiz',     ms:5200 },
+    { label:'看 AI 题眼解析', desc:'四步拆解 + 关键词彩色标记，一眼抓到破题点',
+      mock:'ai',       ms:6400, typeIt:true },
+    { label:'追问不懂的点',   desc:'像聊天一样继续问，问答都留在题目旁边',
+      mock:'ai',       ms:5200, chat:true },
+    { label:'错题自动排期',   desc:'FSRS-5 按遗忘曲线排期，到期的题才出现',
+      mock:'errbook',  ms:5000 },
+    { label:'看进步数据',     desc:'年度贡献热力图、趋势、正确率排行、错题分布',
+      mock:'stats',    ms:5400, pan:true },
+    { label:'主题与数据',     desc:'三套主题随时换肤；数据全在本地，可一键导出备份',
+      mock:'home-dark',ms:5400 }
+  ];
+
+  // 复用主渲染器的绘制能力
+  var Mock = window.__maojuanMock || {};
+  var makeMock = Mock.makeMock, buildCal = Mock.buildCal, buildHeat = Mock.buildHeat,
+      buildChart = Mock.buildChart, renderFull = Mock.renderFull,
+      typeInto = Mock.typeInto, playBubbles = Mock.playBubbles,
+      revealNow = Mock.revealNow;
+
+  var timer = null, i = -1, running = true, started = false, activated = false;
+
+  // 构建步骤卡
+  STEPS.forEach(function(s, k){
+    var d = document.createElement('div');
+    d.className = 'step';
+    d.innerHTML = '<div class="no">' + (k+1) + '</div><div class="tx"><b>' +
+      s.label + '</b><em>' + s.desc + '</em></div>';
+    d.addEventListener('click', function(){ goTo(k, true); });
+    box.appendChild(d);
+  });
+  var nodes = [].slice.call(box.children);
+  var cap = document.getElementById('guide-caption');
+  var prog = document.getElementById('guide-progress');
+  var count = document.getElementById('guide-count');
+  var btnPlay = document.getElementById('guide-play');
+  var btnReplay = document.getElementById('guide-replay');
+
+  function render(){
+    nodes.forEach(function(n, k){
+      n.classList.toggle('on', k === i);
+      n.classList.toggle('done', k < i);
+    });
+    var s = STEPS[Math.max(i,0)];
+    cap.innerHTML = '<b>第 ' + (Math.max(i,0)+1) + ' 步 · ' + s.label + '</b>：' + s.desc;
+    count.textContent = (Math.max(i,0)+1) + ' / ' + STEPS.length;
+    prog.style.width = (((Math.max(i,0)+1) / STEPS.length) * 100) + '%';
+  }
+
+  // 把画框内容换成第 i 步的界面，并触发其内部动画
+  function showStep(k){
+    var s = STEPS[k];
+    var mock = makeMock(s.mock);
+    if(!mock) return;
+    mock.classList.add('swap');
+    mock.querySelectorAll('.mcal').forEach(buildCal);
+    mock.querySelectorAll('.mheat').forEach(buildHeat);
+    mock.querySelectorAll('.mchart').forEach(buildChart);
+    mock.querySelectorAll('.mtxt[data-type]').forEach(renderFull);
+    // 替换内容（触发 swap 入场动画）
+    scr.innerHTML = '';
+    scr.appendChild(mock);
+    revealNow(mock);
+    // 适配缩放
+    var w = scr.clientWidth;
+    mock.querySelectorAll('.mroot').forEach(function(r){
+      r.style.setProperty('--s', w / 390);
+      // 使用说明画框高度有限：内容从顶部开始，超出部分裁掉
+      r.style.height = (scr.clientHeight / (w/390)) + 'px';
+    });
+    window.setTimeout(function(){ mock.classList.remove('swap'); }, 520);
+
+    if(s.typeIt){
+      var t = mock.querySelector('.mtxt[data-type]');
+      if(t) typeInto(t);
+    }
+    if(s.chat){
+      var c = mock.querySelector('.mbubs');
+      if(c){ c.setAttribute('data-anim','1'); playBubbles(c, true); }
+    }
+    if(s.pan){
+      var body = mock.querySelector('.mbody');
+      if(body) slowPan(body);
+    }
+  }
+
+  // 内容缓慢上下浏览（模拟真人滑动）
+  function slowPan(b){
+    if(b._panning) return;
+    b._panning = true;
+    b.style.overflowY = 'auto';
+    b.style.scrollbarWidth = 'none';
+    b.style.msOverflowStyle = 'none';
+    var dir = 1, pos = 0, hold = 0;
+    function step(){
+      var max = b.scrollHeight - b.clientHeight;
+      if(max <= 2) return;
+      if(hold > 0){ hold--; requestAnimationFrame(step); return; }
+      pos += dir * 0.5;
+      if(pos >= max){ pos = max; dir = -1; hold = 70; }
+      if(pos <= 0){ pos = 0; dir = 1; hold = 40; }
+      b.scrollTop = pos;
+      requestAnimationFrame(step);
+    }
+    setTimeout(step, 700);
+  }
+
+  function schedule(){
+    clearTimeout(timer);
+    if(!running) return;
+    var s = STEPS[i];
+    if(!s) return;
+    timer = setTimeout(function(){
+      i++;
+      if(i >= STEPS.length){ i = STEPS.length - 1; render(); stop(); return; }
+      render(); showStep(i); schedule();
+    }, s.ms);
+  }
+
+  // scroll: 仅用户主动点击步骤时把画框带入视野；自动播放/兜底启动不得抢滚动
+  function goTo(k, scroll){
+    i = k; running = true;
+    btnPlay.textContent = '⏸ 暂停';
+    render(); showStep(i); schedule();
+    if(scroll){
+      var stage = document.querySelector('#guide .guide-stage');
+      if(stage && stage.getBoundingClientRect().top > window.innerHeight){
+        stage.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+    }
+  }
+
+  function stop(){ running = false; btnPlay.textContent = '▶ 继续'; }
+
+  btnPlay.addEventListener('click', function(){
+    if(i >= STEPS.length - 1 && !running){ goTo(0); return; }
+    running = !running;
+    btnPlay.textContent = running ? '⏸ 暂停' : '▶ 继续';
+    if(running) schedule(); else clearTimeout(timer);
+  });
+  btnReplay.addEventListener('click', function(){ goTo(0, true); });
+
+  render();
+
+  // 画框尺寸变化时重算缩放
+  window.addEventListener('resize', function(){
+    if(i >= 0 && i < STEPS.length) showStep(i);
+  });
+
+  // 进入视口才开始播放（只启动一次）
+  function startOnce(){
+    if(started) return; started = true;
+    goTo(0);
+  }
+  if(!('IntersectionObserver' in window)){
+    startOnce();
+  } else {
+    var io = new IntersectionObserver(function(list){
+      list.forEach(function(e){ if(e.isIntersecting){ startOnce(); io.disconnect(); } });
+    }, {threshold: 0.18});
+    io.observe(document.getElementById('guide'));
+    // 兜底：无论如何 4s 内启动一次
+    setTimeout(startOnce, 4000);
+  }
+})();
 
 /* ────────── 数字滚动 ────────── */
 (function(){
@@ -1828,14 +2527,38 @@ cycle('mode-scr', 2400);
 (function(){
   var dots = document.querySelectorAll('[data-dot]');
   if(!dots.length) return;
+  // 初始即点亮：动画是增强，不是可见性的前提（后台标签页定时器会被节流）
+  dots.forEach(function(d){ d.classList.add('in'); });
+  function showAll(){ dots.forEach(function(d){ d.classList.add('in'); }); }
+  // 重播动画；无论定时器是否被节流，末尾一定会回到「全部点亮」
   function play(){
-    dots.forEach(function(d,i){ setTimeout(function(){ d.classList.add('in'); }, i * 260 + 150); });
+    if(document.hidden){ showAll(); return; }
+    dots.forEach(function(d,i){
+      d.classList.remove('in');
+      setTimeout(function(){ d.classList.add('in'); }, i * 260 + 150);
+    });
+    setTimeout(showAll, dots.length * 260 + 900);
   }
-  if(!('IntersectionObserver' in window)){ play(); return; }
+  if(!('IntersectionObserver' in window)){ return; }
   var io = new IntersectionObserver(function(list){
     list.forEach(function(en){ if(en.isIntersecting){ play(); io.unobserve(en.target); } });
   },{threshold:.4});
   io.observe(dots[0].parentNode);
+  // 兜底：观察器未触发（窄屏/被遮挡/快速跳过）时也保证点亮
+  setTimeout(showAll, 3500);
+})();
+
+/* ────────── 后台切回前台：补一次可见性兜底 ────────── */
+(function(){
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) return;
+    document.querySelectorAll('.reveal:not(.in)').forEach(function(e){ e.classList.add('in'); });
+    document.querySelectorAll('#dtl-list .dtl-item:not(.in)').forEach(function(e){ e.classList.add('in'); });
+    document.querySelectorAll('#commit-bars .bar').forEach(function(b){
+      if(!b.style.height) b.style.height = b.getAttribute('data-h') + '%';
+    });
+    document.querySelectorAll('[data-dot]').forEach(function(d){ d.classList.add('in'); });
+  });
 })();
 
 /* ────────── Hero 轻视差 ────────── */

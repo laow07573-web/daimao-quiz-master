@@ -452,23 +452,31 @@ $chunk
         s.startsWith('解析生成失败');
   }
 
-  /// 追问功能：基于原题和解析进行追问
+  /// 追问功能：基于原题和解析进行追问（聊天式）
+  ///
+  /// v1.28：篇幅随「AI 解析详细程度」档位浮动；关键词标记沿用同一套约定符号；
+  /// 渲染器已支持 Markdown 表格，故不再禁止表格，仅在需要对比/罗列时使用。
   Future<String> askFollowUp(Question question, String analysis,
       String followUpQuestion) async {
-    final prompt = '''你是一个专业的答题解析助手。
+    final detail = _detailBlock;
+    final marking = _markingBlock;
+
+    final prompt = '''你是一个专业的答题解析助手，正在以聊天的方式回答学生的追问。
 
 原题：${question.title}
-选项：
-${question.optionsWithLabels.join('\n')}
+${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\n')}' : ''}
 正确答案：${question.correctAnswer}
 
 之前的解析：$analysis
 
 学生的追问：$followUpQuestion
 
-请针对学生的追问进行详细解答。
-
-禁止使用任何表格。不要输出 | - JSON 等表格相关符号。只输出纯文本段落。''';
+请直接回答学生的疑问，不要复述题干，也不要重复之前已讲过的内容。
+$detail$marking
+# 输出格式
+- 用 Markdown 输出，**默认用段落和列表**。
+- 只有当「对比多项、罗列多条」时，才用 Markdown 表格（| 表头 | ... | + | --- | 分隔行）；其余情况不要用表格。
+- 不要输出 JSON 或代码块包裹正文。''';
 
     return await _callAI(prompt);
   }
@@ -631,8 +639,37 @@ $statsText
     }
   }
 
+  /// 篇幅要求：按「AI 解析详细程度」档位拼装（v1.28）
+  String get _detailBlock => switch (_settings.analysisDetail) {
+        AnalysisDetail.brief => '''
+# 篇幅要求（重要）
+- 全文控制在 150 字以内。
+- 每个小点最多 2 句话，直接给结论，删掉所有铺垫与重复。
+- 「排除法」只讲最容易混淆的 1~2 个干扰项，其余用"等"带过。
+- 不要复述题干，不要写"综上所述"之类的套话。''',
+        AnalysisDetail.standard => '''
+# 篇幅要求
+- 全文控制在 300 字以内。
+- 每个小点 2~3 句话。
+- 「排除法」讲主要干扰项即可。''',
+        AnalysisDetail.detailed => '',
+      };
+
+  /// 关键词标记（可关闭）：让 AI 用约定符号标出决定答案的词，渲染器上色
+  String get _markingBlock => _settings.keywordHighlight
+      ? '''
+# 关键词标记
+在正文中用以下符号标出关键词（渲染器会加色显示，务必成对闭合）：
+- `==关键词==` 标出「关键依据/决定答案的词」
+- `!!关键词!!` 标出「易错陷阱/否定词」（如"最""不是""除外"）
+每段最多标 2 处，只标词或短语（不超过 8 字），不要标整句，不要嵌套。'''
+      : '';
+
   /// 核心 AI 调用方法
   Future<String> _callAIForAnalysis(Question question) async {
+    final detail = _detailBlock;
+    final marking = _markingBlock;
+
     final prompt = '''# 角色
 你是一位擅长"题眼破题法"的医学考试辅导老师。你的讲解必须像临床带教老师讲病例一样，直击要害，不说废话。
 
@@ -640,14 +677,13 @@ $statsText
 ${question.title}
 ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\n')}' : ''}
 正确答案：${question.correctAnswer}
-
+$detail
 # 解题要求
 请严格遵循以下四个步骤拆解这道题，语言务必口语化、逻辑化，杜绝教科书式的背诵列表。
 
 ## 第一步：抓题眼，定性
 - **动作**：第一句话就点出题干中决定答案的关键数据或特征描述。
 - **示例**："看到PaCO₂ 80，直接锁定是呼酸。"
-- **示例**："题干出现'支原体'，马上想到它没有细胞壁。"
 
 ## 第二步：理逻辑，拆选项
 - **动作**：用核心病理生理机制，把正确选项的推理过程讲透，同时把错误选项"毙掉"。
@@ -656,11 +692,10 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
 
 ## 第三步：指坑点，防踩雷
 - **动作**：精准指出这道题最容易掉进去的陷阱。
-- **示例**："HCO₃⁻ 36看起来高，但这是代偿性升高，不是合并了代碱，千万别被带偏。"
 
 ## 第四步：给结论，划重点
 - **动作**：用一句顺口溜或一句大白话总结本题的得分要点，方便记忆。
-
+$marking
 # 输出格式
 **答案：** [选项字母]
 **题眼：** [一句话点明破题关键]

@@ -29,6 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _endpointController = TextEditingController();
   final _modelController = TextEditingController();
   final _nicknameController = TextEditingController();
+  final _endpointFocus = FocusNode();
   bool _obscureKey = true;
   bool _debugEnabled = false;
   double? _balance;
@@ -48,6 +49,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _modelsLoading = false;
   List<String> _modelOptions = const [];
   String? _modelsError;
+
+  // v1.28 AI 回答风格（未保存的本地态，保存时写入设置）
+  AnalysisDetail _detail = AnalysisDetail.brief;
+  bool _keywordHighlight = true;
 
   /// 从当前端点拉取模型列表（OpenAI 兼容 GET /models）
   Future<void> _loadModels() async {
@@ -91,21 +96,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// 当前填写的地址是否命中某个预设（用于高亮）
+  /// v1.28：「自定义」在地址为空或不匹配任何已知预设时高亮
   bool _isPresetActive(ApiPreset p) {
     final cur = _endpointController.text.trim();
-    if (cur.isEmpty) return false;
+    if (p.isCustom) {
+      return cur.isEmpty ||
+          !kApiPresets.any((q) => !q.isCustom && _matchesPreset(cur, q));
+    }
+    return _matchesPreset(cur, p);
+  }
+
+  bool _matchesPreset(String cur, ApiPreset p) {
+    if (cur.isEmpty || p.endpoint.isEmpty) return false;
     return cur == p.endpoint ||
         cur.startsWith('${p.endpoint}/') ||
         cur == '$p.endpoint/chat/completions';
   }
 
   /// 一键应用预设（端点 + 模型），并清空上一次测试结果
+  /// v1.28：「自定义」清空两个输入框并聚焦，方便直接填写自己的地址
   void _applyPreset(ApiPreset p) {
     setState(() {
-      _endpointController.text = p.endpoint;
-      _modelController.text = p.model;
+      if (p.isCustom) {
+        _endpointController.clear();
+        _modelController.clear();
+      } else {
+        _endpointController.text = p.endpoint;
+        _modelController.text = p.model;
+      }
       _testResult = null;
     });
+    if (p.isCustom) {
+      _endpointFocus.requestFocus();
+    }
   }
 
   /// 连接测试：用当前「未保存」的输入直接验证，避免必须先保存再试
@@ -126,7 +149,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     // 先用临时设置构造 AIService（无需保存即可测试）
-    final temp = AppSettings(
+    // v1.28：以当前设置为底 copyWith，避免测试成功后把回答风格等字段冲回默认值
+    final temp = appState.settings.copyWith(
       apiKey: key,
       apiEndpoint: _endpointController.text.trim().isEmpty
           ? AppSettings.defaultApiEndpoint
@@ -135,6 +159,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? AppSettings.defaultModel
           : _modelController.text.trim(),
       nickname: _nicknameController.text.trim(),
+      analysisDetail: _detail,
+      keywordHighlight: _keywordHighlight,
     );
     final svc = AIService(temp);
     try {
@@ -165,6 +191,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _endpointController.text = settings.apiEndpoint;
       _modelController.text = settings.model;
       _nicknameController.text = settings.nickname;
+      setState(() {
+        _detail = settings.analysisDetail;
+        _keywordHighlight = settings.keywordHighlight;
+      });
       _fetchBalance();
       _loadKeepaliveStatus();
       _loadUntaggedCount();
@@ -205,6 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _endpointController.dispose();
     _modelController.dispose();
     _nicknameController.dispose();
+    _endpointFocus.dispose();
     super.dispose();
   }
 
@@ -216,7 +247,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final dirty = _apiKeyController.text != settings.apiKey ||
         _endpointController.text != settings.apiEndpoint ||
         _modelController.text != settings.model ||
-        _nicknameController.text != settings.nickname;
+        _nicknameController.text != settings.nickname ||
+        _detail != settings.analysisDetail ||
+        _keywordHighlight != settings.keywordHighlight;
     return PopScope(
       canPop: !dirty,
       onPopInvokedWithResult: (didPop, _) async {
@@ -311,15 +344,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 width: _isPresetActive(p) ? 1.4 : 1,
                               ),
                             ),
-                            child: Text(p.name,
-                                style: MaoType.captionStyle.copyWith(
-                                  color: _isPresetActive(p)
-                                      ? ac.accent
-                                      : ac.textSecondary,
-                                  fontWeight: _isPresetActive(p)
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                )),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (p.isCustom) ...[
+                                  Icon(Icons.tune,
+                                      size: 13,
+                                      color: _isPresetActive(p)
+                                          ? ac.accent
+                                          : ac.textSecondary),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(p.name,
+                                    style: MaoType.captionStyle.copyWith(
+                                      color: _isPresetActive(p)
+                                          ? ac.accent
+                                          : ac.textSecondary,
+                                      fontWeight: _isPresetActive(p)
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    )),
+                              ],
+                            ),
                           ),
                         ),
                     ],
@@ -418,6 +464,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 6),
                   TextField(
                     controller: _endpointController,
+                    focusNode: _endpointFocus,
                     // v1.0.2 UI 审查修复：长 API 地址单行截断，
                     // 改为最多 2 行换行完整显示
                     minLines: 1,
@@ -617,21 +664,134 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 16),
 
+            // v1.28 AI 回答风格：篇幅档位 + 关键词高亮开关
+            // 「先试一下吧，或者在设置里面加一个切换的开关」
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: ac.surfaceAlt,
+                borderRadius: BorderRadius.circular(MaoRadius.control),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome, color: ac.accent, size: 20),
+                      const SizedBox(width: 8),
+                      Text('AI 回答风格',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: MaoType.h3,
+                              color: ac.textPrimary)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 篇幅档位（三选一）
+                  Text('回答详细程度',
+                      style: TextStyle(
+                          fontSize: MaoType.body,
+                          fontWeight: FontWeight.w500,
+                          color: ac.textPrimary)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: AnalysisDetail.values.map((d) {
+                      final active = _detail == d;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                              right: d == AnalysisDetail.values.last ? 0 : 8),
+                          child: GestureDetector(
+                            onTap: () => setState(() => _detail = d),
+                            child: AnimatedContainer(
+                              duration: MaoMotion.fast,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: active ? ac.accentSoft : ac.surface,
+                                borderRadius:
+                                    BorderRadius.circular(MaoRadius.small),
+                                border: Border.all(
+                                  color: active ? ac.accent : ac.border,
+                                  width: active ? 1.4 : 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(d.label,
+                                    style: TextStyle(
+                                      fontSize: MaoType.body,
+                                      color: active
+                                          ? ac.accent
+                                          : ac.textSecondary,
+                                      fontWeight: active
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    )),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(_detail.hint,
+                      style: TextStyle(
+                          fontSize: MaoType.caption,
+                          color: ac.textTertiary,
+                          height: 1.4)),
+
+                  const SizedBox(height: 14),
+                  Divider(height: 1, color: ac.border),
+
+                  // 关键词高亮开关
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _keywordHighlight,
+                    onChanged: (v) => setState(() => _keywordHighlight = v),
+                    title: Text(_keywordHighlight ? '关键词高亮已开启' : '关键词高亮已关闭',
+                        style: TextStyle(
+                            fontSize: MaoType.h3, color: ac.textPrimary)),
+                    subtitle: Text(
+                      '开启后，AI 会用颜色标出决定答案的关键词和易错陷阱，一眼抓重点。',
+                      style: TextStyle(
+                          fontSize: MaoType.caption,
+                          color: ac.textSecondary,
+                          height: 1.4),
+                    ),
+                    secondary: Icon(
+                      _keywordHighlight
+                          ? Icons.format_color_text
+                          : Icons.format_color_reset,
+                      color: _keywordHighlight ? ac.accent : ac.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // 保存按钮
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () async {
-                  final newSettings = AppSettings(
-                    apiKey: _apiKeyController.text.trim(),
-                    apiEndpoint: _endpointController.text.trim().isEmpty
-                        ? AppSettings.defaultApiEndpoint
-                        : _endpointController.text.trim(),
-                    model: _modelController.text.trim().isEmpty
-                        ? AppSettings.defaultModel
-                        : _modelController.text.trim(),
-                    nickname: _nicknameController.text.trim(),
-                  );
+                  final newSettings = context
+                      .read<AppState>()
+                      .settings
+                      .copyWith(
+                        apiKey: _apiKeyController.text.trim(),
+                        apiEndpoint: _endpointController.text.trim().isEmpty
+                            ? AppSettings.defaultApiEndpoint
+                            : _endpointController.text.trim(),
+                        model: _modelController.text.trim().isEmpty
+                            ? AppSettings.defaultModel
+                            : _modelController.text.trim(),
+                        nickname: _nicknameController.text.trim(),
+                        analysisDetail: _detail,
+                        keywordHighlight: _keywordHighlight,
+                      );
                   // v1.0.2 修复：等待保存完成再提示/返回（此前 fire-and-forget）
                   await context.read<AppState>().updateSettings(newSettings);
                   if (!mounted) return;
