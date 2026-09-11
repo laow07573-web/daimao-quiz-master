@@ -27,6 +27,8 @@ const List<ApiPreset> kApiPresets = [
       '需自备网络环境'),
   ApiPreset('OpenRouter', 'https://openrouter.ai/api/v1',
       'deepseek/deepseek-chat', '聚合全球模型（含免费额度）'),
+  ApiPreset('OpenCode Go', 'https://opencode.ai/zen/go/v1', 'glm-5.3-flash',
+      'Go 订阅（\$10/月），点「选择模型」可列出全部'),
   ApiPreset('本地 Ollama', 'http://localhost:11434/v1', 'llama3.1',
       '本地部署，需自行启动服务'),
 ];

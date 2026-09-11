@@ -141,4 +141,47 @@ void main() {
       svc.dispose();
     });
   });
+  group('供应商专用头（v1.28 第三方兼容）', () {
+    test('opencode 网关注入 x-opencode-session（用户 400 报错根因）', () {
+      final uri =
+          ApiEndpoint.resolve('https://opencode.ai/zen/go/v1/chat/completions');
+      final h = ApiEndpoint.vendorHeaders(uri, sessionId: 'sess-123');
+      expect(h['x-opencode-session'], 'sess-123',
+          reason: '缺少该头会返回 400「cannot be routed efficiently」');
+      expect(h['x-opencode-client'], isNotNull);
+      expect(h['User-Agent'], ApiEndpoint.userAgent);
+    });
+
+    test('OpenRouter 注入归因头', () {
+      final uri = ApiEndpoint.resolve('https://openrouter.ai/api/v1');
+      final h = ApiEndpoint.vendorHeaders(uri, sessionId: 's');
+      expect(h['HTTP-Referer'], isNotNull);
+      expect(h['X-Title'], isNotNull);
+    });
+
+    test('普通供应商只带自定义 UA（不用 Dart 默认 UA）', () {
+      final uri = ApiEndpoint.resolve('https://api.deepseek.com/v1');
+      final h = ApiEndpoint.vendorHeaders(uri, sessionId: 's');
+      expect(h['User-Agent'], 'MaoJuanQuiz/1.0');
+      expect(h.containsKey('x-opencode-session'), isFalse);
+    });
+
+    test('UA 不应是通用 SDK 名（部分网关据此限流）', () {
+      expect(ApiEndpoint.userAgent, isNot(contains('Dart')));
+      expect(ApiEndpoint.userAgent, isNot(contains('http')));
+    });
+  });
+
+  group('模型列表端点推导', () {
+    test('由 chat 端点推导 /models', () {
+      expect(
+          ApiEndpoint.modelsUrl('https://opencode.ai/zen/go/v1/chat/completions')
+              .toString(),
+          'https://opencode.ai/zen/go/v1/models');
+      expect(ApiEndpoint.modelsUrl('https://api.deepseek.com/v1').toString(),
+          'https://api.deepseek.com/v1/models');
+      expect(ApiEndpoint.modelsUrl('https://api.deepseek.com').toString(),
+          'https://api.deepseek.com/v1/models');
+    });
+  });
 }

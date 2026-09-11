@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/app_settings.dart';
 import 'api_endpoint.dart';
+import 'device_service.dart';
 import '../utils/app_constants.dart';
 import 'database_service.dart';
 import 'debug_log_service.dart';
@@ -260,7 +261,7 @@ $chunk
     try {
       final response = await _client.post(
         ApiEndpoint.resolve(_settings.apiEndpoint),
-        headers: _headers(),
+        headers: await _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -548,7 +549,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     try {
       final response = await _client.post(
         ApiEndpoint.resolve(_settings.apiEndpoint),
-        headers: _headers(),
+        headers: await _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -602,7 +603,7 @@ $statsText
     try {
       final response = await _client.post(
         ApiEndpoint.resolve(_settings.apiEndpoint),
-        headers: _headers(),
+        headers: await _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -676,7 +677,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     try {
       final response = await _client.post(
         ApiEndpoint.resolve(_settings.apiEndpoint),
-        headers: _headers(),
+        headers: await _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -759,16 +760,62 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     return (balance / avgPrice).round();
   }
 
-  /// 统一的请求头（含 OpenRouter 归因头，其服务要求携带）
-  Map<String, String> _headers() {
+  /// 统一的请求头（v1.28）
+  ///
+  /// 除认证外注入供应商专用头：
+  /// - opencode Zen/Go：`x-opencode-session`（必需，否则 400「cannot be
+  ///   routed efficiently」）+ client/project 标识
+  /// - OpenRouter：来源归因头
+  /// - 统一自定义 User-Agent（部分网关拒绝通用 SDK UA）
+  Future<Map<String, String>> _headers() async {
     final uri = ApiEndpoint.resolve(_settings.apiEndpoint);
+    final sessionId = await DeviceService.instance.deviceId;
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ${_settings.apiKey}',
-      if (ApiEndpoint.isOpenRouter(uri))
-        'HTTP-Referer': 'https://github.com/maojuan-quiz',
-      if (ApiEndpoint.isOpenRouter(uri)) 'X-Title': '猫卷',
+      ...ApiEndpoint.vendorHeaders(uri, sessionId: sessionId),
     };
+  }
+
+  /// 拉取可用模型列表（OpenAI 兼容 `GET /models`）。
+  ///
+  /// 供设置页「选择模型」使用：免去用户手填模型名（第三方网关模型名
+  /// 各不相同，填错会 400/422）。返回 (模型 id 列表, 错误说明)。
+  Future<(List<String>, String?)> fetchModels() async {
+    if (_settings.apiKey.trim().isEmpty) {
+      return (<String>[], '请先填写 API Key');
+    }
+    final uri = ApiEndpoint.modelsUrl(_settings.apiEndpoint);
+    try {
+      final response = await _client.get(uri, headers: await _headers())
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        return (<String>[],
+            ApiEndpoint.explainStatus(response.statusCode,
+                utf8.decode(response.bodyBytes)));
+      }
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      final list = (body is Map ? body['data'] : null) ??
+          (body is Map ? body['models'] : null) ??
+          (body is List ? body : null);
+      if (list is! List) return (<String>[], '返回结构异常，无法解析模型列表');
+      final ids = <String>[];
+      for (final e in list) {
+        final id = e is Map ? (e['id'] ?? e['name'] ?? e['model']) : e;
+        if (id != null && id.toString().trim().isNotEmpty) {
+          ids.add(id.toString().trim());
+        }
+      }
+      ids.sort();
+      if (ids.isEmpty) return (<String>[], '该接口未返回任何模型');
+      return (ids, null);
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('TimeoutException')) {
+        return (<String>[], '拉取模型列表超时（20 秒）');
+      }
+      return (<String>[], '拉取失败：$msg');
+    }
   }
 
   /// 连通性测试（设置页「测试连接」按钮）
@@ -787,7 +834,7 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     try {
       final response = await _client.post(
         uri,
-        headers: _headers(),
+        headers: await _headers(),
         body: jsonEncode({
           'model': _settings.model.trim().isEmpty
               ? AppSettings.defaultModel

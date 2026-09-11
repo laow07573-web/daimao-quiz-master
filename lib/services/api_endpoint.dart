@@ -69,6 +69,59 @@ class ApiEndpoint {
   static bool isOpenRouter(Uri uri) =>
       uri.host.toLowerCase().contains('openrouter.ai');
 
+  /// opencode Zen/Go 网关（要求 x-opencode-session 才能路由与缓存）
+  static bool isOpenCode(Uri uri) =>
+      uri.host.toLowerCase().contains('opencode.ai');
+
+  /// 请求用的 User-Agent。
+  ///
+  /// 注意：部分网关（含 opencode Zen）明确要求使用「自有产品名」而非通用
+  /// SDK/HTTP 库名（Dart 默认会发 `Dart/x.y (dart:io)`，可能被拒或限流）。
+  static const String userAgent = 'MaoJuanQuiz/1.0';
+
+  /// 供应商专用请求头（v1.28）。
+  ///
+  /// [sessionId] 为「同一次对话保持稳定」的标识，opencode 用它做路由与
+  /// prompt 缓存优化。这里传入本机设备 ID（安装期内稳定），既满足要求
+  /// 又能最大化缓存命中。
+  static Map<String, String> vendorHeaders(Uri chatUri,
+      {required String sessionId}) {
+    if (isOpenCode(chatUri)) {
+      return {
+        'x-opencode-session': sessionId,
+        'x-opencode-client': 'maojuan',
+        'x-opencode-project': 'global',
+        'User-Agent': userAgent,
+      };
+    }
+    if (isOpenRouter(chatUri)) {
+      return {
+        // OpenRouter 建议携带来源标识（便于统计与限流豁免）
+        'HTTP-Referer': 'https://github.com/maojuan-quiz',
+        'X-Title': 'MaoJuan Quiz',
+        'User-Agent': userAgent,
+      };
+    }
+    return const {'User-Agent': userAgent};
+  }
+
+  /// 由 chat 端点推导「模型列表」端点（OpenAI 兼容的 `GET /models`）。
+  ///
+  /// 例：`https://opencode.ai/zen/go/v1/chat/completions`
+  ///   → `https://opencode.ai/zen/go/v1/models`
+  ///
+  /// 很多第三方网关（含 opencode）都实现了该接口，用它可以让用户
+  /// 直接选模型，避免手填错名字导致 400/422。
+  static Uri modelsUrl(String rawEndpoint) {
+    final chat = resolve(rawEndpoint);
+    var p = chat.path;
+    const suffix = '/chat/completions';
+    if (p.endsWith(suffix)) {
+      p = p.substring(0, p.length - suffix.length);
+    }
+    return chat.replace(path: '$p/models');
+  }
+
   /// 余额查询地址：官方 DeepSeek 用专用接口，其余供应商按通用路径尝试
   static Uri balanceUrl(Uri chatUri) =>
       Uri(scheme: chatUri.scheme, host: chatUri.host, path: '/user/balance');

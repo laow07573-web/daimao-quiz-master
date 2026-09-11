@@ -44,6 +44,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _testOk = false;
   String? _testResult;
 
+  // v1.28 模型列表（从接口拉取供选择）
+  bool _modelsLoading = false;
+  List<String> _modelOptions = const [];
+  String? _modelsError;
+
+  /// 从当前端点拉取模型列表（OpenAI 兼容 GET /models）
+  Future<void> _loadModels() async {
+    if (_modelsLoading) return;
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) {
+      setState(() {
+        _modelsError = '请先填写 API Key';
+        _modelOptions = const [];
+      });
+      return;
+    }
+    setState(() {
+      _modelsLoading = true;
+      _modelsError = null;
+    });
+
+    final temp = AppSettings(
+      apiKey: key,
+      apiEndpoint: _endpointController.text.trim().isEmpty
+          ? AppSettings.defaultApiEndpoint
+          : _endpointController.text.trim(),
+      model: _modelController.text.trim().isEmpty
+          ? AppSettings.defaultModel
+          : _modelController.text.trim(),
+    );
+    final svc = AIService(temp);
+    try {
+      final (models, err) = await svc.fetchModels();
+      if (!mounted) return;
+      setState(() {
+        _modelsLoading = false;
+        _modelOptions = models;
+        _modelsError = err;
+        // 只有一个模型时直接填入，省一次点击
+        if (models.length == 1) _modelController.text = models.first;
+      });
+    } finally {
+      svc.dispose();
+    }
+  }
+
   /// 当前填写的地址是否命中某个预设（用于高亮）
   bool _isPresetActive(ApiPreset p) {
     final cur = _endpointController.text.trim();
@@ -443,8 +489,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 14),
 
                   // Model
-                  Text('模型名称',
-                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w500, color: ac.textPrimary)),
+                  Row(
+                    children: [
+                      Text('模型名称',
+                          style: TextStyle(
+                              fontSize: MaoType.body,
+                              fontWeight: FontWeight.w500,
+                              color: ac.textPrimary)),
+                      const Spacer(),
+                      // v1.28：从接口拉取模型列表供选择（第三方网关模型名各异，
+                      // 手填易错；能拉取的供应商直接点选）
+                      TextButton.icon(
+                        onPressed: _modelsLoading ? null : _loadModels,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: MaoSpace.xs, vertical: 2),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: _modelsLoading
+                            ? const SizedBox(
+                                width: 13,
+                                height: 13,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.list_alt_rounded, size: 15),
+                        label: Text(_modelsLoading ? '拉取中…' : '选择模型',
+                            style: MaoType.captionStyle
+                                .copyWith(color: ac.accent)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _modelController,
@@ -456,6 +531,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           horizontal: 12, vertical: 12),
                     ),
                   ),
+                  if (_modelsError != null) ...[
+                    const SizedBox(height: MaoSpace.xs),
+                    Text(_modelsError!,
+                        style: MaoType.captionStyle.copyWith(color: ac.danger)),
+                  ],
+                  if (_modelOptions.isNotEmpty) ...[
+                    const SizedBox(height: MaoSpace.sm),
+                    // 模型选择：点击即填入（超过 12 个时缩略为可横向滚动）
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 168),
+                      decoration: BoxDecoration(
+                        color: ac.surface,
+                        borderRadius: MaoRadius.smallBorder,
+                        border: Border.all(
+                            color: ac.border, width: MaoShadow.hairline),
+                      ),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(MaoSpace.xs),
+                        child: Wrap(
+                          spacing: MaoSpace.xs,
+                          runSpacing: MaoSpace.xs,
+                          children: [
+                            for (final m in _modelOptions)
+                              InkWell(
+                                borderRadius:
+                                    BorderRadius.circular(MaoRadius.pill),
+                                onTap: () => setState(() {
+                                  _modelController.text = m;
+                                  _testResult = null;
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: MaoSpace.sm,
+                                      vertical: MaoSpace.xxs + 1),
+                                  decoration: BoxDecoration(
+                                    color: _modelController.text.trim() == m
+                                        ? ac.accentSoft
+                                        : ac.surfaceAlt,
+                                    borderRadius:
+                                        BorderRadius.circular(MaoRadius.pill),
+                                    border: Border.all(
+                                      color: _modelController.text.trim() == m
+                                          ? ac.accent
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                  child: Text(m,
+                                      style: MaoType.microStyle.copyWith(
+                                        color: _modelController.text.trim() == m
+                                            ? ac.accent
+                                            : ac.textSecondary,
+                                        fontWeight:
+                                            _modelController.text.trim() == m
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                      )),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
 
                   // v1.0.2 对齐里程碑：昵称（首页专属问候）
