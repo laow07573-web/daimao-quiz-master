@@ -56,21 +56,40 @@
 ## 打开与部署
 
 - **直接双击 `index.html`** 即可（纯静态、无构建、无外部依赖）
-- 也可用本地服务器预览：`cd promo && python -m http.server 8899`
-- **部署**：整个 `promo/` 文件夹丢到 GitHub Pages / Gitee Pages / Vercel / 对象存储均可
+- 本地服务器预览：`cd promo && python -m http.server 8899`
+- **正式部署**：见 [docs/部署与分发指南.md](../docs/部署与分发指南.md)
+  ```powershell
+  # 一键暂存 + 上传到 Cloudflare Pages
+  powershell -ExecutionPolicy Bypass -File tools\deploy_promo.ps1
+  ```
 
-### 托管后要改的地方
+### 下载地址配置（唯一改地址的地方）
 
-页面里现在是 **GitHub 占位链接**，托管后替换即可：
+所有下载链接、版本号、校验值都集中在 `index.html` `<head>` 里的 `window.MAOJUAN` 块，
+**发新版只改这一个块**：
 
-| 位置 | 说明 |
-|---|---|
-| `id="dl-apk"` | Android 安装包 → GitHub Releases 的直链 |
-| `id="dl-win"` | Windows 安装包 → GitHub Releases 的直链 |
-| `id="dl-repo"` | 源码仓库地址 |
-| `id="repo-link"` | 开发历程区「查看完整提交记录」→ 仓库 commits 页 |
+```js
+window.MAOJUAN = {
+  version:         "1.28.0",
+  android:         "https://<网盘分享链接>",           // APK 超 25MB，放网盘
+  windowsSetup:    "download/MaoJuan-v1.28.0-windows-setup.exe",   // 同源直链
+  windowsPortable: "download/MaoJuan-v1.28.0-windows-portable.zip",// 同源直链
+  githubRelease:   "https://github.com/.../releases/tag/v1.28.0",  // 备用
+  repo:            "https://github.com/laow07573-web/daimao-quiz-master",
+  sha256: { apk: "...", setup: "...", portable: "..." }
+};
+```
 
-把 `href="https://github.com"` 换成真实地址即可（三处 `download` 区 + 一处 timeline 区）。
+- HTML 里的 `href` 已预置 GitHub Releases 兜底，**JS 出错也能正常下载**（渐进增强）
+- `promo/download/` 里的 Windows 包由 `tools/deploy_promo.ps1` 从 `dist/` 自动拷入并改名成 ASCII
+  （Cloudflare 会剥掉非 ASCII 文件名，中文包名会变成 `-Setup-....exe`）
+- 页面结构：主渠道 3 个按钮（APK / Windows 安装包 / 绿色版）+ 备用下载行 + 折叠的 SHA-256 校验值
+
+### 关于 25MB 限制
+
+Cloudflare Pages 单文件上限 25 MiB。Windows 两个包（20.7 / 23.5 MB）可以放，APK 34.7 MB 不行，
+所以 APK 走国内网盘。`deploy_promo.ps1` 会在上传前检查并明确报错，不会静默传半截。
+
 
 ## 动画说明
 

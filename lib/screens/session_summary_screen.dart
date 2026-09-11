@@ -201,11 +201,11 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               child: OutlinedButton(
                 onPressed: () async {
                   final appState = context.read<AppState>();
+                  final nav = Navigator.of(context);
                   await appState.startQuiz();
                   if (appState.quizQuestions.isEmpty) return;
                   if (!mounted) return;
-                  Navigator.pushReplacement(
-                    context,
+                  nav.pushReplacement(
                     MaterialPageRoute(
                         builder: (_) => const QuizScreen()),
                   );

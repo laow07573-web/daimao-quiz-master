@@ -185,15 +185,18 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                               borderRadius: BorderRadius.circular(MaoRadius.small)),
                         ),
                         onPressed: () async {
+                          // 先同步取 messenger / navigator，避免跨异步后使用 builder 的 context
+                          final messenger = ScaffoldMessenger.of(context);
+                          final nav = Navigator.of(context);
                           await appState.confirmImport();
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             SnackBar(
                               content: Text(appState.importStatus),
                               backgroundColor: ac.success,
                             ),
                           );
-                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          nav.popUntil((route) => route.isFirst);
                         },
                         child: Text(
                           '确认导入 ${questions.length} 道题目',

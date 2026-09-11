@@ -104,13 +104,16 @@
 
 ## 下载安装
 
-前往 **[Releases](../../releases)** 下载最新版本。
+前往 **[Releases](https://github.com/laow07573-web/daimao-quiz-master/releases)** 下载最新版本。
 
 | 平台 | 文件 | 说明 |
 |------|------|------|
-| Android | `猫卷_v1.28.0_*.apk` | Android 7.0 及以上，约 35 MB |
-| Windows | `猫卷-Setup-1.28.0-Windows-x64.exe` | Windows 10/11 64 位，安装包 |
-| Windows | `猫卷-Windows-*.zip` | 绿色免安装版，解压即用 |
+| Android | `MaoJuan-v1.28.0-android.apk` | Android 7.0 及以上，约 35 MB |
+| Windows | `MaoJuan-v1.28.0-windows-setup.exe` | Windows 10/11 64 位安装包，约 21 MB |
+| Windows | `MaoJuan-v1.28.0-windows-portable.zip` | 绿色免安装版，解压即用，约 23 MB |
+
+> 安装包不放在源码仓库里，统一由 Releases 分发。
+> 每个 Release 的说明中都附有 SHA-256 校验值，下载后可自行核对完整性。
 
 > **基础刷题功能完全离线可用**，无需联网、无需配置任何东西。
 > 只有 AI 讲解、追问、薄弱诊断这些功能需要你在设置里填入自己的 API Key。
