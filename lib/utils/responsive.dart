@@ -59,6 +59,8 @@ class AdaptivePair extends StatelessWidget {
     required this.second,
     this.minWidth = 900,
     this.gap = 14,
+    this.equalHeight = false,
+    this.targetHeight = 0,
   });
 
   final Widget first;
@@ -66,18 +68,37 @@ class AdaptivePair extends StatelessWidget {
   final double minWidth;
   final double gap;
 
+  /// v1.28：并排时是否让两卡片等高。
+  /// 用于「年度坚持」与「近一年趋势」持平（用户反馈）。
+  final bool equalHeight;
+
+  /// 并排等高的目标高度（>0 时生效）。
+  /// 父级高度无界（本组件常位于可滚动列），故用显式高度包一层，
+  /// 让 Row 拿到有界高度后 stretch 才能生效。
+  final double targetHeight;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       if (constraints.maxWidth >= minWidth) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        // v1.28 等高：给一层显式高度（父级高度无界时 stretch 会报无限高），
+        // 使 Row 获得有界高度后 CrossAxisAlignment.stretch 生效。
+        // 注意不能用 IntrinsicHeight：年度坚持内部含 LayoutBuilder，
+        // 而 LayoutBuilder 不支持固有尺寸计算。
+        final useStretch = equalHeight && targetHeight > 0;
+        final row = Row(
+          crossAxisAlignment: useStretch
+              ? CrossAxisAlignment.stretch
+              : CrossAxisAlignment.start,
           children: [
             Expanded(child: first),
             SizedBox(width: gap),
             Expanded(child: second),
           ],
         );
+        return useStretch
+            ? SizedBox(height: targetHeight, child: row)
+            : row;
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

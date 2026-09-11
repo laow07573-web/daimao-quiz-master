@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/app_settings.dart';
+import 'api_endpoint.dart';
 import '../utils/app_constants.dart';
 import 'database_service.dart';
 import 'debug_log_service.dart';
@@ -258,11 +259,8 @@ $chunk
 
     try {
       final response = await _client.post(
-        Uri.parse(_settings.apiEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_settings.apiKey}',
-        },
+        ApiEndpoint.resolve(_settings.apiEndpoint),
+        headers: _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -549,11 +547,8 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
 正确答案：${question.correctAnswer}''';
     try {
       final response = await _client.post(
-        Uri.parse(_settings.apiEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_settings.apiKey}',
-        },
+        ApiEndpoint.resolve(_settings.apiEndpoint),
+        headers: _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -606,11 +601,8 @@ $statsText
 控制在180字，用 ## 分标题，**粗体**突出知识点名和关键数据。''';
     try {
       final response = await _client.post(
-        Uri.parse(_settings.apiEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_settings.apiKey}',
-        },
+        ApiEndpoint.resolve(_settings.apiEndpoint),
+        headers: _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -683,11 +675,8 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
   Future<String> _callAI(String userPrompt) async {
     try {
       final response = await _client.post(
-        Uri.parse(_settings.apiEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_settings.apiKey}',
-        },
+        ApiEndpoint.resolve(_settings.apiEndpoint),
+        headers: _headers(),
         body: jsonEncode({
           'model': _settings.model,
           'messages': [
@@ -737,10 +726,9 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
       return _cachedBalance;
     }
     try {
-      final base = Uri.parse(_settings.apiEndpoint);
       // 余额接口为 DeepSeek 专用；换供应商时按配置端点尝试，失败则返回 null
-      final balanceUri =
-          Uri(scheme: base.scheme, host: base.host, path: '/user/balance');
+      final balanceUri = ApiEndpoint.balanceUrl(
+          ApiEndpoint.resolve(_settings.apiEndpoint));
       final response = await _client.get(
         balanceUri,
         headers: {
@@ -769,6 +757,66 @@ ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\
     final avgPrice = (_totalTokensUsed / 1000000.0) * kAiCostPerQuestionYuan;
     if (avgPrice <= 0) return -1;
     return (balance / avgPrice).round();
+  }
+
+  /// 统一的请求头（含 OpenRouter 归因头，其服务要求携带）
+  Map<String, String> _headers() {
+    final uri = ApiEndpoint.resolve(_settings.apiEndpoint);
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${_settings.apiKey}',
+      if (ApiEndpoint.isOpenRouter(uri))
+        'HTTP-Referer': 'https://github.com/maojuan-quiz',
+      if (ApiEndpoint.isOpenRouter(uri)) 'X-Title': '猫卷',
+    };
+  }
+
+  /// 连通性测试（设置页「测试连接」按钮）
+  ///
+  /// 发送一次极小的对话请求（1 token 上限），用真实往返验证：
+  ///   端点归一化是否正确 → Key 是否有效 → 模型名是否可用。
+  /// 返回 (ok, 人类可读说明)；说明里包含实际请求的端点，便于排查第三方兼容。
+  Future<(bool, String)> testConnection() async {
+    final raw = _settings.apiEndpoint.trim();
+    if (_settings.apiKey.trim().isEmpty) {
+      return (false, '请先填写 API Key');
+    }
+    final uri = ApiEndpoint.resolve(raw);
+    final normalizedNote =
+        uri.toString() == raw ? '' : '（地址已自动补全为 ${uri.toString()}）';
+    try {
+      final response = await _client.post(
+        uri,
+        headers: _headers(),
+        body: jsonEncode({
+          'model': _settings.model.trim().isEmpty
+              ? AppSettings.defaultModel
+              : _settings.model.trim(),
+          'messages': [
+            {'role': 'user', 'content': 'hi'},
+          ],
+          'max_tokens': 1,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final content = data['choices']?[0]?['message']?['content'];
+        // 200 且结构正确 → 连通；内容为空也视为成功（部分供应商 max_tokens=1 无内容）
+        if (data['choices'] != null || content != null) {
+          return (true, '连接成功，模型 ${_settings.model} 可用$normalizedNote');
+        }
+        return (false, '返回结构异常，可能不是 OpenAI 兼容接口$normalizedNote');
+      }
+      return (false,
+          '${ApiEndpoint.explainStatus(response.statusCode, utf8.decode(response.bodyBytes))}$normalizedNote');
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('TimeoutException')) {
+        return (false, '连接超时（20 秒），请检查网络或地址$normalizedNote');
+      }
+      return (false, '连接失败：$msg$normalizedNote');
+    }
   }
 
   void dispose() {

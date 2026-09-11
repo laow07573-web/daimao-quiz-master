@@ -39,6 +39,76 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _batteryIgnored = false;
   int _untaggedCount = 0;
 
+  // v1.28 连接测试状态
+  bool _testing = false;
+  bool _testOk = false;
+  String? _testResult;
+
+  /// 当前填写的地址是否命中某个预设（用于高亮）
+  bool _isPresetActive(ApiPreset p) {
+    final cur = _endpointController.text.trim();
+    if (cur.isEmpty) return false;
+    return cur == p.endpoint ||
+        cur.startsWith('${p.endpoint}/') ||
+        cur == '$p.endpoint/chat/completions';
+  }
+
+  /// 一键应用预设（端点 + 模型），并清空上一次测试结果
+  void _applyPreset(ApiPreset p) {
+    setState(() {
+      _endpointController.text = p.endpoint;
+      _modelController.text = p.model;
+      _testResult = null;
+    });
+  }
+
+  /// 连接测试：用当前「未保存」的输入直接验证，避免必须先保存再试
+  Future<void> _testConnection() async {
+    if (_testing) return;
+    final appState = context.read<AppState>();
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) {
+      setState(() {
+        _testOk = false;
+        _testResult = '请先填写 API Key';
+      });
+      return;
+    }
+    setState(() {
+      _testing = true;
+      _testResult = null;
+    });
+
+    // 先用临时设置构造 AIService（无需保存即可测试）
+    final temp = AppSettings(
+      apiKey: key,
+      apiEndpoint: _endpointController.text.trim().isEmpty
+          ? AppSettings.defaultApiEndpoint
+          : _endpointController.text.trim(),
+      model: _modelController.text.trim().isEmpty
+          ? AppSettings.defaultModel
+          : _modelController.text.trim(),
+      nickname: _nicknameController.text.trim(),
+    );
+    final svc = AIService(temp);
+    try {
+      final (ok, msg) = await svc.testConnection();
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testOk = ok;
+        _testResult = msg;
+      });
+      // 测试成功顺带刷新余额显示
+      if (ok) {
+        await appState.updateSettings(temp);
+        if (mounted) _fetchBalance();
+      }
+    } finally {
+      svc.dispose();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -158,10 +228,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '默认使用 DeepSeek API，填写你的 API Key 即可使用。也可自定义接口地址和模型。',
+                    '默认使用 DeepSeek API，填写你的 API Key 即可使用。'
+                    '也支持任意 OpenAI 兼容的官方或第三方接口。',
                     style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: MaoSpace.md),
+
+                  // v1.28 预设供应商：一键填入端点 + 模型
+                  Text('快速选择服务商',
+                      style: TextStyle(
+                          fontSize: MaoType.body,
+                          fontWeight: FontWeight.w500,
+                          color: ac.textPrimary)),
+                  const SizedBox(height: MaoSpace.xs),
+                  Wrap(
+                    spacing: MaoSpace.xs,
+                    runSpacing: MaoSpace.xs,
+                    children: [
+                      for (final p in kApiPresets)
+                        InkWell(
+                          borderRadius: BorderRadius.circular(MaoRadius.pill),
+                          onTap: () => _applyPreset(p),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: MaoSpace.sm + 2, vertical: MaoSpace.xs - 1),
+                            decoration: BoxDecoration(
+                              color: _isPresetActive(p)
+                                  ? ac.accentSoft
+                                  : ac.surface,
+                              borderRadius:
+                                  BorderRadius.circular(MaoRadius.pill),
+                              border: Border.all(
+                                color: _isPresetActive(p)
+                                    ? ac.accent
+                                    : ac.border,
+                                width: _isPresetActive(p) ? 1.4 : 1,
+                              ),
+                            ),
+                            child: Text(p.name,
+                                style: MaoType.captionStyle.copyWith(
+                                  color: _isPresetActive(p)
+                                      ? ac.accent
+                                      : ac.textSecondary,
+                                  fontWeight: _isPresetActive(p)
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                )),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: MaoSpace.md),
 
                   // API Key
                   Text('API Key',
@@ -269,6 +386,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     style: const TextStyle(fontSize: MaoType.body),
                   ),
+                  const SizedBox(height: 14),
+
+                  // v1.28 连接测试：填完 Key/地址后可直接验证是否可用
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _testing ? null : _testConnection,
+                          icon: _testing
+                              ? const SizedBox(
+                                  width: 15,
+                                  height: 15,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.bolt_outlined, size: 18),
+                          label: Text(_testing ? '测试中…' : '测试连接'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_testResult != null) ...[
+                    const SizedBox(height: MaoSpace.xs),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(MaoSpace.sm),
+                      decoration: BoxDecoration(
+                        color: (_testOk ? ac.success : ac.danger)
+                            .withOpacity(0.10),
+                        borderRadius: MaoRadius.smallBorder,
+                        border: Border.all(
+                            color: (_testOk ? ac.success : ac.danger)
+                                .withOpacity(0.45)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                              _testOk
+                                  ? Icons.check_circle_outline
+                                  : Icons.error_outline,
+                              size: 17,
+                              color: _testOk ? ac.success : ac.danger),
+                          const SizedBox(width: MaoSpace.xs),
+                          Expanded(
+                            child: Text(_testResult!,
+                                style: MaoType.captionStyle.copyWith(
+                                    color:
+                                        _testOk ? ac.success : ac.danger,
+                                    height: 1.5)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
 
                   // Model
