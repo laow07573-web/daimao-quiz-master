@@ -4,11 +4,11 @@ import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
-import '../utils/app_constants.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
 import '../widgets/monthly_calendar.dart';
 import '../widgets/trend_chart.dart';
+import '../widgets/year_heatmap.dart';
 import 'error_book_screen.dart';
 import 'session_detail_screen.dart';
 
@@ -44,20 +44,17 @@ class StatsTabState extends State<StatsTab> {
   bool _loading = true;
   String? _error;
 
-  // v1.0.2 统一重构：年度坚持季度页滑动（初始页 = 当前季度）
-  late final PageController _quarterController;
+  /// v1.28 年度热力图：当前查看的年份（可在卡片上切换）
+  int _heatmapYear = DateTime.now().year;
 
   @override
   void initState() {
     super.initState();
-    // v1.0.2 设计审查修复：年份跨度提为常量 kYearPageSpan
-    _quarterController = PageController(initialPage: 4 * kYearPageSpan);
     _loadAll();
   }
 
   @override
   void dispose() {
-    _quarterController.dispose();
     super.dispose();
   }
 
@@ -209,8 +206,7 @@ class StatsTabState extends State<StatsTab> {
                         title: '年度坚持',
                         // v1.0.2 UI 设计稿：横向展示 7/8/9 三个月（以当前月为中心）
                         // v1.0.3 历史数据可查：季度箭头点击翻页（桌面鼠标友好）
-                        trailing: _QuarterNav(controller: _quarterController),
-                        child: _buildQuarterCalendar(ac),
+                        child: _buildYearHeatmap(ac),
                       ),
                       const SizedBox(height: 14),
                       _SectionCard(
@@ -261,8 +257,7 @@ class StatsTabState extends State<StatsTab> {
         first: _SectionCard(
           title: '年度坚持',
           // v1.0.3 历史数据可查：季度箭头点击翻页（桌面鼠标友好）
-          trailing: _QuarterNav(controller: _quarterController),
-          child: _buildQuarterCalendar(ac),
+          child: _buildYearHeatmap(ac),
         ),
         second: _SectionCard(
           title: '近一年趋势',
@@ -297,81 +292,123 @@ class StatsTabState extends State<StatsTab> {
     ];
   }
 
-  /// v1.0.2 UI 设计稿：年度坚持 = 三个月一页左右滑动（季度页，初始当前季度）+ 热力图例
-  Widget _buildQuarterCalendar(AppThemeColors ac) {
-    final ac = AppThemeColors.of(context);
+  /// 年度坚持 = 整年热力图（GitHub 贡献图风格）
+  ///
+  /// v1.28 重做：旧版「3 个月横排小日历」在手机上每格仅约 46px、
+  /// 日期字号 10px，既小又密，且名为「年度坚持」却只看得到 3 个月。
+  /// 改为 53 周 × 7 天的年度热力图：看整年、格子更大、可点看单日。
+  Widget _buildYearHeatmap(AppThemeColors ac) {
     final now = DateTime.now();
     final todayKey = MonthCalendar.dateKeyOf(now);
-    // 绝对季度索引 = year*4 + (month-1)~/3
-    final initialAbsQuarter = now.year * 4 + (now.month - 1) ~/ 3;
-    const initialPage = 4 * kYearPageSpan; // 大初始页：前后 200 年范围可翻
+    final yearData = _yearlyTotals;
+
+    // 年度摘要：有记录天数 / 全年题量 / 最长连续
+    var activeDays = 0;
+    var yearTotal = 0;
+    yearData.forEach((k, v) {
+      if (!k.startsWith('$_heatmapYear-')) return;
+      if (v > 0) activeDays++;
+      yearTotal += v;
+    });
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final w = constraints.maxWidth / 3; // 单月宽
-            final cellH = (w / 7 / 0.95).clamp(0.0, 56.0);
-            final height = 6 * cellH + 30; // 30 = 月份标题 + 间距
-            return SizedBox(
-              height: height,
-              child: PageView.builder(
-                controller: _quarterController,
-                itemBuilder: (context, page) {
-                  final absQ = initialAbsQuarter + (page - initialPage);
-                  final year = absQ ~/ 4;
-                  final q = absQ % 4;
-                  final baseMonth = q * 3 + 1;
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var m = 0; m < 3; m++) ...[
-                        if (m > 0) const SizedBox(width: 6),
-                        Expanded(
-                          child: MonthCalendar(
-                            year: year,
-                            month: baseMonth + m,
-                            dailyTotals: _yearlyTotals,
-                            vacationDays: _vacationDays,
-                            todayKey: todayKey,
-                            heatColors: [
-                              ac.cardBorder,
-                              ac.accent.withOpacity(0.28),
-                              ac.accent.withOpacity(0.52),
-                              ac.accent.withOpacity(0.85),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
-            );
-          },
+        YearHeatmap(
+          year: _heatmapYear,
+          dailyTotals: yearData,
+          vacationDays: _vacationDays,
+          todayKey: todayKey,
+          onDayTap: (key) => _showDayDetail(key, yearData[key] ?? 0, ac),
         ),
-        const SizedBox(height: 10),
-        // 热力图例：少/达标/多/今天
+        const SizedBox(height: MaoSpace.sm),
+        // 图例：少 / 达标 / 多 / 今天
         Row(
           children: [
             _LegendItem(color: _heatColor(10, ac), label: '少'),
             _LegendItem(color: _heatColor(80, ac), label: '达标'),
             _LegendItem(color: _heatColor(250, ac), label: '多'),
-            const SizedBox(width: 6),
+            const SizedBox(width: MaoSpace.xs),
             Container(
-              width: 14,
-              height: 14,
+              width: 13,
+              height: 13,
               decoration: BoxDecoration(
                 border: Border.all(color: ac.accent, width: 1.5),
-                borderRadius: BorderRadius.circular(MaoRadius.chip),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
-            const SizedBox(width: 2),
+            const SizedBox(width: MaoSpace.xxs),
             Text('今天',
-                style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
+                style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
+            const Spacer(),
+            Text('$activeDays 天有记录 · 共 $yearTotal 题',
+                style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
           ],
         ),
       ],
+    );
+  }
+
+  /// 点击热力图某天：弹出当日详情（保持轻量，不跳页）
+  void _showDayDetail(String dateKey, int total, AppThemeColors ac) {
+    final parts = dateKey.split('-');
+    final label = '${parts[0]} 年 ${int.parse(parts[1])} 月 ${int.parse(parts[2])} 日';
+    final isVacation = _vacationDays.contains(dateKey);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+            MaoSpace.lg, MaoSpace.xs, MaoSpace.lg, MaoSpace.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+            const SizedBox(height: MaoSpace.sm),
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: YearHeatmap.levelColor(total, ac),
+                    borderRadius: BorderRadius.circular(MaoRadius.small),
+                  ),
+                ),
+                const SizedBox(width: MaoSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isVacation
+                            ? '假期模式（不计入统计）'
+                            : (total > 0 ? '刷题 $total 道' : '当天没有刷题记录'),
+                        style: MaoType.h3Style
+                            .copyWith(color: ac.textPrimary, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        total >= 200
+                            ? '完成量很高'
+                            : total >= 50
+                                ? '达标（50 题以上）'
+                                : total > 0
+                                    ? '有练习，继续加油'
+                                    : '休息也是备考的一部分',
+                        style: MaoType.captionStyle
+                            .copyWith(color: ac.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -997,40 +1034,3 @@ class _ErrorView extends StatelessWidget {
 
 /// v1.0.3 历史数据可查：年度坚持季度翻页箭头。
 /// PageView 范围极大（前后 200 年），不做边界禁用。
-class _QuarterNav extends StatelessWidget {
-  const _QuarterNav({required this.controller});
-
-  final PageController controller;
-
-  void _go(int delta) {
-    final cur = (controller.page ?? 0).round();
-    controller.animateToPage(cur + delta,
-        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          tooltip: '上一季度',
-          icon: Icon(Icons.chevron_left, size: 18, color: ac.accent),
-          onPressed: () => _go(-1),
-        ),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          tooltip: '下一季度',
-          icon: Icon(Icons.chevron_right, size: 18, color: ac.accent),
-          onPressed: () => _go(1),
-        ),
-      ],
-    );
-  }
-}
