@@ -46,6 +46,32 @@ void main() {
     expect(c2.opacity, lessThan(c3.opacity));
   });
 
+  testWidgets('窄容器下格子仍然够大（用户反馈：旧版只有 3~5px）', (tester) async {
+    // 手机卡片内可用宽约 300px。旧版把 53 周挤一行 → 每格 3~5px 看不清；
+    // 新版自动分段，保证格子 ≥ 11px。
+    await tester.pumpWidget(host(width: 300));
+    await tester.pumpAndSettle();
+    final cell = tester.getSize(find.byType(AspectRatio).first);
+    expect(cell.width, greaterThanOrEqualTo(11.0),
+        reason: '格子应至少 11px（实际 ${cell.width.toStringAsFixed(1)}px）');
+    expect(cell.width, cell.height, reason: '格子应为正方形');
+  });
+
+  testWidgets('更窄的容器也保证格子下限（极端情况）', (tester) async {
+    await tester.pumpWidget(host(width: 220));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final cell = tester.getSize(find.byType(AspectRatio).first);
+    expect(cell.width, greaterThanOrEqualTo(6.0));
+  });
+
+  testWidgets('宽容器下格子不会被拉得过大', (tester) async {
+    await tester.pumpWidget(host(width: 900));
+    await tester.pumpAndSettle();
+    final cell = tester.getSize(find.byType(AspectRatio).first);
+    expect(cell.width, lessThanOrEqualTo(23.0), reason: '格子应有上限');
+  });
+
   testWidgets('渲染全年 53 周 × 7 天且不溢出（窄容器）', (tester) async {
     await tester.pumpWidget(host(width: 300));
     await tester.pumpAndSettle();

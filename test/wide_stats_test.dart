@@ -157,14 +157,12 @@ void main() {
     expect(find.text('近一年趋势'), findsOneWidget);
     expect(find.text('正确率排行'), findsOneWidget);
     expect(find.text('错题统计'), findsOneWidget);
-    // v1.28 新设计语言：间距调整后内容更长，滚动到历史记录区再断言
-    await tester.scrollUntilVisible(find.text('历史记录'), 300,
-        scrollable: find.byType(Scrollable).first);
-    await settleFrames(tester);
-    expect(find.text('历史记录'), findsOneWidget);
 
     // 2. 周期切换（本周/本月/全部）无异常（切周期内部查 DB，走 runAsync）
+    //    注意：先做顶部交互再滚到底部，否则标签会被滚出视口
     for (final label in ['本月', '全部', '本周']) {
+      await tester.ensureVisible(find.text(label));
+      await settleFrames(tester);
       await tester.tap(find.text(label));
       await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)));
@@ -173,12 +171,20 @@ void main() {
     }
 
     // 3. 排行维度切换（按题库/按知识点）
+    await tester.ensureVisible(find.text('按知识点'));
+    await settleFrames(tester);
     await tester.tap(find.text('按知识点'));
     await settleFrames(tester);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('按题库'));
     await settleFrames(tester);
     expect(tester.takeException(), isNull);
+
+    // 4. 滚动到底部断言历史记录（v1.28 年度热力图使页面更长）
+    await tester.scrollUntilVisible(find.text('历史记录'), 300,
+        scrollable: find.byType(Scrollable).first);
+    await settleFrames(tester);
+    expect(find.text('历史记录'), findsOneWidget);
 
     // 4. 历史记录点击进入会话详情（题库名在排行/历史两处出现，取历史区末位）
     await tester.tap(find.text('统计测试题库').last);

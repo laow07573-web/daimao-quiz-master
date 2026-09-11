@@ -175,9 +175,9 @@ void main() {
         scrollable: find.byType(Scrollable).first);
     await settle();
 
-    // v1.28 新设计语言：间距调整后内容更长，用 ensureVisible 精确滚到目标
-    // （不用 scrollUntilVisible 全程滚动，避免把其他待交互元素推出视口）
-    await tester.ensureVisible(find.text('历史记录'));
+    // v1.28 年度热力图使页面更长：用 scrollUntilVisible 逐步滚到历史记录区
+    await tester.scrollUntilVisible(find.text('历史记录'), 300,
+        scrollable: find.byType(Scrollable).first);
     await settle();
     expect(find.text('历史记录'), findsOneWidget);
 

@@ -4,14 +4,17 @@ import '../utils/design_tokens.dart';
 
 /// 年度坚持热力图（Mao Des）
 ///
-/// GitHub 贡献图风格：一整年 53 周 × 7 天的小方块，一眼看全年坚持情况。
-/// 相比旧版「3 个月横排小日历」，格子更大（≥11px）、看的是整年、
-/// 且能按行（周一…周日）对齐，适合"坚持"这一语义。
+/// 一整年 53 周 × 7 天的小方块，看全年坚持情况。
 ///
-/// - 色阶四档：0 无 / 少 / 达标 / 多（阈值同全站口径）
-/// - 今天：描边高亮；假期：置灰（浅色 danger 淡化）
+/// 关键设计（v1.28 二次修订）：**按可用宽度自动分段**
+/// 上一版把 53 周硬挤在一行，手机上每格仅 3~5px，根本看不清。
+/// 现在若格子达不到 [_minCell]，就把一年拆成 2~4 段纵向排列
+/// （每段仍是周一到周日 7 行），格子始终 ≥ 11px，可读可点。
+///
+/// - 色阶四档：0 无 / 少(<50) / 达标(50~199) / 多(200+)，与全站口径一致
+/// - 今天：描边高亮；假期：淡红置灰
 /// - 点击某天：回调 [onDayTap]（传 'YYYY-MM-DD'）
-/// - 月份标签：每列所属月变化时在顶部标注
+/// - 每段顶部标出月份，左侧标周一/三/五
 class YearHeatmap extends StatelessWidget {
   const YearHeatmap({
     super.key,
@@ -30,11 +33,22 @@ class YearHeatmap extends StatelessWidget {
   final String? todayKey;
   final ValueChanged<String>? onDayTap;
 
+  /// 格子间距
+  static const double _gap = 2.4;
+
+  /// 星期标签列宽
+  static const double _labelWidth = 16;
+
+  /// 最小可读格子尺寸；低于此值就拆段（核心：不再出现 3~5px 的小格子）
+  static const double _minCell = 11.0;
+
+  /// 格子最大尺寸（避免超宽屏下格子过大）
+  static const double _maxCell = 22.0;
+
   static String dateKeyOf(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  /// 色阶：0 / 少(<50) / 达标(50~199) / 多(200+)，
-  /// 与首页、统计页旧日历保持同一口径。
+  /// 色阶：0 / 少(<50) / 达标(50~199) / 多(200+)
   static Color levelColor(int total, AppThemeColors ac) {
     if (total <= 0) return ac.surfaceAlt;
     if (total < 50) return ac.accent.withOpacity(0.30);
@@ -47,31 +61,91 @@ class YearHeatmap extends StatelessWidget {
     final ac = AppThemeColors.of(context);
     final weeks = _buildWeeks();
 
-    // 用 LayoutBuilder 取「本组件实际可用宽度」（而非屏幕宽度）：
-    // 统计页在宽屏下是双列卡片，可用宽远小于屏幕。
-    // 网格用 Expanded 列均分宽度：无论容器多窄都不会横向溢出。
     return LayoutBuilder(
       builder: (context, constraints) {
-        final gridW = constraints.maxWidth - _labelWidth;
-        final cellW = (gridW / weeks.length).clamp(3.0, 15.0);
+        final avail = (constraints.maxWidth - _labelWidth).clamp(0.0, 1e6);
+
+        // 每段最多放多少周（保证格子 ≥ _minCell）
+        var perRow = (avail / (_minCell + _gap)).floor();
+        if (perRow < 1) perRow = 1;
+        // 需要分几段（上限 4 段，避免纵向过长）
+        var segments = (weeks.length / perRow).ceil();
+        if (segments < 1) segments = 1;
+        if (segments > 4) segments = 4;
+        final perSegment = (weeks.length / segments).ceil();
+
+        final cell = (avail / perSegment - _gap).clamp(6.0, _maxCell);
+
+        final blocks = <Widget>[];
+        for (var s = 0; s < segments; s++) {
+          final start = s * perSegment;
+          if (start >= weeks.length) break;
+          final end = (start + perSegment) > weeks.length
+              ? weeks.length
+              : start + perSegment;
+          if (s > 0) blocks.add(const SizedBox(height: MaoSpace.xs + 2));
+          blocks.add(_segment(weeks.sublist(start, end), ac, cell));
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          children: blocks,
+        );
+      },
+    );
+  }
+
+  /// 渲染一段（perSegment 周 × 7 天）
+  Widget _segment(List<_HeatWeek> weeks, AppThemeColors ac, double cell) {
+    final rowH = cell + _gap;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 月份标签行（与周列对齐）
+        Padding(
+          padding: const EdgeInsets.only(left: _labelWidth, bottom: MaoSpace.xxs),
+          child: Row(
+            children: [
+              for (final w in weeks)
+                Expanded(
+                  child: (w.monthLabel != null)
+                      ? FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            w.monthLabel!,
+                            style: MaoType.microStyle
+                                .copyWith(color: ac.textTertiary, fontSize: 10),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+            ],
+          ),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 月份标签行（与周列对齐）──
-            Padding(
-              padding: EdgeInsets.only(left: _labelWidth, bottom: MaoSpace.xxs),
-              child: Row(
+            // 星期标签（一/三/五）
+            SizedBox(
+              width: _labelWidth,
+              child: Column(
                 children: [
-                  for (var i = 0; i < weeks.length; i++)
-                    Expanded(
-                      child: (weeks[i].monthLabel != null)
-                          ? FittedBox(
-                              fit: BoxFit.scaleDown,
+                  for (var d = 0; d < 7; d++)
+                    SizedBox(
+                      height: rowH,
+                      child: (d == 0 || d == 2 || d == 4)
+                          ? Align(
                               alignment: Alignment.centerLeft,
-                              child: Text(
-                                weeks[i].monthLabel!,
-                                style: MaoType.microStyle.copyWith(
-                                    color: ac.textTertiary, fontSize: 9.5),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  const ['一', '二', '三', '四', '五', '六', '日'][d],
+                                  style: MaoType.microStyle.copyWith(
+                                      color: ac.textTertiary, fontSize: 10),
+                                ),
                               ),
                             )
                           : const SizedBox.shrink(),
@@ -79,73 +153,41 @@ class YearHeatmap extends StatelessWidget {
                 ],
               ),
             ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── 星期标签列（一/三/五，避免拥挤）──
-                SizedBox(
-                  width: _labelWidth,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var d = 0; d < 7; d++)
-                        SizedBox(
-                          height: cellW,
-                          child: (d == 0 || d == 2 || d == 4)
-                              ? Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      const ['一', '二', '三', '四', '五', '六', '日'][d],
-                                      style: MaoType.microStyle.copyWith(
-                                          color: ac.textTertiary, fontSize: 9.5),
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                    ],
-                  ),
-                ),
-                // ── 热力网格：每列 Expanded 均分，格内用 AspectRatio 保证正方形 ──
-                Expanded(
-                  child: Column(
-                    children: [
-                      for (var d = 0; d < 7; d++)
-                        Row(
-                          children: [
-                            for (var w = 0; w < weeks.length; w++)
-                              Expanded(child: _cell(weeks[w].days[d], ac)),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+            // 热力网格
+            Expanded(
+              child: Column(
+                children: [
+                  for (var d = 0; d < 7; d++)
+                    Row(
+                      children: [
+                        for (final w in weeks)
+                          Expanded(child: _cell(w.days[d], ac)),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ],
     );
   }
 
-  static const double _labelWidth = 16;
-
   Widget _cell(_HeatDay? day, AppThemeColors ac) {
     if (day == null) {
-      return const AspectRatio(aspectRatio: 1, child: SizedBox.shrink());
+      return const Padding(
+        padding: EdgeInsets.all(_gap / 2),
+        child: AspectRatio(aspectRatio: 1, child: SizedBox.shrink()),
+      );
     }
     final total = dailyTotals[day.key] ?? 0;
     final isToday = todayKey == day.key;
     final isVacation = vacationDays.contains(day.key);
-    final color = isVacation
-        ? ac.danger.withOpacity(0.22)
-        : levelColor(total, ac);
+    final color =
+        isVacation ? ac.danger.withOpacity(0.22) : levelColor(total, ac);
 
     return Padding(
-      padding: const EdgeInsets.all(1.2),
+      padding: const EdgeInsets.all(_gap / 2),
       child: Tooltip(
         message: '${day.key}　${isVacation ? "假期" : "$total 题"}',
         waitDuration: const Duration(milliseconds: 400),
@@ -168,7 +210,7 @@ class YearHeatmap extends StatelessWidget {
     );
   }
 
-  /// 把一年切成 53 个「周列」，每列 7 天（周一起）。年内日期之外为空。
+  /// 把一年切成「周列」，每列 7 天（周一起）。年内日期之外为空。
   List<_HeatWeek> _buildWeeks() {
     final jan1 = DateTime(year, 1, 1);
     final dec31 = DateTime(year, 12, 31);
