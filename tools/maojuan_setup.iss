@@ -4,7 +4,7 @@
 #define MyAppVersion "1.27.0"
 #define MyAppPublisher "Damao"
 #define MyAppExeName "flashcard_app.exe"
-#define SrcDir "d:\dev\flashcard_app\dist\猫卷-Windows-20260901"
+#define SrcDir "d:\dev\flashcard_app\dist\猫卷-Windows-20260911"
 #define OutDir "d:\dev\flashcard_app\dist"
 
 [Setup]
