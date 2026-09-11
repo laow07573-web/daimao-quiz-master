@@ -38,36 +38,6 @@ class DocParserService {
     }
   }
 
-  /// 批量并行解析多个 DOCX 文件
-  /// 返回 {文件名: 解析出的题目列表}
-  static Future<Map<String, List<Question>>> parseMultipleFiles(
-    List<File> files,
-    int bankId,
-    void Function(String fileName, int current, int total) onProgress,
-  ) async {
-    final result = <String, List<Question>>{};
-    final total = files.length;
-
-    // 使用 Isolate 并行处理多个文件
-    final futures = <Future<void>>[];
-    final receivePort = ReceivePort();
-
-    for (int i = 0; i < files.length; i++) {
-      final file = files[i];
-      final index = i;
-
-      futures.add(parseFileInIsolate(file.path, bankId).then((questions) {
-        result[file.path] = questions;
-        onProgress(file.path, index + 1, total);
-      }));
-    }
-
-    await Future.wait(futures);
-    receivePort.close();
-
-    return result;
-  }
-
   /// 检测文件格式：'docx' / 'doc' / 'unknown'
   static String detectFormat(String filePath) {
     try {
@@ -180,10 +150,17 @@ class DocParserService {
 
   /// 将合并后的段落分组成题目块
   static List<List<String>> _groupIntoBlocks(List<String> lines) {
+    // v1.0.2: 合并行拆回——前一步 merge 把题目+选项拼成了多行字符串，
+    // 这里先拆回单行再分组，否则选项/答案会被整行吞掉（丢失根因）
+    final expanded = <String>[];
+    for (final l in lines) {
+      expanded.addAll(l.split('\n'));
+    }
+
     final blocks = <List<String>>[];
     List<String>? currentBlock;
 
-    for (final line in lines) {
+    for (final line in expanded) {
       if (_isQuestionLine(line)) {
         if (currentBlock != null) {
           blocks.add(currentBlock);
@@ -247,7 +224,18 @@ class DocParserService {
       final optLabel = _detectOptionLabel(line);
       if (optLabel != null) {
         seenLabeledOption = true;
-        options.add(_cleanOption(line, optLabel));
+        // v1.0.2: 合并行拆回（"A.x B.y C.z" 一行多选项 → 拆成多个选项，
+        // 修复选项/答案丢失根因）
+        final merged = _splitMergedOptions(line);
+        if (merged.length > 1) {
+          // 每个拆出的片段去掉自己的标签前缀
+          options.addAll(merged.map((m) {
+            final label = _detectOptionLabel(m);
+            return label != null ? _cleanOption(m, label) : m;
+          }));
+        } else {
+          options.add(_cleanOption(line, optLabel));
+        }
       } else if (_isAnswerLine(line)) {
         correctAnswer = _extractAnswer(line);
       } else if (_isAnalysisLine(line)) {
@@ -277,7 +265,7 @@ class DocParserService {
 
     // 推测题型
     String questionType = 'single_choice';
-    if (correctAnswer != null && correctAnswer!.contains(',')) {
+    if (correctAnswer != null && correctAnswer.contains(',')) {
       questionType = 'multi_choice';
     } else if (options.isEmpty) {
       // 无选项：看答案判断是填空还是判断
@@ -307,13 +295,23 @@ class DocParserService {
     return match?.group(1);
   }
 
-  static bool _isOptionLine(String line, String label) {
-    return RegExp('^\\s*${label}[\.、．\\s]', caseSensitive: false)
-        .hasMatch(line);
-  }
-
   static String _cleanOption(String line, String label) {
     return line.replaceFirst(RegExp('^\\s*${label}[\.、．\\s]*', caseSensitive: false), '');
+  }
+
+  /// 合并行拆回（v1.0.2）：一行包含多个 "X. " 选项时拆成多个选项
+  static List<String> _splitMergedOptions(String line) {
+    final matches =
+        RegExp(r'[A-Z][\.、．]\s*').allMatches(line).toList();
+    if (matches.length <= 1) return [line];
+    final parts = <String>[];
+    for (var i = 0; i < matches.length; i++) {
+      final start = matches[i].start;
+      final end = i + 1 < matches.length ? matches[i + 1].start : line.length;
+      final part = line.substring(start, end).trim();
+      if (part.isNotEmpty) parts.add(part);
+    }
+    return parts;
   }
 
   static bool _isAnswerLine(String line) {
@@ -322,24 +320,29 @@ class DocParserService {
   }
 
   static String? _extractAnswer(String line) {
-    // 匹配 A、B、C、D 或 对/错 或 √/×
-    final match = RegExp(r'[答案参考正确][答案案确]?[：:\s]*([A-Da-d]+)',
+    // 匹配 A-Z（含分隔符，供多选归一；支持 E/F 等五选以上）或 对/错 或 √/×
+    final match = RegExp(r'[答案参考正确][答案案确]?[：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)',
             caseSensitive: false)
         .firstMatch(line);
     if (match != null) {
-      return match.group(1)!;
+      return _normalizeMultiAnswer(match.group(1)!);
     }
     // 尝试直接匹配字母
-    final letterMatch = RegExp(r'([A-Da-d]+)').firstMatch(line);
+    final letterMatch =
+        RegExp(r'([A-Za-z][A-Za-z、，,;；/\s]*)').firstMatch(line);
     if (letterMatch != null) {
-      return letterMatch.group(1)!;
+      return _normalizeMultiAnswer(letterMatch.group(1)!);
     }
-    // 判断题
-    if (line.contains('对') || line.contains('√') || line.contains('正确')) {
-      return '对';
-    }
-    if (line.contains('错') || line.contains('×') || line.contains('错误')) {
+    // 判断题（先检查否定/错误类，避免 "不对" 被 "对" 误判）
+    if (line.contains('不对') ||
+        line.contains('不正确') ||
+        line.contains('错误') ||
+        line.contains('错') ||
+        line.contains('×')) {
       return '错';
+    }
+    if (line.contains('正确') || line.contains('对') || line.contains('√')) {
+      return '对';
     }
     // 填空题：提取 "答案：" 后的全部文本
     final textMatch = RegExp(r'[答案参考正确][答案案确]?[：:\s]+(.+)',
@@ -347,7 +350,7 @@ class DocParserService {
         .firstMatch(line);
     if (textMatch != null) {
       final text = textMatch.group(1)!.trim();
-      if (text.isNotEmpty && !RegExp(r'^[A-Da-d]+$').hasMatch(text)) {
+      if (text.isNotEmpty && !RegExp(r'^[A-Za-z]+$').hasMatch(text)) {
         return text;
       }
     }
@@ -360,20 +363,37 @@ class DocParserService {
         line.startsWith('【答案】');
   }
 
+  /// 多选答案归一（v1.0.2）：A、C / A, C / AC / A和C → A,C（支持 A-Z 五选以上）
+  static String _normalizeMultiAnswer(String letters) {
+    final normalized = letters
+        .toUpperCase()
+        .replaceAll(RegExp(r'[和及]'), ',')
+        .replaceAll(RegExp(r'[、，,;；/\s]+'), '')
+        .split('')
+        .where((c) => RegExp(r'^[A-Z]$').hasMatch(c))
+        .toSet()
+        .toList()
+      ..sort();
+    if (normalized.length <= 1) return letters.toUpperCase().trim();
+    return normalized.join(',');
+  }
+
   /// 尝试从整段文本中提取答案
   static String? _tryExtractAnswerFromText(String text) {
     // 在全部文本中搜索"答案"关键词
     final patterns = [
-      RegExp(r'答案[：:\s]*([A-Da-d]+)', caseSensitive: false),
-      RegExp(r'正确答案[：:\s]*([A-Da-d]+)', caseSensitive: false),
-      RegExp(r'参考[答案][：:\s]*([A-Da-d]+)', caseSensitive: false),
+      RegExp(r'答案[：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)', caseSensitive: false),
+      RegExp(r'正确答案[：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)', caseSensitive: false),
+      RegExp(r'参考[答案][：:\s]*([A-Za-z][A-Za-z、，,;；/\s]*)', caseSensitive: false),
       RegExp(r'正确[答案][：:\s]*([对错√×])', caseSensitive: false),
     ];
 
     for (final p in patterns) {
       final match = p.firstMatch(text);
       if (match != null) {
-        return match.group(1)?.toUpperCase();
+        final v = match.group(1)!;
+        if (RegExp(r'^[对错√×]$').hasMatch(v)) return v;
+        return _normalizeMultiAnswer(v);
       }
     }
     // 填空题：提取 "答案：" 后的全部文本

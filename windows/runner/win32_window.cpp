@@ -216,6 +216,17 @@ Win32Window::MessageHandler(HWND hwnd,
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);
       return 0;
+
+    // v1.0.3 window adaptivity: enforce a minimum window size so the layout
+    // cannot be dragged into a broken state.
+    // 680x520 includes window borders; client area about 664x481 (the usable
+    // range of the narrow layout). Keep this file ASCII-only (C4819 as error).
+    case WM_GETMINMAXINFO: {
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      info->ptMinTrackSize.x = 680;
+      info->ptMinTrackSize.y = 520;
+      return 0;
+    }
   }
 
   return DefWindowProc(window_handle_, message, wparam, lparam);

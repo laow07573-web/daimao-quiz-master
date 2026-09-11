@@ -1,8 +1,11 @@
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
+import '../services/theme_service.dart';
 import '../widgets/ai_response_widget.dart';
+import '../utils/responsive.dart';
 import 'quiz_screen.dart';
 
 class SessionSummaryScreen extends StatefulWidget {
@@ -41,18 +44,20 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
     final accuracy = session.accuracy;
     final minutes = session.durationSeconds ~/ 60;
     final seconds = session.durationSeconds % 60;
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
 
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: ac.background,
       appBar: AppBar(
         title: const Text('刷题小结'),
         elevation: 0,
-        backgroundColor: cs.primary,
-        foregroundColor: cs.onPrimary,
+        backgroundColor: ac.accent,
+        foregroundColor: ac.onAccent,
         automaticallyImplyLeading: false,
       ),
-      body: SingleChildScrollView(
+      // 平板适配：内容限宽居中（手机无影响）
+      body: ResponsivePage(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -62,26 +67,26 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [cs.primary, cs.primary.withAlpha(200)],
+                  colors: [ac.accent, ac.accent.withAlpha(200)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(MaoRadius.card),
               ),
               child: Column(
                 children: [
                   Text('本次刷题完成',
-                      style: TextStyle(color: cs.onPrimary.withOpacity(0.7), fontSize: 14)),
+                      style: TextStyle(color: ac.onAccent.withOpacity(0.7), fontSize: MaoType.body)),
                   const SizedBox(height: 12),
                   Text('${accuracy.toStringAsFixed(1)}%',
                       style: TextStyle(
-                          color: cs.onPrimary,
-                          fontSize: 48,
+                          color: ac.onAccent,
+                          fontSize: MaoType.display,
                           fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text('正确率',
                       style: TextStyle(
-                          color: cs.onPrimary.withOpacity(0.8), fontSize: 14)),
+                          color: ac.onAccent.withOpacity(0.8), fontSize: MaoType.body)),
                 ],
               ),
             ),
@@ -96,9 +101,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.quiz_outlined,
                     label: '总题量',
                     value: '${session.totalQuestions}',
-                    color: cs.primary,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    color: ac.accent,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -107,9 +112,10 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.check_circle_outline,
                     label: '正确',
                     value: '${session.correctCount}',
-                    color: const Color(0xFF5CB85C),
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    // v1.0.2 设计审查修复：硬编码绿色 → 主题语义色
+                    color: AppThemeColors.of(context).success,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -118,9 +124,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.cancel_outlined,
                     label: '错误',
                     value: '${session.wrongCount}',
-                    color: cs.error,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    color: ac.danger,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -129,9 +135,9 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     icon: Icons.timer_outlined,
                     label: '用时',
                     value: '$minutes\'${seconds.toString().padLeft(2, '0')}"',
-                    color: cs.secondary,
-                    surfaceColor: cs.surface,
-                    onSurfaceVariant: cs.onSurfaceVariant,
+                    color: ac.textSecondary,
+                    surfaceColor: ac.background,
+                    onSurfaceVariant: ac.textSecondary,
                   ),
                 ),
               ],
@@ -144,8 +150,8 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                color: ac.surfaceAlt,
+                borderRadius: BorderRadius.circular(MaoRadius.control),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,11 +159,11 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                   Row(
                     children: [
                       Icon(Icons.auto_awesome,
-                          color: cs.secondary, size: 20),
+                          color: ac.textSecondary, size: 20),
                       const SizedBox(width: 8),
                       Text('AI 小结',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15, color: cs.onSurface)),
+                              fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -165,13 +171,13 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     Center(
                         child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: CircularProgressIndicator(color: cs.primary),
+                      child: CircularProgressIndicator(color: ac.accent),
                     ))
                   else
                     AiResponseWidget(
                       text: _summaryText ?? '生成小结失败',
-                      fontSize: 14,
-                      color: cs.onSurface,
+                      fontSize: MaoType.body,
+                      color: ac.textPrimary,
                     ),
                 ],
               ),
@@ -186,7 +192,7 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                 onPressed: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
-                child: const Text('返回首页', style: TextStyle(fontSize: 16)),
+                child: const Text('返回首页', style: TextStyle(fontSize: MaoType.h3)),
               ),
             ),
             const SizedBox(height: 10),
@@ -204,11 +210,12 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                         builder: (_) => const QuizScreen()),
                   );
                 },
-                child: const Text('再来一轮', style: TextStyle(fontSize: 16)),
+                child: const Text('再来一轮', style: TextStyle(fontSize: MaoType.h3)),
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -237,7 +244,7 @@ class _StatChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(MaoRadius.small),
       ),
       child: Column(
         children: [
@@ -245,9 +252,9 @@ class _StatChip extends StatelessWidget {
           const SizedBox(height: 4),
           Text(value,
               style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+                  fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: color)),
           Text(label,
-              style: TextStyle(fontSize: 10, color: onSurfaceVariant)),
+              style: TextStyle(fontSize: MaoType.micro, color: onSurfaceVariant)),
         ],
       ),
     );

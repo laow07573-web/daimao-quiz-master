@@ -1,7 +1,7 @@
-name: flashcard_app
-description: 刷题软件 - 支持本地题库、AI解析、数据统计的跨平台刷题工具
+﻿name: flashcard_app
+description: 猫卷 - 本地题库、AI解析、间隔复习的 Android 刷题工具
 publish_to: 'none'
-version: 1.26.6+17
+version: 1.27.0+18
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -29,7 +29,6 @@ dependencies:
   
   # UI组件
   fl_chart: ^0.66.0
-  google_fonts: ^6.1.0
   shimmer: ^3.0.0
   flutter_markdown: ^0.7.1
   audioplayers: ^6.1.0
@@ -40,13 +39,40 @@ dependencies:
   shared_preferences: 2.5.3
   uuid: ^4.2.1
   path_provider: 2.1.5
+
+  # 每日提醒 + 保活（v1.0.2 新增）
+  flutter_local_notifications: ^19.5.0
+  timezone: ^0.10.1
+  flutter_timezone: ^4.1.1
+  flutter_foreground_task: ^6.0.0
+
+  # 密钥加密（v1.0.2 新增：AES-256-GCM）
+  pointycastle: ^3.9.1
+
+  # 哈希（v1.0.2 设计审查：开发者选项密码哈希比对）
+  crypto: ^3.0.0
+
+  # 安全存储（v1.0.2 七项改进：Android 上 API Key 走 Keystore 加密，
+  # 其他平台回退 KeyCrypto 混淆存储）
+  flutter_secure_storage: ^9.2.0
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true
   assets:
     - assets/
+  # v1.27 视觉优化：内置 MiSans（小米开源字体），PC/安卓跨端字形一致，
+  # 解决默认微软雅黑小字号发虚观感。只带 Regular + Semibold 两字重（省包体，
+  # w500 自动回落 Regular，观感几乎无差）
+  fonts:
+    - family: MiSans
+      fonts:
+        - asset: fonts/MiSans-Regular.ttf
+        - asset: fonts/MiSans-Semibold.ttf
+          weight: 600

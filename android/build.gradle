@@ -1,6 +1,6 @@
 buildscript {
     repositories {
-        google()
+        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
         mavenCentral()
     }
     dependencies {
@@ -10,7 +10,10 @@ buildscript {
 
 allprojects {
     repositories {
-        google()
+        // Local Flutter engine maven (io.flutter artifacts assembled from SDK cache,
+        // because download.flutter.io is unreachable from this network)
+        maven { url 'file:///D:/dev/flutter_engine_maven' }
+        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
         mavenCentral()
     }
 }

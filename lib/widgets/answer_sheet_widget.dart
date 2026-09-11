@@ -1,7 +1,10 @@
+import '../utils/design_tokens.dart';
+import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 
 class PracticeAnswerState {
   bool answered = false;
+  // v1.0.2 七项改进：练习结果页复盘用（提交后回填判定结果）
   bool correct = false;
 }
 
@@ -9,32 +12,41 @@ class AnswerSheetWidget extends StatelessWidget {
   final List<PracticeAnswerState> answers;
   final int currentIndex;
   final void Function(int index) onJumpTo;
+  /// v1.0.2 七项改进：是否显示对错（结果页复盘 = true；练习作答中 = false）
+  final bool showResult;
 
   const AnswerSheetWidget({
     super.key,
     required this.answers,
     required this.currentIndex,
     required this.onJumpTo,
+    this.showResult = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final ac = AppThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('答题卡', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: cs.onSurface)),
+          Text('答题卡', style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.w600, color: ac.textPrimary)),
           const SizedBox(height: 4),
           Row(
             children: [
-              _legend(const Color(0xFF5CB85C), '答对'),
-              const SizedBox(width: 12),
-              _legend(const Color(0xFFD9534F), '答错'),
-              const SizedBox(width: 12),
-              _legend(cs.onSurfaceVariant, '未答'),
+              if (showResult) ...[
+                _legend(ac.accent, '答对'),
+                const SizedBox(width: 12),
+                _legend(ac.danger, '答错'),
+                const SizedBox(width: 12),
+                _legend(ac.textSecondary, '未答'),
+              ] else ...[
+                _legend(ac.accent, '已答'),
+                const SizedBox(width: 12),
+                _legend(ac.textSecondary, '未答'),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -46,17 +58,21 @@ class AnswerSheetWidget extends StatelessWidget {
               Color bg;
               Color fg;
               if (!a.answered) {
-                bg = cs.surfaceContainerHighest;
-                fg = cs.onSurfaceVariant;
-              } else if (a.correct) {
-                bg = const Color(0xFF5CB85C).withOpacity(0.2);
-                fg = const Color(0xFF5CB85C);
+                bg = ac.surfaceAlt;
+                fg = ac.textSecondary;
+              } else if (showResult && a.correct) {
+                bg = ac.accent.withOpacity(0.2);
+                fg = ac.accent;
+              } else if (showResult) {
+                bg = ac.danger.withOpacity(0.2);
+                fg = ac.danger;
               } else {
-                bg = const Color(0xFFD9534F).withOpacity(0.2);
-                fg = const Color(0xFFD9534F);
+                // 练习模式：已答用主题色（不判定对错）
+                bg = ac.accent.withOpacity(0.2);
+                fg = ac.accent;
               }
               if (i == currentIndex) {
-                bg = cs.primaryContainer;
+                bg = ac.accentSoft;
               }
               return GestureDetector(
                 onTap: () => onJumpTo(i),
@@ -65,12 +81,12 @@ class AnswerSheetWidget extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: bg,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: i == currentIndex ? cs.primary : cs.outlineVariant, width: i == currentIndex ? 2 : 1),
+                    borderRadius: BorderRadius.circular(MaoRadius.chip),
+                    border: Border.all(color: i == currentIndex ? ac.accent : ac.border, width: i == currentIndex ? 2 : 1),
                   ),
                   alignment: Alignment.center,
                   child: Text('${i + 1}',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: fg)),
+                      style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w600, color: fg)),
                 ),
               );
             }),
@@ -85,9 +101,9 @@ class AnswerSheetWidget extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color.withOpacity(0.3), borderRadius: BorderRadius.circular(3))),
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color.withOpacity(0.3), borderRadius: BorderRadius.circular(MaoRadius.chip))),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: const TextStyle(fontSize: MaoType.caption)),
       ],
     );
   }

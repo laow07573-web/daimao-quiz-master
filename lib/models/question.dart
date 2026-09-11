@@ -9,6 +9,7 @@ class Question {
   final String? analysis;
   final String questionType; // single_choice, multi_choice, true_false
   final String? source;
+  final String? knowledgePoint; // 知识点（v1.0.2: schema v5）
   final String createdAt;
 
   Question({
@@ -20,8 +21,20 @@ class Question {
     this.analysis,
     this.questionType = 'single_choice',
     this.source,
+    this.knowledgePoint,
     required this.createdAt,
   });
+
+  /// 题型中文标签（v1.0.2 设计审查修复：页面中两套映射收敛到此）
+  String get typeLabel => switch (questionType) {
+        'multi_choice' => '多选',
+        'fill_blank' => '填空',
+        'true_false' => '判断',
+        'ming_jie' => '名解',
+        'jian_da' => '简答',
+        'jie_da' => '问答',
+        _ => '单选',
+      };
 
   /// 带前缀的选项文本列表：["A. 热带假丝酵母菌", "B. 新型隐球菌", ...]
   List<String> get optionsWithLabels {
@@ -46,6 +59,7 @@ class Question {
       'analysis': analysis,
       'question_type': questionType,
       'source': source,
+      'knowledge_point': knowledgePoint,
       'created_at': createdAt,
     };
   }
@@ -84,6 +98,7 @@ class Question {
       analysis: map['analysis'] as String?,
       questionType: map['question_type'] as String? ?? 'single_choice',
       source: map['source'] as String?,
+      knowledgePoint: map['knowledge_point'] as String?,
       createdAt: map['created_at'] as String? ?? DateTime.now().toIso8601String(),
     );
   }
@@ -97,6 +112,7 @@ class Question {
     String? analysis,
     String? questionType,
     String? source,
+    String? knowledgePoint,
     String? createdAt,
   }) {
     return Question(
@@ -108,6 +124,7 @@ class Question {
       analysis: analysis ?? this.analysis,
       questionType: questionType ?? this.questionType,
       source: source ?? this.source,
+      knowledgePoint: knowledgePoint ?? this.knowledgePoint,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -26,8 +26,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
-  if (!window.Create(L"刷题宝", origin, size)) {
+  Win32Window::Size size(1280, 800);
+  // Window title = product name (unicode escapes keep this file ASCII-only,
+  // avoiding MSVC C4819 warning-as-error with non-ASCII sources)
+  if (!window.Create(L"\x732B\x5377", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

@@ -1,3 +1,13 @@
+// China-network friendly plugin resolution (dl.google.com / plugins.gradle.org unreachable)
+pluginManagement {
+    repositories {
+        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 include ":app"
 
 def flutterProjectRoot = rootProject.projectDir.parentFile.toPath()

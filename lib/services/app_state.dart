@@ -1,16 +1,25 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
+import '../models/follow_up_message.dart';
 import '../models/app_settings.dart';
 import 'database_service.dart';
+import 'device_service.dart';
 import 'doc_parser_service.dart';
+import 'bank_file_service.dart';
+import 'reminder_service.dart';
 import 'ai_service.dart';
 import 'quiz_service.dart';
+import 'sample_bank.dart';
 import 'stats_service.dart';
+import 'debug_log_service.dart';
 import 'fsrs_service.dart';
+import 'key_crypto.dart';
+import 'secure_key_storage.dart';
 
 class AppState extends ChangeNotifier {
   final DatabaseService _db = DatabaseService.instance;
@@ -55,8 +64,9 @@ class AppState extends ChangeNotifier {
 
   // 答题历史（按题目索引存储，支持前后翻题）
   final List<AnswerRecord?> _answerHistory = [];
-  bool _skipFSRS = false;
-  void set skipFSRS(bool v) => _skipFSRS = v;
+bool _skipFSRS = false;
+bool get skipFSRS => _skipFSRS;
+void set skipFSRS(bool v) => _skipFSRS = v;
   bool _noShuffle = false;
   void set noShuffle(bool v) => _noShuffle = v;
   bool get hasPrevious => _currentQuestionIndex > 0;
@@ -64,6 +74,23 @@ class AppState extends ChangeNotifier {
   // 单题统计
   Map<String, int> _currentQuestionStats = {};
   Map<String, int> get currentQuestionStats => _currentQuestionStats;
+
+  // v1.0.2 FSRS 可见化：当前题的复习卡（下次复习时间展示）
+  FSRSCardState? _currentFsrsCard;
+  FSRSCardState? get currentFsrsCard => _currentFsrsCard;
+
+  // v1.0.2 聊天气泡式追问：当前题追问历史（用户/AI 消息）
+  List<FollowUpMessage> _followUpHistory = [];
+  List<FollowUpMessage> get followUpHistory => _followUpHistory;
+  bool _followUpLoading = false;
+  bool get followUpLoading => _followUpLoading;
+
+  /// 清空当前题上下文（单题统计 + 复习卡 + 追问历史）
+  void _clearQuestionContext() {
+    _currentQuestionStats = {};
+    _currentFsrsCard = null;
+    _followUpHistory = [];
+  }
 
   // 首页统计
   HomeStats? _homeStats;
@@ -79,6 +106,23 @@ class AppState extends ChangeNotifier {
   bool _useAiImport = false;
   bool get useAiImport => _useAiImport;
 
+  // v1.27 后台导入：任务在应用层运行，离开导入页不中断；
+  // 首页展示进度卡，完成后经 [pendingImportResult] 弹完成提示。
+  bool _importTaskActive = false;
+  bool get importTaskActive => _importTaskActive;
+  ImportTaskResult? _pendingImportResult;
+  ImportTaskResult? get pendingImportResult => _pendingImportResult;
+  // 当前解析阶段在总进度中的起点/跨度（JSON 与 AI 解析两阶段共存时拼接）
+  double _bgProgressBase = 0;
+  double _bgProgressSpan = 1;
+
+  /// 消费完成提示（主壳弹窗后调用，防重复弹）
+  ImportTaskResult? consumeImportResult() {
+    final r = _pendingImportResult;
+    _pendingImportResult = null;
+    return r;
+  }
+
   void setUseAiImport(bool value) {
     _useAiImport = value;
     notifyListeners();
@@ -89,10 +133,14 @@ class AppState extends ChangeNotifier {
   List<Question> get previewQuestions => _previewQuestions;
   String _previewBankName = '';
   String get previewBankName => _previewBankName;
+  // v1.0.2 设计审查修复：分块解析失败原因（预览页显性提示，不再伪装 0 题成功）
+  List<String> _previewParseErrors = [];
+  List<String> get previewParseErrors => _previewParseErrors;
 
   /// 解析文件并在预览中展示（不保存到数据库）
   Future<void> parseForPreview(List<String> filePaths) async {
     _previewQuestions = [];
+    _previewParseErrors = [];
     _importProgress = 0;
     _importStatus = '正在解析...';
     notifyListeners();
@@ -137,15 +185,40 @@ class AppState extends ChangeNotifier {
       _importStatus = 'AI 解析中...';
       notifyListeners();
       final rawText = await DocParserService.extractRawText(file.path);
-      _previewQuestions = await _aiService!.parseQuestionsFromRawText(
+      final result = await _aiService!.parseQuestionsFromRawText(
           rawText, 0, (d, t) {
         _importStatus = 'AI 解析中 ($d/$t 块)';
+        // v1.27 进度精确化：按分块推进进度条（映射到当前阶段跨度内）
+        _importProgress = (_bgProgressBase +
+                _bgProgressSpan * (t > 0 ? d / t : 0))
+            .clamp(0.0, 1.0);
         notifyListeners();
       });
+      _previewQuestions = result.questions;
+      _previewParseErrors = result.errors;
     }
 
-    _importStatus = '解析完成，共 ${_previewQuestions.length} 道题目，请预览确认';
+    // v1.0.2 设计审查修复：失败块显性提示，不再「解析完成，共 0 道题目」假成功
+    if (_previewQuestions.isEmpty && _previewParseErrors.isNotEmpty) {
+      _importStatus = '解析失败：${_previewParseErrors.first}';
+      notifyListeners();
+      return;
+    }
+    _importStatus = '解析完成，共 ${_previewQuestions.length} 道题目，请预览确认'
+        '${_previewParseErrors.isNotEmpty ? '（${_previewParseErrors.length} 个分块失败，已跳过）' : ''}';
     notifyListeners();
+  }
+
+  /// v1.0.2 七项改进：同名题库自动改名（导入防重复）。
+  /// 返回 (最终名字, 是否改名)
+  Future<(String, bool)> ensureUniqueBankName(String base) async {
+    final names = (await _db.getAllBanks()).map((b) => b.name).toSet();
+    if (!names.contains(base)) return (base, false);
+    var i = 2;
+    while (names.contains('$base($i)')) {
+      i++;
+    }
+    return ('$base($i)', true);
   }
 
   /// 确认导入：将预览题目保存到数据库
@@ -153,8 +226,10 @@ class AppState extends ChangeNotifier {
     if (_previewQuestions.isEmpty) return;
 
     final now = DateTime.now().toIso8601String();
+    // v1.0.2 七项改进：重名自动加后缀，杜绝同一文档重复导入产生重复题库
+    final (uniqueName, renamed) = await ensureUniqueBankName(_previewBankName);
     final bankId = await _db.insertBank(QuestionBank(
-      name: _previewBankName,
+      name: uniqueName,
       createdAt: now,
     ));
 
@@ -165,24 +240,52 @@ class AppState extends ChangeNotifier {
           correctAnswer: q.correctAnswer,
           analysis: q.analysis,
           questionType: q.questionType,
+          // v1.0.2 修复：预览阶段 AI 整理出的知识点不丢失
+          knowledgePoint: q.knowledgePoint,
           createdAt: now,
         )).toList();
 
     await _db.insertQuestions(questions);
     await _db.updateBankQuestionCount(bankId, questions.length);
 
-    _importStatus = '导入完成！共 ${questions.length} 道题目';
+    _importStatus = '导入完成！共 ${questions.length} 道题目'
+        '${renamed ? '（检测到同名题库，已自动命名为「$uniqueName」）' : ''}';
     _previewQuestions = [];
     await _loadBanks();
     notifyListeners();
   }
 
-  /// 从预览中删除单题
+  /// 一键导入内置示例题库（无需文件、无需 AI 解析）：
+  /// 新用户/演示场景快速体验刷题。重名自动加后缀，返回导入题数。
+  Future<int> importSampleBank() async {
+    final now = DateTime.now().toIso8601String();
+    final (uniqueName, _) = await ensureUniqueBankName(sampleBankName);
+    final bankId = await _db.insertBank(QuestionBank(
+      name: uniqueName,
+      createdAt: now,
+    ));
+    final questions = sampleQuestions(bankId: bankId, createdAt: now);
+    await _db.insertQuestions(questions);
+    await _db.updateBankQuestionCount(bankId, questions.length);
+    await _loadBanks();
+    notifyListeners();
+    return questions.length;
+  }
+
+  /// 从预览中删除单题。v1.27：筛选态下按原始序号删除不错位。
   void removePreviewQuestion(int index) {
     if (index >= 0 && index < _previewQuestions.length) {
       _previewQuestions.removeAt(index);
       notifyListeners();
     }
+  }
+  
+  /// 测试注入：直接填充预览题目（预览页交互测试用，跳过 AI 解析）。
+  @visibleForTesting
+  void setPreviewQuestionsForTest(List<Question> qs, {String bankName = '测试题库'}) {
+    _previewQuestions = List.of(qs);
+    _previewBankName = bankName;
+    notifyListeners();
   }
 
   /// 编辑预览中的单题
@@ -216,6 +319,9 @@ class AppState extends ChangeNotifier {
   }
 
   void _initAIService() {
+    // v1.0.2 设计审查修复：重建前关闭旧实例的 http.Client，
+    // 避免每次保存设置/启动都泄漏一个 socket 连接
+    _aiService?.dispose();
     _aiService = AIService(_settings);
   }
 
@@ -232,27 +338,225 @@ class AppState extends ChangeNotifier {
   // ======================== 设置 ========================
 
   Future<void> _loadSettings() async {
-    final apiKey = await _db.getSetting('api_key') ?? '';
+    // v1.0.2 七项改进：API Key 优先读 Android 安全存储（Keystore 加密），
+    // 读不到时从 DB 旧密文迁移（一次性）
+    var apiKey = await SecureKeyStorage.readApiKey();
+    if (apiKey == null || apiKey.isEmpty) {
+      final storedKey = await _db.getSetting('api_key') ?? '';
+      apiKey = KeyCrypto.decrypt(storedKey);
+      if (apiKey.isNotEmpty) {
+        await SecureKeyStorage.writeApiKey(apiKey);
+      }
+    }
     final apiEndpoint =
         await _db.getSetting('api_endpoint') ?? AppSettings.defaultApiEndpoint;
     final model = await _db.getSetting('model') ?? AppSettings.defaultModel;
+    final soundEnabled = (await _db.getSetting('sound_enabled') ?? '1') == '1';
+    final nickname = await _db.getSetting('nickname') ?? '';
+    // 局域网同步设置（v11）
+    final autoSync = (await _db.getSetting('auto_sync') ?? '0') == '1';
+    final deviceName = await _db.getSetting('device_name') ?? '';
     _settings = AppSettings(
       apiKey: apiKey,
       apiEndpoint: apiEndpoint,
       model: model,
+      soundEnabled: soundEnabled,
+      nickname: nickname,
+      autoSync: autoSync,
+      deviceName: deviceName,
     );
+    // v1.0.2 新增设置
+    _vacationModeEnabled = (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
+    final vStart = await _db.getSetting('vacation_start_date');
+    final vEnd = await _db.getSetting('vacation_end_date');
+    _vacationStartDate = vStart != null ? DateTime.tryParse(vStart) : null;
+    _vacationEndDate = vEnd != null ? DateTime.tryParse(vEnd) : null;
+    _reminderEnabled = (await _db.getSetting('reminder_enabled') ?? '0') == '1';
+    final rTime = await _db.getSetting('reminder_time');
+    _reminderTime = rTime != null ? DateTime.tryParse(rTime) : null;
     _initAIService();
     notifyListeners();
   }
 
   Future<void> updateSettings(AppSettings newSettings) async {
     _settings = newSettings;
-    await _db.setSetting('api_key', newSettings.apiKey);
+    // v1.0.2 七项改进：双写——DB 加密副本（备份可移植）+ Android 安全存储
+    await _db.setSetting('api_key', KeyCrypto.encrypt(newSettings.apiKey));
+    await SecureKeyStorage.writeApiKey(newSettings.apiKey);
     await _db.setSetting('api_endpoint', newSettings.apiEndpoint);
     await _db.setSetting('model', newSettings.model);
+    await _db.setSetting('sound_enabled', newSettings.soundEnabled ? '1' : '0');
+    await _db.setSetting('nickname', newSettings.nickname);
+    // 局域网同步设置（v11）；设备名同步给 DeviceService（信标广播用）
+    await _db.setSetting('auto_sync', newSettings.autoSync ? '1' : '0');
+    await _db.setSetting('device_name', newSettings.deviceName);
+    if (newSettings.deviceName.isNotEmpty) {
+      await DeviceService.instance.setDeviceName(newSettings.deviceName);
+    }
     _initAIService();
     notifyListeners();
   }
+
+  /// 局域网同步落库后刷新（题库列表 + 首页统计；同步引擎回调接入）
+  Future<void> refreshAfterSync() async {
+    await _loadBanks();
+    await _loadHomeStats();
+    notifyListeners();
+  }
+
+  // ======================== v1.0.2: 假期模式 / 每日提醒设置 ========================
+
+  bool _vacationModeEnabled = false;
+  DateTime? _vacationStartDate;
+  DateTime? _vacationEndDate;
+  bool _reminderEnabled = false;
+  DateTime? _reminderTime;
+
+  bool get vacationModeEnabled => _vacationModeEnabled;
+  DateTime? get vacationStartDate => _vacationStartDate;
+  DateTime? get vacationEndDate => _vacationEndDate;
+  bool get reminderEnabled => _reminderEnabled;
+  DateTime? get reminderTime => _reminderTime;
+
+  /// 假期日期范围（用于连击冻结与日历标注）
+  List<DateTime> get vacationDateRange {
+    final start = _vacationStartDate;
+    final end = _vacationEndDate;
+    if (!_vacationModeEnabled || start == null || end == null) return const [];
+    final result = <DateTime>[];
+    var cursor = DateTime(start.year, start.month, start.day);
+    final last = DateTime(end.year, end.month, end.day);
+    while (!cursor.isAfter(last)) {
+      result.add(cursor);
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    return result;
+  }
+
+  /// 保存假期模式（开关 + 起止日期）
+  Future<void> setVacationMode({
+    required bool enabled,
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    _vacationModeEnabled = enabled;
+    if (start != null) _vacationStartDate = start;
+    if (end != null) _vacationEndDate = end;
+    await _db.setSetting('vacation_mode_enabled', enabled ? '1' : '0');
+    if (_vacationStartDate != null) {
+      await _db.setSetting('vacation_start_date', _vacationStartDate!.toIso8601String());
+    }
+    if (_vacationEndDate != null) {
+      await _db.setSetting('vacation_end_date', _vacationEndDate!.toIso8601String());
+    }
+    notifyListeners();
+  }
+
+  /// 保存每日提醒设置
+  Future<void> setReminderSettings({
+    required bool enabled,
+    DateTime? time,
+  }) async {
+    _reminderEnabled = enabled;
+    if (time != null) _reminderTime = time;
+    await _db.setSetting('reminder_enabled', enabled ? '1' : '0');
+    if (_reminderTime != null) {
+      await _db.setSetting('reminder_time', _reminderTime!.toIso8601String());
+    }
+    notifyListeners();
+  }
+
+  // ======================== v1.0.2: 统计页数据 ========================
+
+  /// 首页/统计页切换时刷新战绩数据
+  Future<void> refreshWeeklyStats() async {
+    await _loadHomeStats();
+    notifyListeners();
+  }
+
+  /// 最近 N 天每日刷题量（date: DateTime, total: int）
+  Future<List<Map<String, dynamic>>> getDailyStats(int days) =>
+      _db.getDailyStats(days);
+
+  /// 最近 N 天每日正确率（total/correct，与 getDailyStats 同日口径）
+  Future<List<Map<String, dynamic>>> getDailyAccuracy(int days) =>
+      _db.getDailyAccuracy(days);
+
+  /// 年度每日刷题量映射（key: 'YYYY-MM-DD'）
+  Future<Map<String, int>> getYearlyTotals() async {
+    final list = await _db.getDailyStats(365);
+    return {
+      for (final d in list)
+        '${(d['date'] as DateTime).year}-'
+            '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
+            '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}':
+            d['total'] as int,
+    };
+  }
+
+  /// 趋势数据（含正确率，无记录天占位）。
+  /// v1.0.3 历史数据可查：窗口参数化，统计页传 365 覆盖一年历史。
+  Future<List<Map<String, dynamic>>> getTrendData({int days = 30}) async {
+    final totals = await _db.getDailyStats(days);
+    final accuracy = await _db.getDailyAccuracy(days);
+    final accByDay = <String, Map<String, dynamic>>{
+      for (final a in accuracy) a['day'] as String: a,
+    };
+    return totals.map((d) {
+      final date = d['date'] as DateTime;
+      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+          '${date.day.toString().padLeft(2, '0')}';
+      final total = d['total'] as int;
+      final acc = accByDay[key];
+      final correct = acc != null ? (acc['correct'] as int?) ?? 0 : 0;
+      return {
+        'date': date,
+        'total': total,
+        'accuracy': total > 0 ? (correct / total) * 100 : 0.0,
+      };
+    }).toList();
+  }
+
+  /// 连续打卡天数（含今天，>=50 题/天，假期冻结）。
+  /// 今天未刷时与截止昨天结果一致；今天已刷则计入当天，首页/统计页口径统一
+  Future<int> getStreakDays() async {
+    final totals = await getYearlyTotals();
+    return DatabaseService.countConsecutiveDays(
+      totals,
+      now: DateTime.now(),
+      vacationStart: _vacationModeEnabled ? _vacationStartDate : null,
+      vacationEnd: _vacationModeEnabled ? _vacationEndDate : null,
+      upTo: DateTime.now(),
+    );
+  }
+
+  /// 周期统计（week/month/all）
+  Future<PeriodStats> getPeriodStats(String period) =>
+      _statsService.getPeriodStats(period);
+
+  /// 周期内最长连击
+  Future<int> getPeriodLongestStreak(String period) =>
+      _statsService.getPeriodLongestStreak(period);
+
+  /// 最近会话记录（LIMIT 下推数据库，不再全量加载后内存截断）
+  Future<List<QuizSession>> getRecentSessions(int limit) async {
+    return await _db.getAllSessions(limit: limit);
+  }
+
+  /// 按 id 查单个会话（改判后局部刷新用）
+  Future<QuizSession?> getSessionById(int id) => _db.getSessionById(id);
+
+  /// 会话详情（answer_records JOIN questions）
+  Future<List<Map<String, dynamic>>> getSessionDetail(int sessionId) =>
+      _db.getSessionDetail(sessionId);
+
+  /// 按知识点正确率排行
+  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() =>
+      _db.getAccuracyByKnowledgePoint();
+
+  /// 各题库正确率（薄弱点分析/统计页排行）
+  Future<List<BankAccuracy>> getBankAccuracies() =>
+      _statsService.getBankAccuracies();
 
   // ======================== 题库管理 ========================
 
@@ -286,6 +590,7 @@ class AppState extends ChangeNotifier {
 
     int totalQuestions = 0;
     int processedFiles = 0;
+    int failedChunksTotal = 0;
 
     for (final file in files) {
       final fileName = file.path.split('/').last.split('\\').last;
@@ -307,6 +612,8 @@ class AppState extends ChangeNotifier {
 
         final rawText = await DocParserService.extractRawText(file.path);
         if (rawText.isEmpty) {
+          // 空文本：清理刚建的空题库，避免残留 0 题题库
+          await _db.deleteBank(bankId);
           processedFiles++;
           continue;
         }
@@ -314,7 +621,7 @@ class AppState extends ChangeNotifier {
         _importStatus = 'AI 正在解析题目: $fileName';
         notifyListeners();
 
-        questions = await _aiService!.parseQuestionsFromRawText(
+        final result = await _aiService!.parseQuestionsFromRawText(
           rawText,
           bankId,
           (done, total) {
@@ -322,6 +629,8 @@ class AppState extends ChangeNotifier {
             notifyListeners();
           },
         );
+        questions = result.questions;
+        failedChunksTotal += result.failedChunks;
       } else {
         // ===== 正则解析模式（原有逻辑）=====
         _importStatus = '正在解析: $fileName';
@@ -333,6 +642,9 @@ class AppState extends ChangeNotifier {
         await _db.insertQuestions(questions);
         totalQuestions += questions.length;
         await _db.updateBankQuestionCount(bankId, questions.length);
+      } else {
+        // AI 解析失败/无可解析题目：清理空题库
+        await _db.deleteBank(bankId);
       }
 
       processedFiles++;
@@ -341,11 +653,195 @@ class AppState extends ChangeNotifier {
     }
 
     final mode = _useAiImport ? '（AI 整理）' : '';
-    _importStatus = '导入完成$mode！共 $totalQuestions 道题目，${files.length} 个题库';
+    _importStatus = '导入完成$mode！共 $totalQuestions 道题目，${files.length} 个题库'
+        '${failedChunksTotal > 0 ? '；其中 $failedChunksTotal 个分块解析失败（已跳过）' : ''}';
     await _loadBanks();
     notifyListeners();
   }
 
+  /// JSON 题库导入（v1.0.2：分组建库，无需预览）
+  /// 返回 (题库数, 题目数, 错误信息, 改名组数)——错误随返回值传递；
+  /// v1.0.2 七项改进：同名题库自动加后缀，杜绝重复题库
+  Future<(int, int, String?, int)> importJsonFiles(List<String> filePaths) async {
+    var banks = 0;
+    var questions = 0;
+    var renamed = 0;
+    String? firstError;
+    final existingNames =
+        (await _db.getAllBanks()).map((b) => b.name).toSet();
+    for (final p in filePaths) {
+      final (b, q, err, r) =
+          await BankFileService.importJsonFile(p, existingNames: existingNames);
+      banks += b;
+      questions += q;
+      renamed += r;
+      firstError ??= err;
+    }
+    await _loadBanks();
+    notifyListeners();
+    return (banks, questions, firstError, renamed);
+  }
+
+  // ======================== v1.27 后台导入（离开导入页不中断） ========================
+
+  static String _fileName(String path) => path.split('/').last.split('\\').last;
+
+  /// 后台导入：立即返回，任务在应用层继续运行（可离开导入页）。
+  /// [jsonFiles] JSON 题库直接入库（按文件推进进度）；
+  /// [docxFiles] 走 AI 解析（按分块推进进度），解析完成后待预览确认。
+  /// 两者混选时先 JSON 后 AI，总进度按阶段拼接。
+  Future<void> startBackgroundImport({
+    List<String> jsonFiles = const [],
+    List<String> docxFiles = const [],
+  }) async {
+    if (_importTaskActive) return;
+    if (jsonFiles.isEmpty && docxFiles.isEmpty) return;
+    _importTaskActive = true;
+    _importProgress = 0;
+    _importStatus = '准备导入...';
+    _bgProgressBase = 0;
+    _bgProgressSpan = 1;
+    notifyListeners();
+
+    final hasDocx = docxFiles.isNotEmpty;
+    final jsonSpan = hasDocx ? 0.3 : 1.0; // 混选时 JSON 占 0~0.3，AI 解析占 0.3~1
+    var jsonBanks = 0;
+    var jsonQuestions = 0;
+    var jsonRenamed = 0;
+    String? jsonError;
+
+    try {
+      // 阶段一：JSON 题库（按文件数推进，精确）
+      if (jsonFiles.isNotEmpty) {
+        final existingNames =
+            (await _db.getAllBanks()).map((b) => b.name).toSet();
+        for (var i = 0; i < jsonFiles.length; i++) {
+          _importStatus =
+              '正在导入题库 (${i + 1}/${jsonFiles.length})：${_fileName(jsonFiles[i])}';
+          notifyListeners();
+          final (b, q, err, r) = await BankFileService.importJsonFile(
+              jsonFiles[i],
+              existingNames: existingNames);
+          jsonBanks += b;
+          jsonQuestions += q;
+          jsonRenamed += r;
+          jsonError ??= err;
+          _importProgress = jsonSpan * (i + 1) / jsonFiles.length;
+          notifyListeners();
+        }
+        await _loadBanks();
+      }
+
+      // 阶段二：DOCX AI 解析（按分块推进；解析完待预览确认）
+      if (hasDocx) {
+        _bgProgressBase = jsonSpan;
+        _bgProgressSpan = 1 - jsonSpan;
+        if (docxFiles.length > 1) {
+          _importStatus =
+              '已选 ${docxFiles.length} 个文档，本次仅解析第一个：${_fileName(docxFiles.first)}';
+          notifyListeners();
+        }
+        await parseForPreview(docxFiles);
+      }
+    } catch (e) {
+      _importStatus = '导入异常：$e';
+    }
+
+    // 汇总结果（完成提示由主壳在主页弹出）
+    final ImportTaskResult result;
+    if (hasDocx) {
+      if (_previewQuestions.isNotEmpty) {
+        result = ImportTaskResult(
+          kind: ImportTaskKind.docxParse,
+          success: true,
+          message: 'AI 解析完成，共 ${_previewQuestions.length} 道题目，'
+              '请预览确认后入库'
+              '${jsonBanks > 0 ? '\n（JSON 题库已入库：$jsonBanks 个 / $jsonQuestions 道）' : ''}',
+          questionCount: _previewQuestions.length,
+        );
+      } else {
+        result = ImportTaskResult(
+          kind: ImportTaskKind.docxParse,
+          success: false,
+          message: (jsonBanks > 0
+                  ? 'JSON 题库已入库（$jsonBanks 个 / $jsonQuestions 道），'
+                      '但文档解析失败：'
+                  : '解析失败：') +
+              _importStatus,
+          questionCount: 0,
+        );
+      }
+    } else if (jsonBanks > 0 || jsonQuestions > 0) {
+      result = ImportTaskResult(
+        kind: ImportTaskKind.json,
+        success: true,
+        message: 'JSON 导入完成：$jsonBanks 个题库，$jsonQuestions 道题'
+            '${jsonRenamed > 0 ? '（$jsonRenamed 个同名题库已自动改名）' : ''}'
+            '${jsonError != null ? '\n部分文件：$jsonError' : ''}',
+        questionCount: jsonQuestions,
+      );
+    } else {
+      result = ImportTaskResult(
+        kind: ImportTaskKind.json,
+        success: false,
+        message: jsonError ?? _importStatus,
+        questionCount: 0,
+      );
+    }
+
+    _importTaskActive = false;
+    _importProgress = 1;
+    _pendingImportResult = result;
+    _bgProgressBase = 0;
+    _bgProgressSpan = 1;
+    if (jsonFiles.isNotEmpty) {
+      await _loadHomeStats(); // JSON 已入库，首页统计同步刷新。
+    }
+    notifyListeners();
+  }
+
+  /// 后台导入示例题库（一键入口，完成后弹提示引导刷题）
+  Future<void> startBackgroundSampleImport() async {
+    if (_importTaskActive) return;
+    _importTaskActive = true;
+    _importProgress = 0.2;
+    _importStatus = '正在导入示例题库...';
+    notifyListeners();
+    try {
+      final count = await importSampleBank();
+      _importProgress = 1;
+      _pendingImportResult = ImportTaskResult(
+        kind: ImportTaskKind.sample,
+        success: true,
+        message: '示例题库导入完成，共 $count 道题，快去刷题体验吧',
+        questionCount: count,
+      );
+    } catch (e) {
+      _pendingImportResult = ImportTaskResult(
+        kind: ImportTaskKind.sample,
+        success: false,
+        message: '示例题库导入失败：$e',
+        questionCount: 0,
+      );
+    }
+    _importTaskActive = false;
+    await _loadHomeStats();
+    notifyListeners();
+  }
+
+  /// 模拟长期使用（开发者选项，幂等）
+  Future<({String? error, int records, int cards})> simulateLongTermUse({
+    int days = 90,
+    bool randomWeakKp = false,
+    bool dueToday = false,
+  }) =>
+      _db.simulateLongTermUse(
+          days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
+
+  /// 清除模拟长期使用产生的全部数据（会话/记录/复习卡/错题条目）
+  Future<int> clearSimulatedData() => _db.clearSimulatedData();
+
+  /// 删除题库（同时清理答案记录）
   Future<void> deleteBank(int bankId) async {
     await _db.deleteBank(bankId);
     _selectedBankIds.remove(bankId);
@@ -368,14 +864,20 @@ class AppState extends ChangeNotifier {
 
   // ======================== 刷题逻辑 ========================
 
-  Future<void> startQuiz() async {
+  Future<void> startQuiz({bool persistSession = true}) async {
     if (_selectedBankIds.isEmpty) return;
+
+    // v1.0.2 设计审查修复：skipFSRS 复位收口到会话生命周期
+    // （startQuiz/abortSession/endSession），不再依赖 QuizScreen.dispose 的
+    // context.read 复位（Element 存活时机脆弱）
+    _skipFSRS = false;
 
     await _quizService.startQuiz(
       bankIds: _selectedBankIds.toList(),
       mode: _selectedBankIds.length > 1 ? 'mixed' : 'single',
       questionCount: _selectedQuestionCount,
       noShuffle: _noShuffle,
+      persistSession: persistSession,
     );
 
     _currentSession = _quizService.currentSession;
@@ -383,7 +885,7 @@ class AppState extends ChangeNotifier {
     _currentQuestionIndex = 0;
     _currentAnalysis = null;
     _lastAnswerRecord = null;
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _analysisLoading = false;
     _answerHistory.clear();
     _answerHistory.length = _quizQuestions.length;
@@ -392,27 +894,66 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> submitAnswer(String userAnswer) async {
-    if (_quizService.currentQuestion == null) return;
+    final question = _quizService.currentQuestion;
+    if (question == null) return;
 
-    _lastAnswerRecord = await _quizService.submitAnswer(userAnswer);
+    // v1.0.2 设计审查修复（async gap 竞态）：await DB 写入期间用户可能切题，
+    // 必须用提交时刻的题号/题目 id 写历史槽位与统计，否则记录会写入错误槽
+    final submitIndex = _currentQuestionIndex;
+    final submitQid = question.id!;
+
+    // v1.0.2 完善：该题已有作答记录（返回上一题重新作答）→ 走更新路径，
+    // 不新增记录、不污染刷题量统计
+    final hasPrev = submitIndex < _answerHistory.length &&
+        _answerHistory[submitIndex] != null;
+    if (hasPrev) {
+      _lastAnswerRecord = await _quizService.resubmitAnswer(userAnswer);
+    } else {
+      _lastAnswerRecord = await _quizService.submitAnswer(userAnswer);
+    }
     _currentSession = _quizService.currentSession;
 
-    // 存储答题历史
-    if (_currentQuestionIndex < _answerHistory.length) {
-      _answerHistory[_currentQuestionIndex] = _lastAnswerRecord;
+    // 存储答题历史（按提交时刻的槽位）
+    if (submitIndex < _answerHistory.length) {
+      _answerHistory[submitIndex] = _lastAnswerRecord;
     }
 
-    // 加载单题统计
-    final qId = _quizService.currentQuestion!.id!;
-    _currentQuestionStats = await _quizService.getQuestionStats(qId);
+    // 加载单题统计（按提交时刻的题目；切题后由 _restoreAnswerState 覆盖）
+    final stats = await _quizService.getQuestionStats(submitQid);
+    if (_currentQuestionIndex == submitIndex) {
+      _currentQuestionStats = stats;
+    }
 
-    // 不再自动加载解析，由用户手动触发
+    // 不再自动加载解析，由用户手动触发（仅当前题未变时才复位展示状态）
+    if (_currentQuestionIndex == submitIndex) {
+      _currentAnalysis = null;
+      _analysisLoading = false;
+    }
+
+    // 更新 FSRS 状态（重答路径已由改判逻辑补记，不再重复更新）
+    if (!_skipFSRS && !hasPrev) {
+      try {
+        await _updateFSRSIfNeeded(submitQid);
+      } catch (e) {
+        DebugLogService.instance.log('FSRS', '更新 FSRS 失败: $e');
+      }
+    }
+    // v1.0.2 FSRS 可见化：提交后重读复习卡（间隔已更新），题号不变才回显
+    if (_currentQuestionIndex == submitIndex) {
+      _currentFsrsCard = await _db.getFSRSCard(submitQid);
+    }
+
+    notifyListeners();
+  }
+
+  /// v1.0.2 设计审查修复：进入「重新作答」只清 UI 展示状态。
+  /// 保留 _answerHistory 记录 → 再提交时 hasPrev 为 true，走 resubmitAnswer
+  /// 更新路径（不新增记录、不双计会话统计）；此前置 null 会走新增路径
+  void resetCurrentAnswer() {
+    _lastAnswerRecord = null;
+    _clearQuestionContext();
     _currentAnalysis = null;
     _analysisLoading = false;
-
-    // 更新 FSRS 状态（如果这道题已有 FSRS 卡，则更新；如果答错且没有卡，则创建）
-    if (!_skipFSRS) _updateFSRSIfNeeded(qId);
-
     notifyListeners();
   }
 
@@ -441,19 +982,54 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadAnalysis() async {
     if (_aiService == null || currentQuestion == null) return;
+    final q = currentQuestion!;
 
     _analysisLoading = true;
     notifyListeners();
 
-    _currentAnalysis = await _aiService!.getAnalysis(currentQuestion!);
-
-    _analysisLoading = false;
-    notifyListeners();
+    // v1.0.2 设计审查修复：异常兜底 + finally 复位，防止加载圈永久卡死
+    try {
+      _currentAnalysis = await _aiService!.getAnalysis(q);
+    } catch (e) {
+      DebugLogService.instance.log('AI', '解析加载失败: $e');
+      _currentAnalysis = null;
+    } finally {
+      _analysisLoading = false;
+      notifyListeners();
+    }
   }
 
   /// 手动查看解析
   Future<void> showAnalysis() async {
     await _loadAnalysis();
+    await _loadFollowUpHistory();
+  }
+
+  /// 加载当前题的追问历史（聊天气泡式）
+  Future<void> _loadFollowUpHistory() async {
+    final q = currentQuestion;
+    if (q?.id == null) {
+      if (_followUpHistory.isNotEmpty) {
+        _followUpHistory = [];
+        notifyListeners();
+      }
+      return;
+    }
+    final rows = await _db.getFollowUpMessages(q!.id!);
+    _followUpHistory = rows.map(FollowUpMessage.fromMap).toList();
+    notifyListeners();
+  }
+
+  /// 供独立「AI 对话页」主动拉取当前题历史（页面进入时调用）
+  Future<void> loadFollowUpHistory() => _loadFollowUpHistory();
+
+  /// 清空当前题的追问历史（对话页右上角「清空对话」）
+  Future<void> clearFollowUpHistory() async {
+    final q = currentQuestion;
+    if (q?.id == null) return;
+    await _db.deleteFollowUpMessages(q!.id!);
+    _followUpHistory = [];
+    notifyListeners();
   }
 
   /// 重新生成解析（清除缓存）
@@ -467,16 +1043,35 @@ class AppState extends ChangeNotifier {
     await _loadAnalysis();
   }
 
-  /// 追问题目
-  Future<String> askFollowUp(String question) async {
-    if (_aiService == null || currentQuestion == null) return '';
-    if (_currentAnalysis == null) return '';
+  /// 追问题目（聊天气泡式：用户消息与 AI 回复均入历史并持久化）
+  Future<void> sendFollowUp(String question) async {
+    final q = currentQuestion;
+    if (_aiService == null || q?.id == null || _currentAnalysis == null) return;
+    if (_followUpLoading) return; // 发送中防重复
+    _followUpLoading = true;
 
-    return await _aiService!.askFollowUp(
-      currentQuestion!,
-      _currentAnalysis!,
-      question,
-    );
+    final qId = q!.id!;
+    final userMsg = FollowUpMessage(role: 'user', content: question);
+    _followUpHistory = [..._followUpHistory, userMsg];
+    notifyListeners();
+    await _db.saveFollowUpMessage(qId, 'user', question);
+
+    var reply = '';
+    try {
+      reply = await _aiService!.askFollowUp(q, _currentAnalysis!, question);
+    } catch (e) {
+      DebugLogService.instance.log('AI', '追问失败: $e');
+    }
+    if (_isAiError(reply)) reply = '追问失败，请检查网络后重试。';
+
+    _followUpLoading = false;
+    // 竞态保护：期间切题则不再插入当前 UI 历史（数据库已按捕获题号保存）
+    if (currentQuestion?.id == qId) {
+      final aiMsg = FollowUpMessage(role: 'assistant', content: reply);
+      _followUpHistory = [..._followUpHistory, aiMsg];
+      notifyListeners();
+    }
+    await _db.saveFollowUpMessage(qId, 'assistant', reply);
   }
 
   void nextQuestion() {
@@ -498,6 +1093,17 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// 直接跳转到指定题号（答题卡/底部圆点）。
+  /// v1.0.2 设计审查修复：单次变更替代 while 逐题循环
+  /// （每次 previous/next 都触发 notifyListeners + 逐题 DB 统计查询）
+  void jumpToQuestion(int index) {
+    if (_quizService.jumpToIndex(index)) {
+      _currentQuestionIndex = _quizService.currentIndex;
+      _restoreAnswerState();
+      notifyListeners();
+    }
+  }
+
   void _restoreAnswerState() {
     _currentAnalysis = null;
     if (_currentQuestionIndex < _answerHistory.length) {
@@ -505,8 +1111,112 @@ class AppState extends ChangeNotifier {
     } else {
       _lastAnswerRecord = null;
     }
-    _currentQuestionStats = {};
+    // v1.0.2 修复：返回已答题时保留单题统计（异步加载，避免切题竞态覆盖）
+    final q = currentQuestion;
+    if (q?.id != null) {
+      final qid = q!.id!;
+      _quizService.getQuestionStats(qid).then((stats) {
+        if (_quizService.currentQuestion?.id == qid) {
+          _currentQuestionStats = stats;
+          notifyListeners();
+        }
+      });
+      // v1.0.2 FSRS 可见化：切题异步读复习卡（竞态守卫）
+      _db.getFSRSCard(qid).then((card) {
+        if (_quizService.currentQuestion?.id == qid) {
+          _currentFsrsCard = card;
+          notifyListeners();
+        }
+      });
+    } else {
+      _clearQuestionContext();
+    }
   }
+
+  /// 当前会话是否已有作答记录
+  bool get hasSessionAnswers => _quizService.hasAnyAnswers;
+
+  /// 放弃当前会话（练习退出/未作答退出）：不保存记录、不产生幽灵会话
+  Future<void> abortSession() async {
+    _skipFSRS = false;
+    await _quizService.abortSession();
+    _currentSession = null;
+    _quizQuestions = [];
+    _clearQuestionContext();
+    _lastAnswerRecord = null;
+    notifyListeners();
+  }
+
+  /// 暂停当前会话（v1.0.2 七项改进：断点续刷）。
+  /// 保留 DB 会话行（end_time 为空，历史列表显示「未完成」），
+  /// 作答记录已逐题落库，下次继续时不丢进度
+  Future<void> pauseSession() async {
+    _skipFSRS = false;
+    _quizService.pauseSession();
+    _quizService.reset();
+    _currentSession = null;
+    _quizQuestions = [];
+    _clearQuestionContext();
+    _lastAnswerRecord = null;
+    // 已答题 → 今天已刷，续排明天提醒
+    try {
+      await ReminderService.instance.rescheduleNextDay();
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  /// 断点续刷：恢复最新未完成会话（题目顺序 + 作答历史 + 跳到第一个未答题）。
+  /// 返回 true 表示恢复成功，调用方应进入 QuizScreen
+  Future<bool> resumeUnfinishedSession() async {
+    final unfinished = await _db.getLatestUnfinishedSession();
+    if (unfinished == null) return false;
+    final (session, _) = unfinished;
+    if (session.id == null) return false;
+    final questions = await _db.getSessionQuestions(session.id!);
+    if (questions.isEmpty) return false;
+    final records = await _db.getAnswerRecordsBySession(session.id!);
+
+    _skipFSRS = false;
+    _quizService.loadQuiz(questions: questions, session: session);
+    _quizQuestions = questions;
+    _currentSession = session;
+    _currentAnalysis = null;
+    _clearQuestionContext();
+    _analysisLoading = false;
+    _answerHistory.clear();
+    _answerHistory.length = questions.length;
+    for (var i = 0; i < questions.length; i++) {
+      final q = questions[i];
+      if (q.id != null && records.containsKey(q.id)) {
+        _answerHistory[i] = records[q.id];
+      }
+    }
+    // 跳到第一个未答题（全部答完则停在最后一题，走完成路径）
+    var target = questions.length - 1;
+    for (var i = 0; i < _answerHistory.length; i++) {
+      if (_answerHistory[i] == null) {
+        target = i;
+        break;
+      }
+    }
+    _quizService.jumpToIndex(target);
+    _currentQuestionIndex = target;
+    _lastAnswerRecord = _answerHistory[target];
+    notifyListeners();
+    return true;
+  }
+
+  /// 首页续刷卡片数据：最新未完成会话（含已答题数）
+  Future<(QuizSession, int)?> getUnfinishedSessionInfo() =>
+      _db.getLatestUnfinishedSession();
+
+  /// 会话关联的题库名（统计页历史副标题用）
+  Future<List<String>> getSessionBankNames(int sessionId) =>
+      _db.getSessionBankNames(sessionId);
+
+  /// v1.0.2 FSRS 可见化：批量取题目复习卡（错题本知识点弹窗逐题展示用）
+  Future<Map<int, FSRSCardState>> getFsrsCardsByIds(List<int> questionIds) =>
+      _db.getFsrsCardsByIds(questionIds);
 
   Future<void> updateCurrentQuestion(String title, String answer, String? type) async {
     final q = currentQuestion;
@@ -520,10 +1230,34 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// v1.0.2 设计审查修复：编辑题目后，若当前题已作答，按新正确答案重判该记录，
+  /// 使判定显示与落库记录一致（会话统计/FSRS 由 rejudge 差量修正）
+  Future<void> rejudgeCurrentAnswerAfterEdit() async {
+    final record = _lastAnswerRecord;
+    final q = currentQuestion;
+    if (record == null || record.id == null || q == null) return;
+    final isCorrect = QuizService.judgeAnswer(q, record.userAnswer ?? '');
+    if (isCorrect == record.isCorrect) return;
+    await _db.rejudgeAnswerRecord(record.id!, isCorrect);
+    _quizService.adjustSessionCounts(toCorrect: isCorrect);
+    _currentSession = _quizService.currentSession;
+    final updated = record.copyWith(isCorrect: isCorrect);
+    _lastAnswerRecord = updated;
+    if (_currentQuestionIndex < _answerHistory.length) {
+      _answerHistory[_currentQuestionIndex] = updated;
+    }
+    notifyListeners();
+  }
+
   Future<QuizSession> endSession() async {
+    _skipFSRS = false;
     _currentSession = await _quizService.endSession();
     _quizService.reset();
     await _loadHomeStats();
+    // v1.0.2: 答题完成后续排明天提醒
+    try {
+      await ReminderService.instance.rescheduleNextDay();
+    } catch (_) {}
     notifyListeners();
     return _currentSession!;
   }
@@ -543,32 +1277,60 @@ class AppState extends ChangeNotifier {
     return await _db.isInErrorBook(questionId);
   }
 
-  /// 错题重刷模式（全题库 FSRS 到期题目 + 收藏）
-  /// [bankIds] 为 null 或空时，从所有题库抽题；否则只从指定题库抽题
-  Future<void> startErrorReview({Set<int>? bankIds}) async {
-    // 使用 FSRS 到期题目，按题库分组获取
-    final questionsByBank = await _db.getDueReviewQuestionsByBank();
-    if (questionsByBank.isEmpty) return;
+  /// 获取错题本统计（按题库分组）：到期题数 + 收藏题数 + 全部去重
+  Future<List<Map<String, dynamic>>> getErrorBookStats() async {
+    return await _db.getErrorStatsByBank();
+  }
 
-    // 按 bankIds 过滤（null/空 = 全题库）
-    final allQuestions = <Question>[];
-    for (final entry in questionsByBank.entries) {
-      if (bankIds == null || bankIds.isEmpty || bankIds.contains(entry.key)) {
-        allQuestions.addAll(entry.value);
-      }
+  // ======================== v1.0.2: 错题本筛选/知识点 ========================
+
+  /// 按筛选模式取错题全量题列表（mode: all/wrong/bookmark）
+  Future<List<Question>> getFullErrorQuestions(String mode,
+          {Set<int>? bankIds}) =>
+      _db.getFullErrorQuestions(mode, bankIds: bankIds);
+
+  /// 按筛选模式的错题总数
+  Future<int> getFullErrorCount(String mode, {Set<int>? bankIds}) =>
+      _db.getFullErrorCount(mode, bankIds: bankIds);
+
+  /// 知识点分组统计（与主列表同口径）
+  Future<List<Map<String, dynamic>>> getKnowledgePointStats(String mode,
+          {Set<int>? bankIds}) =>
+      _db.getKnowledgePointStats(mode, bankIds: bankIds);
+
+  /// 按知识点取题（复习范围与主列表同口径）
+  Future<List<Question>> getFullQuestionsByKnowledgePoint(
+          String kp, String mode,
+          {Set<int>? bankIds}) =>
+      _db.getFullQuestionsByKnowledgePoint(kp, mode, bankIds: bankIds);
+
+  /// 错题复习：按筛选模式取题（all/wrong/bookmark）+ 可选知识点
+  /// [kp] 非空时复习指定知识点（会话 mode = kp_review）
+  Future<void> startErrorReview({
+    String mode = 'all',
+    Set<int>? bankIds,
+    String? kp,
+  }) async {
+    final List<Question> questions;
+    if (kp != null && kp.isNotEmpty) {
+      questions =
+          await _db.getFullQuestionsByKnowledgePoint(kp, mode, bankIds: bankIds);
+    } else {
+      questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
     }
-    if (allQuestions.isEmpty) return;
+    if (questions.isEmpty) return;
 
-    allQuestions.shuffle();
-    final count = allQuestions.length > _selectedQuestionCount
-        ? _selectedQuestionCount
-        : allQuestions.length;
+    questions.shuffle();
+    // v1.0.2 修复：错题复习不再被 selectedQuestionCount（默认 50）静默截断，
+    // 复习范围与错题本展示口径一致
+    final selectedQuestions = questions;
 
-    final selectedQuestions = allQuestions.take(count).toList();
+    // 开始新会话前，清空上一次未完成会话的断档记录（新会话取代旧中断会话）
+    await _db.deleteUnfinishedSessions();
 
     final session = QuizSession(
       bankIds: bankIds?.join(',') ?? 'all',
-      mode: 'error_review',
+      mode: kp != null && kp.isNotEmpty ? 'kp_review' : 'error_review',
       totalQuestions: selectedQuestions.length,
       startTime: DateTime.now().toIso8601String(),
     );
@@ -581,25 +1343,78 @@ class AppState extends ChangeNotifier {
     );
 
     _quizService.loadQuiz(questions: selectedQuestions, session: sessionWithId);
+    // v1.0.2 七项改进：会话题目顺序 + 题库关联（断点续刷/历史副标题用）
+    final questionBankIds =
+        selectedQuestions.map((q) => q.bankId).toSet().toList();
+    await _db.insertSessionBanks(sessionWithId.id!, questionBankIds);
+    await _db.insertSessionQuestions(sessionWithId.id!, selectedQuestions);
     _quizQuestions = _quizService.questions;
     _currentSession = _quizService.currentSession;
     _currentQuestionIndex = 0;
     _currentAnalysis = null;
     _lastAnswerRecord = null;
-    _currentQuestionStats = {};
+    _clearQuestionContext();
     _answerHistory.clear();
     _answerHistory.length = _quizQuestions.length;
 
     notifyListeners();
   }
 
-  /// 获取错题本统计（按题库分组）：到期题数 + 收藏题数
-  Future<List<Map<String, dynamic>>> getErrorBookStats() async {
-    return await _db.getErrorStatsByBank();
-  }
+  // ======================== v1.0.2 对齐里程碑：打标签 / 改判 / 隐藏今日 ========================
 
-  Future<int> getErrorBookCount() async {
-    return await _db.getErrorBookCount();
+  /// 未打知识标签的错题数（设置页入口角标）
+  Future<int> getUntaggedErrorCount() => _db.getUntaggedErrorCount();
+
+  /// 未打知识标签的错题列表（批处理上限）
+  Future<List<Question>> getUntaggedErrorQuestions({int limit = 200}) =>
+      _db.getUntaggedErrorQuestions(limit: limit);
+
+  /// 更新题目知识点标签
+  Future<void> updateQuestionKnowledgePoint(int questionId, String kp) =>
+      _db.updateQuestionKnowledgePoint(questionId, kp);
+
+  /// 改判一条作答记录（会话统计 + FSRS 同步修正）
+  Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) =>
+      _db.rejudgeAnswerRecord(recordId, isCorrect);
+
+  /// 隐藏今日全部作答记录
+  Future<int> hideTodayRecords() => _db.hideTodayRecords();
+
+  /// 恢复被隐藏的今日作答记录
+  Future<int> restoreTodayRecords() => _db.restoreTodayRecords();
+
+  /// 今日被隐藏记录条数
+  Future<int> getHiddenTodayRecordCount() => _db.getHiddenTodayRecordCount();
+
+  // ======================== v1.0.2 对齐里程碑：错题导出 JSON ========================
+
+  /// 导出当前筛选下的错题为 .json 题库文件（带 format 标记）。
+  /// 返回文件路径；失败返回 null。
+  Future<String?> exportErrorQuestionsJson(String mode,
+      {Set<int>? bankIds}) async {
+    final questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
+    if (questions.isEmpty) return null;
+    final list = questions.map((q) => {
+          'title': q.title,
+          'options': q.options,
+          'correct_answer': q.correctAnswer,
+          'analysis': q.analysis,
+          'question_type': q.questionType,
+          'knowledge_point': q.knowledgePoint,
+        }).toList();
+    final json = const JsonEncoder.withIndent('  ').convert({
+      'format': BankFileService.formatMarker,
+      'name': '错题导出_${DateTime.now().millisecondsSinceEpoch}',
+      'count': list.length,
+      'questions': list,
+    });
+    // v1.0.2 修复：复用系统临时目录单文件（此前每次新建 createTempSync('export')
+    // 目录且从不清理，累积垃圾）
+    final tmp = Directory.systemTemp;
+    final file = File(
+        '${tmp.path}/错题导出_${DateTime.now().millisecondsSinceEpoch}.json');
+    await file.writeAsString(json);
+    return file.path;
   }
 
   // ======================== 统计 ========================
@@ -633,17 +1448,45 @@ class AppState extends ChangeNotifier {
   /// 生成刷题小结
   Future<String> generateSessionSummary(QuizSession session) async {
     if (_aiService == null) return '';
-    return await _aiService!.generateSessionSummary(
+    final result = await _aiService!.generateSessionSummary(
       session.totalQuestions,
       session.correctCount,
       session.wrongCount,
       session.durationSeconds,
     );
+    // v1.0.2 对齐里程碑：失败统一提示
+    if (_isAiError(result)) return '小结生成失败，请检查网络或 API 配置后重试。';
+    return result;
   }
+
+  /// AI 错误串判定（AI请求失败/AI服务返回错误/解析生成失败）
+  bool _isAiError(String s) =>
+      s.startsWith('AI请求失败') ||
+      s.startsWith('AI服务返回错误') ||
+      s.contains('解析生成失败');
 
   @override
   void dispose() {
     _aiService?.dispose();
     super.dispose();
   }
+}
+
+/// 后台导入任务类型（v1.27）
+enum ImportTaskKind { json, sample, docxParse }
+
+/// 后台导入完成结果：主壳据此弹「导入完成」提示（仅一次，
+/// 消费后清除）；docxParse 成功时引导去预览确认页。
+class ImportTaskResult {
+  final ImportTaskKind kind;
+  final bool success;
+  final String message;
+  final int questionCount;
+
+  const ImportTaskResult({
+    required this.kind,
+    required this.success,
+    required this.message,
+    this.questionCount = 0,
+  });
 }

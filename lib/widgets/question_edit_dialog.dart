@@ -27,6 +27,8 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
     'fill_blank': '填空',
     'jian_da': '简答',
     'ming_jie': '名解',
+    // v1.0.2 修复：问答型题目编辑不再触发 DropdownButton 断言崩溃
+    'jie_da': '问答',
   };
 
   @override
@@ -34,7 +36,10 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.question.title);
     _answerCtrl = TextEditingController(text: widget.question.correctAnswer);
-    _type = widget.question.questionType;
+    // v1.0.2 修复：未知题型兜底为单选，避免 value 不在 items 中触发断言
+    _type = _types.containsKey(widget.question.questionType)
+        ? widget.question.questionType
+        : 'single_choice';
   }
 
   @override
@@ -46,7 +51,6 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
       title: const Text('编辑题目'),
       content: SingleChildScrollView(

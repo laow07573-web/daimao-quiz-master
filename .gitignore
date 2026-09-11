@@ -1,26 +1,62 @@
-build/
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+swp.*
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
 .dart_tool/
-.packages
 .flutter-plugins
 .flutter-plugins-dependencies
-*.iml
-.idea/
-.vscode/
-android/.gradle/
-android/app/build/
-android/build/
-android/local.properties
-windows/flutter/
-*.exe
-*.dll
-*.apk
-*.zip
-.gradle/
+.packages
+.pub-cache/
+.pub/
+/build/
 
-.backup_*
-release*.json
-tool/gen_audio.dart
-.idea/
-.restore/
-android/.kotlin/
-*.jks
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# v1.27.0 归档策略：冗余产物不入库（里程碑交付物仍保留在 dist/）
+dist/猫卷-Windows-*/
+dist/猫卷-Windows-*.zip
+dist/猫卷-Setup-1.26.6-Windows-x64.exe*
+docs/maojuan_plan/node_modules/
+docs/ui_review_assets/
+.qoder/
+/windows/flutter/ephemeral/
+
+# 安全加固：密钥/证书永不入库
+android/key.properties
+**/*.jks
+**/*.keystore
+
+# 发布校验报告为本地生成物
+tools/reference_check/reference_check_report.txt

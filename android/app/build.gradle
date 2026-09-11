@@ -6,6 +6,14 @@ if (localPropertiesFile.exists()) {
     }
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 def flutterRoot = localProperties.getProperty('flutter.sdk')
 if (flutterRoot == null) {
     throw new Exception("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
@@ -31,19 +39,43 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+        // flutter_local_notifications 需要 core library desugaring
+        coreLibraryDesugaringEnabled true
     }
 
     defaultConfig {
         applicationId "com.flashcard.app"
-        minSdk 21
+        // flutter_foreground_task 要求 minSdk >= 23
+        minSdk 23
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+        }
+        // 仅当 debug keystore 口令已知时才覆盖默认 debug 签名
+        if (keystoreProperties['debugStoreFile']) {
+            debug {
+                keyAlias keystoreProperties['debugKeyAlias']
+                keyPassword keystoreProperties['debugKeyPassword']
+                storeFile file(keystoreProperties['debugStoreFile'])
+                storePassword keystoreProperties['debugStorePassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            // v1.0.2 设计审查修复：正式构建改用正式签名（防篡改校验真实生效）。
+            // 注意：与历史 debug 证书(540320cd)不是同一把钥匙，
+            // 旧版本安装的设备需卸载后重装一次。
+            signingConfig signingConfigs.release
         }
     }
 }
@@ -52,4 +84,6 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+}
