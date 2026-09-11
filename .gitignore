@@ -44,10 +44,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# v1.27.0 归档策略：冗余产物不入库（里程碑交付物仍保留在 dist/）
-dist/猫卷-Windows-*/
-dist/猫卷-Windows-*.zip
-dist/猫卷-Setup-1.26.6-Windows-x64.exe*
+# 构建产物与安装包一律不入库，统一通过 GitHub Releases 分发
+# （二进制进 git 会永久膨胀历史，且受单文件 100MB 限制）
+/dist/
+
+# 基线对照用的原始参考 APK 不入库（verify_reference 只读取已提取的文本基准，
+# 需要重新提取时请自行向原作者获取原版 APK 放到此处）
+/reference/*.apk
 docs/maojuan_plan/node_modules/
 docs/ui_review_assets/
 .qoder/
