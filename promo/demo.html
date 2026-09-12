@@ -85,7 +85,7 @@
   /* 需裁切的变体各自给落定形状（同形状才能平滑插值） */
   .scene.t-wipe.in{clip-path:inset(0 0 0 0)}
   .scene.t-iris.in{clip-path:circle(142% at 50% 50%)}
-  .box{width:86%;max-height:94%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  .box{width:90%;max-height:94%;display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:1em;text-align:center}
   .kick{font-weight:800;letter-spacing:.42em;text-indent:.42em;color:var(--acc);text-transform:uppercase}
   .h1{font-weight:900;line-height:1.08;letter-spacing:-.028em}
@@ -98,20 +98,20 @@
     transition:opacity .68s ease, transform .78s cubic-bezier(.22,1,.36,1);will-change:transform,opacity}
   .rise.in{opacity:1;transform:none}
   .rows{width:100%;margin-top:1.05em}
-  .row{display:flex;align-items:flex-start;gap:1.15em;text-align:left;padding:.95em 0;border-top:1px solid var(--line)}
+  .row{display:flex;align-items:flex-start;gap:1.25em;text-align:left;padding:1.15em 0;border-top:1px solid var(--line)}
   .row:last-child{border-bottom:1px solid var(--line)}
   .row .no{font-weight:900;color:var(--acc);font-variant-numeric:tabular-nums;min-width:2.1em}
   .row .tx b{display:block;font-weight:800}
   .row .tx em{font-style:normal;color:var(--tx2);line-height:1.55}
-  .tl{width:94%;text-align:left}
-  .tl .lrow{display:flex;align-items:flex-start;gap:1.2em;padding:.85em 0;border-top:1px solid var(--line)}
+  .tl{width:100%;text-align:left}
+  .tl .lrow{display:flex;align-items:flex-start;gap:1.3em;padding:1.05em 0;border-top:1px solid var(--line)}
   .tl .lrow:last-child{border-bottom:1px solid var(--line)}
   .tl .when{min-width:6.6em;font-weight:900;color:var(--acc);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:.5em}
   .tl .when .pt{width:7px;height:7px;border-radius:50%;background:var(--acc);flex:0 0 auto;box-shadow:0 0 12px var(--acc)}
   .tl .what b{display:block;font-weight:800}
   .tl .what em{font-style:normal;color:var(--tx2);line-height:1.5}
-  .statrow{width:90%;text-align:left}
-  .srow{display:flex;align-items:baseline;gap:1.1em;padding:1em 0;border-top:1px solid var(--line)}
+  .statrow{width:96%;text-align:left}
+  .srow{display:flex;align-items:baseline;gap:1.15em;padding:1.35em 0;border-top:1px solid var(--line)}
   .srow:last-child{border-bottom:1px solid var(--line)}
   .srow .n{min-width:4.6em;font-weight:900;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
     background:var(--gr);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -125,16 +125,24 @@
   .bars{width:100%;display:flex;flex-direction:column;gap:.7em;margin-top:.4em}
   .brow{display:flex;align-items:center;gap:1em}
   .brow .bl{min-width:4.2em;text-align:right;color:var(--tx2);font-weight:700;font-variant-numeric:tabular-nums}
-  .brow .bt{flex:1;height:14px;border-radius:7px;background:rgba(255,255,255,.06);overflow:hidden}
+  .brow .bt{flex:1;height:20px;border-radius:7px;background:rgba(255,255,255,.06);overflow:hidden}
   .brow .bt i{display:block;height:100%;border-radius:7px;background:var(--gr);transform-origin:left;transform:scaleX(0);
     transition:transform 1s cubic-bezier(.2,.8,.3,1);will-change:transform}
   .brow.on .bt i{transform:scaleX(var(--w))}
-  .heat{display:grid;grid-template-columns:repeat(21,1fr);gap:5px;width:100%;margin-top:.6em}
+  .heat{display:grid;grid-template-columns:repeat(21,1fr);gap:6px;width:116%;margin-left:-8%;margin-top:.8em}
   .heat i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.055);
     transition:background .38s ease, box-shadow .38s ease}
   .heat i.l1{background:rgba(79,141,255,.34)}
   .heat i.l2{background:rgba(79,141,255,.62)}
   .heat i.l3{background:linear-gradient(135deg,#4F8DFF,#22D3EE)}
+  .heatlegend{display:flex;align-items:center;gap:.5em;margin-top:1.1em;color:var(--tx3);
+    font-size:1em;font-weight:650}
+  .heatlegend i{width:15px;height:15px;border-radius:3px;background:rgba(255,255,255,.055)}
+  .heatlegend i.lv1{background:rgba(79,141,255,.34)}
+  .heatlegend i.lv2{background:rgba(79,141,255,.62)}
+  .heatlegend i.lv3{background:linear-gradient(135deg,#4F8DFF,#22D3EE)}
+  .heatlegend .sp{flex:1}
+  .heatlegend .cap{color:var(--tx3);font-weight:600}
   /* 字模格不加辉光：靠亮度差异隐约显形，混在正常热力痕迹里 */
   .closewrap{display:flex;flex-direction:column;align-items:center;gap:1em}
   .closewrap img{object-fit:contain;filter:brightness(0) invert(1) opacity(.96)}
@@ -145,7 +153,7 @@
     transform:translate3d(-180%,0,0) skewX(-18deg);will-change:transform;animation:chip 3.4s ease-in-out infinite}
   @keyframes chip{0%{transform:translate3d(-180%,0,0) skewX(-18deg)}55%{transform:translate3d(560%,0,0) skewX(-18deg)}100%{transform:translate3d(560%,0,0) skewX(-18deg)}}
   .segs{width:100%;display:flex;gap:5px;z-index:40}
-  .segs i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.10);overflow:hidden;position:relative}
+  .segs i{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,.10);overflow:hidden;position:relative}
   .segs i.done{background:rgba(79,141,255,.75)}
   .segs i b{position:absolute;inset:0;background:var(--gr);transform-origin:left;transform:scaleX(0);border-radius:3px;will-change:transform}
   #count{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:90}
@@ -200,7 +208,15 @@ function fitStage(){
 }
 window.addEventListener('resize', fitStage); fitStage();
 document.getElementById('cutlabel').textContent = FAST ? 'SHORT CUT' : 'KEYNOTE';
-function px(base){ return Math.round(base * Math.max(U, .78)); }
+var CS = 1.28;   /* 全局内容放大系数：填补画面留白 */
+function px(base){ return Math.round(base * CS * Math.max(U, .78)); }
+/* 巨字自适应：保证不超出画面宽度（数字/字母平均宽约 0.56em） */
+function megaPx(text, cap){
+  var want = px(cap);
+  var stageW = LAY === 'port' ? SW : SW * 0.92;
+  var fit = stageW * 0.92 / (String(text).length * 0.56);
+  return Math.round(Math.min(want, fit));
+}
 
 /* ══════════ 立体运镜引擎（透视相机 + 脏检查） ══════════ */
 function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
@@ -265,13 +281,13 @@ var FEATS = [
          再叠加周期波动（某些周整体更勤）、昨日顺延（连续打卡）与噪声，
          最后按阈值分档。325 从「某些时段练得特别勤」里隐约浮出，
          不是摆出来的字。 */
-      var W = 31, H = 7;
+      var W = 21, H = 7;
       var D = {
         '3':['11111','00001','00001','01111','00001','00001','11111'],
         '2':['11111','00001','00001','11111','10000','10000','11111'],
         '5':['11111','10000','10000','11111','00001','00001','11111']
       };
-      var TXT = '325', START = [4, 12, 20];          /* 略偏左，不居中 */
+      var TXT = '325', START = [1, 8, 15];          /* 略偏左，不居中 */
       var mk = [], r, c, d;
       for(r = 0; r < H; r++){ mk[r] = []; for(c = 0; c < W; c++) mk[r][c] = 0; }
       for(d = 0; d < 3; d++){
@@ -310,7 +326,10 @@ var FEATS = [
           }
         }
       }
-      return '<div class="heat rise" data-heat="1" style="grid-template-columns:repeat(' + W + ',1fr)">' + html + '</div>'; } },
+      return '<div class="heat rise" data-heat="1" style="grid-template-columns:repeat(' + W + ',1fr)">' + html + '</div>' +
+        '<div class="rise heatlegend"><span>少</span>' +
+        '<i class="lv0"></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i>' +
+        '<span>多</span><span class="sp"></span><span class="cap">过去 147 天的练习记录</span></div>'; } },
   { ghost:'?', kick:'06 · 追问', h:'看不懂，|直接问|', sub:'解析里哪句没懂，接着问就行。',
     el:function(){ return '<div class="rise" style="font-size:' + px(17) + 'px;color:var(--tx2);line-height:1.7">' +
       '「为什么内脏痛定位模糊？」<br>「那考试怎么快速判断？」</div>' +
@@ -350,7 +369,8 @@ var BEATS_K = [
            ['v1.28','全新设计语言','Mao Des · AI 对话页 · 关键词标记']],
     cam:Z_SCAN(9200) }),
   B('today', { ms:4200, kick:'今天', mega:'v1.28.1', ghost:'v',
-    sub:'接下来 40 秒，看它怎么陪你把这轮复习刷完。', cam:Z_RUSH(2800) }),
+    sub:'接下来 40 秒，看它怎么陪你把这轮复习刷完。',
+    chips:['全新设计语言','AI 对话页','关键词高亮','任意 OpenAI 兼容接口'], cam:Z_RUSH(2800) }),
   B('feat', { ms:6000, f:0, cam:Z_FEAT(18, 5800) }),
   B('feat', { ms:4800, f:1, cam:Z_FEAT(-18, 4600) }),
   B('feat', { ms:6000, f:2, cam:{ y:[14,-10], z:[0,80], rx:[-1.6,1.4], dur:5800, ease:easeInOutCubic } }),
@@ -479,9 +499,9 @@ function showBeat(k){
   setGhost(b.ghost);
 
   if(b.kind === 'hero'){
-    mountScene('<img class="rise" src="' + LOGO + '" style="height:' + px(146) + 'px;object-fit:contain;filter:brightness(0) invert(1)" alt="">' +
-      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 76 : 86) + 'px">' + esc(b.h) + '</div>' +
-      '<div class="rise lede" style="font-size:' + px(17) + 'px">' + esc(b.sub) + '</div>' +
+    mountScene('<img class="rise" src="' + LOGO + '" style="height:' + px(196) + 'px;object-fit:contain;filter:brightness(0) invert(1)" alt="">' +
+      '<div class="rise h1" style="font-size:' + megaPx(b.h, LAY === 'port' ? 116 : 124) + 'px;margin-top:.1em">' + esc(b.h) + '</div>' +
+      '<div class="rise lede" style="font-size:' + px(20) + 'px;margin-top:.2em">' + esc(b.sub) + '</div>' +
       (b.foot ? '<div class="rise foot" style="margin-top:.6em;font-size:' + px(12.5) + 'px;letter-spacing:.18em">' + esc(b.foot) + '</div>' : ''));
   }
   else if(b.kind === 'rows'){
@@ -514,8 +534,10 @@ function showBeat(k){
   }
   else if(b.kind === 'today'){
     mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(b.kick) + '</div>' +
-      '<div class="rise mega" style="font-size:' + px(LAY === 'port' ? 100 : 116) + 'px;margin:.1em 0">' + esc(b.mega) + '</div>' +
-      (b.sub ? '<div class="rise lede" style="font-size:' + px(15) + 'px;margin-top:.4em">' + esc(b.sub) + '</div>' : ''));
+      '<div class="rise mega" style="font-size:' + megaPx(b.mega, LAY === 'port' ? 132 : 152) + 'px;margin:.14em 0">' + esc(b.mega) + '</div>' +
+      (b.sub ? '<div class="rise lede" style="font-size:' + px(17) + 'px;margin-top:.5em">' + esc(b.sub) + '</div>' : '') +
+      (b.chips ? '<div class="chips rise" style="margin-top:1.5em">' + b.chips.map(function(t){
+        return '<span class="chip" style="font-size:' + px(14.5) + 'px;padding:.52em 1.2em">' + esc(t) + '</span>'; }).join('') + '</div>' : ''));
   }
   else if(b.kind === 'feat'){
     var f = FEATS[b.f];
@@ -528,14 +550,14 @@ function showBeat(k){
     mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(b.kick) + '</div>' +
       '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 28 : 34) + 'px;margin-bottom:.4em">' + em(b.h) + '</div>' +
       '<div class="statrow">' + b.stats.map(function(s){
-        return '<div class="srow rise"><div class="n" style="font-size:' + px(40) + 'px"><span data-n="' + s[0] + '">0</span><s>' + esc(s[1]) + '</s></div>' +
+        return '<div class="srow rise"><div class="n" style="font-size:' + px(46) + 'px"><span data-n="' + s[0] + '">0</span><s>' + esc(s[1]) + '</s></div>' +
           '<div class="lb" style="font-size:' + px(15) + 'px">' + esc(s[2]) + '</div></div>';
       }).join('') + '</div>');
   }
   else if(b.kind === 'close'){
     mountScene('<div class="closewrap">' +
-      '<img class="rise" src="' + LOGO + '" style="height:' + px(78) + 'px" alt="">' +
-      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 32 : 36) + 'px">' + esc(b.h) + '</div>' +
+      '<img class="rise" src="' + LOGO + '" style="height:' + px(104) + 'px" alt="">' +
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 42 : 46) + 'px;margin-top:.15em">' + esc(b.h) + '</div>' +
       '<div class="rise lede" style="font-size:' + px(15) + 'px">' + esc(b.sub) + '</div>' +
       '<div class="rise urlchip" style="font-size:' + px(14) + 'px">' + esc(b.url) + '<i></i></div>' +
       (b.foot ? '<div class="rise foot" style="font-size:' + px(14) + 'px">' + esc(b.foot) + '</div>' : '') + '</div>');
