@@ -445,6 +445,14 @@ function em(s){ return esc(s).replace(/\|(.+?)\|/g,'<span class="g">$1</span>');
 function clearTimers(){ TYPE_TIMERS.forEach(clearTimeout); TYPE_TIMERS = []; }
 function px(base){ return Math.round(base * Math.max(U, .78)); }
 
+/* 上一拍留下的界面层：淡出后移除（与下一屏形成交叉溶解，避免硬切空白） */
+function clearLayers(){
+  [].slice.call(scrEl.querySelectorAll('.layer')).forEach(function(l){
+    l.classList.remove('on');
+    setTimeout(function(){ l.remove(); }, 600);
+  });
+}
+
 function retireScenes(){
   SCENE_TOKEN++;
   [].slice.call(stage.querySelectorAll('.scene')).forEach(function(s){
@@ -537,6 +545,7 @@ function showBeat(k){
   var b = BEATS[k];
   clearTimers();
   retireScenes();
+  clearLayers();
   tapEl.classList.remove('on');
   toastEl.classList.remove('on');
   segEls.forEach(function(s, i){
