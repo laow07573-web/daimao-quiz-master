@@ -56,7 +56,7 @@ if (Test-Path $stage) {
 New-Item -ItemType Directory -Path (Join-Path $stage 'assets')   -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $stage 'download') -Force | Out-Null
 Copy-Item (Join-Path $promo 'index.html') $stage -Force
-Copy-Item (Join-Path $promo 'demo.html')  $stage -Force
+# promo/demo.html 是本地录屏专用文件（file:// 直开），不上架网站
 Copy-Item (Join-Path $promo '404.html')   $stage -Force
 Copy-Item (Join-Path $promo '.nojekyll')  $stage -Force
 Copy-Item (Join-Path $promo 'assets\logo.png') (Join-Path $stage 'assets') -Force
