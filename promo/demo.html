@@ -129,11 +129,13 @@
   .brow .bt i{display:block;height:100%;border-radius:7px;background:var(--gr);transform-origin:left;transform:scaleX(0);
     transition:transform 1s cubic-bezier(.2,.8,.3,1);will-change:transform}
   .brow.on .bt i{transform:scaleX(var(--w))}
-  .heat{display:grid;grid-template-columns:repeat(20,1fr);gap:5px;width:100%;margin-top:.6em}
-  .heat i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.055)}
+  .heat{display:grid;grid-template-columns:repeat(21,1fr);gap:5px;width:100%;margin-top:.6em}
+  .heat i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.055);
+    transition:background .38s ease, box-shadow .38s ease}
   .heat i.l1{background:rgba(79,141,255,.34)}
   .heat i.l2{background:rgba(79,141,255,.62)}
   .heat i.l3{background:linear-gradient(135deg,#4F8DFF,#22D3EE)}
+  /* 字模格不加辉光：靠亮度差异隐约显形，混在正常热力痕迹里 */
   .closewrap{display:flex;flex-direction:column;align-items:center;gap:1em}
   .closewrap img{object-fit:contain;filter:brightness(0) invert(1) opacity(.96)}
   .urlchip{position:relative;overflow:hidden;margin-top:.35em;padding:.75em 1.5em;border-radius:999px;color:#fff;font-weight:800;
@@ -258,10 +260,39 @@ var FEATS = [
       .map(function(x){ return '<div class="brow rise" style="--w:' + x[1] + '"><span class="bl" style="font-size:' + px(13) + 'px">' + x[0] + '</span>' +
         '<span class="bt"><i></i></span></div>'; }).join('') + '</div>'; } },
   { ghost:'↑', kick:'05 · 数据', h:'坚持，|看得见|', sub:'不是凭感觉，是有记录、有依据。',
-    el:function(){ var c = '', seed = 20260911;
+    el:function(){
+      /* 用逐格点亮的点阵摆出「325」（5×6 字模，1 边距 + 5 + 2 + 5 + 2 + 5 + 1 = 21 列） */
+      var D = {
+        '3':['11111','00001','00001','01111','00001','11111'],
+        '2':['11111','00001','00001','11111','10000','11111'],
+        '5':['11111','10000','10000','11111','00001','11111']
+      };
+      var TXT = '325', COLS = 21, ROWS = 6, START = [1, 8, 15];
+      var mask = [], r, c, d;
+      for(r = 0; r < ROWS; r++){ mask[r] = []; for(c = 0; c < COLS; c++) mask[r][c] = 0; }
+      for(d = 0; d < 3; d++){
+        var pat = D[TXT.charAt(d)];
+        for(r = 0; r < ROWS; r++) for(c = 0; c < 5; c++)
+          if(pat[r].charAt(c) === '1') mask[r][START[d] + c] = 1;
+      }
+      var seed = 20260911;
       function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
-      for(var i = 0; i < 120; i++){ var r = rnd(), lv = r > .70 ? 3 : r > .46 ? 2 : r > .26 ? 1 : 0; c += '<i class="l' + lv + '"></i>'; }
-      return '<div class="heat rise">' + c + '</div>'; } },
+      var html = '';
+      for(r = 0; r < ROWS; r++) for(c = 0; c < COLS; c++){
+        var rr = rnd();
+        if(mask[r][c]){
+          /* 字形格：约两成留暗（打散字形，像自然形成的），其余亮度随机 */
+          if(rr < .10){ html += '<i class="mk"></i>'; }
+          else {
+            var lv = rr > .58 ? 3 : (rr > .20 ? 2 : 1);
+            html += '<i class="mk" data-lv="' + lv + '"></i>';
+          }
+        } else {
+          /* 非字形格：散布零散痕迹（低亮为主，极少数中亮） */
+          html += '<i class="' + (rr > .972 ? 'l2' : rr > .84 ? 'l1' : '') + '"></i>';
+        }
+      }
+      return '<div class="heat rise" style="grid-template-columns:repeat(' + COLS + ',1fr)">' + html + '</div>'; } },
   { ghost:'?', kick:'06 · 追问', h:'看不懂，|直接问|', sub:'解析里哪句没懂，接着问就行。',
     el:function(){ return '<div class="rise" style="font-size:' + px(17) + 'px;color:var(--tx2);line-height:1.7">' +
       '「为什么内脏痛定位模糊？」<br>「那考试怎么快速判断？」</div>' +
@@ -383,6 +414,14 @@ function mountScene(inner){
         r.classList.add('in');
         if(r.classList.contains('brow')) r.classList.add('on');
       }, i * 150 + 210));
+    });
+    /* 点阵「325」逐格点亮（左→右、上→下） */
+    d.querySelectorAll('.heat').forEach(function(h){
+      h.querySelectorAll('i.mk').forEach(function(cell, i){
+        TYPE_TIMERS.push(setTimeout(function(){
+          cell.classList.add('l' + (cell.getAttribute('data-lv') || 2));
+        }, 640 + i * 26));
+      });
     });
     var t2 = SCENE_TOKEN;
     d.querySelectorAll('[data-n]').forEach(function(el){
