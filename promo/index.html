@@ -836,7 +836,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     </div>
     <div class="mqt">快速操作</div>
     <div class="mq">
-      <div class="mqi" style="border:1.5px solid color-mix(in srgb,var(--m-accent) 55%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--m-accent) 14%,transparent)"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg></span><span class="tx"><b>新生第一步</b><em>导入示例题库（10 道医学题），无需任何配置立即体验</em></span><span class="lk" style="background:var(--m-accent);color:#fff;border-radius:12px;padding:7px 15px;font-weight:600;font-size:13.5px">导入</span></div>
+      <div class="mqi" style="border:1.5px solid color-mix(in srgb,var(--m-accent) 55%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--m-accent) 14%,transparent)"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg></span><span class="tx"><b>新生第一步</b><em>导入示例题库（10 道医学题），无需注册立即体验</em></span><span class="lk" style="background:var(--m-accent);color:#fff;border-radius:12px;padding:7px 15px;font-weight:600;font-size:13.5px">导入</span></div>
       <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/><circle cx="15" cy="9" r="1.7"/></svg></span><span class="tx"><b>定向爆破</b><em>请先选择题库</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
       <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 10%,transparent);color:color-mix(in srgb,var(--m-accent) 80%,transparent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg></span><span class="tx"><b>管理题库</b><em>还没有题库，先去导入</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
     </div>
@@ -850,7 +850,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 </div>
 </template>
 
-<!-- 判断题答错后的「示例解析」（v1.28.1：没配 Key 也看得到解析） -->
+<!-- 判断题答错后的解析（示例题库自带静态解析；AI 解析需配置 API Key） -->
 <template id="tpl-ai-sample">
 <div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
@@ -869,7 +869,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div class="rr" style="opacity:.85">正确答案: ✗ 错误</div>
     </div>
     <div class="mai">
-      <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>示例解析<span class="sp"></span><span style="font-size:11px;font-weight:500;color:var(--m-fg3)">内置 · 免 Key</span></div>
+      <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>示例解析<span class="sp"></span><span style="font-size:11px;font-weight:500;color:var(--m-fg3)">题目自带</span></div>
       <div class="mtxt">内脏痛定位模糊、对切割/烧灼等刺激不敏感，但对牵拉、缺血、痉挛和炎症等刺激敏感，常伴有<b style="color:var(--m-accent)">牵涉痛</b>和情绪反应。</div>
     </div>
     <div class="mqi" style="padding:11px 13px"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.5-.7L3 21l1.8-4.6A8.4 8.4 0 1 1 21 11.5z"/></svg></span><span class="tx"><b>向 AI 追问</b><em>没看懂？直接问，对话式讲解</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
@@ -1255,9 +1255,9 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="f-text reveal">
     <div class="f-no">功能 01</div>
     <h3>丢一份文档进去，<em>自动变成题库</em></h3>
-    <p class="f-desc">不用一题一题手工录入。选择 DOCX 或 JSON 文件，猫卷自动识别题目、选项、答案与解析，生成可编辑的预览，确认后入库。</p>
+    <p class="f-desc">不用一题一题手工录入。DOCX 走 AI 解析（需配置 API Key），自动识别题目、选项、答案与解析，生成可编辑预览；JSON 题库文件无需 Key，直接入库。</p>
     <ul class="f-list">
-      <li><b>DOCX / JSON 双通道</b>：Word 文档直接导入，也支持结构化 JSON 题库</li>
+      <li><b>DOCX / JSON 双通道</b>：Word 走 AI 解析（需 API Key），JSON 结构化题库免 Key 直接入库</li>
       <li><b>AI 智能分块</b>：长文档按题目边界切块，并发解析，不阻塞界面</li>
       <li><b>可视化校对</b>：入库前逐题预览、编辑、删除，AI 打的知识点标签一并保留</li>
       <li><b>开放格式</b>：题库可导出为标准 JSON，在同学之间自由流转</li>
@@ -1352,7 +1352,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <li><b>给结论，划重点</b>：一句口诀或大白话总结得分要点</li>
       <li><b>篇幅三档</b>：简洁（≤150 字）/ 标准（≤300 字）/ 详细，设置里随时切换</li>
       <li><b>关键词高亮</b>：答案绿、题眼蓝、避坑红，关键依据与易错否定词单独着色</li>
-      <li><b>没配 Key 也能用</b>：示例题库每题自带「示例解析」，0 配置先学起来；配置 Key 后升级为 AI 逐题讲解</li>
+      <li><b>需要 API Key</b>：AI 解析要在设置里填一个 Key（DeepSeek 等，自带免费额度）；未配置时示例题库显示题目自带的静态解析</li>
       <li><b>只看一次的钱</b>：解析本地缓存，同一道题不重复消耗 Token</li>
     </ul>
   </div>
@@ -1707,7 +1707,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="reveal">
     <div class="eyebrow">动画使用说明</div>
     <h2>从装好到上手，<em>八步走完</em></h2>
-    <p class="lead">下面这套演示按新生装好后的真实上手顺序播放：打开 → 一键导入 → 开刷 → 看解析（全部由代码实时矢量绘制，非截图）。点「重播」可再看一遍，点任意一步可跳到那一步。</p>
+    <p class="lead">下面这套演示按新生装好后的真实上手顺序播放：打开 → 导入示例题 → 开刷 → 配置 Key → AI 解析（全部由代码实时矢量绘制，非截图）。点「重播」可再看一遍，点任意一步可跳到那一步。</p>
   </div>
 
   <div class="guide-wrap">
@@ -2489,13 +2489,13 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 
   // mock: [模板名, 可选的主题覆盖]
   var STEPS = [
-    { label:'打开就有引导',   desc:'首次打开首页就有「新生第一步」：一键导入示例题库，无需注册、无需 API Key',
+    { label:'打开就有引导',   desc:'首次打开首页就有「新生第一步」：一键导入示例题库（10 道医学题），无需注册',
       mock:'home-new', ms:5000 },
     { label:'导入完成直接开刷', desc:'示例题库自动勾选，「定向爆破」立刻可刷，答完马上判对错',
       mock:'quiz',     ms:5200 },
-    { label:'没配 Key 也有解析', desc:'示例题库每题自带「示例解析」，0 配置先学起来；想上 AI 随时去设置',
-      mock:'ai-sample', ms:5400 },
-    { label:'看 AI 题眼解析', desc:'配置 API Key 后：四步拆解 + 关键词彩色标记，一眼抓到破题点',
+    { label:'配置 API Key', desc:'AI 解析与 DOCX 导入都需要它：设置页填一个 Key（DeepSeek 等，有免费额度）',
+      mock:'import', ms:5400 },
+    { label:'看 AI 题眼解析', desc:'配好 Key 后，每题按四步拆解，关键词彩色标记，一眼抓到破题点',
       mock:'ai',       ms:6400, typeIt:true },
     { label:'追问不懂的点',   desc:'像聊天一样继续问，问答都留在题目旁边',
       mock:'ai',       ms:5200, chat:true },
