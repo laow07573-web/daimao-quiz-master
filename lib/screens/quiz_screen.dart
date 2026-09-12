@@ -20,6 +20,7 @@ import '../widgets/annotation_toolbar.dart';
 import '../services/debug_log_service.dart';
 import 'ai_chat_screen.dart';
 import 'session_summary_screen.dart';
+import 'settings_screen.dart';
 import '../widgets/answer_sheet_widget.dart';
 import '../widgets/question_edit_dialog.dart';
 import 'practice_screen.dart';
@@ -1425,6 +1426,15 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  /// v1.28.1 新生引导：跳转设置页配置 API Key，返回后刷新解析区
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (mounted) setState(() {});
+  }
+
   Widget _buildShowAnalysisButton(AppState appState, AppThemeColors ac) {
     return SizedBox(
       width: double.infinity,
@@ -1456,7 +1466,8 @@ class _QuizScreenState extends State<QuizScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再查看解析。'),
-                  backgroundColor: AppThemeColors.of(context).warning),
+                  backgroundColor: AppThemeColors.of(context).warning,
+                  action: SnackBarAction(label: '去设置', onPressed: _openSettings)),
             );
             return;
           }
@@ -1478,7 +1489,8 @@ class _QuizScreenState extends State<QuizScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再查看解析。'),
-                  backgroundColor: AppThemeColors.of(context).warning),
+                  backgroundColor: AppThemeColors.of(context).warning,
+                  action: SnackBarAction(label: '去设置', onPressed: _openSettings)),
             );
             return;
           }
@@ -1505,6 +1517,7 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
 
+    final bool noKey = !appState.settings.isConfigured;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1519,7 +1532,7 @@ class _QuizScreenState extends State<QuizScreen> {
               Icon(Icons.psychology_outlined,
                   color: ac.accent, size: 20),
               const SizedBox(width: 8),
-              Text('AI解析',
+              Text(noKey ? '示例解析' : 'AI解析',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: MaoType.h3,
@@ -1538,9 +1551,17 @@ class _QuizScreenState extends State<QuizScreen> {
           else if (appState.analysisLoading)
             Text('正在生成AI解析...',
                 style: TextStyle(color: ac.textSecondary, fontSize: MaoType.body))
-          else
-            Text('解析生成失败',
+          else ...[
+            // v1.28.1 新生引导：无 Key 且无自带解析 → 引导去配置，而不是裸错误
+            Text('配置 API Key 后，这里会显示 AI 逐题讲解\n（题眼破题 · 关键词高亮 · 追问）。',
                 style: TextStyle(color: ac.textSecondary, fontSize: MaoType.body)),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.settings, size: 16),
+              label: const Text('去设置'),
+              onPressed: _openSettings,
+            ),
+          ],
 
           if (appState.currentAnalysis != null &&
               appState.currentAnalysis!.isNotEmpty) ...[
@@ -1572,7 +1593,8 @@ class _QuizScreenState extends State<QuizScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再追问。'),
-                  backgroundColor: ac.warning),
+                  backgroundColor: ac.warning,
+                  action: SnackBarAction(label: '去设置', onPressed: _openSettings)),
             );
             return;
           }

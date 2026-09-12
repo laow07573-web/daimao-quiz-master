@@ -1,7 +1,7 @@
 ﻿; 猫卷 Windows 安装包脚本（Inno Setup 6）
 ; 编译：& "C:\Users\CTSwe\AppData\Local\Programs\Inno Setup 6\ISCC.exe" d:\dev\flashcard_app\tools\maojuan_setup.iss
 #define MyAppName "猫卷"
-#define MyAppVersion "1.28.0"
+#define MyAppVersion "1.28.1"
 #define MyAppPublisher "Damao"
 #define MyAppExeName "flashcard_app.exe"
 #define SrcDir "d:\dev\flashcard_app\dist\猫卷-Windows-20260911"
