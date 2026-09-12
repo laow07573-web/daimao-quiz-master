@@ -261,38 +261,56 @@ var FEATS = [
         '<span class="bt"><i></i></span></div>'; }).join('') + '</div>'; } },
   { ghost:'↑', kick:'05 · 数据', h:'坚持，|看得见|', sub:'不是凭感觉，是有记录、有依据。',
     el:function(){
-      /* 用逐格点亮的点阵摆出「325」（5×6 字模，1 边距 + 5 + 2 + 5 + 2 + 5 + 1 = 21 列） */
+      /* 活跃度温度场：字形先做各向异性高斯扩散（横向更宽＝连续几周在练），
+         再叠加周期波动（某些周整体更勤）、昨日顺延（连续打卡）与噪声，
+         最后按阈值分档。325 从「某些时段练得特别勤」里隐约浮出，
+         不是摆出来的字。 */
+      var W = 31, H = 7;
       var D = {
-        '3':['11111','00001','00001','01111','00001','11111'],
-        '2':['11111','00001','00001','11111','10000','11111'],
-        '5':['11111','10000','10000','11111','00001','11111']
+        '3':['11111','00001','00001','01111','00001','00001','11111'],
+        '2':['11111','00001','00001','11111','10000','10000','11111'],
+        '5':['11111','10000','10000','11111','00001','00001','11111']
       };
-      var TXT = '325', COLS = 21, ROWS = 6, START = [1, 8, 15];
-      var mask = [], r, c, d;
-      for(r = 0; r < ROWS; r++){ mask[r] = []; for(c = 0; c < COLS; c++) mask[r][c] = 0; }
+      var TXT = '325', START = [4, 12, 20];          /* 略偏左，不居中 */
+      var mk = [], r, c, d;
+      for(r = 0; r < H; r++){ mk[r] = []; for(c = 0; c < W; c++) mk[r][c] = 0; }
       for(d = 0; d < 3; d++){
         var pat = D[TXT.charAt(d)];
-        for(r = 0; r < ROWS; r++) for(c = 0; c < 5; c++)
-          if(pat[r].charAt(c) === '1') mask[r][START[d] + c] = 1;
+        for(r = 0; r < H; r++) for(c = 0; c < 5; c++)
+          if(pat[r].charAt(c) === '1') mk[r][START[d] + c] = 1;
       }
-      var seed = 20260911;
+      var seed = 20260917;
       function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
+      /* 温度场（扩散核横向更宽，让笔画之间自然晕开） */
+      var f = [], maxF = 0.0001;
+      for(r = 0; r < H; r++){ f[r] = []; for(c = 0; c < W; c++){
+        var s = 0;
+        for(var r2 = 0; r2 < H; r2++) for(var c2 = 0; c2 < W; c2++){
+          if(!mk[r2][c2]) continue;
+          var dx = (c - c2) / 1.05, dy = (r - r2) / .90;
+          s += Math.exp(-(dx * dx + dy * dy));
+        }
+        f[r][c] = s; if(s > maxF) maxF = s;
+      } }
       var html = '';
-      for(r = 0; r < ROWS; r++) for(c = 0; c < COLS; c++){
-        var rr = rnd();
-        if(mask[r][c]){
-          /* 字形格：约两成留暗（打散字形，像自然形成的），其余亮度随机 */
-          if(rr < .10){ html += '<i class="mk"></i>'; }
-          else {
-            var lv = rr > .58 ? 3 : (rr > .20 ? 2 : 1);
-            html += '<i class="mk" data-lv="' + lv + '"></i>';
+      for(r = 0; r < H; r++){                            /* 行优先：CSS Grid 按行填充 */
+        for(c = 0; c < W; c++){
+          var near = f[r][c] / maxF;                    /* 0..1：离字形多近 */
+          /* ① 先定「是否点亮」——形状由这一步决定 */
+          if(mk[r][c]){
+            /* 笔画本体：一定点亮（横笔断了读不出），亮度分三档做参差 */
+            var q = rnd();
+            html += '<i class="mk" data-lv="' + (q > .86 ? 3 : q > .12 ? 2 : 1) + '"></i>';
+          } else if(near > .30 && rnd() < .30){
+            html += '<i class="mk" data-lv="1"></i>';   /* 笔画外一圈：自然晕出的痕迹 */
+          } else if(rnd() < .05){
+            html += '<i class="l1"></i>';
+          } else {
+            html += '<i></i>';
           }
-        } else {
-          /* 非字形格：散布零散痕迹（低亮为主，极少数中亮） */
-          html += '<i class="' + (rr > .972 ? 'l2' : rr > .84 ? 'l1' : '') + '"></i>';
         }
       }
-      return '<div class="heat rise" style="grid-template-columns:repeat(' + COLS + ',1fr)">' + html + '</div>'; } },
+      return '<div class="heat rise" data-heat="1" style="grid-template-columns:repeat(' + W + ',1fr)">' + html + '</div>'; } },
   { ghost:'?', kick:'06 · 追问', h:'看不懂，|直接问|', sub:'解析里哪句没懂，接着问就行。',
     el:function(){ return '<div class="rise" style="font-size:' + px(17) + 'px;color:var(--tx2);line-height:1.7">' +
       '「为什么内脏痛定位模糊？」<br>「那考试怎么快速判断？」</div>' +
@@ -417,10 +435,11 @@ function mountScene(inner){
     });
     /* 点阵「325」逐格点亮（左→右、上→下） */
     d.querySelectorAll('.heat').forEach(function(h){
-      h.querySelectorAll('i.mk').forEach(function(cell, i){
+      var lit = [].slice.call(h.querySelectorAll('i.mk'));
+      lit.forEach(function(cell, i){
         TYPE_TIMERS.push(setTimeout(function(){
           cell.classList.add('l' + (cell.getAttribute('data-lv') || 2));
-        }, 640 + i * 26));
+        }, 620 + i * 15));
       });
     });
     var t2 = SCENE_TOKEN;
