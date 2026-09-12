@@ -5,51 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>猫卷 · 发布会（本地录屏版）</title>
 <!--
-  猫卷 · 产品发布会（本地录屏版 v7 · 丝滑优先）
-  ═══════════════════════════════════════════
-  双击即播（file:// 本地协议，零网络依赖；logo 已内嵌单文件）。
+  猫卷 · 产品发布会（本地录屏版 · 纯排版 / 两个版本）
+  ═══════════════════════════════════════════════════
+  双击即播（file:// 本地协议，零网络依赖；logo 内嵌单文件）。
   3-2-1 倒计时后自动开播，播完无缝循环。
 
-  为 60fps 做的取舍（v6 卡顿根因逐条修掉）：
-    · 背景柔光全部静态（不再每帧对大滤镜元素做 transform）
-    · 扫光 / 进度用 transform 动画，不用 left/width（避免重排）
-    · 相机只做平移，缩放只给手机；文字永不缩放（避免每帧重栅格化变糊）
-    · 入场过渡 / 待机漂浮 / 相机运镜分属三个元素，各管一个 transform，互不打架
-    · 每帧计算结果与上一帧相同则不写样式（空闲帧零写入）
-    · 只动 transform / opacity，全部图层 will-change 常驻，走合成器
+  · 画面：深色舞台 + 巨幅排版 + 发丝分隔线 + 渐变强调字。不放手机模型。
+  · 立体：透视相机（Z 推拉 / rotateX·Y 环绕），内容层与背景巨字层不同景深，
+          转动时产生真实视差。
+  · 丝滑：只动 transform/opacity，空闲帧零 DOM 写入（脏检查）。
 
-  参数：?ar=16:9  比例(默认 9:16)   ?speed=1.15  倍速
-        ?from=5   从第 5 拍起循环    ?go=1        跳过倒计时
+  两个版本：
+    demo.html             发布会版（慢，约 85 秒，14 拍）
+    demo.html?cut=fast    短视频版（快，约 25 秒，9 拍，冲切更狠）
+
+  参数：?ar=16:9 横版    ?speed=1.15 调速    ?go=1 跳倒计时    ?from=N 从第 N 拍起
   快捷键：空格 暂停 · R 重播 · F 全屏 · ←→ 逐拍
 -->
 <style>
   :root{
-    --acc:#2563EB; --acc2:#3B82F6;
-    --ink:#0B1220; --ink2:#5A6B85; --ink3:#93A1B8;
-    --line:rgba(11,18,32,.10);
-    --gr:linear-gradient(96deg,#2563EB 0%,#6D5BF6 46%,#06B6D4 100%);
-    --m-bg:#F5F7FA; --m-card:#FFFFFF; --m-bd:#E2E8F0; --m-fg:#111827; --m-fg2:#566072; --m-fg3:#8A94A6;
-    --m-s2:#EDF1F7; --m-bad:#B91C1C; --m-badbg:#FEE2E2;
+    --acc:#4F8DFF;
+    --tx:#F5F8FF; --tx2:#9AA7BD; --tx3:#5C6C88;
+    --line:rgba(255,255,255,.13);
+    --bg:#080B12;
+    --gr:linear-gradient(96deg,#4F8DFF 0%,#8B7BFF 50%,#22D3EE 100%);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%}
-  body{background:#F5F7FB;color:var(--ink);overflow:hidden;cursor:none;
+  body{background:var(--bg);color:var(--tx);overflow:hidden;cursor:none;
     font-family:-apple-system,"SF Pro Display","PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",sans-serif;
     -webkit-font-smoothing:antialiased}
-  /* 静态背景柔光（无 filter、无动画 → 恒定零成本） */
   #bg{position:fixed;inset:0;z-index:0;pointer-events:none;
     background:
-      radial-gradient(58% 48% at 10% 4%, rgba(37,99,235,.20), rgba(37,99,235,0) 70%),
-      radial-gradient(52% 44% at 92% 98%, rgba(6,182,212,.17), rgba(6,182,212,0) 70%),
-      radial-gradient(40% 34% at 84% 8%, rgba(109,91,246,.10), rgba(109,91,246,0) 72%)}
-  /* 扫光：只动 transform（合成器） */
+      radial-gradient(60% 46% at 12% 2%, rgba(79,141,255,.16), rgba(79,141,255,0) 68%),
+      radial-gradient(52% 42% at 90% 100%, rgba(34,211,238,.11), rgba(34,211,238,0) 68%),
+      radial-gradient(46% 38% at 86% 6%, rgba(139,123,255,.10), rgba(139,123,255,0) 70%)}
   #sheen{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden;contain:strict}
-  #sheen .bar{position:absolute;top:-40%;bottom:-40%;width:34%;left:0;
-    background:linear-gradient(100deg,rgba(37,99,235,0),rgba(37,99,235,.10),rgba(37,99,235,0));
+  #sheen .bar{position:absolute;top:-40%;bottom:-40%;width:30%;left:0;
+    background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.055),rgba(255,255,255,0));
     transform:translate3d(-140%,0,0) skewX(-16deg);will-change:transform}
   #sheen.go .bar{animation:sheen 1.5s cubic-bezier(.33,0,.2,1) 1}
-  @keyframes sheen{from{transform:translate3d(-140%,0,0) skewX(-16deg)}to{transform:translate3d(420%,0,0) skewX(-16deg)}}
-  /* 舞台 */
+  @keyframes sheen{from{transform:translate3d(-140%,0,0) skewX(-16deg)}to{transform:translate3d(440%,0,0) skewX(-16deg)}}
   #stage{position:absolute;left:50%;top:50%;transform:translate3d(-50%,-50%,0);
     transform-origin:center;display:flex;flex-direction:column;align-items:center;z-index:10;
     perspective:2000px;perspective-origin:50% 50%}
@@ -57,183 +53,106 @@
   .topbar .lg{object-fit:contain}
   .topbar b{letter-spacing:.02em}
   .topbar .sp{flex:1}
-  .topbar .ver{color:var(--ink2);border:1px solid var(--line);border-radius:999px;font-variant-numeric:tabular-nums}
-  /* 相机三层：#cam 全局平移 → #textcam 文字视差 → .phonecam 手机推拉 */
+  .topbar .cut{font-weight:800;letter-spacing:.3em;color:var(--tx3);text-transform:uppercase}
   #cam{position:relative;flex:1;width:100%;min-height:0;will-change:transform;
-    transform-style:preserve-3d;transform:translate3d(0,0,0)}
-  #textcam{position:absolute;inset:0;z-index:30;will-change:transform;
-    transform:translateZ(-110px) scale(1.055)}
-  .phonecam{position:absolute;left:0;right:0;bottom:0;top:0;display:flex;align-items:center;justify-content:center;
-    will-change:transform;transform-style:preserve-3d;transform:translateZ(60px);pointer-events:none}
-  [data-lay="port"] .phonecam{align-items:flex-end;padding-bottom:1%}
-  .phonecam.hide{display:none}
-  /* 手机：入场（.phonewrap）/ 待机漂浮（.phonefloat）各管一个 transform */
-  .phonewrap{opacity:0;transform:translate3d(0,24px,0) scale(.97);
-    transition:opacity .7s ease, transform .85s cubic-bezier(.22,1,.36,1);will-change:transform,opacity}
-  .phonecam.show .phonewrap{opacity:1;transform:none}
-  .phonefloat{will-change:transform}
-  .phonecam.show .phonefloat{animation:floaty 13s ease-in-out infinite alternate}
-  @keyframes floaty{
-    from{transform:translate3d(0,0,0) rotateY(-4deg) rotateX(1deg)}
-    to{transform:translate3d(0,-9px,0) rotateY(4deg) rotateX(-1.2deg)}}
-  .phone{position:relative;border-radius:9.6% / 4.5%;background:#0F1729;transform:translateZ(0);
-    box-shadow:0 2px 4px rgba(11,18,32,.10), 0 34px 62px -20px rgba(11,18,32,.34), 0 0 0 1px rgba(11,18,32,.07)}
-  .scr{position:absolute;border-radius:8%/3.9%;overflow:hidden;background:var(--m-bg);color:var(--m-fg);
-    transform:translateZ(0)}
-  .notch{position:absolute;top:2.1%;left:50%;transform:translateX(-50%);width:25%;height:2.5%;
-    background:#0F1729;border-radius:999px;z-index:40}
-  /* 屏内通用件（276×613 设计稿） */
-  .sbar{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:11px;font-weight:600;color:var(--m-fg)}
-  .sbar .r{display:flex;gap:4px;align-items:center}
-  .sg{width:14px;height:10px;background:var(--m-fg);clip-path:polygon(0 100%,100% 0,100% 100%);opacity:.9}
-  .bat{width:20px;height:10px;border:1.4px solid var(--m-fg);border-radius:3px;position:relative;opacity:.9}
-  .bat::before{content:"";position:absolute;inset:1.6px;right:5px;background:var(--m-fg);border-radius:1px}
-  .bat::after{content:"";position:absolute;right:-3.4px;top:2.4px;width:2px;height:4px;background:var(--m-fg);border-radius:0 2px 2px 0}
-  .appb{height:40px;display:flex;align-items:center;gap:8px;padding:0 16px;font-size:17px;font-weight:800}
-  .appb .sp{flex:1}
-  .gear{width:26px;height:26px;border-radius:8px;background:var(--m-s2);display:flex;align-items:center;justify-content:center;color:var(--m-fg2)}
-  .prog{height:3px;background:var(--m-s2);margin:0 14px;border-radius:2px;overflow:hidden}
-  .prog i{display:block;height:100%;background:var(--acc);border-radius:2px}
-  .body{position:absolute;top:70px;bottom:52px;left:0;right:0;overflow:hidden;padding:10px 14px 0}
-  .navb{position:absolute;left:0;right:0;bottom:0;height:52px;background:var(--m-card);
-    border-top:1px solid var(--m-bd);display:flex;align-items:center;justify-content:space-around;font-size:10.5px;color:var(--m-fg3)}
-  .navb .t{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
-  .navb .t.on{color:var(--acc);font-weight:700}
-  .navb .pip{width:26px;height:3px;border-radius:2px;background:transparent;margin-top:1px}
-  .navb .t.on .pip{background:var(--acc)}
-  .card{background:var(--m-card);border:1px solid var(--m-bd);border-radius:14px;padding:13px}
-  .hero{background:linear-gradient(135deg,#2E6BFF,#1D4ED8);border-radius:16px;color:#fff;padding:16px 16px 14px;box-shadow:0 10px 24px rgba(37,99,235,.35)}
-  .hero .hi{font-size:16px;font-weight:800}
-  .hero .hr{display:flex;align-items:center;gap:10px;margin-top:12px}
-  .hero .lg2{width:38px;height:38px;border-radius:10px;object-fit:contain;background:#fff}
-  .hero .ht{font-size:14px;font-weight:800}
-  .hero .hq{font-size:11.5px;opacity:.85;margin-top:1px}
-  .sech{font-size:13.5px;font-weight:800;margin:14px 2px 8px;color:var(--m-fg)}
-  .qa{display:flex;flex-direction:column;gap:9px}
-  .qi{display:flex;align-items:center;gap:10px;background:var(--m-card);border:1px solid var(--m-bd);border-radius:13px;padding:11px 12px}
-  .qi.hl{border:1.5px solid color-mix(in srgb,var(--acc) 55%,transparent);box-shadow:0 4px 16px rgba(37,99,235,.16)}
-  .qi .ic{width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-  .qi .tx{flex:1;min-width:0}
-  .qi .tx b{font-size:13.5px;display:block}
-  .qi .tx em{font-style:normal;font-size:11px;color:var(--m-fg2);display:block;margin-top:2px;line-height:1.45}
-  .qi .go{font-size:12px;font-weight:700;color:var(--m-fg3)}
-  .qi .btn{background:var(--acc);color:#fff;font-size:12.5px;font-weight:700;border-radius:11px;padding:7px 14px}
-  .qtag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--acc);background:#E4EDFE;border-radius:7px;padding:3px 8px}
-  .qmeta{font-size:10px;color:var(--m-fg3);margin-left:7px}
-  .stem{font-size:14.5px;line-height:1.6;margin-top:8px;font-weight:600}
-  .tf{display:flex;gap:10px;margin-top:12px}
-  .tf .b{flex:1;background:var(--m-card);border:1.5px solid #16A34A;border-radius:13px;padding:14px 0;text-align:center;font-size:15px;font-weight:800;color:#15803D}
-  .tf .b.x{border-color:#DC2626;color:#B91C1C}
-  .fb{margin-top:11px;background:var(--m-badbg);border:1.5px solid #DC2626;border-radius:14px;padding:12px 13px;
-    opacity:0;transform:translate3d(0,10px,0);transition:opacity .4s ease, transform .4s cubic-bezier(.22,1,.36,1)}
-  .fb.on{opacity:1;transform:none}
-  .fb .tt{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:var(--m-bad)}
-  .fb .rr{font-size:12.5px;margin-top:6px;color:var(--m-fg2)}
-  .fb .rr b{color:#15803D}
-  .aih{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:800;color:var(--acc)}
-  .aih .sp{flex:1}
-  .aih .mini{font-size:10px;font-weight:600;color:var(--m-fg3);background:var(--m-s2);padding:3px 8px;border-radius:999px}
-  .atext{font-size:12.8px;line-height:1.75;color:var(--m-fg);margin-top:8px}
-  .atext .hl{color:var(--acc);font-weight:700}
-  .caret{display:inline-block;width:2px;height:14px;background:var(--acc);vertical-align:-2px;margin-left:1px;animation:blink 1s steps(1) infinite}
-  @keyframes blink{50%{opacity:0}}
-  .askrow{display:flex;align-items:center;gap:10px;background:var(--m-card);border:1px solid var(--m-bd);border-radius:13px;padding:11px 12px;margin-top:10px}
-  .askrow .aic{width:32px;height:32px;border-radius:9px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-  .askrow .tx b{font-size:13px;display:block}
-  .askrow .tx em{font-style:normal;font-size:11px;color:var(--m-fg2)}
-  .heat{display:grid;grid-template-columns:repeat(13,1fr);gap:3.5px;margin-top:10px}
-  .heat i{aspect-ratio:1;border-radius:3px;background:#E7ECF4}
-  .heat i.l1{background:#BFD5FA}.heat i.l2{background:#6E9EF6}.heat i.l3{background:#2563EB}
-  .trio{display:flex;gap:9px;margin-top:10px}
-  .trio>div{flex:1;background:var(--m-card);border:1px solid var(--m-bd);border-radius:12px;text-align:center;padding:10px 4px}
-  .trio b{font-size:15px;display:block}
-  .trio em{font-style:normal;font-size:9.5px;color:var(--m-fg2)}
-  .toast{position:absolute;left:50%;top:15%;opacity:0;transform:translate3d(-50%,-14px,0);
-    background:rgba(17,24,39,.92);color:#fff;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:999px;
-    white-space:nowrap;transition:opacity .35s ease, transform .35s cubic-bezier(.22,1,.36,1);
-    box-shadow:0 10px 26px rgba(0,0,0,.35);z-index:5}
-  .toast.on{opacity:1;transform:translate3d(-50%,0,0)}
-  .tap{position:absolute;width:46px;height:46px;border-radius:50%;pointer-events:none;z-index:9;
-    border:2.5px solid rgba(37,99,235,.85);background:rgba(37,99,235,.18);
-    transform:translate3d(-50%,-50%,0) scale(.4);opacity:0}
-  .tap.on{animation:tap 1.15s ease-out infinite}
-  @keyframes tap{0%{opacity:0;transform:translate3d(-50%,-50%,0) scale(.35)}25%{opacity:1}70%{opacity:.9;transform:translate3d(-50%,-50%,0) scale(1)}100%{opacity:0;transform:translate3d(-50%,-50%,0) scale(1.12)}}
-  .layer{position:absolute;inset:0;opacity:0;transition:opacity .5s ease;will-change:opacity}
-  .layer.on{opacity:1}
-  .fitbox{position:absolute;top:0;left:0;width:276px;height:613px;transform-origin:top left}
-  /* 说明区块 */
-  .speaklayer{position:absolute;inset:0;z-index:35;display:flex;pointer-events:none}
-  [data-lay="port"] .speaklayer{align-items:flex-start;justify-content:flex-start;padding:3.5% 6% 0}
-  [data-lay="land"] .speaklayer{align-items:center;justify-content:flex-end;padding:0 4% 0 0}
-  .speak{display:flex;flex-direction:column;text-align:left;pointer-events:auto}
-  [data-lay="port"] .speak{width:100%}
-  [data-lay="land"] .speak{width:48%}
-  .speak .kicker{font-weight:800;letter-spacing:.34em;color:var(--acc);text-transform:uppercase}
-  .speak h1{font-weight:850;line-height:1.16;letter-spacing:-.015em;margin-top:.5em}
-  .speak h1 .g{background:var(--gr);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .speak .sub{color:var(--ink2);line-height:1.65;margin-top:.8em}
-  .speak .rows{margin-top:1.05em}
-  .speak .row{display:flex;align-items:flex-start;gap:14px;padding:.68em 0;border-top:1px solid var(--line)}
-  .speak .row:last-child{border-bottom:1px solid var(--line)}
-  .speak .row b{font-weight:700}
-  .speak .row .dot{width:6px;height:6px;border-radius:50%;background:var(--acc);flex:0 0 auto;transform:translateY(7px)}
-  /* 场景（大屏） */
-  .scene{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
-    opacity:0;transform:translate3d(0,14px,0);pointer-events:none;will-change:transform,opacity;
-    transition:opacity .7s ease, transform .85s cubic-bezier(.22,1,.36,1)}
-  .scene.in{opacity:1;transform:none}
-  .scene.out{opacity:0;transform:translate3d(0,-10px,0)}
-  .scenebox{width:84%;max-height:92%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1em;text-align:center}
-  .kick{font-weight:800;letter-spacing:.4em;text-indent:.4em;color:var(--acc);text-transform:uppercase}
-  .hero-line{font-weight:850;line-height:1.1;letter-spacing:-.02em}
-  .hero-line .g{background:var(--gr);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .mega{font-weight:900;line-height:1;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
+    transform-style:preserve-3d}
+  #ghost{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    transform:translateZ(-340px) scale(1.19);pointer-events:none;
+    font-weight:900;letter-spacing:-.05em;line-height:1;white-space:nowrap;
+    color:rgba(255,255,255,.038);font-size:360px;
+    opacity:0;transition:opacity .9s ease}
+  #ghost.on{opacity:1}
+  #textcam{position:absolute;inset:0;z-index:30;transform:translateZ(-96px) scale(1.048)}
+  .scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;will-change:transform,opacity,filter,clip-path;
+    transition:opacity .62s ease, transform .8s cubic-bezier(.22,1,.36,1),
+      filter .66s ease, clip-path .78s cubic-bezier(.66,0,.34,1)}
+  /* ── 多变转场：每种一套「进来自哪 / 退出到哪」 ── */
+  .scene.t-rise {transform:translate3d(0,16px,0)}   .scene.t-rise.out {transform:translate3d(0,-12px,0)}
+  .scene.t-left {transform:translate3d(84px,0,0)}   .scene.t-left.out {transform:translate3d(-84px,0,0)}
+  .scene.t-right{transform:translate3d(-84px,0,0)}  .scene.t-right.out{transform:translate3d(84px,0,0)}
+  .scene.t-up   {transform:translate3d(0,78px,0)}   .scene.t-up.out   {transform:translate3d(0,-78px,0)}
+  .scene.t-down {transform:translate3d(0,-78px,0)}  .scene.t-down.out {transform:translate3d(0,78px,0)}
+  .scene.t-zoom {transform:scale(.84)}              .scene.t-zoom.out {transform:scale(1.08)}
+  .scene.t-pull {transform:scale(1.16)}             .scene.t-pull.out {transform:scale(.9)}
+  .scene.t-flip {transform:perspective(1200px) rotateY(-17deg) translateZ(-170px);transform-origin:50% 50%}
+  .scene.t-flip.out{transform:perspective(1200px) rotateY(13deg) translateZ(-130px)}
+  .scene.t-focus{filter:blur(13px);transform:scale(1.06)}  .scene.t-focus.out{filter:blur(13px);transform:scale(.97)}
+  .scene.t-wipe {clip-path:inset(0 0 0 100%)}       .scene.t-wipe.out {clip-path:inset(0 100% 0 0)}
+  .scene.t-iris {clip-path:circle(0% at 50% 50%)}   .scene.t-iris.out {clip-path:circle(0% at 50% 50%)}
+  /* 落定态：必须排在所有变体之后以覆盖入场初值 */
+  .scene.in{opacity:1;transform:none;filter:none}
+  /* 需裁切的变体各自给落定形状（同形状才能平滑插值） */
+  .scene.t-wipe.in{clip-path:inset(0 0 0 0)}
+  .scene.t-iris.in{clip-path:circle(142% at 50% 50%)}
+  .box{width:86%;max-height:94%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:1em;text-align:center}
+  .kick{font-weight:800;letter-spacing:.42em;text-indent:.42em;color:var(--acc);text-transform:uppercase}
+  .h1{font-weight:900;line-height:1.08;letter-spacing:-.028em}
+  .h1 .g{background:var(--gr);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .mega{font-weight:900;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums;
     background:var(--gr);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .lede{color:var(--ink2);line-height:1.7}
-  /* 逐行升起：只动 opacity + 2D transform */
-  .rise{opacity:0;transform:translate3d(0,16px,0);
-    transition:opacity .7s ease, transform .8s cubic-bezier(.22,1,.36,1);will-change:transform,opacity}
+  .lede{color:var(--tx2);line-height:1.7}
+  .foot{color:var(--tx3);font-weight:650;letter-spacing:.02em}
+  .rise{opacity:0;transform:translate3d(0,18px,0);
+    transition:opacity .68s ease, transform .78s cubic-bezier(.22,1,.36,1);will-change:transform,opacity}
   .rise.in{opacity:1;transform:none}
-  .pain{width:100%;display:flex;align-items:flex-start;gap:1.1em;text-align:left;padding:1em 0;border-top:1px solid var(--line)}
-  .pain:last-of-type{border-bottom:1px solid var(--line)}
-  .pain .no{font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums;min-width:2.2em}
-  .pain .tx b{display:block;font-weight:750}
-  .pain .tx em{font-style:normal;color:var(--ink2);line-height:1.55}
-  .tl{width:92%;text-align:left}
-  .tl .lrow{display:flex;align-items:flex-start;gap:1.2em;padding:.9em 0;border-top:1px solid var(--line)}
+  .rows{width:100%;margin-top:1.05em}
+  .row{display:flex;align-items:flex-start;gap:1.15em;text-align:left;padding:.95em 0;border-top:1px solid var(--line)}
+  .row:last-child{border-bottom:1px solid var(--line)}
+  .row .no{font-weight:900;color:var(--acc);font-variant-numeric:tabular-nums;min-width:2.1em}
+  .row .tx b{display:block;font-weight:800}
+  .row .tx em{font-style:normal;color:var(--tx2);line-height:1.55}
+  .tl{width:94%;text-align:left}
+  .tl .lrow{display:flex;align-items:flex-start;gap:1.2em;padding:.85em 0;border-top:1px solid var(--line)}
   .tl .lrow:last-child{border-bottom:1px solid var(--line)}
-  .tl .when{min-width:6.4em;font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:.5em}
-  .tl .when .pt{width:7px;height:7px;border-radius:50%;background:var(--acc);flex:0 0 auto}
-  .tl .what b{display:block;font-weight:750}
-  .tl .what em{font-style:normal;color:var(--ink2);line-height:1.5}
-  .tl .what img{height:1.35em;vertical-align:-.32em;margin-right:.4em}
-  .statrow{width:88%;text-align:left}
-  .srow{display:flex;align-items:baseline;gap:1.1em;padding:1.05em 0;border-top:1px solid var(--line)}
+  .tl .when{min-width:6.6em;font-weight:900;color:var(--acc);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:.5em}
+  .tl .when .pt{width:7px;height:7px;border-radius:50%;background:var(--acc);flex:0 0 auto;box-shadow:0 0 12px var(--acc)}
+  .tl .what b{display:block;font-weight:800}
+  .tl .what em{font-style:normal;color:var(--tx2);line-height:1.5}
+  .statrow{width:90%;text-align:left}
+  .srow{display:flex;align-items:baseline;gap:1.1em;padding:1em 0;border-top:1px solid var(--line)}
   .srow:last-child{border-bottom:1px solid var(--line)}
-  .srow .n{min-width:4.6em;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;
+  .srow .n{min-width:4.6em;font-weight:900;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
     background:var(--gr);-webkit-background-clip:text;background-clip:text;color:transparent}
   .srow .n s{text-decoration:none}
-  .srow .lb{color:var(--ink2)}
+  .srow .lb{color:var(--tx2)}
+  .chips{display:flex;flex-wrap:wrap;gap:.6em;justify-content:center;margin-top:.2em}
+  .chip{padding:.42em 1.05em;border:1px solid var(--line);border-radius:999px;color:var(--tx2);font-weight:700}
+  .flow{display:flex;align-items:center;flex-wrap:wrap;justify-content:center;gap:.7em;margin-top:.5em}
+  .flow .st{padding:.5em 1.1em;border:1px solid var(--line);border-radius:12px;font-weight:800;color:var(--tx)}
+  .flow .ar{color:var(--acc);font-weight:900}
+  .bars{width:100%;display:flex;flex-direction:column;gap:.7em;margin-top:.4em}
+  .brow{display:flex;align-items:center;gap:1em}
+  .brow .bl{min-width:4.2em;text-align:right;color:var(--tx2);font-weight:700;font-variant-numeric:tabular-nums}
+  .brow .bt{flex:1;height:14px;border-radius:7px;background:rgba(255,255,255,.06);overflow:hidden}
+  .brow .bt i{display:block;height:100%;border-radius:7px;background:var(--gr);transform-origin:left;transform:scaleX(0);
+    transition:transform 1s cubic-bezier(.2,.8,.3,1);will-change:transform}
+  .brow.on .bt i{transform:scaleX(var(--w))}
+  .heat{display:grid;grid-template-columns:repeat(20,1fr);gap:5px;width:100%;margin-top:.6em}
+  .heat i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.055)}
+  .heat i.l1{background:rgba(79,141,255,.34)}
+  .heat i.l2{background:rgba(79,141,255,.62)}
+  .heat i.l3{background:linear-gradient(135deg,#4F8DFF,#22D3EE)}
   .closewrap{display:flex;flex-direction:column;align-items:center;gap:1em}
-  .closewrap img{object-fit:contain}
-  .urlchip{position:relative;overflow:hidden;margin-top:.3em;padding:.75em 1.5em;border-radius:999px;color:#fff;font-weight:800;
-    background:var(--gr);box-shadow:0 12px 30px -10px rgba(37,99,235,.6);font-variant-numeric:tabular-nums}
-  .urlchip i{position:absolute;top:-50%;bottom:-50%;width:28%;left:0;
-    background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.45),rgba(255,255,255,0));
+  .closewrap img{object-fit:contain;filter:brightness(0) invert(1) opacity(.96)}
+  .urlchip{position:relative;overflow:hidden;margin-top:.35em;padding:.75em 1.5em;border-radius:999px;color:#fff;font-weight:800;
+    background:var(--gr);box-shadow:0 14px 40px -12px rgba(79,141,255,.7);font-variant-numeric:tabular-nums}
+  .urlchip i{position:absolute;top:-50%;bottom:-50%;width:26%;left:0;
+    background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.5),rgba(255,255,255,0));
     transform:translate3d(-180%,0,0) skewX(-18deg);will-change:transform;animation:chip 3.4s ease-in-out infinite}
-  @keyframes chip{0%{transform:translate3d(-180%,0,0) skewX(-18deg)}55%{transform:translate3d(520%,0,0) skewX(-18deg)}100%{transform:translate3d(520%,0,0) skewX(-18deg)}}
+  @keyframes chip{0%{transform:translate3d(-180%,0,0) skewX(-18deg)}55%{transform:translate3d(560%,0,0) skewX(-18deg)}100%{transform:translate3d(560%,0,0) skewX(-18deg)}}
   .segs{width:100%;display:flex;gap:5px;z-index:40}
-  .segs i{flex:1;height:3px;border-radius:3px;background:rgba(11,18,32,.10);overflow:hidden;position:relative}
-  .segs i.done{background:var(--acc2)}
+  .segs i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.10);overflow:hidden;position:relative}
+  .segs i.done{background:rgba(79,141,255,.75)}
   .segs i b{position:absolute;inset:0;background:var(--gr);transform-origin:left;transform:scaleX(0);border-radius:3px;will-change:transform}
   #count{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:90}
   #count i{position:absolute;font-style:normal;font-weight:900;color:var(--acc);opacity:0;animation:cnum 1s cubic-bezier(.2,.8,.3,1) forwards}
   @keyframes cnum{0%{opacity:0;transform:translate3d(0,0,0) scale(1.5)}22%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(.92)}}
-  #pausebd{position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:80;font-size:13px;letter-spacing:.18em;
-    color:var(--ink2);border:1px solid var(--line);background:rgba(255,255,255,.72);
+  #pausebd{position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:80;letter-spacing:.18em;
+    color:var(--tx2);border:1px solid var(--line);background:rgba(12,16,26,.72);backdrop-filter:blur(8px);
     border-radius:999px;padding:.45em 1.2em;opacity:0;transition:opacity .25s;pointer-events:none}
   #pausebd.on{opacity:1}
-  @media (prefers-reduced-motion: reduce){ #sheen,#stage,.phonefloat{animation:none!important} }
 </style>
 </head>
 <body>
@@ -241,25 +160,13 @@
 <div id="sheen"><div class="bar"></div></div>
 <div id="stage">
   <div class="topbar">
-    <img class="lg" style="width:30px;height:30px" data-logo alt="">
-    <b style="font-size:17px">猫卷</b><span class="sp"></span>
-    <span class="ver" style="font-size:12px;padding:4px 11px" id="ver">v1.28.1</span>
+    <img class="lg" style="width:28px;height:28px" data-logo alt="">
+    <b style="font-size:16px">猫卷</b><span class="sp"></span>
+    <span class="cut" style="font-size:11px" id="cutlabel">KEYNOTE</span>
   </div>
   <div id="cam">
+    <div id="ghost"></div>
     <div id="textcam"></div>
-    <div class="phonecam hide" id="phonecam">
-      <div class="phonewrap" id="phonewrap">
-        <div class="phonefloat" id="phonefloat">
-          <div class="phone" id="phone">
-            <div class="scr" id="scr">
-              <div class="toast" id="toast">示例题库导入完成 · 共 10 道题</div>
-              <div class="tap" id="tap"></div>
-            </div>
-            <div class="notch"></div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
   <div class="segs" id="segs"></div>
 </div>
@@ -268,8 +175,11 @@
 
 <script>
 var LOGO = "data:image/png;base64,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";
+document.querySelectorAll('[data-logo]').forEach(function(im){ im.src = LOGO; });
 
-var AR = (location.search.match(/ar=([\d.]+(?:[:x][\d.]+)?)/) || [])[1] || '9:16';
+var Q = location.search;
+var FAST = /cut=fast/.test(Q);
+var AR = (Q.match(/ar=([\d.]+(?:[:x][\d.]+)?)/) || [])[1] || '9:16';
 var pp = AR.replace('x', ':').split(':').map(Number);
 var RATIO = (pp[0] / pp[1]) || (9 / 16);
 var LAY = RATIO >= 0.98 ? 'land' : 'port';
@@ -279,231 +189,24 @@ else { SW = 1000; SH = Math.round(1000 / RATIO); }
 var stage = document.getElementById('stage');
 var cam = document.getElementById('cam');
 var textcam = document.getElementById('textcam');
-var phonecam = document.getElementById('phonecam');
-var phonefloat = document.getElementById('phonefloat');
+var ghost = document.getElementById('ghost');
 stage.style.width = SW + 'px'; stage.style.height = SH + 'px';
-stage.setAttribute('data-lay', LAY);
 var U = LAY === 'port' ? SW / 540 : SH / 540;
 function fitStage(){
   var s = Math.min(window.innerWidth / SW, window.innerHeight / SH);
   stage.style.transform = 'translate3d(-50%,-50%,0) scale(' + s.toFixed(4) + ')';
 }
 window.addEventListener('resize', fitStage); fitStage();
-document.querySelectorAll('[data-logo]').forEach(function(im){ im.src = LOGO; });
+document.getElementById('cutlabel').textContent = FAST ? 'SHORT CUT' : 'KEYNOTE';
+function px(base){ return Math.round(base * Math.max(U, .78)); }
 
-var PH = Math.round(SH * (LAY === 'port' ? 0.50 : 0.72));
-var PW = Math.round(PH * 0.452);
-var phone = document.getElementById('phone');
-phone.style.width = PW + 'px'; phone.style.height = PH + 'px';
-var scrEl = document.getElementById('scr');
-var pad = Math.round(PW * 0.035);
-scrEl.style.left = pad + 'px'; scrEl.style.top = pad + 'px';
-scrEl.style.width = (PW - pad * 2) + 'px'; scrEl.style.height = (PH - pad * 2) + 'px';
-
-/* ══════════ 屏幕模板（与 v1.28.1 真机一致） ══════════ */
-var ICONS = {
-  gear:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg>',
-  grad:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg>',
-  rocket:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/><circle cx="15" cy="9" r="1.7"/></svg>',
-  lib:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg>',
-  bulb:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>',
-  chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.5-.7L3 21l1.8-4.6A8.4 8.4 0 1 1 21 11.5z"/></svg>',
-  chev:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
-  home:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>',
-  chart:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>',
-  user:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>',
-  xcirc:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>'
-};
-function navbar(active){
-  var tabs = [['首页', ICONS.home], ['统计', ICONS.chart], ['我的', ICONS.user]];
-  return '<div class="navb">' + tabs.map(function(t, i){
-    return '<div class="t' + (i === (active || 0) ? ' on' : '') + '">' + t[1] + t[0] + '<div class="pip"></div></div>';
-  }).join('') + '</div>';
-}
-function chrome_(){ return '<div class="sbar"><span>9:41</span><span class="r"><span class="sg"></span><span class="bat"></span></span></div>'; }
-function scrHome(opt){
-  var card = opt.sel
-    ? '<div class="qi"><span class="ic">' + ICONS.grad + '</span><span class="tx"><b>新生第一步</b><em>示例题库已导入 · 已为你勾选</em></span><span class="go" style="color:var(--m-ok)">✓</span></div>'
-    : '<div class="qi hl"><span class="ic">' + ICONS.grad + '</span><span class="tx"><b>新生第一步</b><em>导入示例题库（10 道医学题），无需任何配置立即体验</em></span><span class="btn" id="b-import">导入</span></div>';
-  return chrome_() +
-    '<div class="appb">猫卷<span class="sp"></span><span class="gear">' + ICONS.gear + '</span></div>' +
-    '<div class="body">' +
-      '<div class="hero"><div class="hi">下午好！</div><div class="hr"><img class="lg2" data-logo2 alt=""><div><div class="ht">猫卷</div><div class="hq">为你，千千万万遍。</div></div></div></div>' +
-      '<div class="sech">快速操作</div>' +
-      '<div class="qa">' + card +
-        '<div class="qi"><span class="ic">' + ICONS.rocket + '</span><span class="tx"><b>定向爆破</b><em>' + (opt.sel ? '已选 1 个题库，全部' : '请先选择题库') + '</em></span><span class="go">' + ICONS.chev + '</span></div>' +
-        '<div class="qi"><span class="ic">' + ICONS.lib + '</span><span class="tx"><b>管理题库</b><em>' + (opt.sel ? '1 个题库' : '还没有题库，先去导入') + '</em></span><span class="go">' + ICONS.chev + '</span></div>' +
-      '</div>' +
-    '</div>' + navbar(0);
-}
-function scrQuiz(){
-  return chrome_() +
-    '<div class="appb" style="font-size:15px">第 1/10 题<span class="sp"></span></div>' +
-    '<div class="prog"><i style="width:10%"></i></div>' +
-    '<div class="body">' +
-      '<div class="card"><span class="qtag">判断</span><span class="qmeta">作答 1 次 · 正确率 0% · 下次复习：今天</span>' +
-      '<div class="stem">内脏痛的主要特点是定位准确、对切割刺激敏感。</div></div>' +
-      '<div class="tf"><div class="b">✓ 正确</div><div class="b x" id="b-wrong">✗ 错误</div></div>' +
-      '<div class="fb" id="fb"><div class="tt">' + ICONS.xcirc + '回答错误</div>' +
-      '<div class="rr">你选择了：<b style="color:var(--m-bad)">✓ 正确</b>　　正确答案：<b>✗ 错误</b></div></div>' +
-      '<div class="askrow" style="justify-content:center;color:var(--acc);font-weight:700;font-size:13px">' + ICONS.bulb + '查看解析</div>' +
-    '</div>';
-}
-function scrSample(){
-  return chrome_() +
-    '<div class="appb" style="font-size:15px">第 1/10 题<span class="sp"></span></div>' +
-    '<div class="prog"><i style="width:10%"></i></div>' +
-    '<div class="body">' +
-      '<div class="card"><span class="qtag">判断</span><div class="stem">内脏痛的主要特点是定位准确、对切割刺激敏感。</div></div>' +
-      '<div class="fb on"><div class="tt">' + ICONS.xcirc + '回答错误</div>' +
-      '<div class="rr">你选择了：<b style="color:var(--m-bad)">✓ 正确</b>　　正确答案：<b>✗ 错误</b></div></div>' +
-      '<div class="card" style="margin-top:10px"><div class="aih">' + ICONS.bulb + '示例解析<span class="sp"></span><span class="mini">内置 · 免 Key</span></div>' +
-      '<div class="atext">内脏痛定位模糊、对切割/烧灼等刺激不敏感，但对牵拉、缺血、痉挛和炎症等刺激敏感，常伴有<span class="hl">牵涉痛</span>和情绪反应。</div></div>' +
-      '<div class="askrow"><span class="aic">' + ICONS.chat + '</span><span class="tx"><b>向 AI 追问</b><em>没看懂？直接问，对话式讲解</em></span><span class="go" style="color:var(--m-fg3)">' + ICONS.chev + '</span></div>' +
-    '</div>';
-}
-var AI_TEXT = '**答案：** 错误。**题眼：** 内脏痛 ==定位模糊==，对切割/烧灼不敏感，但对牵拉、缺血、痉挛和炎症敏感。**避坑：** 别和躯体痛（定位准、怕切割）混淆。**口诀：** 内脏痛慢而广，牵涉痛要提防。';
-function aiHtml(){
-  return chrome_() +
-    '<div class="appb" style="font-size:15px">第 1/10 题<span class="sp"></span></div>' +
-    '<div class="prog"><i style="width:10%"></i></div>' +
-    '<div class="body">' +
-      '<div class="card"><div class="aih">' + ICONS.bulb + 'AI 解析<span class="sp"></span><span class="mini">题眼破题法</span></div>' +
-      '<div class="atext" id="ai-typed"><span class="caret"></span></div></div>' +
-      '<div id="bubs" style="margin-top:10px;display:flex;flex-direction:column;gap:7px"></div>' +
-    '</div>';
-}
-var BUBS = [
-  { u:true,  t:'为什么内脏痛定位模糊？' },
-  { u:false, t:'因为<b>内脏神经感受器分布稀疏</b>，信号进入脊髓时容易和体表信号汇到同一节段，大脑难以精确定位，还会「牵涉」到体表——比如心肌缺血时左肩内侧发酸。' },
-  { u:true,  t:'那考试怎么快速判断？' }
-];
-function renderAi(s){
-  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  s = s.replace(/==(.+?)==/g, '<span class="hl">$1</span>');
-  return s;
-}
-function scrStats(){
-  var cells = '', seed = 20260911;
-  function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
-  for(var i = 0; i < 91; i++){
-    var r = rnd(), lv = r > .68 ? 3 : r > .42 ? 2 : r > .22 ? 1 : 0;
-    cells += '<i class="l' + lv + '"></i>';
-  }
-  return chrome_() +
-    '<div class="appb">统计<span class="sp"></span></div>' +
-    '<div class="body">' +
-      '<div class="card"><div class="aih" style="color:var(--m-fg)">🔥 连续打卡 <span style="color:var(--acc)">21</span> 天<span class="sp"></span></div>' +
-      '<div class="heat">' + cells + '</div></div>' +
-      '<div class="trio"><div><b style="color:var(--acc)">1,284</b><em>总刷题量</em></div><div><b style="color:#16A34A">76%</b><em>平均正确率</em></div><div><b style="color:#D97706">6h24m</b><em>累计时长</em></div></div>' +
-      '<div class="card" style="margin-top:10px"><div class="aih" style="color:var(--m-fg);font-size:12.5px">错题 TOP 知识点<span class="sp"></span><span class="mini">FSRS-5 排期</span></div>' +
-      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:7px">' +
-        '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><span style="width:86px;color:var(--m-fg2)">缺氧分类</span><span style="flex:1;height:8px;border-radius:4px;background:var(--m-s2);overflow:hidden"><i style="display:block;height:100%;width:72%;background:var(--acc);border-radius:4px"></i></span><b style="font-size:11px">12</b></div>' +
-        '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><span style="width:86px;color:var(--m-fg2)">抗结核药</span><span style="flex:1;height:8px;border-radius:4px;background:var(--m-s2);overflow:hidden"><i style="display:block;height:100%;width:55%;background:var(--acc);border-radius:4px;opacity:.75"></i></span><b style="font-size:11px">9</b></div>' +
-        '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><span style="width:86px;color:var(--m-fg2)">心脏听诊</span><span style="flex:1;height:8px;border-radius:4px;background:var(--m-s2);overflow:hidden"><i style="display:block;height:100%;width:38%;background:var(--acc);border-radius:4px;opacity:.55"></i></span><b style="font-size:11px">6</b></div>' +
-      '</div></div>' +
-    '</div>' + navbar(1);
-}
-
-/* ══════════ 议程 ══════════ */
-var FEATS = [
-  { mock:function(){ return scrHome({sel:false}); }, tap:'#b-import',
-    kick:'01 · 开箱即用', h:'不用注册，|不用配置|', sub:'第一次打开，首页就把路径铺好。',
-    rows:[['一键导入示例题库','内置 10 道医学题，点一下就能开刷'],['无需 API Key','解析、判题、错题本全部本地可用'],['无需注册登录','没有账号，没有试用期，没有广告']] },
-  { mock:function(){ return scrHome({sel:true}); }, toast:true,
-    kick:'02 · 导入完成', h:'题库就位，|直接开刷|', sub:'导入完自动勾选，下一步就是刷题。',
-    rows:[['自动勾选题库','省掉去管理页勾选的来回'],['后台导入不打断','导入时还能继续别的事'],['进度实时可见','首页卡片显示导入状态']] },
-  { mock:function(){ return scrQuiz(); }, tap:'#b-wrong', revealFb:true,
-    kick:'03 · 判题', h:'答完即判，|七种题型|', sub:'单选、多选、判断、填空、名词解释、简答、案例。',
-    rows:[['答完立刻出结果','对错分色，选项高亮，不含糊'],['作答次数与正确率','逐题统计，答几次心里有数'],['自动进入错题本','答错即建复习卡，不用手动收藏']] },
-  { mock:function(){ return scrSample(); },
-    kick:'04 · 解析', h:'没配 Key，|也有解析|', sub:'先把内容看懂，再决定要不要接 AI。',
-    rows:[['题目自带示例解析','示例题库每道题都有讲解'],['0 配置先学起来','不花钱也能完成一轮复习'],['想上 AI 随时去设置','设置页填一个 Key 就升级']] },
-  { mock:function(){ return aiHtml(); }, type:true,
-    kick:'05 · AI 解析', h:'教你|题眼怎么破|', sub:'不是丢答案，是复现老师讲题的思路。',
-    rows:[['题眼破题法四步','抓题眼 → 拆选项 → 指坑点 → 给结论'],['关键词彩色标记','答案、题眼、避坑分别着色'],['篇幅三档','简洁 / 标准 / 详细，随时切换']] },
-  { mock:function(){ return aiHtml(); }, chat:true,
-    kick:'06 · 追问', h:'看不懂，|直接问|', sub:'解析里哪句没懂，接着问就行。',
-    rows:[['对话式追问','像聊天一样把疑点问透'],['按题保存','每题的问答独立留着，换题不串'],['富文本回复','列表、加粗、表格都能读明白']] },
-  { mock:function(){ return scrStats(); }, pan:true,
-    kick:'07 · 数据', h:'进步，|看得见|', sub:'复习不是凭感觉，是有排期、有数据。',
-    rows:[['FSRS-5 间隔复习','按遗忘曲线安排到期错题'],['年度贡献热力图','坚持了多少天，一眼看得到'],['薄弱知识点排行','哪里最该补，数据说了算']] }
-];
-
-/* 运镜：全局平移 x/y（px）+ 文字缩放 ts + 手机推拉 pz，dur 与缓动 */
-var camIn   = function(d){ return { y:[14,-12], dur:d, ease:easeInOutCubic }; };
-var camTruck= function(a,d){ return { x:[a,-a*0.35], dur:d, ease:easeInOutCubic }; };
-var camPz    = function(d){ return { pz:[1.0,1.055], dur:d, ease:easeInOutCubic }; };
-
-var BEATS = [
-  { kind:'hero', ms:5400, kick:'MAOJUAN · 2026 秋季发布', h:'猫卷', sub:'医学生的备考刷题 App',
-    foot:'从 0 到 1.28 —— 一个人做完的一整套系统',
-    cam:{ y:[-22,0], ts:[1.0,1.05], dur:2600, ease:easeOutCubic } },
-  { kind:'why', ms:7200, kick:'为什么做猫卷', h:'备考工具，|本不该这么贵|',
-    pains:[
-      ['01','订阅制把内容锁死','年费几百到数千元，停止续费，题库和解析一起消失'],
-      ['02','数据存在别人手里','换个设备就抓瞎，说停服就停服，复习记录说没就没'],
-      ['03','通用工具门槛太高','想刷自己的讲义和真题，先过格式和配置两关']
-    ],
-    foot:'2026 年 6 月，我决定自己写一个。', cam:camIn(7000) },
-  { kind:'origin', ms:6000, kick:'第一章 · 2026.06.15', h:'从零，跑通第一版',
-    rows:[['DOCX 讲义一键导入','把讲义变成可刷的题库'],['AI 题眼破题法解析','按老师讲题的逻辑拆解'],['错题本 · FSRS 排期','答错就排进复习计划']],
-    foot:'那时候，它叫「呆猫刷题宝」', cam:camTruck(34, 6000) },
-  { kind:'timeline', ms:9400, kick:'第一章 · 成长轨迹',
-    items:[
-      ['v1.26','三模式 · 练习模式 · 五套主题','正常 / 背题 / 快刷三种节奏'],
-      ['42 项','UI 与逻辑密集修复','统计页重构成六大板块'],
-      ['AES-256','密钥加密 · 开发包封存','Key 加密存储，历史版本归档'],
-      ['重建','环境从源码快照复活','测试从 1 个补到 62 个'],
-      ['猫卷','更名 · 手写新 logo','定位聚焦医学备考', true],
-      ['v1.27','批注 · 同步 · 三端','手写批注、局域网同步、宽屏自适应'],
-      ['v1.28','全新设计语言','Mao Des · AI 对话页 · 关键词标记']
-    ], cam:{ y:[22,-20], dur:9200, ease:easeInOutCubic } },
-  { kind:'today', ms:4200, kick:'今天', mega:'v1.28.1', h:'这是 v1.28.1',
-    sub:'接下来 40 秒，看它怎么陪你把这轮复习刷完。',
-    cam:{ ts:[1.0,1.10], dur:2800, ease:easeOutCubic } },
-  { kind:'feat', ms:5800, f:0, cam:{ x:[16,-8], pz:[1.0,1.05], dur:5600, ease:easeInOutCubic } },
-  { kind:'feat', ms:4500, f:1, cam:{ x:[-16,6], pz:[1.02,1.06], dur:4400, ease:easeInOutCubic } },
-  { kind:'feat', ms:5800, f:2, cam:{ y:[14,-10], pz:[1.0,1.05], dur:5600, ease:easeInOutCubic } },
-  { kind:'feat', ms:5400, f:3, cam:{ x:[14,-6], pz:[1.02,1.06], dur:5200, ease:easeInOutCubic } },
-  { kind:'feat', ms:6600, f:4, cam:{ y:[-12,8], pz:[1.0,1.055], dur:6400, ease:easeInOutCubic } },
-  { kind:'feat', ms:5400, f:5, cam:{ x:[-14,6], pz:[1.02,1.06], dur:5200, ease:easeInOutCubic } },
-  { kind:'feat', ms:5600, f:6, cam:{ y:[12,-9], pz:[1.0,1.05], dur:5400, ease:easeInOutCubic } },
-  { kind:'stats', ms:7000, kick:'尾声 · 一个人的长期主义', h:'从 6 月的一个念头|到你手机里的今天',
-    stats:[['3',' 个月','业余时间开发'],['9',' 个里程碑','持续迭代'],['221',' 项','自动化测试守护']],
-    cam:{ ts:[1.06,1.0], dur:6800, ease:easeInOutCubic } },
-  { kind:'close', ms:6600, kick:'FREE · OPEN SOURCE', h:'猫卷 · 备考刷题', sub:'免费 · 开源 · 数据全在本地',
-    url:'laow07573-web.github.io/daimao-quiz-master', foot:'现在就去下载，装好即刷',
-    cam:{ ts:[1.0,1.06], dur:6400, ease:easeInOutCubic } }
-];
-
-
-/* 3D 运镜曲线（按拍）：z 推拉 / ry 偏转 / rx 俯仰 / x,y 位移 / pz 手机前推 */
-var CAM3D = [
-  { z:[-300,0], ry:[-16,0], dur:2500, ease:easeOutCubic },                                  /* 0 hero 立体飞入 */
-  { z:[0,110], rx:[1.6,-1.0], dur:7200, ease:easeInOutCubic },                              /* 1 why 推入 */
-  { x:[40,-14], ry:[-7,3], dur:6000, ease:easeInOutCubic },                                 /* 2 origin 横移带转 */
-  { y:[24,-22], rx:[2.6,-2.2], z:[40,0], dur:9400, ease:easeInOutCubic },                    /* 3 timeline 俯仰扫 */
-  { z:[-80,150], ry:[9,-2], dur:2800, ease:easeOutCubic },                                   /* 4 today 冲推 */
-  { x:[18,-9],  z:[0,70],  ry:[6,-3],  pz:[1.0,1.05], dur:5800, ease:easeInOutCubic },
-  { x:[-18,8],  z:[20,80], ry:[-6,3],  pz:[1.0,1.05], dur:4500, ease:easeInOutCubic },
-  { y:[16,-12], z:[0,70],  rx:[-1.6,1.4], pz:[1.0,1.05], dur:5800, ease:easeInOutCubic },
-  { x:[16,-7],  z:[20,80], ry:[6,-3],  pz:[1.0,1.05], dur:5400, ease:easeInOutCubic },
-  { y:[-14,10], z:[0,75],  rx:[1.6,-1.4], pz:[1.0,1.05], dur:6600, ease:easeInOutCubic },
-  { x:[-16,7],  z:[20,80], ry:[-6,3],  pz:[1.0,1.05], dur:5400, ease:easeInOutCubic },
-  { y:[14,-10], z:[0,70],  pz:[1.0,1.05], dur:5600, ease:easeInOutCubic },
-  { z:[130,0], rx:[-2,1.2], dur:7000, ease:easeInOutCubic },                                 /* 12 stats 后拉 */
-  { z:[0,80], ry:[0,3], dur:6600, ease:easeInOutCubic }                                      /* 13 close 缓推 */
-];
-
-/* ══════════ 运镜引擎（虚拟时钟 + 脏检查，空闲帧零写入） ══════════ */
+/* ══════════ 立体运镜引擎（透视相机 + 脏检查） ══════════ */
 function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 function easeInOutCubic(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+function easeOutQuint(t){ return 1 - Math.pow(1 - t, 5); }
 function lerp(a, b, k){ return a + (b - a) * k; }
-/* 3D 相机：位移 x/y/z(px) + 俯仰 rx / 偏转 ry(deg)；pz 为手机额外前推 */
 var KF = null, camT0 = 0, clock = 0, prevT = performance.now();
-var vx = 0, vy = 0, vz = 0, vrx = 0, vry = 0, vpz = 1, wrote = '';
+var vx=0, vy=0, vz=0, vrx=0, vry=0, wrote='';
 function applyCam(){
   var k = 1;
   if(KF){
@@ -514,16 +217,12 @@ function applyCam(){
     vz  = KF.z  ? lerp(KF.z[0],  KF.z[1],  k) : 0;
     vrx = KF.rx ? lerp(KF.rx[0], KF.rx[1], k) : 0;
     vry = KF.ry ? lerp(KF.ry[0], KF.ry[1], k) : 0;
-    vpz = KF.pz ? lerp(KF.pz[0], KF.pz[1], k) : 1;
   }
-  var key = vx.toFixed(2)+'|'+vy.toFixed(2)+'|'+vz.toFixed(2)+'|'+vrx.toFixed(3)+'|'+vry.toFixed(3)+'|'+vpz.toFixed(4);
-  if(key === wrote) return;          /* 数值没变 → 不碰 DOM（空闲帧零写入） */
+  var key = vx.toFixed(2)+'|'+vy.toFixed(2)+'|'+vz.toFixed(2)+'|'+vrx.toFixed(3)+'|'+vry.toFixed(3);
+  if(key === wrote) return;
   wrote = key;
-  /* 相机本体：透视投影下，Z 推拉与 X/Y 旋转由子层不同景深自然产生视差 */
   cam.style.transform = 'translate3d(' + vx.toFixed(2) + 'px,' + vy.toFixed(2) + 'px,' + vz.toFixed(2) +
     'px) rotateX(' + vrx.toFixed(3) + 'deg) rotateY(' + vry.toFixed(3) + 'deg)';
-  /* 手机额外前推（功能拍强调产品） */
-  phonecam.style.transform = 'translate3d(0,0,' + (60 + (vpz - 1) * 460).toFixed(1) + 'px)';
 }
 (function loop(){
   var t = performance.now(), dt = t - prevT; prevT = t;
@@ -536,50 +235,154 @@ function sheen(){
   s.classList.remove('go'); void s.offsetWidth; s.classList.add('go');
 }
 
-/* ══════════ 播放器 ══════════ */
+/* ══════════ 内容 ══════════ */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function em(s){ return esc(s).replace(/\|(.+?)\|/g,'<span class="g">$1</span>'); }
+
+var FEATS = [
+  { ghost:'0', kick:'01 · 开箱即用', h:'不用注册，|不用配置|', sub:'第一次打开，路径就已经铺好。',
+    el:function(){ return '<div class="rows">' + [['—','一键导入示例题库','内置 10 道医学题，点一下就能开刷'],
+      ['—','无需 API Key','解析、判题、错题本全部本地可用'],['—','无需注册登录','没有账号，没有试用期，没有广告']]
+      .map(function(r){ return '<div class="row rise"><span class="no" style="font-size:' + px(15) + 'px">' + r[0] + '</span>' +
+        '<div class="tx"><b style="font-size:' + px(17) + 'px">' + esc(r[1]) + '</b>' +
+        '<em style="font-size:' + px(13.5) + 'px">' + esc(r[2]) + '</em></div></div>'; }).join('') + '</div>'; } },
+  { ghost:'7', kick:'02 · 题型覆盖', h:'七种题型，|一套判定|', sub:'从判断到案例，判题逻辑各不相同。',
+    el:function(){ return '<div class="chips">' + ['单选','多选','判断','填空','名词解释','简答','案例']
+      .map(function(t){ return '<span class="chip rise" style="font-size:' + px(14) + 'px">' + t + '</span>'; }).join('') + '</div>'; } },
+  { ghost:'AI', kick:'03 · 题眼破题法', h:'不是给答案，|是教你破题|', sub:'复现一个老师在旁边讲题的思路。',
+    el:function(){ return '<div class="flow">' + ['抓题眼','拆选项','指坑点','给结论']
+      .map(function(t, i){ return (i ? '<span class="ar rise">→</span>' : '') +
+        '<span class="st rise" style="font-size:' + px(15) + 'px">' + t + '</span>'; }).join('') + '</div>'; } },
+  { ghost:'F', kick:'04 · 间隔复习', h:'错题按|遗忘曲线|排期', sub:'FSRS-5 决定今天该复习哪几道。',
+    el:function(){ return '<div class="bars">' + [['第 1 天','.18'],['第 3 天','.34'],['第 7 天','.55'],['第 21 天','.78'],['第 60 天','1']]
+      .map(function(x){ return '<div class="brow rise" style="--w:' + x[1] + '"><span class="bl" style="font-size:' + px(13) + 'px">' + x[0] + '</span>' +
+        '<span class="bt"><i></i></span></div>'; }).join('') + '</div>'; } },
+  { ghost:'↑', kick:'05 · 数据', h:'坚持，|看得见|', sub:'不是凭感觉，是有记录、有依据。',
+    el:function(){ var c = '', seed = 20260911;
+      function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
+      for(var i = 0; i < 120; i++){ var r = rnd(), lv = r > .70 ? 3 : r > .46 ? 2 : r > .26 ? 1 : 0; c += '<i class="l' + lv + '"></i>'; }
+      return '<div class="heat rise">' + c + '</div>'; } },
+  { ghost:'?', kick:'06 · 追问', h:'看不懂，|直接问|', sub:'解析里哪句没懂，接着问就行。',
+    el:function(){ return '<div class="rise" style="font-size:' + px(17) + 'px;color:var(--tx2);line-height:1.7">' +
+      '「为什么内脏痛定位模糊？」<br>「那考试怎么快速判断？」</div>' +
+      '<div class="rise" style="margin-top:.9em;font-size:' + px(13.5) + 'px;color:var(--tx3)">一问一答留在题目旁边，下次打开还在</div>'; } }
+];
+
+function Z_IN(d){ return { z:[-300,0], ry:[-15,0], dur:d, ease:easeOutCubic }; }
+function Z_PUSH(d){ return { z:[0,150], rx:[1.6,-1.0], dur:d, ease:easeInOutCubic }; }
+function Z_SWING(d){ return { x:[38,-12], ry:[-7,3], dur:d, ease:easeInOutCubic }; }
+function Z_SCAN(d){ return { y:[24,-22], rx:[2.6,-2.2], z:[40,0], dur:d, ease:easeInOutCubic }; }
+function Z_RUSH(d){ return { z:[-90,170], ry:[9,-2], dur:d, ease:easeOutQuint }; }
+function Z_OUT(d){ return { z:[150,0], rx:[-2,1.2], dur:d, ease:easeInOutCubic }; }
+function Z_FEAT(a, d){ return { x:[a, -a*.4], z:[0,90], ry:[a>0?7:-7, -a*.3], dur:d, ease:easeInOutCubic }; }
+function Z_CLOSE(d){ return { z:[0,90], ry:[0,3], dur:d, ease:easeInOutCubic }; }
+
+function B(kind, o){ o = o || {}; o.kind = kind; return o; }
+var BEATS_K = [
+  B('hero', { ms:5400, kick:'MAOJUAN · 2026 秋季发布', h:'猫卷', ghost:'猫',
+    sub:'医学生的备考刷题 App', foot:'从 0 到 1.28 —— 一个人做完的一整套系统', cam:Z_IN(2500) }),
+  B('rows', { ms:7200, kick:'为什么做猫卷', h:'备考工具，|本不该这么贵|', ghost:'贵',
+    rows:[['01','订阅制把内容锁死','年费几百到数千元，停止续费，题库和解析一起消失'],
+          ['02','数据存在别人手里','换个设备就抓瞎，说停服就停服，复习记录说没就没'],
+          ['03','通用工具门槛太高','想刷自己的讲义和真题，先过格式和配置两关']],
+    foot:'2026 年 6 月，我决定自己写一个。', cam:Z_PUSH(7000) }),
+  B('origin', { ms:6000, kick:'第一章 · 2026.06.15', h:'从零，跑通第一版', ghost:'0',
+    rows:[['＋','DOCX 讲义一键导入','把讲义变成可刷的题库'],
+          ['＋','AI 题眼破题法解析','按老师讲题的逻辑拆解'],
+          ['＋','错题本 · FSRS 排期','答错就排进复习计划']],
+    foot:'那时候，它叫「呆猫刷题宝」', cam:Z_SWING(6000) }),
+  B('timeline', { ms:9400, kick:'第一章 · 成长轨迹', ghost:'↗',
+    items:[['v1.26','三模式 · 练习模式 · 五套主题','正常 / 背题 / 快刷三种节奏'],
+           ['42 项','UI 与逻辑密集修复','统计页重构成六大板块'],
+           ['AES-256','密钥加密 · 开发包封存','Key 加密存储，历史版本归档'],
+           ['重建','环境从源码快照复活','测试从 1 个补到 62 个'],
+           ['猫卷','更名 · 手写新 logo','定位聚焦医学备考'],
+           ['v1.27','批注 · 同步 · 三端','手写批注、局域网同步、宽屏自适应'],
+           ['v1.28','全新设计语言','Mao Des · AI 对话页 · 关键词标记']],
+    cam:Z_SCAN(9200) }),
+  B('today', { ms:4200, kick:'今天', mega:'v1.28.1', ghost:'v',
+    sub:'接下来 40 秒，看它怎么陪你把这轮复习刷完。', cam:Z_RUSH(2800) }),
+  B('feat', { ms:6000, f:0, cam:Z_FEAT(18, 5800) }),
+  B('feat', { ms:4800, f:1, cam:Z_FEAT(-18, 4600) }),
+  B('feat', { ms:6000, f:2, cam:{ y:[14,-10], z:[0,80], rx:[-1.6,1.4], dur:5800, ease:easeInOutCubic } }),
+  B('feat', { ms:6000, f:3, cam:Z_FEAT(16, 5800) }),
+  B('feat', { ms:6000, f:4, cam:{ y:[-12,8], z:[0,85], dur:5800, ease:easeInOutCubic } }),
+  B('feat', { ms:5600, f:5, cam:Z_FEAT(-16, 5400) }),
+  B('stats', { ms:7000, kick:'尾声 · 一个人的长期主义', h:'从 6 月的一个念头|到你手机里的今天', ghost:'∞',
+    stats:[['3',' 个月','业余时间开发'],['9',' 个里程碑','持续迭代'],['221',' 项','自动化测试守护']],
+    cam:Z_OUT(6800) }),
+  B('close', { ms:6600, kick:'FREE · OPEN SOURCE', h:'猫卷 · 备考刷题', ghost:'猫',
+    sub:'免费 · 开源 · 数据全在本地', url:'laow07573-web.github.io/daimao-quiz-master',
+    foot:'现在就去下载，装好即刷', cam:Z_CLOSE(6400) })
+];
+
+var BEATS_F = [
+  B('hero', { ms:2400, kick:'MAOJUAN', h:'猫卷', ghost:'猫',
+    sub:'装好就能刷，不用任何配置', foot:'', cam:{ z:[-380,0], ry:[-19,0], dur:1500, ease:easeOutQuint } }),
+  B('rows', { ms:4000, kick:'为什么做它', h:'订阅制，|正在吃掉你的备考预算|', ghost:'¥',
+    rows:[['01','内容锁死','停止续费，题库和解析一起消失'],
+          ['02','数据在别人手里','说停服就停服，复习记录说没就没'],
+          ['03','门槛太高','想刷自己的讲义，先过格式和配置两关']],
+    foot:'', cam:{ z:[-120,220], rx:[3,-2], dur:4000, ease:easeInOutCubic } }),
+  B('today', { ms:2000, kick:'今天', mega:'v1.28.1', ghost:'v', sub:'',
+    cam:{ z:[-220,190], ry:[13,-3], dur:1900, ease:easeOutQuint } }),
+  B('feat', { ms:2600, f:0, cam:{ z:[-160,150], ry:[-11,3], dur:2500, ease:easeOutQuint } }),
+  B('feat', { ms:2600, f:1, cam:{ x:[30,-16], z:[-60,140], dur:2500, ease:easeOutQuint } }),
+  B('feat', { ms:2800, f:2, cam:{ z:[-140,160], ry:[10,-3], dur:2700, ease:easeOutQuint } }),
+  B('feat', { ms:2600, f:4, cam:{ y:[18,-14], z:[-60,130], dur:2500, ease:easeOutQuint } }),
+  B('stats', { ms:3600, kick:'一个人做完', h:'从 6 月的念头|到你手机里的今天', ghost:'∞',
+    stats:[['3',' 个月','业余时间开发'],['9',' 个里程碑','持续迭代'],['221',' 项','自动化测试守护']],
+    cam:{ z:[-200,40], rx:[2.4,-1.4], dur:3400, ease:easeInOutCubic } }),
+  B('close', { ms:3400, kick:'FREE · OPEN SOURCE', h:'猫卷 · 备考刷题', ghost:'猫',
+    sub:'免费 · 开源 · 数据全在本地', url:'laow07573-web.github.io/daimao-quiz-master',
+    foot:'装好即刷', cam:{ z:[-40,140], dur:3200, ease:easeOutQuint } })
+];
+
+var BEATS = FAST ? BEATS_F : BEATS_K;
+
+/* 转场序列：每拍一种，相邻不重复 */
+var TR_K = ['t-rise','t-left','t-up','t-down','t-wipe','t-right','t-zoom','t-left','t-flip','t-up','t-focus','t-pull','t-iris','t-zoom'];
+var TR_F = ['t-wipe','t-flip','t-zoom','t-left','t-right','t-up','t-focus','t-pull','t-iris'];
+(function(){ var seq = FAST ? TR_F : TR_K;
+  BEATS.forEach(function(b, i){ if(!b.tr) b.tr = seq[i % seq.length]; }); })();
+var CUR_TR = 't-rise';
+
+
+/* ══════════ 渲染 ══════════ */
 function byId(id){ return document.getElementById(id); }
-var segsBox = byId('segs'), countBox = byId('count'),
-    tapEl = byId('tap'), toastEl = byId('toast'), pauseBd = byId('pausebd'),
-    phonewrap = byId('phonewrap');
-var speed = parseFloat((location.search.match(/speed=([\d.]+)/) || [])[1]) || 1;
+var segsBox = byId('segs'), countBox = byId('count'), pauseBd = byId('pausebd');
+var speed = parseFloat((Q.match(/speed=([\d.]+)/) || [])[1]) || 1;
 var timer = null, beat = -1, paused = false;
 var segStart = 0, segDur = 0, pausedAt = 0, segFill = null;
 var TYPE_TIMERS = [], SCENE_TOKEN = 0;
 BEATS.forEach(function(){ var s = document.createElement('i'); segsBox.appendChild(s); });
 var segEls = [].slice.call(segsBox.children);
 
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-function em(s){ return esc(s).replace(/\|(.+?)\|/g,'<span class="g">$1</span>'); }
 function clearTimers(){ TYPE_TIMERS.forEach(clearTimeout); TYPE_TIMERS = []; }
-function px(base){ return Math.round(base * Math.max(U, .78)); }
-
 function retireScenes(){
   SCENE_TOKEN++;
   [].slice.call(textcam.children).forEach(function(s){
     if(s.classList.contains('in')){
       s.classList.remove('in'); s.classList.add('out');
       var t = SCENE_TOKEN;
-      setTimeout(function(){ if(t === SCENE_TOKEN) s.remove(); }, 1100);
+      setTimeout(function(){ if(t === SCENE_TOKEN) s.remove(); }, 1050);
     } else s.remove();
-  });
-}
-function clearLayers(){
-  [].slice.call(scrEl.querySelectorAll('.layer')).forEach(function(l){
-    l.classList.remove('on');
-    setTimeout(function(){ l.remove(); }, 560);
   });
 }
 function mountScene(inner){
   var d = document.createElement('div');
-  d.className = 'scene';
-  d.innerHTML = '<div class="scenebox">' + inner + '</div>';
+  d.className = 'scene ' + CUR_TR;
+  d.innerHTML = '<div class="box">' + inner + '</div>';
   textcam.appendChild(d);
   var t = SCENE_TOKEN;
   requestAnimationFrame(function(){ requestAnimationFrame(function(){
     if(t !== SCENE_TOKEN) return;
     d.classList.add('in');
     d.querySelectorAll('.rise').forEach(function(r, i){
-      TYPE_TIMERS.push(setTimeout(function(){ r.classList.add('in'); }, i * 160 + 220));
+      TYPE_TIMERS.push(setTimeout(function(){
+        r.classList.add('in');
+        if(r.classList.contains('brow')) r.classList.add('on');
+      }, i * 150 + 210));
     });
     var t2 = SCENE_TOKEN;
     d.querySelectorAll('[data-n]').forEach(function(el){
@@ -594,55 +397,10 @@ function mountScene(inner){
   }); });
   return d;
 }
-function fitLayer(l){
-  var box = l.querySelector('.fitbox');
-  if(!box) return;
-  box.style.transform = 'scale(' + Math.min(scrEl.clientWidth / 276, scrEl.clientHeight / 613) + ')';
-}
-function showTap(sel){
-  var el = scrEl.querySelector(sel);
-  if(!el){ tapEl.classList.remove('on'); return; }
-  var x = 0, y = 0, n = el;
-  while(n && n !== scrEl){ x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
-  var s = Math.min(scrEl.clientWidth / 276, scrEl.clientHeight / 613);
-  tapEl.style.width = tapEl.style.height = (46 * s) + 'px';
-  tapEl.style.borderWidth = Math.max(1.5, 2.5 * s) + 'px';
-  tapEl.style.left = (x * s + el.offsetWidth * s / 2) + 'px';
-  tapEl.style.top = (y * s + el.offsetHeight * s / 2) + 'px';
-  tapEl.classList.remove('on'); void tapEl.offsetWidth; tapEl.classList.add('on');
-}
-function typeInto(el, text, ms){
-  var i = 0, step = Math.max(14, ms / text.length);
-  (function tick(){
-    if(i >= text.length){ el.innerHTML = renderAi(text); return; }
-    i += 2;
-    el.innerHTML = renderAi(text.slice(0, i)) + '<span class="caret"></span>';
-    TYPE_TIMERS.push(setTimeout(tick, step));
-  })();
-}
-function playBubs(box){
-  BUBS.forEach(function(b, i){
-    TYPE_TIMERS.push(setTimeout(function(){
-      var d = document.createElement('div');
-      d.style.cssText = 'max-width:82%;font-size:12px;line-height:1.6;padding:9px 12px;border-radius:' +
-        (b.u ? '13px 13px 13px 4px;align-self:flex-end;background:var(--acc);color:#fff'
-             : '13px 13px 4px 13px;align-self:flex-start;background:var(--m-card);border:1px solid var(--m-bd);color:var(--m-fg)');
-      d.innerHTML = b.t;
-      d.style.opacity = '0'; d.style.transform = 'translate3d(0,8px,0)'; d.style.transition = 'opacity .35s ease, transform .35s';
-      box.appendChild(d);
-      requestAnimationFrame(function(){ d.style.opacity = '1'; d.style.transform = 'none'; });
-    }, i * 1200 + 460));
-  });
-}
-function featSpeak(f){
-  return '<div class="speak">' +
-    '<div class="kicker rise" style="font-size:' + px(12.5) + 'px">' + esc(f.kick) + '</div>' +
-    '<h1 class="rise" style="font-size:' + px(LAY === 'port' ? 30 : 34) + 'px">' + em(f.h) + '</h1>' +
-    '<div class="sub rise" style="font-size:' + px(15) + 'px">' + esc(f.sub) + '</div>' +
-    '<div class="rows">' + f.rows.map(function(r){
-      return '<div class="row rise"><span class="dot"></span><div><b style="font-size:' + px(15.5) + 'px">' + esc(r[0]) + '</b>' +
-        '<div style="color:var(--ink2);font-size:' + px(13.5) + 'px;line-height:1.5">' + esc(r[1]) + '</div></div></div>';
-    }).join('') + '</div></div>';
+function setGhost(g){
+  ghost.textContent = g || '';
+  ghost.style.fontSize = px(g && g.length > 1 ? 210 : 400) + 'px';
+  ghost.classList.toggle('on', !!g);
 }
 
 function showBeat(k){
@@ -651,119 +409,78 @@ function showBeat(k){
   var b = BEATS[k];
   clearTimers();
   retireScenes();
-  clearLayers();
-  tapEl.classList.remove('on');
-  toastEl.classList.remove('on');
   segEls.forEach(function(s, i){
     s.classList.toggle('done', i < k);
     s.classList.toggle('cur', i === k);
     var f = s.querySelector('b'); if(f) f.remove();
   });
   segDur = b.ms / speed;
-  camT0 = clock; KF = CAM3D[k] || { z:[0,60], dur:3500, ease:easeInOutCubic };
+  camT0 = clock; KF = b.cam || { z:[0,60], dur:3200, ease:easeInOutCubic };
+  CUR_TR = b.tr || 't-rise';
   sheen();
-
-  var isFeat = b.kind === 'feat';
-  phonecam.classList.toggle('hide', !isFeat);
-  if(isFeat){
-    var f = FEATS[b.f];
-    phonecam.classList.add('show');
-    var l = document.createElement('div');
-    l.className = 'layer';
-    l.innerHTML = '<div class="fitbox">' + f.mock() + '</div>';
-    scrEl.insertBefore(l, toastEl);
-    l.querySelectorAll('[data-logo2]').forEach(function(im){ im.src = LOGO; });
-    fitLayer(l);
-    requestAnimationFrame(function(){ l.classList.add('on'); });
-    var sp = document.createElement('div');
-    sp.className = 'speaklayer';
-    sp.innerHTML = featSpeak(f);
-    textcam.appendChild(sp);
-    requestAnimationFrame(function(){ requestAnimationFrame(function(){
-      sp.querySelectorAll('.rise').forEach(function(r, i){
-        TYPE_TIMERS.push(setTimeout(function(){ r.classList.add('in'); }, i * 140 + 300));
-      });
-    }); });
-    if(f.toast) TYPE_TIMERS.push(setTimeout(function(){ toastEl.classList.add('on'); }, 850));
-    if(f.type){
-      var at = l.querySelector('#ai-typed');
-      if(at) TYPE_TIMERS.push(setTimeout(function(){ typeInto(at, AI_TEXT, b.ms * 0.58 / speed); }, 460));
-    }
-    if(f.chat){
-      var a0 = l.querySelector('#ai-typed');
-      if(a0) a0.innerHTML = renderAi(AI_TEXT);
-      var bx = l.querySelector('#bubs');
-      if(bx) playBubs(bx);
-    }
-    if(f.pan){
-      var body = l.querySelector('.body');
-      if(body){
-        body.style.transition = 'transform 5s cubic-bezier(.4,.1,.2,1)';
-        TYPE_TIMERS.push(setTimeout(function(){ body.style.transform = 'translate3d(0,-26px,0)'; }, 650));
-      }
-    }
-    if(f.tap) TYPE_TIMERS.push(setTimeout(function(){ showTap(f.tap); }, 500));
-    if(f.revealFb) TYPE_TIMERS.push(setTimeout(function(){
-      var fb = l.querySelector('.fb'); if(fb) fb.classList.add('on');
-    }, 1900));
-  } else {
-    phonecam.classList.remove('show');
-  }
+  setGhost(b.ghost);
 
   if(b.kind === 'hero'){
-    mountScene('<img class="rise" src="' + LOGO + '" style="height:' + px(158) + 'px;object-fit:contain" alt="">' +
-      '<div class="rise hero-line" style="font-size:' + px(LAY === 'port' ? 58 : 64) + 'px">' + esc(b.h) + '</div>' +
-      '<div class="rise lede" style="font-size:' + px(16) + 'px">' + esc(b.sub) + '</div>' +
-      '<div class="rise" style="margin-top:.7em;font-size:' + px(12.5) + 'px;color:var(--ink3);letter-spacing:.2em">' + esc(b.foot) + '</div>');
+    mountScene('<img class="rise" src="' + LOGO + '" style="height:' + px(146) + 'px;object-fit:contain;filter:brightness(0) invert(1)" alt="">' +
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 76 : 86) + 'px">' + esc(b.h) + '</div>' +
+      '<div class="rise lede" style="font-size:' + px(17) + 'px">' + esc(b.sub) + '</div>' +
+      (b.foot ? '<div class="rise foot" style="margin-top:.6em;font-size:' + px(12.5) + 'px;letter-spacing:.18em">' + esc(b.foot) + '</div>' : ''));
   }
-  else if(b.kind === 'why'){
+  else if(b.kind === 'rows'){
     mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(b.kick) + '</div>' +
-      '<div class="rise hero-line" style="font-size:' + px(LAY === 'port' ? 30 : 36) + 'px;margin-bottom:.4em">' + em(b.h) + '</div>' +
-      b.pains.map(function(p){
-        return '<div class="pain rise"><span class="no" style="font-size:' + px(15) + 'px">' + esc(p[0]) + '</span>' +
-          '<div class="tx"><b style="font-size:' + px(16.5) + 'px">' + esc(p[1]) + '</b>' +
-          '<em style="font-size:' + px(13.5) + 'px">' + esc(p[2]) + '</em></div></div>';
-      }).join('') +
-      '<div class="rise lede" style="margin-top:1.1em;font-size:' + px(15) + 'px">' + esc(b.foot) + '</div>');
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 34 : 40) + 'px">' + em(b.h) + '</div>' +
+      '<div class="rows">' + b.rows.map(function(r){
+        return '<div class="row rise"><span class="no" style="font-size:' + px(15) + 'px">' + esc(r[0]) + '</span>' +
+          '<div class="tx"><b style="font-size:' + px(17) + 'px">' + esc(r[1]) + '</b>' +
+          '<em style="font-size:' + px(13.5) + 'px">' + esc(r[2]) + '</em></div></div>';
+      }).join('') + '</div>' +
+      (b.foot ? '<div class="rise lede" style="margin-top:1em;font-size:' + px(15) + 'px">' + esc(b.foot) + '</div>' : ''));
   }
   else if(b.kind === 'origin'){
     mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(b.kick) + '</div>' +
-      '<div class="rise hero-line" style="font-size:' + px(LAY === 'port' ? 32 : 38) + 'px;margin-bottom:.5em">' + em(b.h) + '</div>' +
-      b.rows.map(function(r){
-        return '<div class="pain rise"><span class="no" style="font-size:' + px(15) + 'px">＋</span>' +
-          '<div class="tx"><b style="font-size:' + px(16.5) + 'px">' + esc(r[0]) + '</b>' +
-          '<em style="font-size:' + px(13.5) + 'px">' + esc(r[1]) + '</em></div></div>';
-      }).join('') +
-      '<div class="rise lede" style="margin-top:.9em;font-size:' + px(14) + 'px">' + esc(b.foot) + '</div>');
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 36 : 42) + 'px">' + esc(b.h) + '</div>' +
+      '<div class="rows">' + b.rows.map(function(r){
+        return '<div class="row rise"><span class="no" style="font-size:' + px(15) + 'px">' + esc(r[0]) + '</span>' +
+          '<div class="tx"><b style="font-size:' + px(17) + 'px">' + esc(r[1]) + '</b>' +
+          '<em style="font-size:' + px(13.5) + 'px">' + esc(r[2]) + '</em></div></div>';
+      }).join('') + '</div>' +
+      (b.foot ? '<div class="rise lede" style="margin-top:.9em;font-size:' + px(14) + 'px">' + esc(b.foot) + '</div>' : ''));
   }
   else if(b.kind === 'timeline'){
-    mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px;margin-bottom:.4em">' + esc(b.kick) + '</div>' +
+    mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px;margin-bottom:.3em">' + esc(b.kick) + '</div>' +
       '<div class="tl">' + b.items.map(function(it){
         return '<div class="lrow rise"><div class="when" style="font-size:' + px(14) + 'px"><span class="pt"></span>' + esc(it[0]) + '</div>' +
           '<div class="what"><b style="font-size:' + px(15.5) + 'px">' + esc(it[1]) + '</b>' +
-          '<em style="font-size:' + px(13) + 'px">' + (it[3] ? '<img src="' + LOGO + '" alt="">' : '') + esc(it[2]) + '</em></div></div>';
+          '<em style="font-size:' + px(13) + 'px">' + esc(it[2]) + '</em></div></div>';
       }).join('') + '</div>');
   }
   else if(b.kind === 'today'){
     mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(b.kick) + '</div>' +
-      '<div class="rise mega" style="font-size:' + px(LAY === 'port' ? 82 : 96) + 'px;margin:.12em 0">' + esc(b.mega) + '</div>' +
-      '<div class="rise lede" style="font-size:' + px(15) + 'px;margin-top:.4em">' + esc(b.sub) + '</div>');
+      '<div class="rise mega" style="font-size:' + px(LAY === 'port' ? 100 : 116) + 'px;margin:.1em 0">' + esc(b.mega) + '</div>' +
+      (b.sub ? '<div class="rise lede" style="font-size:' + px(15) + 'px;margin-top:.4em">' + esc(b.sub) + '</div>' : ''));
+  }
+  else if(b.kind === 'feat'){
+    var f = FEATS[b.f];
+    mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(f.kick) + '</div>' +
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 36 : 42) + 'px">' + em(f.h) + '</div>' +
+      '<div class="rise lede" style="font-size:' + px(15) + 'px">' + esc(f.sub) + '</div>' +
+      '<div style="width:100%;margin-top:.9em">' + f.el() + '</div>');
   }
   else if(b.kind === 'stats'){
     mountScene('<div class="rise kick" style="font-size:' + px(12.5) + 'px">' + esc(b.kick) + '</div>' +
-      '<div class="rise hero-line" style="font-size:' + px(LAY === 'port' ? 26 : 32) + 'px;margin-bottom:.5em">' + em(b.h) + '</div>' +
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 28 : 34) + 'px;margin-bottom:.4em">' + em(b.h) + '</div>' +
       '<div class="statrow">' + b.stats.map(function(s){
-        return '<div class="srow rise"><div class="n" style="font-size:' + px(38) + 'px"><span data-n="' + s[0] + '">0</span><s>' + esc(s[1]) + '</s></div>' +
+        return '<div class="srow rise"><div class="n" style="font-size:' + px(40) + 'px"><span data-n="' + s[0] + '">0</span><s>' + esc(s[1]) + '</s></div>' +
           '<div class="lb" style="font-size:' + px(15) + 'px">' + esc(s[2]) + '</div></div>';
       }).join('') + '</div>');
   }
   else if(b.kind === 'close'){
     mountScene('<div class="closewrap">' +
-      '<img class="rise" src="' + LOGO + '" style="height:' + px(72) + 'px" alt="">' +
-      '<div class="rise hero-line" style="font-size:' + px(LAY === 'port' ? 30 : 34) + 'px">' + esc(b.h) + '</div>' +
+      '<img class="rise" src="' + LOGO + '" style="height:' + px(78) + 'px" alt="">' +
+      '<div class="rise h1" style="font-size:' + px(LAY === 'port' ? 32 : 36) + 'px">' + esc(b.h) + '</div>' +
       '<div class="rise lede" style="font-size:' + px(15) + 'px">' + esc(b.sub) + '</div>' +
       '<div class="rise urlchip" style="font-size:' + px(14) + 'px">' + esc(b.url) + '<i></i></div>' +
-      '<div class="rise" style="font-size:' + px(14) + 'px;color:var(--ink2);font-weight:650">' + esc(b.foot) + '</div></div>');
+      (b.foot ? '<div class="rise foot" style="font-size:' + px(14) + 'px">' + esc(b.foot) + '</div>' : '') + '</div>');
   }
 
   segFill = document.createElement('b');
@@ -776,7 +493,7 @@ function showBeat(k){
       if(p < 1) requestAnimationFrame(drive);
     }
   })();
-  timer = setTimeout(function(){ showBeat((k + 1) % BEATS.length); }, segDur + 400);
+  timer = setTimeout(function(){ showBeat((k + 1) % BEATS.length); }, segDur + (FAST ? 220 : 400));
 }
 
 function setPaused(v){
@@ -787,7 +504,7 @@ function setPaused(v){
   else {
     segStart += performance.now() - pausedAt;
     var rest = Math.max(300, segDur - (performance.now() - segStart));
-    timer = setTimeout(function(){ showBeat((beat + 1) % BEATS.length); }, rest + 400);
+    timer = setTimeout(function(){ showBeat((beat + 1) % BEATS.length); }, rest + (FAST ? 220 : 400));
   }
 }
 window.addEventListener('keydown', function(e){
@@ -802,22 +519,21 @@ window.addEventListener('keydown', function(e){
 });
 document.addEventListener('visibilitychange', function(){ setPaused(document.hidden); });
 
-var SKIP = /go=1/.test(location.search);
-var FROM = parseInt((location.search.match(/from=(\d+)/) || [])[1] || '0', 10);
+var SKIP = /go=1/.test(Q);
+var FROM = parseInt((Q.match(/from=(\d+)/) || [])[1] || '0', 10);
 FROM = Math.min(Math.max(FROM, 0), BEATS.length - 1);
-function start(){
+(function start(){
   countBox.innerHTML = '';
   if(SKIP){ showBeat(FROM); return; }
-  ['3', '2', '1'].forEach(function(n, i){
+  ['3','2','1'].forEach(function(x, i){
     var el = document.createElement('i');
-    el.textContent = n;
+    el.textContent = x;
     el.style.fontSize = px(120) + 'px';
-    el.style.animationDelay = (i * 0.95) + 's';
+    el.style.animationDelay = (i * (FAST ? .6 : .95)) + 's';
     countBox.appendChild(el);
   });
-  setTimeout(function(){ countBox.innerHTML = ''; showBeat(FROM); }, 2950);
-}
-start();
+  setTimeout(function(){ countBox.innerHTML = ''; showBeat(FROM); }, FAST ? 1950 : 2950);
+})();
 </script>
 </body>
 </html>
