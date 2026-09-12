@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>猫卷 · 发布会（本地录屏版）</title>
 <!--
-  猫卷 · 产品发布会风格（本地录屏版 v5 · Keynote）
+  猫卷 · 产品发布会（本地录屏版 v6 · 电影运镜）
   ═══════════════════════════════════════════
   双击即播（file:// 本地协议，零网络；logo 已内嵌单文件）。
   3-2-1 倒计时后自动开播，播完无缝循环。
 
-  风格：明亮舞台 + 巨大排版 + 产品居中 + 发丝分隔线 + 渐变标题字，
-  转场为「淡出微推 / 淡入微拉」的发布会节奏，动作全部长缓动、不闪不抖。
+  画面：明亮舞台 + 巨大排版 + 发丝分隔线 + 渐变标题字。
+  运镜：镜头在场景里持续推/拉/摇/移（每拍一条运镜曲线），
+        背景柔光反向视差，转场由镜头运动完成，扫光掠过舞台。
 
   参数：?ar=16:9  比例(默认 9:16)   ?speed=1.15  倍速
         ?from=5   从第 5 拍起循环    ?go=1        跳过倒计时
@@ -32,37 +33,52 @@
   body{background:var(--bg);color:var(--ink);overflow:hidden;cursor:none;
     font-family:-apple-system,"SF Pro Display","PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",sans-serif;
     -webkit-font-smoothing:antialiased}
-  .glow{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
-  .g1{width:62vmax;height:62vmax;left:-18vmax;top:-24vmax;opacity:.32;
-    background:radial-gradient(circle,rgba(37,99,235,.55),transparent 68%);
-    animation:breathe 22s ease-in-out infinite alternate}
-  .g2{width:54vmax;height:54vmax;right:-20vmax;bottom:-22vmax;opacity:.26;
-    background:radial-gradient(circle,rgba(6,182,212,.5),transparent 68%);
-    animation:breathe 26s ease-in-out infinite alternate-reverse}
-  @keyframes breathe{from{transform:translate(0,0) scale(1)}to{transform:translate(3vmax,2vmax) scale(1.12)}}
+  /* ── 背景柔光（随镜头反向视差） ── */
+  .glow{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0;
+    transition:transform .2s linear}
+  .g1{width:64vmax;height:64vmax;left:-19vmax;top:-25vmax;opacity:.32;
+    background:radial-gradient(circle,rgba(37,99,235,.55),transparent 68%)}
+  .g2{width:56vmax;height:56vmax;right:-21vmax;bottom:-23vmax;opacity:.26;
+    background:radial-gradient(circle,rgba(6,182,212,.5),transparent 68%)}
+  /* ── 扫光（每拍掠过舞台） ── */
+  #sheen{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+  #sheen i{position:absolute;top:-60%;bottom:-60%;width:36%;left:-48%;
+    background:linear-gradient(100deg,transparent,rgba(37,99,235,.13),transparent);
+    transform:skewX(-16deg);filter:blur(22px);opacity:0}
+  #sheen.go i{animation:sheen 1.6s cubic-bezier(.4,0,.2,1)}
+  @keyframes sheen{0%{left:-48%;opacity:0}18%{opacity:1}100%{left:118%;opacity:0}}
+  /* ── 舞台 ── */
   #stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     transform-origin:center;display:flex;flex-direction:column;align-items:center;z-index:10}
   .topbar{width:100%;display:flex;align-items:center;gap:11px;z-index:40}
-  .topbar .lg{object-fit:contain;mix-blend-mode:normal}
+  .topbar .lg{object-fit:contain}
   .topbar b{letter-spacing:.02em}
   .topbar .sp{flex:1}
   .topbar .ver{color:var(--ink2);border:1px solid var(--line);border-radius:999px;font-variant-numeric:tabular-nums}
-  .mid{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0}
-  [data-lay="port"] .mid{flex-direction:column;gap:4%}
-  [data-lay="land"] .mid{flex-direction:row;gap:6%}
-  .phonewrap{position:relative;flex:0 0 auto;opacity:0;transform:translateY(26px) scale(.965);
-    transition:opacity .9s ease, transform 1.15s cubic-bezier(.22,1,.36,1)}
+  /* 镜头区：运镜作用于这一层，角标保持不动 */
+  #camwrap{position:relative;flex:1;width:100%;min-height:0;display:flex;align-items:center;justify-content:center;
+    transform-origin:50% 50%;will-change:transform}
+  [data-lay="port"] #camwrap{flex-direction:column;gap:4%}
+  [data-lay="land"] #camwrap{flex-direction:row;gap:6%}
+  /* ── 产品（手机） ── */
+  .phonewrap{position:relative;flex:0 0 auto;opacity:0;transform:translateY(26px) scale(.96) rotateY(10deg);
+    transform-style:preserve-3d;perspective:1200px;
+    transition:opacity .9s ease, transform 1.2s cubic-bezier(.22,1,.36,1)}
   .phonewrap.in{opacity:1;transform:none}
-  .phonewrap.floaty{animation:floaty 8s ease-in-out infinite alternate}
-  @keyframes floaty{from{transform:translateY(0)}to{transform:translateY(-11px)}}
-  .phonewrap::after{content:"";position:absolute;left:6%;right:6%;bottom:-7%;height:10%;
-    background:radial-gradient(50% 50% at 50% 50%, rgba(11,18,32,.22), transparent 72%);
-    filter:blur(10px);z-index:-1}
+  .phonewrap.floaty{animation:floaty 9s ease-in-out infinite alternate}
+  @keyframes floaty{
+    from{transform:rotateY(-5.5deg) rotateX(1.4deg) translateY(0)}
+    to{transform:rotateY(5.5deg) rotateX(-1.6deg) translateY(-12px)}}
+  .phonewrap::after{content:"";position:absolute;left:5%;right:5%;bottom:-7%;height:11%;
+    background:radial-gradient(50% 50% at 50% 50%, rgba(11,18,32,.24), transparent 72%);
+    filter:blur(11px);z-index:-1;transition:transform 1s ease}
+  .phonewrap.floaty::after{transform:scaleX(.94) translateX(2%)}
   .phone{position:relative;border-radius:9.6% / 4.5%;background:#0F1729;
-    box-shadow:0 2px 4px rgba(11,18,32,.10), 0 34px 64px -18px rgba(11,18,32,.34), 0 0 0 1px rgba(11,18,32,.07)}
+    box-shadow:0 2px 4px rgba(11,18,32,.10), 0 36px 68px -18px rgba(11,18,32,.36), 0 0 0 1px rgba(11,18,32,.07)}
   .scr{position:absolute;border-radius:8%/3.9%;overflow:hidden;background:var(--m-bg);color:var(--m-fg)}
   .notch{position:absolute;top:2.1%;left:50%;transform:translateX(-50%);width:25%;height:2.5%;
     background:#0F1729;border-radius:999px;z-index:40}
+  /* ── 屏内通用件（276×613 设计稿） ── */
   .sbar{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:11px;font-weight:600;color:var(--m-fg)}
   .sbar .r{display:flex;gap:4px;align-items:center}
   .sg{width:14px;height:10px;background:var(--m-fg);clip-path:polygon(0 100%,100% 0,100% 100%);opacity:.9}
@@ -135,10 +151,10 @@
     border:2.5px solid rgba(37,99,235,.85);background:rgba(37,99,235,.18);transform:translate(-50%,-50%) scale(.4);opacity:0}
   .tap.on{animation:tap 1.15s ease-out infinite}
   @keyframes tap{0%{opacity:0;transform:translate(-50%,-50%) scale(.35)}25%{opacity:1}70%{opacity:.9;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.12)}}
-  .layer{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .45s ease}
+  .layer{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .6s ease}
   .layer.on{opacity:1;pointer-events:auto}
   .fitbox{position:absolute;top:0;left:0;width:276px;height:613px;transform-origin:top left}
-  /* 说明区块 */
+  /* ── 说明区块 ── */
   .speak{display:flex;flex-direction:column;text-align:left}
   [data-lay="port"] .speak{width:100%}
   [data-lay="land"] .speak{flex:0 1 46%}
@@ -151,19 +167,22 @@
   .speak .row:last-child{border-bottom:1px solid var(--line)}
   .speak .row b{font-weight:700}
   .speak .row .dot{width:6px;height:6px;border-radius:50%;background:var(--acc);flex:0 0 auto;transform:translateY(7px)}
-  /* 场景 */
+  /* ── 场景（大屏） ── */
   .scene{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
-    opacity:0;transform:scale(1.02);pointer-events:none;transition:opacity .85s ease, transform 1.15s cubic-bezier(.22,1,.36,1)}
+    opacity:0;transform:scale(1.03) translateY(10px);pointer-events:none;
+    transition:opacity .9s ease, transform 1.2s cubic-bezier(.22,1,.36,1)}
   .scene.in{opacity:1;transform:none;pointer-events:auto}
-  .scene.out{opacity:0;transform:scale(.975)}
-  .scenebox{width:84%;max-height:90%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1em;text-align:center}
+  .scene.out{opacity:0;transform:scale(.975) translateY(-8px)}
+  .scenebox{width:84%;max-height:92%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1em;text-align:center}
   .kick{font-weight:800;letter-spacing:.4em;text-indent:.4em;color:var(--acc);text-transform:uppercase}
   .hero-line{font-weight:850;line-height:1.1;letter-spacing:-.02em}
   .hero-line .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   .mega{font-weight:900;line-height:1;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
     background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   .lede{color:var(--ink2);line-height:1.7}
-  .rise{opacity:0;transform:translateY(18px);transition:opacity .8s ease,transform .95s cubic-bezier(.22,1,.36,1)}
+  /* 景深入场：从纵深翻入（配合运镜） */
+  .rise{opacity:0;transform:perspective(1000px) translateY(22px) translateZ(-70px) rotateX(7deg);
+    transition:opacity .85s ease, transform 1.05s cubic-bezier(.22,1,.36,1)}
   .rise.in{opacity:1;transform:none}
   .pain{width:100%;display:flex;align-items:flex-start;gap:1.1em;text-align:left;padding:1em 0;border-top:1px solid var(--line)}
   .pain:last-of-type{border-bottom:1px solid var(--line)}
@@ -177,7 +196,7 @@
   .tl .when .pt{width:7px;height:7px;border-radius:50%;background:var(--acc);flex:0 0 auto}
   .tl .what b{display:block;font-weight:750}
   .tl .what em{font-style:normal;color:var(--ink2);line-height:1.5}
-  .tl .what img{height:1.35em;vertical-align:-.32em;margin-right:.4em;mix-blend-mode:normal}
+  .tl .what img{height:1.35em;vertical-align:-.32em;margin-right:.4em}
   .statrow{width:88%;text-align:left}
   .srow{display:flex;align-items:baseline;gap:1.1em;padding:1.05em 0;border-top:1px solid var(--line)}
   .srow:last-child{border-bottom:1px solid var(--line)}
@@ -186,10 +205,13 @@
   .srow .n s{text-decoration:none}
   .srow .lb{color:var(--ink2)}
   .closewrap{display:flex;flex-direction:column;align-items:center;gap:1em}
-  .closewrap img{object-fit:contain;mix-blend-mode:normal}
-  .urlchip{margin-top:.3em;padding:.75em 1.5em;border-radius:999px;color:#fff;font-weight:800;
+  .closewrap img{object-fit:contain}
+  .urlchip{position:relative;overflow:hidden;margin-top:.3em;padding:.75em 1.5em;border-radius:999px;color:#fff;font-weight:800;
     background:var(--grad);box-shadow:0 12px 30px -10px rgba(37,99,235,.6);font-variant-numeric:tabular-nums}
-  .caps{position:relative;width:100%;height:0;z-index:40}
+  .urlchip::after{content:"";position:absolute;top:-50%;bottom:-50%;width:30%;left:-40%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg);
+    animation:chip 3.2s ease-in-out infinite}
+  @keyframes chip{0%{left:-40%}55%{left:120%}100%{left:120%}}
   .segs{width:100%;display:flex;gap:5px;z-index:40}
   .segs i{flex:1;height:3px;border-radius:3px;background:rgba(11,18,32,.10);overflow:hidden;position:relative}
   .segs i.done{background:var(--acc2)}
@@ -204,14 +226,15 @@
 </style>
 </head>
 <body>
-<div class="glow g1"></div><div class="glow g2"></div>
+<div class="glow g1" id="glow1"></div><div class="glow g2" id="glow2"></div>
+<div id="sheen"><i></i></div>
 <div id="stage">
   <div class="topbar">
     <img class="lg" style="width:30px;height:30px" data-logo alt="">
     <b style="font-size:17px">猫卷</b><span class="sp"></span>
     <span class="ver" style="font-size:12px;padding:4px 11px" id="ver">v1.28.1</span>
   </div>
-  <div class="mid" id="mid">
+  <div id="camwrap">
     <div class="phonewrap" id="phonewrap">
       <div class="phone" id="phone">
         <div class="scr" id="scr">
@@ -221,7 +244,6 @@
         <div class="notch"></div>
       </div>
     </div>
-    <div class="caps" id="caps"></div>
   </div>
   <div class="segs" id="segs"></div>
 </div>
@@ -239,7 +261,7 @@ var SW, SH;
 if (LAY === 'port') { SH = 960; SW = Math.round(960 * RATIO); }
 else { SW = 1000; SH = Math.round(1000 / RATIO); }
 var stage = document.getElementById('stage');
-var mid = document.getElementById('mid');
+var camwrap = document.getElementById('camwrap');
 stage.style.width = SW + 'px'; stage.style.height = SH + 'px';
 stage.setAttribute('data-lay', LAY);
 var U = LAY === 'port' ? SW / 540 : SH / 540;
@@ -259,6 +281,7 @@ var pad = Math.round(PW * 0.035);
 scrEl.style.left = pad + 'px'; scrEl.style.top = pad + 'px';
 scrEl.style.width = (PW - pad * 2) + 'px'; scrEl.style.height = (PH - pad * 2) + 'px';
 
+/* ══════════ 屏幕模板（与 v1.28.1 真机一致） ══════════ */
 var ICONS = {
   gear:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg>',
   grad:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg>',
@@ -391,19 +414,27 @@ var FEATS = [
     rows:[['FSRS-5 间隔复习','按遗忘曲线安排到期错题'],['年度贡献热力图','坚持了多少天，一眼看得到'],['薄弱知识点排行','哪里最该补，数据说了算']] }
 ];
 
+/* 运镜曲线：s=缩放 x/y=位移 r=旋转（舞台内部像素/度），dur=完成时间(ms) */
+var dollyIn  = function(d){ return { s:[1.0,1.075], dur:d||6000, ease:easeInOutCubic }; };
+var dollyOut = function(d){ return { s:[1.075,1.0], dur:d||5000, ease:easeInOutCubic }; };
+var truckL   = function(d){ return { x:[46,-14], s:[1.02,1.05], dur:d||6000, ease:easeInOutCubic }; };
+var truckR   = function(d){ return { x:[-46,14], s:[1.02,1.05], dur:d||6000, ease:easeInOutCubic }; };
+var scanY    = function(d){ return { y:[34,-30], s:[1.05,1.02], dur:d||9000, ease:easeInOutCubic }; };
+
 var BEATS = [
   { kind:'hero', ms:5600, kick:'MAOJUAN · 2026 秋季发布', h:'猫卷', sub:'医学生的备考刷题 App',
-    foot:'从 0 到 1.28 —— 一个人做完的一整套系统' },
+    foot:'从 0 到 1.28 —— 一个人做完的一整套系统',
+    cam:{ s:[1.12,1.0], y:[-30,0], rot:[-.5,0], dur:2600, ease:easeOutCubic } },
   { kind:'why', ms:7400, kick:'为什么做猫卷', h:'备考工具，|本不该这么贵|',
     pains:[
       ['01','订阅制把内容锁死','年费几百到数千元，停止续费，题库和解析一起消失'],
       ['02','数据存在别人手里','换个设备就抓瞎，说停服就停服，复习记录说没就没'],
       ['03','通用工具门槛太高','想刷自己的讲义和真题，先过格式和配置两关']
     ],
-    foot:'2026 年 6 月，我决定自己写一个。' },
+    foot:'2026 年 6 月，我决定自己写一个。', cam:dollyIn(7200) },
   { kind:'origin', ms:6200, kick:'第一章 · 2026.06.15', h:'从零，跑通第一版',
     rows:[['DOCX 讲义一键导入','把讲义变成可刷的题库'],['AI 题眼破题法解析','按老师讲题的逻辑拆解'],['错题本 · FSRS 排期','答错就排进复习计划']],
-    foot:'那时候，它叫「呆猫刷题宝」' },
+    foot:'那时候，它叫「呆猫刷题宝」', cam:truckL(6200) },
   { kind:'timeline', ms:9600, kick:'第一章 · 成长轨迹',
     items:[
       ['v1.26','三模式 · 练习模式 · 五套主题','正常 / 背题 / 快刷三种节奏'],
@@ -413,21 +444,61 @@ var BEATS = [
       ['猫卷','更名 · 手写新 logo','定位聚焦医学备考', true],
       ['v1.27','批注 · 同步 · 三端','手写批注、局域网同步、宽屏自适应'],
       ['v1.28','全新设计语言','Mao Des · AI 对话页 · 关键词标记']
-    ] },
+    ], cam:scanY(9400) },
   { kind:'today', ms:4400, kick:'今天', mega:'v1.28.1', h:'这是 v1.28.1',
-    sub:'接下来 40 秒，看它怎么陪你把这轮复习刷完。' },
-  { kind:'feat', ms:6000, f:0 },
-  { kind:'feat', ms:4600, f:1 },
-  { kind:'feat', ms:6000, f:2 },
-  { kind:'feat', ms:5600, f:3 },
-  { kind:'feat', ms:6800, f:4 },
-  { kind:'feat', ms:5600, f:5 },
-  { kind:'feat', ms:5800, f:6 },
+    sub:'接下来 40 秒，看它怎么陪你把这轮复习刷完。',
+    cam:{ s:[1.0,1.16], dur:2800, ease:easeOutCubic } },
+  { kind:'feat', ms:6000, f:0, cam:{ s:[1.0,1.06], x:[22,-10], dur:5800, ease:easeInOutCubic } },
+  { kind:'feat', ms:4600, f:1, cam:{ s:[1.02,1.08], x:[-22,10], dur:4500, ease:easeInOutCubic } },
+  { kind:'feat', ms:6000, f:2, cam:{ s:[1.0,1.06], y:[18,-14], dur:5800, ease:easeInOutCubic } },
+  { kind:'feat', ms:5600, f:3, cam:{ s:[1.03,1.08], x:[18,-8], dur:5400, ease:easeInOutCubic } },
+  { kind:'feat', ms:6800, f:4, cam:{ s:[1.0,1.07], y:[-16,10], dur:6600, ease:easeInOutCubic } },
+  { kind:'feat', ms:5600, f:5, cam:{ s:[1.02,1.08], x:[-18,8], dur:5400, ease:easeInOutCubic } },
+  { kind:'feat', ms:5800, f:6, cam:{ s:[1.0,1.065], y:[16,-12], dur:5600, ease:easeInOutCubic } },
   { kind:'stats', ms:7200, kick:'尾声 · 一个人的长期主义', h:'从 6 月的一个念头|到你手机里的今天',
-    stats:[['3',' 个月','业余时间开发'],['9',' 个里程碑','持续迭代'],['221',' 项','自动化测试守护']] },
+    stats:[['3',' 个月','业余时间开发'],['9',' 个里程碑','持续迭代'],['221',' 项','自动化测试守护']],
+    cam:dollyOut(7000) },
   { kind:'close', ms:6800, kick:'FREE · OPEN SOURCE', h:'猫卷 · 备考刷题', sub:'免费 · 开源 · 数据全在本地',
-    url:'laow07573-web.github.io/daimao-quiz-master', foot:'现在就去下载，装好即刷' }
+    url:'laow07573-web.github.io/daimao-quiz-master', foot:'现在就去下载，装好即刷',
+    cam:{ s:[1.0,1.09], dur:6600, ease:easeInOutCubic } }
 ];
+
+/* ══════════ 运镜引擎（虚拟时钟：暂停即冻结） ══════════ */
+var camState = { x:0, y:0, s:1, rot:0 };
+var CAM_KF = null, camStart = 0;
+var clockNow = 0, clockLast = performance.now();
+var glow1 = document.getElementById('glow1'), glow2 = document.getElementById('glow2');
+function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+function easeInOutCubic(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+function lerp(a, b, k){ return a + (b - a) * k; }
+function applyCam(){
+  var k = 1;
+  if(CAM_KF){
+    var t = CAM_KF.dur > 0 ? Math.min(1, (clockNow - camStart) / CAM_KF.dur) : 1;
+    k = CAM_KF.ease ? CAM_KF.ease(t) : easeOutCubic(t);
+    camState.x   = CAM_KF.x  ? lerp(CAM_KF.x[0],   CAM_KF.x[1],   k) : 0;
+    camState.y   = CAM_KF.y  ? lerp(CAM_KF.y[0],   CAM_KF.y[1],   k) : 0;
+    camState.s   = CAM_KF.s  ? lerp(CAM_KF.s[0],   CAM_KF.s[1],   k) : 1;
+    camState.rot = CAM_KF.rot? lerp(CAM_KF.rot[0], CAM_KF.rot[1], k) : 0;
+  }
+  camwrap.style.transform = 'translate(' + camState.x.toFixed(2) + 'px,' + camState.y.toFixed(2) +
+    'px) scale(' + camState.s.toFixed(4) + ') rotate(' + camState.rot.toFixed(3) + 'deg)';
+  /* 背景柔光反向视差（幅度小，制造纵深） */
+  var gx = -camState.x * 0.42, gy = -camState.y * 0.42, gs = 1 + (camState.s - 1) * -0.5;
+  glow1.style.transform = 'translate(' + gx.toFixed(1) + 'px,' + gy.toFixed(1) + 'px) scale(' + gs.toFixed(3) + ')';
+  glow2.style.transform = 'translate(' + (-gx).toFixed(1) + 'px,' + (-gy).toFixed(1) + 'px) scale(' + gs.toFixed(3) + ')';
+}
+(function camLoop(){
+  var t = performance.now();
+  var dt = t - clockLast; clockLast = t;
+  if(!paused) clockNow += dt;
+  applyCam();
+  requestAnimationFrame(camLoop);
+})();
+function sheen(){
+  var s = document.getElementById('sheen');
+  s.classList.remove('go'); void s.offsetWidth; s.classList.add('go');
+}
 
 /* ══════════ 播放器 ══════════ */
 function byId(id){ return document.getElementById(id); }
@@ -445,35 +516,33 @@ function em(s){ return esc(s).replace(/\|(.+?)\|/g,'<span class="g">$1</span>');
 function clearTimers(){ TYPE_TIMERS.forEach(clearTimeout); TYPE_TIMERS = []; }
 function px(base){ return Math.round(base * Math.max(U, .78)); }
 
-/* 上一拍留下的界面层：淡出后移除（与下一屏形成交叉溶解，避免硬切空白） */
-function clearLayers(){
-  [].slice.call(scrEl.querySelectorAll('.layer')).forEach(function(l){
-    l.classList.remove('on');
-    setTimeout(function(){ l.remove(); }, 600);
-  });
-}
-
 function retireScenes(){
   SCENE_TOKEN++;
-  [].slice.call(stage.querySelectorAll('.scene')).forEach(function(s){
+  [].slice.call(camwrap.querySelectorAll('.scene')).forEach(function(s){
     if(s.classList.contains('in')){
       s.classList.remove('in'); s.classList.add('out');
       var t = SCENE_TOKEN;
-      setTimeout(function(){ if(t === SCENE_TOKEN) s.remove(); }, 1200);
+      setTimeout(function(){ if(t === SCENE_TOKEN) s.remove(); }, 1300);
     } else s.remove();
+  });
+}
+function clearLayers(){
+  [].slice.call(scrEl.querySelectorAll('.layer')).forEach(function(l){
+    l.classList.remove('on');
+    setTimeout(function(){ l.remove(); }, 650);
   });
 }
 function mountScene(inner){
   var d = document.createElement('div');
   d.className = 'scene';
   d.innerHTML = '<div class="scenebox">' + inner + '</div>';
-  stage.appendChild(d);
+  camwrap.appendChild(d);
   var t = SCENE_TOKEN;
   requestAnimationFrame(function(){ requestAnimationFrame(function(){
     if(t !== SCENE_TOKEN) return;
     d.classList.add('in');
     d.querySelectorAll('.rise').forEach(function(r, i){
-      TYPE_TIMERS.push(setTimeout(function(){ r.classList.add('in'); }, i * 170 + 260));
+      TYPE_TIMERS.push(setTimeout(function(){ r.classList.add('in'); }, i * 170 + 240));
     });
     var t2 = SCENE_TOKEN;
     d.querySelectorAll('[data-n]').forEach(function(el){
@@ -554,11 +623,14 @@ function showBeat(k){
     var f = s.querySelector('b'); if(f) f.remove();
   });
   segDur = b.ms / speed;
+  /* 起拍：切运镜曲线 + 扫光 */
+  camStart = clockNow;
+  CAM_KF = b.cam || { s:[1.0,1.03], dur:4000, ease:easeInOutCubic };
+  sheen();
 
   if(b.kind === 'feat'){
     var f = FEATS[b.f];
-    /* 竖屏：说明在上、产品在下，分区不重叠；横屏：产品在左、说明在右 */
-    mid.style.justifyContent = LAY === 'port' ? 'flex-end' : 'center';
+    camwrap.style.justifyContent = LAY === 'port' ? 'flex-end' : 'center';
     phonewrap.classList.add('in'); phonewrap.classList.remove('floaty');
     TYPE_TIMERS.push(setTimeout(function(){ phonewrap.classList.add('floaty'); }, 900));
     var l = document.createElement('div');
@@ -572,18 +644,14 @@ function showBeat(k){
     sp.className = 'scene';
     sp.style.zIndex = '35';
     sp.innerHTML = '<div class="scenebox" style="width:' + (LAY === 'land' ? '48%' : '90%') + '">' + featSpeak(f) + '</div>';
-    if(LAY === 'land'){
-      sp.style.justifyContent = 'flex-end';
-      sp.style.paddingRight = '4%';
-      sp.style.alignItems = 'center';
-    }
+    if(LAY === 'land'){ sp.style.justifyContent = 'flex-end'; sp.style.paddingRight = '4%'; sp.style.alignItems = 'center'; }
     else { sp.style.alignItems = 'flex-start'; sp.style.justifyContent = 'flex-start'; sp.style.paddingTop = '4%'; }
-    stage.appendChild(sp);
+    camwrap.appendChild(sp);
     var t = SCENE_TOKEN;
     requestAnimationFrame(function(){ requestAnimationFrame(function(){
       if(t === SCENE_TOKEN) sp.classList.add('in');
       sp.querySelectorAll('.rise').forEach(function(r, i){
-        TYPE_TIMERS.push(setTimeout(function(){ r.classList.add('in'); }, i * 150 + 350));
+        TYPE_TIMERS.push(setTimeout(function(){ r.classList.add('in'); }, i * 150 + 320));
       });
     }); });
     if(f.toast) TYPE_TIMERS.push(setTimeout(function(){ toastEl.classList.add('on'); }, 900));
@@ -610,7 +678,7 @@ function showBeat(k){
       var fb = l.querySelector('.fb'); if(fb) fb.classList.add('on');
     }, 2000));
   } else {
-    if(mid) mid.style.justifyContent = 'center';
+    camwrap.style.justifyContent = 'center';
     phonewrap.classList.remove('in', 'floaty');
   }
 
