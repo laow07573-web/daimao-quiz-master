@@ -268,6 +268,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _db.insertQuestions(questions);
     await _db.updateBankQuestionCount(bankId, questions.length);
     await _loadBanks();
+    // v1.28.1 新生引导：尚无勾选题库时自动勾上刚导入的示例题库，
+    // 导入完成即可直接从「定向爆破」开刷，不用再去题库管理页勾选。
+    if (_selectedBankIds.isEmpty) _selectedBankIds.add(bankId);
     notifyListeners();
     return questions.length;
   }
@@ -983,6 +986,16 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   Future<void> _loadAnalysis() async {
     if (_aiService == null || currentQuestion == null) return;
     final q = currentQuestion!;
+
+    // v1.28.1 新生引导：未配置 Key 时回落展示题目自带解析（示例题库每题都有），
+    // 有 Key 才走 AI（缓存 / 实时请求）。无自带解析则置空，由 UI 显示引导卡。
+    if (!_settings.isConfigured) {
+      final builtin = q.analysis?.trim() ?? '';
+      _currentAnalysis = builtin.isNotEmpty ? builtin : null;
+      _analysisLoading = false;
+      notifyListeners();
+      return;
+    }
 
     _analysisLoading = true;
     notifyListeners();

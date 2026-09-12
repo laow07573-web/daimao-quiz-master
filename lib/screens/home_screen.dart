@@ -1,4 +1,6 @@
-﻿import 'practice_screen.dart';
+﻿import 'dart:async';
+
+import 'practice_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
@@ -593,6 +595,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 快速操作列表（v1.0.2 UI 设计稿：4 项，每项带状态文案与真实路由）
+  /// v1.28.1 新生引导：一键导入示例题库（免 Key、免文件，转后台执行）
+  void _importSampleBank(AppState appState) {
+    if (appState.importTaskActive) return;
+    unawaited(appState.startBackgroundSampleImport());
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已开始导入示例题库，进度见首页')),
+    );
+  }
+
   Widget _buildQuickActions(AppState appState, AppThemeColors ac) {
     final vacation = appState.vacationModeEnabled;
     final ac = AppThemeColors.of(context);
@@ -608,9 +619,20 @@ class _HomeScreenState extends State<HomeScreen> {
         iconColor: ac.accent,
         onTap: appState.selectedBankIds.isEmpty
             ? () {
+                // v1.28.1 新生引导：空态提示带直达动作——没题库去导入，
+                // 有题库（未勾选）去题库管理页勾选
+                final hasBanks = appState.banks.isNotEmpty;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('请先在「管理题库」中选择要刷的题库')),
+                  SnackBar(
+                      content: Text(hasBanks ? '先勾选要刷的题库' : '还没有题库，先导入一份吧'),
+                      action: SnackBarAction(
+                          label: hasBanks ? '去选择' : '去导入',
+                          onPressed: () => _navigateAndRefresh(
+                              context,
+                              appState,
+                              hasBanks
+                                  ? const BankManageScreen()
+                                  : const ImportScreen()))),
                 );
               }
             : () {
@@ -625,7 +647,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _QuickActionTile(
         icon: Icons.library_books_outlined,
         label: '管理题库',
-        subtitle: '${appState.banks.length} 个题库',
+        subtitle: appState.banks.isEmpty
+            ? '还没有题库，先去导入'
+            : '${appState.banks.length} 个题库',
         iconColor: ac.accent.withOpacity(0.8),
         onTap: () => _navigateAndRefresh(
             context, appState, const BankManageScreen()),
@@ -657,6 +681,60 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
                 fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.textPrimary)),
         const SizedBox(height: 12),
+        // v1.28.1 新生引导卡：零题库时置顶展示，一步直达示例题库导入
+        if (appState.banks.isEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: ac.surface,
+              borderRadius: BorderRadius.circular(MaoRadius.control),
+              border: Border.all(color: ac.accent.withOpacity(0.55), width: 1.4),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: ac.accentSoft,
+                    borderRadius: BorderRadius.circular(MaoRadius.small),
+                  ),
+                  child: Icon(Icons.school_rounded, color: ac.accent, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('新生第一步',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: MaoType.body,
+                              color: ac.textPrimary)),
+                      const SizedBox(height: 2),
+                      Text('导入示例题库（10 道医学题），无需任何配置立即体验',
+                          style: TextStyle(
+                              fontSize: MaoType.caption,
+                              color: ac.textSecondary,
+                              height: 1.35)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () {
+                    _importSampleBank(appState);
+                  },
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  child: const Text('导入',
+                      style: TextStyle(fontSize: MaoType.caption)),
+                ),
+              ],
+            ),
+          ),
         if (isWideLayout(context))
           // v1.0.3 窗口自适应：按最大单元宽自动决定列数（宽窗 2 列，
           // 拖窄时自动回 1 列）

@@ -838,8 +838,9 @@ class _ErrorStatsSection extends StatelessWidget {
         Text('按题库分布', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         const SizedBox(height: 6),
         if (stats.isEmpty)
-          // v1.0.2 UI 设计稿：空状态「0题错题总数」
-          Text('0题错题总数', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary))
+          // 空状态：还没有错题记录（措辞修正，原文"0题错题总数"难以理解）
+          Text('还没有错题，答错的题会汇总在这里',
+              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary))
         else
           for (final s in stats.take(5))
             Padding(

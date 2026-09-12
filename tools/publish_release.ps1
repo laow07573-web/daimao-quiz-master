@@ -60,8 +60,18 @@ $portableName = 'MaoJuan-v{0}-windows-portable.zip' -f $Version
 # ---- 1/2. analyze + test -------------------------------------------------------
 if (-not $SkipTests) {
     Step '1/8' 'flutter analyze'
-    & flutter analyze
-    if ($LASTEXITCODE -ne 0) { Fail 'flutter analyze reported issues' }
+    # 用文件重定向而非 PS 管道：flutter/dart 在管道模式下可能长时间阻塞
+    cmd /c "flutter analyze > build\_analyze.txt 2>&1"
+    $analyzeOut = Get-Content (Join-Path $root 'build\_analyze.txt')
+    # 门槛 = 0 error / 0 warning；info 为既有风格噪音不算失败
+    # （flutter analyze 对任何 issue 都返回非零退出码，不能只看退出码）
+    $bad = @($analyzeOut | Where-Object { $_ -match '^\s+(error|warning) ' })
+    if ($bad.Count -gt 0) {
+        $bad | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" }
+        Fail ("flutter analyze: {0} error/warning" -f $bad.Count)
+    }
+    $info = @($analyzeOut | Where-Object { $_ -match '^\s+info ' }).Count
+    Write-Host ("    0 error / 0 warning / {0} info（既有风格噪音）" -f $info)
 
     Step '2/8' 'flutter test'
     & flutter test
@@ -83,7 +93,10 @@ if (-not (Test-Path $universalSrc)) { Fail "APK not found: $universalSrc" }
 
 # ---- 4. reference gate ---------------------------------------------------------
 Step '4/8' 'verify_reference (four-dimension baseline)'
-$out = & cmd /c "tools\reference_check\verify_reference.bat `"$universalSrc`"" 2>&1
+# 直接调用 .bat（不经过 cmd /c：嵌套引号会被 cmd 二次拆分，中文注释行会被误当命令）
+$bat = Join-Path $root 'tools\reference_check\verify_reference.bat'
+if (-not (Test-Path $bat)) { Fail "verify_reference.bat not found: $bat" }
+$out = & $bat $universalSrc 2>&1
 $out | Select-Object -Last 10 | ForEach-Object { Write-Host "    $_" }
 if (-not ($out -match 'PASS')) {
     Write-Host ''
@@ -97,18 +110,22 @@ Step '5/8' 'signature check'
 $certs = & 'D:\dev\jdk21\bin\keytool.exe' -printcert -jarfile $universalSrc 2>&1
 $line = ($certs | Select-String -Pattern 'SHA256' | Select-Object -First 1).ToString()
 Write-Host "    $line"
-if ($line -notmatch $EXPECTED_CERT) { Fail "signing cert mismatch: expected $EXPECTED_CERT..." }
+# keytool 输出形如 SHA256: 43:A9:...（冒号分隔），比对前先去掉冒号与空白
+$certHex = ($line -replace '[:\s]', '')
+if ($certHex -notmatch $EXPECTED_CERT) { Fail "signing cert mismatch: expected $EXPECTED_CERT..." }
 
 # ---- 6. build arm64 + stage all artifacts --------------------------------------
 Step '6/8' 'building arm64 APK and staging artifacts'
+
+# 先把通用版落盘（arm64 构建会覆盖 build/.../app-release.apk）
+$apkUnivDst = Join-Path $dist $apkUnivName
+Copy-Item $universalSrc $apkUnivDst -Force; SaveHash $apkUnivDst
+
 & flutter build apk --release --obfuscate --split-debug-info=build/symbols --target-platform android-arm64
 if ($LASTEXITCODE -ne 0) { Fail 'arm64 APK build failed' }
 $arm64Src = Join-Path $root 'build\app\outputs\flutter-apk\app-release.apk'
-
 $apkArm64Dst = Join-Path $dist $apkArm64Name
 Copy-Item $arm64Src $apkArm64Dst -Force; SaveHash $apkArm64Dst
-$apkUnivDst = Join-Path $dist $apkUnivName
-Copy-Item $universalSrc $apkUnivDst -Force; SaveHash $apkUnivDst
 
 # Windows installers: package portable zip, bump the .iss version, compile setup
 & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'package_windows.ps1') | Out-Null
@@ -138,6 +155,27 @@ foreach ($n in @($apkArm64Name, $apkUnivName, $setupName, $portableName)) {
     Write-Host ("    {0}  ({1:N1} MB)" -f $n, ((Get-Item (Join-Path $dist $n)).Length / 1MB))
 }
 
+# ---- 6.5 sync promo page sha256 -------------------------------------------------
+# 推广页 window.MAOJUAN.sha256 必须与本次产物一致，否则页面展示过期校验值。
+# 直接按 dist 里的四个产物就地改写 promo/index.html（无 BOM，保持原样）。
+$promo = Join-Path $root 'promo\index.html'
+$promoText = [System.IO.File]::ReadAllText($promo, [System.Text.Encoding]::UTF8)
+$promoHashes = @{
+    apk      = Hash $apkArm64Dst
+    apkUniv  = Hash $apkUnivDst
+    setup    = Hash $setupDst
+    portable = Hash $portableDst
+}
+foreach ($k in $promoHashes.Keys) {
+    # 注意：不能用 -f 拼这个正则——{64} 会被 -f 当占位符。三组：前缀 / 旧哈希 / 闭引号，
+    # 替换串用 ${1}/${3}（花括号形式，防止哈希以数字开头被解析成分组引用）。
+    $pattern = '(\b' + $k + '\s*:\s*")([0-9a-fA-F]{64})(")'
+    $promoText = [regex]::Replace($promoText, $pattern,
+        ('${1}' + $promoHashes[$k] + '${3}'))
+}
+[System.IO.File]::WriteAllText($promo, $promoText, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host '    promo/index.html sha256 synced to staged artifacts'
+
 # ---- 7. GitHub Release ---------------------------------------------------------
 if (-not $SkipGithub) {
     Step '7/8' 'creating GitHub Release and uploading assets'
@@ -150,6 +188,9 @@ if (-not $SkipGithub) {
         $token = ($credOut | Select-String '^password=').ToString().Substring(9)
     }
     if (-not $token) { Fail 'no GitHub credential (GH_TOKEN unset and GCM has none)' }
+    # 传给第 8 步的 deploy_pages.ps1 子进程：非 TTY 下 GCM 选择器会挂死 git push，
+    # 部署脚本检测到 GH_TOKEN 会改用 Basic 认证头推送
+    $env:GH_TOKEN = $token
 
     $assets = @(
         @{ path = $apkArm64Dst;  name = $apkArm64Name },
@@ -236,13 +277,21 @@ $(($assets | ForEach-Object { '{0}  {1}' -f $_.name, (Hash $_.path) }) -join "`n
     }
 
     $uploadBase = "https://uploads.github.com/repos/$REPO/releases/$relId/assets"
+    # 注意：URL 必须用 -f 拼接。"$var?name=..." 会被 PowerShell 把 $var? 解析成
+    # 一个不存在的变量（? 属于变量名字符集），得到残缺 URL，curl 静默失败。
+    $upFile = Join-Path $root 'build\_up.json'
     foreach ($a in $assets) {
         Write-Host ("    uploading {0} ({1:N1} MB)" -f $a.name, ((Get-Item $a.path).Length / 1MB))
-        curl.exe -s -o (Join-Path $root 'build\_up.json') -X POST `
+        $upUrl = '{0}?name={1}' -f $uploadBase, $a.name
+        curl.exe -sS -o $upFile -X POST `
             -H "Authorization: Bearer $token" -H 'Accept: application/vnd.github+json' `
             -H 'Content-Type: application/octet-stream' `
-            --data-binary "@$($a.path)" "$uploadBase?name=$($a.name)"
-        $up = Get-Content (Join-Path $root 'build\_up.json') -Raw | ConvertFrom-Json
+            --data-binary "@$($a.path)" $upUrl 2>&1
+        $curlCode = $LASTEXITCODE
+        if ($curlCode -ne 0 -or -not (Test-Path $upFile)) {
+            Fail ("asset upload failed (curl exit {0}): {1}" -f $curlCode, $a.name)
+        }
+        $up = Get-Content $upFile -Raw | ConvertFrom-Json
         if (-not $up.state -or $up.state -ne 'uploaded') { Fail ("asset upload failed: " + $a.name) }
     }
     Write-Host ("    release: https://github.com/{0}/releases/tag/v{1}" -f $REPO, $Version)

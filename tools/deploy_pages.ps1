@@ -148,8 +148,18 @@ if ($DryRun) {
     exit 0
 }
 Step '4/4' 'pushing gh-pages'
-& git push $Repo gh-pages --force-with-lease
-if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+# 非 TTY 环境下 GCM 的账号选择器会无声挂死推送（实测）。设置 GH_TOKEN 时改用
+# Basic 认证头推送，完全绕开凭据助手；未设置则走原路径（前台交互可用）。
+if ($env:GH_TOKEN) {
+    $basic = [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes(('laow07573-web:{0}' -f $env:GH_TOKEN)))
+    & git -c "http.extraheader=Authorization: Basic $basic" `
+        push $Repo gh-pages --force-with-lease --progress
+    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+} else {
+    & git push $Repo gh-pages --force-with-lease --progress
+    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+}
 
 Write-Host ''
 Write-Host ("Live at: https://{0}.github.io/{1}/" -f $owner, $repoName) -ForegroundColor Green

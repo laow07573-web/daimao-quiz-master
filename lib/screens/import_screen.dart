@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
 import '../utils/responsive.dart';
+import 'settings_screen.dart';
 
 class ImportScreen extends StatefulWidget {
   const ImportScreen({super.key});
@@ -332,17 +333,53 @@ class _ImportScreenState extends State<ImportScreen> {
                                 );
                                 return;
                               }
+                              // v1.28.1 新生引导：DOCX 依赖 AI 解析，无 Key 时
+                              // 前置拦截并直达设置页，不再让后台任务失败后
+                              // 只弹一个"知道了"
+                              final docxFiles = _selectedFiles
+                                  .where((f) =>
+                                      f.toLowerCase().endsWith('.docx') ||
+                                      f.toLowerCase().endsWith('.doc'))
+                                  .toList();
+                              final hasDocx = docxFiles.isNotEmpty;
+                              if (hasDocx && !appState.settings.isConfigured) {
+                                showDialog<void>(
+                                  context: context,
+                                  builder: (dlgCtx) => AlertDialog(
+                                    title: const Text('需要 API Key'),
+                                    content: const Text(
+                                        'DOCX 导入使用 AI 解析题目，需要先配置 API Key。\n\n'
+                                        '没有 Key？可以先点「一键导入示例题库」离线体验；'
+                                        'JSON 题库文件也无需 Key。'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(dlgCtx),
+                                        child: const Text('知道了'),
+                                      ),
+                                      FilledButton.icon(
+                                        icon: const Icon(Icons.settings, size: 16),
+                                        label: const Text('去设置'),
+                                        onPressed: () {
+                                          Navigator.pop(dlgCtx);
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const SettingsScreen()),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
                               // v1.27 后台导入：JSON 直接入库 + DOCX 走 AI 解析，
                               // 全部在应用层执行；立即回首页（进度在首页展示、
                               // 完成弹提示），导入期间可随时离开本页。
                               final jsonFiles = _selectedFiles
                                   .where((f) =>
                                       f.toLowerCase().endsWith('.json'))
-                                  .toList();
-                              final docxFiles = _selectedFiles
-                                  .where((f) =>
-                                      f.toLowerCase().endsWith('.docx') ||
-                                      f.toLowerCase().endsWith('.doc'))
                                   .toList();
                               unawaited(appState.startBackgroundImport(
                                 jsonFiles: jsonFiles,
