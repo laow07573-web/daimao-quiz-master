@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>猫卷 · 30 秒看懂（自动播放演示）</title>
+<!--
+  猫卷 · 宣发录屏专用演示页
+  - 打开即自动播放、循环；无滚动、无交互依赖，直接录屏
+  - 540×960（9:16 竖屏）设计基准，自动等比缩放适配任意录屏窗口
+  - 快捷键：空格 暂停/继续 · R 重播 · F 全屏；?speed=1.5 调速
+-->
+<style>
+  :root{
+    --acc:#2563EB; --acc2:#5B9BFF;
+    --ink:#0A1120; --ink2:#0E1830;
+    --tx:#F3F6FC; --tx2:#9DB0D0; --tx3:#5D6E8E;
+    --m-bg:#F5F7FA; --m-card:#FFFFFF; --m-bd:#E2E8F0; --m-fg:#111827; --m-fg2:#566072; --m-fg3:#8A94A6;
+    --m-s2:#EDF1F7; --m-ok:#15803D; --m-okbg:#DCFCE7; --m-bad:#B91C1C; --m-badbg:#FEE2E2;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(900px 600px at 18% 12%, rgba(37,99,235,.16), transparent 60%),
+      radial-gradient(820px 560px at 84% 86%, rgba(99,102,241,.13), transparent 60%),
+      radial-gradient(520px 380px at 78% 8%, rgba(14,165,164,.08), transparent 60%),
+      linear-gradient(180deg, var(--ink) 0%, var(--ink2) 100%);
+    color:var(--tx); overflow:hidden; font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  }
+  /* ───── 舞台：540×960 设计基准，等比缩放 ───── */
+  #stage{
+    position:absolute; left:50%; top:50%; width:540px; height:960px;
+    transform:translate(-50%,-50%); transform-origin:center center;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  /* 顶部品牌行 */
+  .brand{
+    width:100%; display:flex; align-items:center; gap:10px; padding:10px 6px 0;
+  }
+  .brand .lg{
+    width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#2E6BFF,#2563EB);
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px; color:#fff;
+    box-shadow:0 6px 18px rgba(37,99,235,.4);
+  }
+  .brand b{font-size:19px; letter-spacing:.5px}
+  .brand .sp{flex:1}
+  .brand .ver{
+    font-size:12px; color:var(--tx2); border:1px solid rgba(157,176,208,.28);
+    padding:4px 10px; border-radius:999px;
+  }
+  /* 中部：手机 + 字幕 */
+  .mid{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; width:100%}
+  .phone{
+    position:relative; width:296px; height:640px; border-radius:40px; padding:10px;
+    background:linear-gradient(160deg,#2A3550,#141D33 55%,#232F4E);
+    box-shadow:0 34px 80px rgba(2,6,18,.75), 0 0 0 1px rgba(255,255,255,.06),
+               0 0 90px rgba(37,99,235,.18);
+    flex:0 0 auto;
+  }
+  .scr{
+    position:relative; width:100%; height:100%; border-radius:31px; overflow:hidden;
+    background:var(--m-bg); color:var(--m-fg);
+  }
+  /* 手机屏内通用部件 */
+  .sbar{height:30px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; font-size:11px; font-weight:600; color:var(--m-fg)}
+  .sbar .r{display:flex; gap:4px; align-items:center}
+  .sg{width:14px;height:10px;background:var(--m-fg);clip-path:polygon(0 100%,100% 0,100% 100%);opacity:.9}
+  .bat{width:20px;height:10px;border:1.4px solid var(--m-fg);border-radius:3px;position:relative;opacity:.9}
+  .bat::before{content:"";position:absolute;inset:1.6px;right:5px;background:var(--m-fg);border-radius:1px}
+  .bat::after{content:"";position:absolute;right:-3.4px;top:2.4px;width:2px;height:4px;background:var(--m-fg);border-radius:0 2px 2px 0}
+  .appb{height:40px; display:flex; align-items:center; gap:8px; padding:0 16px; font-size:17px; font-weight:800}
+  .appb .sp{flex:1}
+  .gear{width:26px;height:26px;border-radius:8px;background:var(--m-s2);display:flex;align-items:center;justify-content:center;color:var(--m-fg2)}
+  .prog{height:3px;background:var(--m-s2);margin:0 14px;border-radius:2px;overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--acc);border-radius:2px}
+  .body{position:absolute; top:70px; bottom:52px; left:0; right:0; overflow:hidden; padding:10px 14px 0}
+  .navb{
+    position:absolute; left:0; right:0; bottom:0; height:52px; background:var(--m-card);
+    border-top:1px solid var(--m-bd); display:flex; align-items:center; justify-content:space-around;
+    font-size:10.5px; color:var(--m-fg3);
+  }
+  .navb .t{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+  .navb .t.on{color:var(--acc);font-weight:700}
+  .navb .t.on .pip{width:26px;height:3px;border-radius:2px;background:var(--acc);margin-top:1px}
+  .pip{width:26px;height:3px;border-radius:2px;background:transparent;margin-top:1px}
+  .card{background:var(--m-card);border:1px solid var(--m-bd);border-radius:14px;padding:13px}
+  .hero{
+    background:linear-gradient(135deg,#2E6BFF,#1D4ED8); border-radius:16px; color:#fff;
+    padding:16px 16px 14px; box-shadow:0 10px 24px rgba(37,99,235,.35);
+  }
+  .hero .hi{font-size:16px;font-weight:800}
+  .hero .hr{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .hero .lg2{width:38px;height:38px;border-radius:10px;background:#fff;color:#1D4ED8;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px}
+  .hero .ht{font-size:14px;font-weight:800}
+  .hero .hq{font-size:11.5px;opacity:.85;margin-top:1px}
+  .sech{font-size:13.5px;font-weight:800;margin:14px 2px 8px;color:var(--m-fg)}
+  .duo{display:flex;gap:10px}
+  .duo>div{flex:1;background:#EEF3FE;border-radius:12px;padding:10px 6px;text-align:center}
+  .duo b{font-size:22px;color:var(--acc)}
+  .duo s{text-decoration:none;font-size:12px;color:var(--acc);font-weight:700}
+  .duo em{display:block;font-style:normal;font-size:10.5px;color:var(--m-fg2);margin-top:2px}
+  .qa{display:flex;flex-direction:column;gap:9px}
+  .qi{display:flex;align-items:center;gap:10px;background:var(--m-card);border:1px solid var(--m-bd);border-radius:13px;padding:11px 12px}
+  .qi.hl{border:1.5px solid color-mix(in srgb,var(--acc) 55%,transparent);box-shadow:0 4px 16px rgba(37,99,235,.16)}
+  .qi .ic{width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .qi .tx{flex:1;min-width:0}
+  .qi .tx b{font-size:13.5px;display:block}
+  .qi .tx em{font-style:normal;font-size:11px;color:var(--m-fg2);display:block;margin-top:2px;line-height:1.45}
+  .qi .go{font-size:12px;font-weight:700;color:var(--m-fg3)}
+  .qi .btn{background:var(--acc);color:#fff;font-size:12.5px;font-weight:700;border-radius:11px;padding:7px 14px}
+  .streak{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--m-fg2);margin-top:9px}
+  /* 刷题屏 */
+  .qtag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--acc);background:#E4EDFE;border-radius:7px;padding:3px 8px}
+  .qmeta{font-size:10px;color:var(--m-fg3);margin-left:7px}
+  .stem{font-size:14.5px;line-height:1.6;margin-top:8px;font-weight:600}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-top:11px}
+  .opt{display:flex;align-items:center;gap:9px;background:var(--m-card);border:1.5px solid var(--m-bd);border-radius:12px;padding:11px 12px;font-size:13px}
+  .opt .n{width:22px;height:22px;border-radius:7px;background:var(--m-s2);color:var(--m-fg2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .opt.ok{border-color:#16A34A;background:var(--m-okbg)}
+  .opt.ok .n{background:#16A34A;color:#fff}
+  .opt.bad{border-color:#DC2626;background:var(--m-badbg)}
+  .opt.bad .n{background:#DC2626;color:#fff}
+  .tf{display:flex;gap:10px;margin-top:12px}
+  .tf .b{flex:1;background:var(--m-card);border:1.5px solid #16A34A;border-radius:13px;padding:14px 0;text-align:center;font-size:15px;font-weight:800;color:#15803D}
+  .tf .b.x{border-color:#DC2626;color:#B91C1C}
+  .fb{margin-top:11px;background:var(--m-badbg);border:1.5px solid #DC2626;border-radius:14px;padding:12px 13px;opacity:0;transform:translateY(10px);transition:all .45s cubic-bezier(.22,1,.36,1)}
+  .fb.on{opacity:1;transform:none}
+  .fb .tt{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:var(--m-bad)}
+  .fb .rr{font-size:12.5px;margin-top:6px;color:var(--m-fg2)}
+  .fb .rr b{color:#15803D}
+  .aih{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:800;color:var(--acc)}
+  .aih .sp{flex:1}
+  .aih .mini{font-size:10px;font-weight:600;color:var(--m-fg3);background:var(--m-s2);padding:3px 8px;border-radius:999px}
+  .atext{font-size:12.8px;line-height:1.75;color:var(--m-fg);margin-top:8px}
+  .atext .hl{color:var(--acc);font-weight:700}
+  .caret{display:inline-block;width:2px;height:14px;background:var(--acc);vertical-align:-2px;margin-left:1px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .askrow{display:flex;align-items:center;gap:10px;background:var(--m-card);border:1px solid var(--m-bd);border-radius:13px;padding:11px 12px;margin-top:10px}
+  .askrow .tx b{font-size:13px;display:block}
+  .askrow .tx em{font-style:normal;font-size:11px;color:var(--m-fg2)}
+  /* 统计屏 */
+  .heat{display:grid;grid-template-columns:repeat(13,1fr);gap:3.5px;margin-top:10px}
+  .heat i{aspect-ratio:1;border-radius:3px;background:#E7ECF4}
+  .heat i.l1{background:#BFD5FA}.heat i.l2{background:#6E9EF6}.heat i.l3{background:#2563EB}
+  .trio{display:flex;gap:9px;margin-top:10px}
+  .trio>div{flex:1;background:var(--m-card);border:1px solid var(--m-bd);border-radius:12px;text-align:center;padding:10px 4px}
+  .trio b{font-size:15px;display:block}
+  .trio em{font-style:normal;font-size:9.5px;color:var(--m-fg2)}
+  /* 提示浮层（导入完成） */
+  .toast{
+    position:absolute;left:50%;top:96px;transform:translate(-50%,-16px);opacity:0;
+    background:rgba(17,24,39,.92);color:#fff;font-size:12.5px;font-weight:600;
+    padding:9px 16px;border-radius:999px;white-space:nowrap;transition:all .4s cubic-bezier(.22,1,.36,1);
+    box-shadow:0 10px 26px rgba(0,0,0,.35); z-index:5;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  /* 点击波纹 */
+  .tap{
+    position:absolute;width:46px;height:46px;border-radius:50%;pointer-events:none;z-index:9;
+    border:2.5px solid rgba(37,99,235,.85);background:rgba(37,99,235,.18);
+    transform:translate(-50%,-50%) scale(.4); opacity:0;
+  }
+  .tap.on{animation:tap 1.15s ease-out infinite}
+  @keyframes tap{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.35)}
+    25%{opacity:1}
+    70%{opacity:.9;transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1.12)}
+  }
+  /* 屏幕切换 */
+  .layer{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .5s ease}
+  .layer.on{opacity:1;pointer-events:auto}
+  /* ───── 字幕区 ───── */
+  .caps{height:150px;width:100%;position:relative}
+  .cap{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;text-align:center;opacity:0;transform:translateY(14px);transition:all .5s cubic-bezier(.22,1,.36,1);
+  }
+  .cap.on{opacity:1;transform:none}
+  .cap .k{font-size:12px;font-weight:700;letter-spacing:3px;color:var(--acc2)}
+  .cap h1{font-size:31px;font-weight:800;line-height:1.3;text-shadow:0 2px 24px rgba(37,99,235,.35)}
+  .cap p{font-size:15.5px;color:var(--tx2);line-height:1.6;max-width:440px}
+  .cap h1 .em{color:var(--acc2)}
+  /* 进度段 */
+  .segs{width:100%;display:flex;gap:6px;padding:6px 6px 0}
+  .segs i{flex:1;height:4px;border-radius:3px;background:rgba(157,176,208,.22);overflow:hidden;position:relative}
+  .segs i.done{background:var(--acc2)}
+  .hint{
+    position:fixed;right:14px;bottom:12px;font-size:11.5px;color:var(--tx3);
+    opacity:.85;transition:opacity 1.2s;pointer-events:none;z-index:99;
+  }
+  .hint.off{opacity:0}
+  /* 开场 / 结尾大卡（替代手机的舞台内容） */
+  .bigcard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+  .bigcard .lg3{
+    width:104px;height:104px;border-radius:30px;background:linear-gradient(135deg,#2E6BFF,#1D4ED8);
+    display:flex;align-items:center;justify-content:center;font-size:58px;font-weight:800;color:#fff;
+    box-shadow:0 20px 70px rgba(37,99,235,.55);
+  }
+  .bigcard h1{font-size:40px;font-weight:800;letter-spacing:2px}
+  .bigcard .sl{font-size:16.5px;color:var(--tx2)}
+  .bigcard .badges{display:flex;gap:9px;margin-top:6px}
+  .bigcard .bd{font-size:12.5px;color:var(--tx2);border:1px solid rgba(157,176,208,.3);padding:6px 13px;border-radius:999px}
+  .bigcard .url{
+    margin-top:6px;font-size:19px;font-weight:800;color:#fff;letter-spacing:.4px;
+    background:linear-gradient(135deg,rgba(37,99,235,.32),rgba(99,102,241,.32));
+    border:1px solid rgba(91,155,255,.45); padding:13px 22px;border-radius:16px;
+    box-shadow:0 12px 40px rgba(37,99,235,.3);
+  }
+  .url{
+    font-size:19px;font-weight:800;color:#fff;letter-spacing:.4px;
+    background:linear-gradient(135deg,rgba(37,99,235,.32),rgba(99,102,241,.32));
+    border:1px solid rgba(91,155,255,.45); padding:13px 22px;border-radius:16px;
+    box-shadow:0 12px 40px rgba(37,99,235,.3);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="brand">
+    <div class="lg">猫</div><b>猫卷</b><span class="sp"></span><span class="ver" id="ver">v1.28.1</span>
+  </div>
+
+  <div class="mid">
+    <div class="phone" id="phone">
+      <div class="scr" id="scr">
+        <!-- 各拍子的屏幕层（JS 注入） -->
+        <div class="tap" id="tap"></div>
+        <div class="toast" id="toast">示例题库导入完成 · 共 10 道题</div>
+      </div>
+    </div>
+
+    <div class="caps" id="caps"></div>
+  </div>
+
+  <div class="segs" id="segs"></div>
+</div>
+<div class="hint" id="hint">空格 暂停 · R 重播 · F 全屏</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   屏幕模板：与 App v1.28.1 真实界面一一对应（代码矢量绘制）
+   ══════════════════════════════════════════════════════════ */
+var ICONS = {
+  gear:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg>',
+  grad:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg>',
+  rocket:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/><circle cx="15" cy="9" r="1.7"/></svg>',
+  lib:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg>',
+  flame:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c2.6 3.6 5 5.1 5 8.6a5 5 0 0 1-10 0c0-2.2 1-3.4 2-4.4.3 1.2 1 2 1.8 2 1.1 0 1.4-1.2 1.4-2.2 0-1.3-.4-2.6-.2-4z"/></svg>',
+  bulb:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>',
+  chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.5-.7L3 21l1.8-4.6A8.4 8.4 0 1 1 21 11.5z"/></svg>',
+  chev:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+  home:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>',
+  chart:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>',
+  user:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>',
+  xcirc:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>'
+};
+
+function navbar(active){
+  var tabs = [
+    ['首页', ICONS.home], ['统计', ICONS.chart], ['我的', ICONS.user]
+  ];
+  return '<div class="navb">' + tabs.map(function(t, i){
+    return '<div class="t' + (i === (active || 0) ? ' on' : '') + '">' + t[1] + t[0] + '<div class="pip"></div></div>';
+  }).join('') + '</div>';
+}
+function chrome(){
+  return '<div class="sbar"><span>9:41</span><span class="r"><span class="sg"></span><span class="bat"></span></span></div>';
+}
+
+/* 首次安装首页（v1.28.1 新生引导） */
+function scrHome(opt){  // opt.toast: 显示导入完成浮层; opt.sel: 题库已导入
+  var card = opt.sel
+    ? '<div class="qi"><span class="ic">' + ICONS.grad + '</span><span class="tx"><b>新生第一步</b><em>示例题库已导入 · 已为你勾选</em></span><span class="go" style="color:var(--m-ok)">✓</span></div>'
+    : '<div class="qi hl"><span class="ic">' + ICONS.grad + '</span><span class="tx"><b>新生第一步</b><em>导入示例题库（10 道医学题），无需任何配置立即体验</em></span><span class="btn" id="b-import">导入</span></div>';
+  return chrome() +
+    '<div class="appb">猫卷<span class="sp"></span><span class="gear">' + ICONS.gear + '</span></div>' +
+    '<div class="body">' +
+      '<div class="hero"><div class="hi">下午好！</div><div class="hr"><div class="lg2">猫</div><div><div class="ht">猫卷</div><div class="hq">为你，千千万万遍。</div></div></div></div>' +
+      '<div class="sech">快速操作</div>' +
+      '<div class="qa">' + card +
+        '<div class="qi"><span class="ic">' + ICONS.rocket + '</span><span class="tx"><b>定向爆破</b><em>' + (opt.sel ? '已选 1 个题库，全部' : '请先选择题库') + '</em></span><span class="go">' + ICONS.chev + '</span></div>' +
+        '<div class="qi"><span class="ic">' + ICONS.lib + '</span><span class="tx"><b>管理题库</b><em>' + (opt.sel ? '1 个题库' : '还没有题库，先去导入') + '</em></span><span class="go">' + ICONS.chev + '</span></div>' +
+      '</div>' +
+    '</div>' + navbar();
+}
+
+/* 刷题屏：判断题（wrong=true 显示判错卡） */
+function scrQuiz(wrong){
+  return chrome() +
+    '<div class="appb" style="font-size:15px">第 1/10 题<span class="sp"></span></div>' +
+    '<div class="prog"><i style="width:10%"></i></div>' +
+    '<div class="body">' +
+      '<div class="card"><span class="qtag">判断</span><span class="qmeta">作答 1 次 · 正确率 0% · 下次复习：今天</span>' +
+      '<div class="stem">内脏痛的主要特点是定位准确、对切割刺激敏感。</div></div>' +
+      '<div class="tf"><div class="b">✓ 正确</div><div class="b x" id="b-wrong">✗ 错误</div></div>' +
+      '<div class="fb' + (wrong ? ' on' : '') + '"><div class="tt">' + ICONS.xcirc + '回答错误</div>' +
+      '<div class="rr">你选择了：<b style="color:var(--m-bad)">✓ 正确</b>　　正确答案：<b>✗ 错误</b></div></div>' +
+      '<div class="askrow" style="justify-content:center;color:var(--acc);font-weight:700;font-size:13px">' + ICONS.bulb + '查看解析</div>' +
+    '</div>';
+}
+
+/* 示例解析（没配 Key 也看得到） */
+function scrSample(){
+  return chrome() +
+    '<div class="appb" style="font-size:15px">第 1/10 题<span class="sp"></span></div>' +
+    '<div class="prog"><i style="width:10%"></i></div>' +
+    '<div class="body">' +
+      '<div class="card"><span class="qtag">判断</span><div class="stem">内脏痛的主要特点是定位准确、对切割刺激敏感。</div></div>' +
+      '<div class="fb on"><div class="tt">' + ICONS.xcirc + '回答错误</div>' +
+      '<div class="rr">你选择了：<b style="color:var(--m-bad)">✓ 正确</b>　　正确答案：<b>✗ 错误</b></div></div>' +
+      '<div class="card" style="margin-top:10px"><div class="aih">' + ICONS.bulb + '示例解析<span class="sp"></span><span class="mini">内置 · 免 Key</span></div>' +
+      '<div class="atext">内脏痛定位模糊、对切割/烧灼等刺激不敏感，但对牵拉、缺血、痉挛和炎症等刺激敏感，常伴有<span class="hl">牵涉痛</span>和情绪反应。</div></div>' +
+      '<div class="askrow"><span class="ic" style="width:32px;height:32px;border-radius:9px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:0 0 auto">' + ICONS.chat + '</span><span class="tx"><b>向 AI 追问</b><em>没看懂？直接问，对话式讲解</em></span><span class="go" style="color:var(--m-fg3)">' + ICONS.chev + '</span></div>' +
+    '</div>';
+}
+
+/* AI 解析（打字机）+ 追问气泡 */
+var AI_TEXT = '**答案：** 错误。**题眼：** 内脏痛 ==定位模糊==，对切割/烧灼不敏感，但对牵拉、缺血、痉挛和炎症敏感。**避坑：** 别和躯体痛（定位准、怕切割）混淆。**口诀：** 内脏痛慢而广，牵涉痛要提防。';
+function aiHtml(){
+  return chrome() +
+    '<div class="appb" style="font-size:15px">第 1/10 题<span class="sp"></span></div>' +
+    '<div class="prog"><i style="width:10%"></i></div>' +
+    '<div class="body">' +
+      '<div class="card"><div class="aih">' + ICONS.bulb + 'AI 解析<span class="sp"></span><span class="mini">题眼破题法</span></div>' +
+      '<div class="atext" id="ai-typed"><span class="caret"></span></div></div>' +
+      '<div id="bubs" style="margin-top:10px;display:flex;flex-direction:column;gap:7px"></div>' +
+    '</div>';
+}
+var BUBS = [
+  { u:true,  t:'为什么内脏痛定位模糊？' },
+  { u:false, t:'因为<b>内脏神经感受器分布稀疏</b>，信号进入脊髓时容易和体表信号汇到同一节段，大脑难以精确定位，还会「牵涉」到体表——比如心肌缺血时左肩内侧发酸。' },
+  { u:true,  t:'那考试怎么快速判断？' }
+];
+/* 渲染 AI 文本（**粗** ==高==） */
+function renderAi(s){
+  s = s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  s = s.replace(/==(.+?)==/g, '<span class="hl">$1</span>');
+  return s;
+}
+
+/* 统计屏（热力图 + 三格） */
+function scrStats(){
+  var cells = '';
+  var seed = 20260911;
+  function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
+  for(var i = 0; i < 91; i++){
+    var r = rnd(), lv = r > .68 ? 3 : r > .42 ? 2 : r > .22 ? 1 : 0;
+    cells += '<i class="l' + lv + '"></i>';
+  }
+  return chrome() +
+    '<div class="appb">统计<span class="sp"></span></div>' +
+    '<div class="body">' +
+      '<div class="card"><div class="aih" style="color:var(--m-fg)">🔥 连续打卡 <span style="color:var(--acc)">21</span> 天<span class="sp"></span></div>' +
+      '<div class="heat">' + cells + '</div></div>' +
+      '<div class="trio"><div><b style="color:var(--acc)">1,284</b><em>总刷题量</em></div><div><b style="color:#16A34A">76%</b><em>平均正确率</em></div><div><b style="color:#D97706">6h24m</b><em>累计时长</em></div></div>' +
+      '<div class="card" style="margin-top:10px"><div class="aih" style="color:var(--m-fg);font-size:12.5px">错题 TOP 知识点<span class="sp"></span><span class="mini">FSRS-5 排期</span></div>' +
+      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:7px">' +
+        '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><span style="width:86px;color:var(--m-fg2)">缺氧分类</span><span style="flex:1;height:8px;border-radius:4px;background:var(--m-s2);overflow:hidden"><i style="display:block;height:100%;width:72%;background:var(--acc);border-radius:4px"></i></span><b style="font-size:11px">12</b></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><span style="width:86px;color:var(--m-fg2)">抗结核药</span><span style="flex:1;height:8px;border-radius:4px;background:var(--m-s2);overflow:hidden"><i style="display:block;height:100%;width:55%;background:var(--acc);border-radius:4px;opacity:.75"></i></span><b style="font-size:11px">9</b></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><span style="width:86px;color:var(--m-fg2)">心脏听诊</span><span style="flex:1;height:8px;border-radius:4px;background:var(--m-s2);overflow:hidden"><i style="display:block;height:100%;width:38%;background:var(--acc);border-radius:4px;opacity:.55"></i></span><b style="font-size:11px">6</b></div>' +
+      '</div></div>' +
+    '</div>' + navbar(1);
+}
+
+/* ══════════════════════════════════════════════════════════
+   分镜脚本：screen / 大字幕 / 副题 / 时长 / 点击位置 / 进场动作
+   ══════════════════════════════════════════════════════════ */
+var BEATS = [
+  { kind:'title', ms:4200,
+    k:'MAOJUAN · 备考刷题', h:'装好就能刷，<span class="em">不用任何配置</span>', p:'医学生的备考刷题 App · 免费 · 数据全在本地' },
+  { kind:'screen', ms:5200, build:function(){ return scrHome({sel:false}); },
+    k:'STEP 1 · 新生第一步', h:'首页就是引导，<span class="em">一键导入</span>示例题库', p:'10 道医学题，不注册、不配 Key，点一下就能体验',
+    tap:'#b-import' },
+  { kind:'screen', ms:3600, build:function(){ return scrHome({sel:true}); }, toast:true,
+    k:'STEP 2 · 导入完成', h:'题库自动勾选，<span class="em">马上能刷</span>', p:'不用自己找设置、不用自己建库' },
+  { kind:'screen', ms:5600, build:function(){ return scrQuiz(false); }, tap:'#b-wrong', revealFb:true,
+    k:'STEP 3 · 答完即判', h:'答错的那一刻，<span class="em">解析就在手边</span>', p:'单选 / 多选 / 判断 / 填空…七种题型自动判定' },
+  { kind:'screen', ms:5400, build:function(){ return scrSample(); },
+    k:'STEP 4 · 示例解析', h:'<span class="em">没配 AI Key</span> 也有解析', p:'示例题库每题自带解析，0 配置先学起来' },
+  { kind:'screen', ms:6800, build:function(){ return aiHtml(); }, type:true,
+    k:'STEP 5 · AI 题眼解析', h:'配置 Key 后，<span class="em">AI 逐题教你怎么破</span>', p:'题眼破题法四步拆解 · 关键词彩色标记 · 篇幅三档' },
+  { kind:'screen', ms:5600, build:function(){ return aiHtml(); }, chat:true,
+    k:'STEP 6 · 像聊天一样追问', h:'看不懂？<span class="em">直接问</span>', p:'一问一答都留在题目旁边，下次打开还在' },
+  { kind:'screen', ms:5600, build:function(){ return scrStats(); }, pan:true,
+    k:'STEP 7 · 坚持看得见', h:'错题自动排期，<span class="em">进步有据可查</span>', p:'FSRS-5 遗忘曲线 · 年度热力图 · 薄弱知识点排行' },
+  { kind:'end', ms:6200,
+    k:'FREE · OPEN SOURCE', h:'现在就去下载，<span class="em">装好即刷</span>',
+    p:'Android / Windows 双端 · 免费 · 数据全在本地' }
+];
+
+/* ══════════════════════════════════════════════════════════
+   播放器
+   ══════════════════════════════════════════════════════════ */
+function byId(id){ return document.getElementById(id); }
+var scr = byId('scr'), capsBox = byId('caps'), segsBox = byId('segs'),
+    tapEl = byId('tap'), toastEl = byId('toast'), hintEl = byId('hint');
+var speed = parseFloat((location.search.match(/speed=([\d.]+)/) || [])[1]) || 1;
+var timer = null, beat = -1, paused = false;
+var segFill = null, segStart = 0, segDur = 0, segRaf = null, pausedAt = 0;
+
+/* 构建字幕节点与进度段 */
+BEATS.forEach(function(b, i){
+  var c = document.createElement('div');
+  c.className = 'cap';
+  var inner = '<div class="k">' + b.k + '</div><h1>' + b.h + '</h1>';
+  if(b.p) inner += '<p>' + b.p + '</p>';
+  c.innerHTML = inner;
+  capsBox.appendChild(c);
+  var s = document.createElement('i');
+  segsBox.appendChild(s);
+});
+var capEls = [].slice.call(capsBox.children);
+var segEls = [].slice.call(segsBox.children);
+
+function showTap(sel){
+  // 沿 offsetParent 链累加出元素在 scr 内的中心点（中间可能有 .body 等定位层）
+  var el = scr.querySelector(sel);
+  if(!el){ tapEl.classList.remove('on'); return; }
+  var x = 0, y = 0, n = el;
+  while(n && n !== scr){
+    x += n.offsetLeft; y += n.offsetTop;
+    n = n.offsetParent;
+  }
+  tapEl.style.left = (x + el.offsetWidth / 2) + 'px';
+  tapEl.style.top = (y + el.offsetHeight / 2) + 'px';
+  tapEl.classList.remove('on');
+  void tapEl.offsetWidth;
+  tapEl.classList.add('on');
+}
+
+/* 开场 / 结尾：手机屏放一张大卡 */
+function bigLayer(html){
+  var d = document.createElement('div');
+  d.className = 'layer';
+  d.innerHTML = '<div class="bigcard">' + html + '</div>';
+  return d;
+}
+
+var TYPE_TIMERS = [];
+function clearType(){ TYPE_TIMERS.forEach(clearTimeout); TYPE_TIMERS = []; }
+function typeInto(el, text, ms){
+  var i = 0, step = Math.max(14, ms / text.length);
+  (function tick(){
+    if(i >= text.length){ el.innerHTML = renderAi(text); return; }
+    i += 2;
+    el.innerHTML = renderAi(text.slice(0, i)) + '<span class="caret"></span>';
+    TYPE_TIMERS.push(setTimeout(tick, step));
+  })();
+}
+function playBubs(box){
+  BUBS.forEach(function(b, i){
+    TYPE_TIMERS.push(setTimeout(function(){
+      var d = document.createElement('div');
+      d.style.cssText = 'max-width:82%;font-size:12px;line-height:1.6;padding:9px 12px;border-radius:' +
+        (b.u ? '13px 13px 13px 4px;align-self:flex-end;background:var(--acc);color:#fff' :
+               '13px 13px 4px 13px;align-self:flex-start;background:var(--m-card);border:1px solid var(--m-bd);color:var(--m-fg)');
+      d.innerHTML = b.t;
+      d.style.opacity = '0'; d.style.transform = 'translateY(8px)'; d.style.transition = 'all .4s';
+      box.appendChild(d);
+      requestAnimationFrame(function(){ d.style.opacity = '1'; d.style.transform = 'none'; });
+    }, i * 1300 + 500));
+  });
+}
+
+function clearLayers(){
+  [].slice.call(scr.querySelectorAll('.layer')).forEach(function(l){ l.remove(); });
+  clearType();
+}
+
+function showBeat(k){
+  if(timer) clearTimeout(timer);   // 手动跳拍/重播时，撤销上一拍遗留的推进定时器
+  beat = k;
+  var b = BEATS[k];
+  clearLayers();
+  tapEl.classList.remove('on');
+  toastEl.classList.remove('on');
+  capEls.forEach(function(c, i){ c.classList.toggle('on', i === k); });
+  segEls.forEach(function(s, i){
+    s.classList.toggle('done', i < k);
+    s.classList.toggle('cur', i === k);
+  });
+  segDur = b.ms / speed;
+
+  if(b.kind === 'title'){
+    var t = bigLayer('<div class="lg3">猫</div><h1 style="font-size:34px">猫卷 · 备考刷题</h1><div class="sl">为你，千千万万遍。</div>');
+    scr.appendChild(t); requestAnimationFrame(function(){ t.classList.add('on'); });
+  } else if(b.kind === 'end'){
+    var e = bigLayer('<div class="lg3">猫</div><h1 style="font-size:34px">猫卷 · 备考刷题</h1>' +
+      '<div class="sl">免费 · 开源 · 数据全在本地<br>现在就去下载，装好即刷</div>' +
+      '<div class="url" style="margin-top:10px;font-size:15px;padding:11px 14px;letter-spacing:0">laow07573-web.github.io<br>daimao-quiz-master</div>');
+    scr.appendChild(e); requestAnimationFrame(function(){ e.classList.add('on'); });
+  } else {
+    var l = document.createElement('div');
+    l.className = 'layer';
+    l.innerHTML = b.build();
+    scr.insertBefore(l, tapEl);
+    requestAnimationFrame(function(){ l.classList.add('on'); });
+    if(b.toast) TYPE_TIMERS.push(setTimeout(function(){ toastEl.classList.add('on'); }, 900));
+    if(b.type){
+      var at = l.querySelector('#ai-typed');
+      if(at) TYPE_TIMERS.push(setTimeout(function(){ typeInto(at, AI_TEXT, b.ms * 0.62 / speed); }, 500));
+    }
+    if(b.chat){
+      var at0 = l.querySelector('#ai-typed');
+      if(at0) at0.innerHTML = renderAi(AI_TEXT);
+      var bx = l.querySelector('#bubs');
+      if(bx) playBubs(bx);
+    }
+    if(b.pan){
+      var body = l.querySelector('.body');
+      if(body){
+        body.style.transition = 'transform 5.2s cubic-bezier(.4,.1,.2,1)';
+        body.style.transformOrigin = 'top center';
+        TYPE_TIMERS.push(setTimeout(function(){ body.style.transform = 'scale(1.14) translateY(-14px)'; }, 700));
+      }
+    }
+    if(b.tap) TYPE_TIMERS.push(setTimeout(function(){ showTap(b.tap); }, 500));
+    if(b.revealFb) TYPE_TIMERS.push(setTimeout(function(){
+      var f = document.querySelector('#scr .fb');
+      if(f) f.classList.add('on');
+    }, 2100));
+  }
+
+  /* 进度段填充（真实子元素，可随暂停冻结） */
+  if(segFill){ try{ segFill.parentNode.removeChild(segFill); }catch(e){} }
+  segFill = document.createElement('b');
+  segFill.style.cssText = 'position:absolute;inset:0;background:var(--acc2);transform-origin:left;transform:scaleX(0);border-radius:3px';
+  segEls[k].appendChild(segFill);
+  segStart = performance.now();
+  (function drive(){
+    if(segFill && segEls[k] === segFill.parentNode){
+      if(!paused){
+        var p = Math.min(1, (performance.now() - segStart) / segDur);
+        segFill.style.transform = 'scaleX(' + p + ')';
+      }
+      if(parseFloat(segFill.style.transform.replace(/[^\d.]/g, '') || '0') < 1){
+        segRaf = requestAnimationFrame(drive);
+      }
+    }
+  })();
+
+  timer = setTimeout(function(){ showBeat((k + 1) % BEATS.length); }, segDur + 350);
+}
+
+/* 暂停 / 继续：冻结拍子推进与进度填充，恢复时顺延时间基点 */
+function setPaused(v){
+  if(paused === v) return;
+  paused = v;
+  if(v){
+    clearTimeout(timer);
+    pausedAt = performance.now();
+  } else {
+    var pausedDur = performance.now() - pausedAt;
+    segStart += pausedDur;
+    var rest = Math.max(300, segDur - (performance.now() - segStart));
+    timer = setTimeout(function(){ showBeat((beat + 1) % BEATS.length); }, rest + 350);
+  }
+}
+
+window.addEventListener('keydown', function(e){
+  if(e.code === 'Space'){ e.preventDefault(); setPaused(!paused); }
+  if(e.key === 'r' || e.key === 'R'){ paused = false; clearTimeout(timer); showBeat(0); }
+  if(e.key === 'f' || e.key === 'F'){
+    if(document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+  }
+});
+document.addEventListener('visibilitychange', function(){
+  // 后台标签页：暂停，避免定时器节流导致演出错乱；回前台从当前拍子继续
+  setPaused(document.hidden);
+});
+
+/* 等比缩放舞台 */
+function fit(){
+  var s = Math.min(window.innerWidth / 540, window.innerHeight / 960);
+  byId('stage').style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+}
+window.addEventListener('resize', fit);
+
+fit();
+setTimeout(function(){ showBeat(0); }, 500);
+setTimeout(function(){ hintEl.classList.add('off'); }, 4600);
+
+</script>
+</body>
+</html>
