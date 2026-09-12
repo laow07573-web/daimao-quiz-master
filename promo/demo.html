@@ -258,16 +258,17 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 function em(s){ return esc(s).replace(/\|(.+?)\|/g,'<span class="g">$1</span>'); }
 
 var FEATS = [
-  { ghost:'0', kick:'01 · 开箱即用', h:'不用注册，|不用配置|', sub:'第一次打开，路径就已经铺好。',
+  { ghost:'0', kick:'01 · 装好即用', h:'不用注册，|示例题先刷起来|', sub:'内置 10 道医学题，打开就能开始。',
     el:function(){ return '<div class="rows">' + [['—','一键导入示例题库','内置 10 道医学题，点一下就能开刷'],
-      ['—','无需 API Key','解析、判题、错题本全部本地可用'],['—','无需注册登录','没有账号，没有试用期，没有广告']]
+      ['—','判题 · 错题本 · 统计','这部分全部本地完成，不用联网'],
+      ['—','AI 解析 · DOCX 导入','这两项要走模型，需要 API Key；设置里填一个即可']]
       .map(function(r){ return '<div class="row rise"><span class="no" style="font-size:' + px(15) + 'px">' + r[0] + '</span>' +
         '<div class="tx"><b style="font-size:' + px(17) + 'px">' + esc(r[1]) + '</b>' +
         '<em style="font-size:' + px(13.5) + 'px">' + esc(r[2]) + '</em></div></div>'; }).join('') + '</div>'; } },
   { ghost:'7', kick:'02 · 题型覆盖', h:'七种题型，|一套判定|', sub:'从判断到案例，判题逻辑各不相同。',
     el:function(){ return '<div class="chips">' + ['单选','多选','判断','填空','名词解释','简答','案例']
       .map(function(t){ return '<span class="chip rise" style="font-size:' + px(14) + 'px">' + t + '</span>'; }).join('') + '</div>'; } },
-  { ghost:'AI', kick:'03 · 题眼破题法', h:'不是给答案，|是教你破题|', sub:'复现一个老师在旁边讲题的思路。',
+  { ghost:'AI', kick:'03 · 题眼破题法', h:'不是给答案，|是教你破题|', sub:'配置 API Key 后，复现一个老师在旁边讲题的思路。',
     el:function(){ return '<div class="flow">' + ['抓题眼','拆选项','指坑点','给结论']
       .map(function(t, i){ return (i ? '<span class="ar rise">→</span>' : '') +
         '<span class="st rise" style="font-size:' + px(15) + 'px">' + t + '</span>'; }).join('') + '</div>'; } },
@@ -330,7 +331,7 @@ var FEATS = [
         '<div class="rise heatlegend"><span>少</span>' +
         '<i class="lv0"></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i>' +
         '<span>多</span><span class="sp"></span><span class="cap">过去 147 天的练习记录</span></div>'; } },
-  { ghost:'?', kick:'06 · 追问', h:'看不懂，|直接问|', sub:'解析里哪句没懂，接着问就行。',
+  { ghost:'?', kick:'06 · 追问', h:'看不懂，|直接问|', sub:'同样基于你的 API Key，解析里哪句没懂接着问就行。',
     el:function(){ return '<div class="rise" style="font-size:' + px(17) + 'px;color:var(--tx2);line-height:1.7">' +
       '「为什么内脏痛定位模糊？」<br>「那考试怎么快速判断？」</div>' +
       '<div class="rise" style="margin-top:.9em;font-size:' + px(13.5) + 'px;color:var(--tx3)">一问一答留在题目旁边，下次打开还在</div>'; } }
@@ -387,7 +388,7 @@ var BEATS_K = [
 
 var BEATS_F = [
   B('hero', { ms:2400, kick:'MAOJUAN', h:'猫卷', ghost:'猫',
-    sub:'装好就能刷，不用任何配置', foot:'', cam:{ z:[-380,0], ry:[-19,0], dur:1500, ease:easeOutQuint } }),
+    sub:'装好就能刷，不用注册账号', foot:'', cam:{ z:[-380,0], ry:[-19,0], dur:1500, ease:easeOutQuint } }),
   B('rows', { ms:4000, kick:'为什么做它', h:'订阅制，|正在吃掉你的备考预算|', ghost:'¥',
     rows:[['01','内容锁死','停止续费，题库和解析一起消失'],
           ['02','数据在别人手里','说停服就停服，复习记录说没就没'],
