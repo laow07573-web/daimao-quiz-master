@@ -1436,11 +1436,16 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildShowAnalysisButton(AppState appState, AppThemeColors ac) {
+    // 无 Key 时展开的是题目自带解析（见 _loadAnalysis 的回落），标题也照此写明，
+    // 免得用户以为点了会调 AI——与 _buildAnalysisArea 里的小条/面板标题保持同一口径。
+    final bool noKey = !appState.settings.isConfigured;
+    final bool hasBuiltin =
+        (appState.currentQuestion?.analysis?.trim() ?? '').isNotEmpty;
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.psychology, size: 18),
-        label: const Text('查看 AI 解析'),
+        label: Text(noKey && hasBuiltin ? '查看示例解析' : '查看 AI 解析'),
         onPressed: () {
           setState(() => _showAnalysis = true);
           appState.showAnalysis();
@@ -1480,12 +1485,19 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget _buildAnalysisArea(AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     final isCorrect = lastRecord?.isCorrect ?? false;
+    final bool noKey = !appState.settings.isConfigured;
+    // 题目自带解析（示例题库每题都有）：无 Key 时也能看，_loadAnalysis 会回落到它
+    final bool hasBuiltin = (question.analysis?.trim() ?? '').isNotEmpty;
 
     if (isCorrect && !_showManualAnalysis) {
       return GestureDetector(
         onTap: () {
-          // v1.0.2: API 未配置拦截解析请求
-          if (!appState.settings.isConfigured) {
+          // v1.28.2 修复：只有「既没 Key、又没有自带解析」时才拦截。
+          // 此前这里无条件要求 Key，导致无 Key 用户在示例题库里答对题、
+          // 点开解析却被拦（而答错时同一份自带解析能正常显示）——
+          // 与 _loadAnalysis 的回落逻辑、以及「无 Key 时显示自带解析」的
+          // 产品承诺都矛盾。
+          if (noKey && !hasBuiltin) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再查看解析。'),
@@ -1509,7 +1521,8 @@ class _QuizScreenState extends State<QuizScreen> {
             children: [
               Icon(Icons.lightbulb_outline, color: ac.textSecondary, size: 18),
               const SizedBox(width: 8),
-              Text('查看AI解析',
+              // 无 Key 时展开的是题目自带解析，标题也跟着切换（与下方面板标题一致）
+              Text(noKey && hasBuiltin ? '查看示例解析' : '查看AI解析',
                   style: TextStyle(color: ac.accent, fontSize: MaoType.body)),
             ],
           ),
@@ -1517,7 +1530,6 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
 
-    final bool noKey = !appState.settings.isConfigured;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
