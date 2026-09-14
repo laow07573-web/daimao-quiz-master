@@ -493,6 +493,25 @@ $chunk
   static bool isSseDoneLine(String line) =>
       line.startsWith('data:') && line.substring(5).trim() == '[DONE]';
 
+  /// 从一行 SSE 里取 token 用量（流式默认不返回 usage，部分服务商会在末尾补上）。
+  /// 取不到就返回 null，不影响主流程。
+  @visibleForTesting
+  static int? usageFromSseLine(String line) {
+    if (!line.startsWith('data:')) return null;
+    final payload = line.substring(5).trim();
+    if (payload.isEmpty || payload == '[DONE]') return null;
+    try {
+      final data = jsonDecode(payload);
+      if (data is! Map) return null;
+      final usage = data['usage'];
+      if (usage is! Map) return null;
+      final total = usage['total_tokens'];
+      return total is int ? total : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 从一次性响应体里取正文（兼容分支复用，与 [_callAI] 的取值口径一致）
   static String? _contentFromChatBody(String body) {
     try {
@@ -558,13 +577,24 @@ $chunk
 
     final buffer = StringBuffer();
     var received = false;
+    // 总时长上限：只有「空闲超时」不够——网关若持续发心跳注释行（`: keep-alive`）
+    // 却永不发 [DONE]、也不关连接，空闲计时会被不断重置，流永不结束，
+    // 调用方的 loading 就永久卡住。改造前的一次性请求有 30s 硬超时，不会无限等。
+    final deadline = DateTime.now().add(const Duration(minutes: 5));
     final lines = response.stream
         .transform(utf8.decoder)
         .transform(const LineSplitter()) // 自动处理 \n 与 \r\n
-        .timeout(const Duration(seconds: 60)); // 流空闲超时：长时间没有新数据视为失败
+        .timeout(const Duration(seconds: 60)); // 流空闲超时
 
     await for (final line in lines) {
+      if (DateTime.now().isAfter(deadline)) {
+        throw Exception('AI流式响应超时');
+      }
       if (isSseDoneLine(line)) break;
+      // token 统计：流式默认不带 usage，但部分服务商会在末尾 chunk 里给出；
+      // 有就记，没有就算了（不主动加 stream_options，避免严格网关直接 400）
+      final usage = usageFromSseLine(line);
+      if (usage != null) _totalTokensUsed += usage;
       final delta = deltaFromSseLine(line);
       if (delta == null) continue;
       received = true;
@@ -604,7 +634,16 @@ $chunk
         yield await _generateAndCacheAnalysis(question);
         return;
       }
-      if (question.id != null) await _db.cacheAnalysis(question.id!, last);
+      // 写缓存**移出 try**：缓存写失败（磁盘满 / SQLITE_BUSY / 题行被删）不该
+      // 被当成「流式失败」，否则会再发一次完整 AI 请求、并用新文本覆盖用户
+      // 已经看完的解析（既多花钱又让内容前后不一致）。
+      if (question.id != null) {
+        try {
+          await _db.cacheAnalysis(question.id!, last);
+        } catch (e) {
+          DebugLogService.instance.log('AI', '解析写缓存失败（不影响展示）: $e');
+        }
+      }
     } catch (e) {
       DebugLogService.instance.log('AI', '流式讲解失败，回退一次性请求: $e');
       yield await _generateAndCacheAnalysis(question);

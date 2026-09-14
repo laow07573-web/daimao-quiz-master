@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
@@ -23,6 +24,12 @@ import 'key_crypto.dart';
 import 'secure_key_storage.dart';
 
 class AppState extends ChangeNotifier {
+  /// 测试注入：给定则用它构造 [AIService]（配合 MockClient 覆盖流式竞态等
+  /// 只能在 AppState 层验证的行为）。生产代码不传，行为不变。
+  AppState({http.Client? aiClient}) : _aiClientOverride = aiClient;
+
+  final http.Client? _aiClientOverride;
+
   final DatabaseService _db = DatabaseService.instance;
   final QuizService _quizService = QuizService();
   final StatsService _statsService = StatsService();
@@ -64,6 +71,10 @@ class AppState extends ChangeNotifier {
 
   /// 解析流的通知节流时间戳（见 _notifyAnalysisThrottled）
   DateTime _lastAnalysisNotify = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 解析代次：每发起一次生成就自增。**同一题可能有多条流**（点重新生成、
+  /// 切走再切回），所以守卫要用代次而不是题号——否则旧流的 chunk 会被当成新结果。
+  int _analysisGen = 0;
 
   /// 正在流式生成的追问回复（App 内对话页据此渲染「边生成边显示」的气泡）；
   /// 生成完成后并入 followUpHistory，这里清空。
@@ -379,7 +390,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     // 不取消的话「保存设置」会把正在显示的解析打崩。
     _cancelAnalysisStream();
     _aiService?.dispose();
-    _aiService = AIService(_settings);
+    _aiService = AIService(_settings, client: _aiClientOverride);
   }
 
   AIService? get aiService => _aiService;
@@ -1080,24 +1091,21 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     //   · 节流：markdown 每帧全量重解析，逐 chunk 通知会掉帧 → 60ms 合并一次
     //   · 异常兜底：finally 复位 loading，防止加载圈永久卡死（沿用原逻辑）
     final questionId = q.id;
+    // 必须先取消上一条流，并用**代次**而非题号做守卫：
+    // 「点重新生成解析」「切走再切回」都会让同一题有两条流在跑，题号相等挡不住，
+    // 两条流的 chunk 会交错写入 currentAnalysis（文本抖动、缓存被旧版本覆盖、
+    // 还多花一份 token）。旧订阅若只是被覆盖赋值，就再也取消不掉了。
+    _cancelAnalysisStream();
+    final gen = ++_analysisGen;
     final sub = _aiService!.streamAnalysis(q).listen(
       (accumulated) {
-        if (currentQuestion?.id != questionId) return; // 已切题，丢弃
+        // 注意：不要在这里写 onError/onDone —— 下面的 `asFuture()` 会**覆盖**
+        // listen 时传入的这两个回调（Dart SDK 行为），写了也不会执行。
+        // 收尾统一由 catch / finally 负责。
+        if (gen != _analysisGen || currentQuestion?.id != questionId) return;
         _currentAnalysis = accumulated;
         _analysisLoading = false; // 首个 chunk 到达即撤掉转圈
         _notifyAnalysisThrottled();
-      },
-      onError: (Object e) {
-        DebugLogService.instance.log('AI', '解析流异常: $e');
-        if (currentQuestion?.id != questionId) return;
-        _currentAnalysis = null;
-        _analysisLoading = false;
-        notifyListeners();
-      },
-      onDone: () {
-        if (currentQuestion?.id != questionId) return;
-        _analysisLoading = false;
-        notifyListeners();
       },
       cancelOnError: true,
     );
@@ -1107,9 +1115,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       await sub.asFuture<void>();
     } catch (e) {
       DebugLogService.instance.log('AI', '解析加载失败: $e');
-      if (currentQuestion?.id == questionId) _currentAnalysis = null;
+      if (gen == _analysisGen && currentQuestion?.id == questionId) {
+        _currentAnalysis = null;
+      }
     } finally {
-      if (currentQuestion?.id == questionId) {
+      if (gen == _analysisGen && currentQuestion?.id == questionId) {
         _analysisLoading = false;
         notifyListeners();
       }
@@ -1129,11 +1139,16 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   void _cancelAnalysisStream() {
     _analysisSub?.cancel();
     _analysisSub = null;
+    // 代次自增：让在途 chunk 的回调立刻失效（取消与在途 chunk 之间有窗口）
+    _analysisGen++;
   }
 
   /// 手动查看解析
   Future<void> showAnalysis() async {
-    await _loadAnalysis();
+    // 流式改造：**不再 await 解析**。对话页进入时会调它，若在这里等整条流结束，
+    // 页面就一直显示转圈，「边生成边显示」等于白做。解析结果通过
+    // currentAnalysis 的增量通知驱动 UI，调用方不需要等。
+    unawaited(_loadAnalysis());
     await _loadFollowUpHistory();
   }
 
@@ -1191,12 +1206,17 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     var reply = '';
     // 流式输出：边生成边显示。_streamingReply 供对话页渲染进行中的气泡，
     // 生成完成后清空并照旧写入历史 + 落库（数据库只存最终完整文本）。
+    //
+    // 切题时**不能 break**——break 会取消底层订阅并留下半截回答，随后被当作
+    // 最终结果落库（改造前只有完整结果才会存）。这里改成：继续把流读完，
+    // 只是不再刷新 UI，这样回到那道题看到的是完整回答。
     _streamingReply = '';
+    final onCurrentQuestion = () => currentQuestion?.id == qId;
     try {
       await for (final acc
           in _aiService!.streamFollowUp(q, _currentAnalysis!, question)) {
-        if (currentQuestion?.id != qId) break; // 期间切题：停止更新 UI
         reply = acc;
+        if (!onCurrentQuestion()) continue; // 已切题：不更新 UI，但继续收完
         _streamingReply = acc;
         _notifyAnalysisThrottled();
       }
