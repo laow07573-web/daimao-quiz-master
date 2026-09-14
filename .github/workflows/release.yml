@@ -138,14 +138,14 @@ jobs:
           ls -lh *.apk
 
       - name: 归档符号文件（仅供崩溃定位，不随发布上传）
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-symbols
           path: build/symbols
           if-no-files-found: ignore
 
       - name: 上传产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-android
           path: '*.apk'
@@ -202,7 +202,7 @@ jobs:
           Get-ChildItem *.zip, *.exe | Select-Object Name, Length
 
       - name: 上传产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-windows
           path: |
