@@ -1,10 +1,23 @@
 ﻿; 猫卷 Windows 安装包脚本（Inno Setup 6）
-; 编译：& "C:\Users\CTSwe\AppData\Local\Programs\Inno Setup 6\ISCC.exe" d:\dev\flashcard_app\tools\maojuan_setup.iss
+;
+; 编译（推荐 —— 版本号与源目录都由发布脚本传入）：
+;   ISCC.exe /DMyAppVersion=1.28.1 /DSrcDir="...\dist\猫卷-Windows-20260914" tools\maojuan_setup.iss
+;
+; 直接双击编译也可以，但 MyAppVersion 会退化成 0.0.0 —— 这是刻意的：
+; 宁可版本号明显是错的，也不要静默沿用上一次的版本。
+;
+; 关于 SrcDir：以前这里写死了一个带日期的目录（dist\猫卷-Windows-20260911），
+; 而发布脚本只替换版本号、从不更新它 —— 于是打包可能装进旧日期的绿色版内容。
+; 现在改为由 publish_release.ps1 显式传入，与实际产物目录由构造保证一致。
+#ifndef MyAppVersion
+  #define MyAppVersion "0.0.0"
+#endif
+#ifndef SrcDir
+  #define SrcDir "d:\dev\flashcard_app\dist\猫卷-Windows-未指定"
+#endif
 #define MyAppName "猫卷"
-#define MyAppVersion "1.28.1"
 #define MyAppPublisher "Damao"
 #define MyAppExeName "flashcard_app.exe"
-#define SrcDir "d:\dev\flashcard_app\dist\猫卷-Windows-20260911"
 #define OutDir "d:\dev\flashcard_app\dist"
 
 [Setup]

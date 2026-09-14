@@ -156,7 +156,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         color: ac.textPrimary)),
                 const SizedBox(height: 6),
                 Text(
-                  '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧',
+                  '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧\n许可：AGPL-3.0（可自由使用 / 修改 / 分发）',
                   style: TextStyle(
                       fontSize: MaoType.body,
                       height: 1.7,

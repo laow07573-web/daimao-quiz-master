@@ -63,22 +63,26 @@
   powershell -ExecutionPolicy Bypass -File tools\deploy_promo.ps1
   ```
 
-### 下载地址配置（唯一改地址的地方）
+### 下载地址配置
 
-所有下载链接、版本号、校验值都集中在 `index.html` `<head>` 里的 `window.MAOJUAN` 块，
-**发新版只改这一个块**：
+所有下载链接、版本号、校验值都集中在 `index.html` `<head>` 里的 `window.MAOJUAN` 块：
 
 ```js
 window.MAOJUAN = {
-  version:         "1.28.0",
-  android:         "https://<网盘分享链接>",           // APK 超 25MB，放网盘
-  windowsSetup:    "download/MaoJuan-v1.28.0-windows-setup.exe",   // 同源直链
-  windowsPortable: "download/MaoJuan-v1.28.0-windows-portable.zip",// 同源直链
-  githubRelease:   "https://github.com/.../releases/tag/v1.28.0",  // 备用
-  repo:            "https://github.com/laow07573-web/daimao-quiz-master",
-  sha256: { apk: "...", setup: "...", portable: "..." }
+  version:         "1.28.1",                    // 与 pubspec.yaml 一致
+  android:          "download/MaoJuan-v1.28.1-android-arm64.apk",     // 同源直链
+  androidUniversal: "download/MaoJuan-v1.28.1-android-universal.apk", // 同源直链
+  windowsSetup:     "download/MaoJuan-v1.28.1-windows-setup.exe",     // 同源直链
+  windowsPortable:  "download/MaoJuan-v1.28.1-windows-portable.zip",  // 同源直链
+  githubRelease:    "https://github.com/.../releases/latest",         // 备用
+  repo:             "https://github.com/laow07573-web/daimao-quiz-master",
+  sha256: { apk: "...", apkUniv: "...", setup: "...", portable: "..." }
 };
 ```
+
+> **发版时不需要手工改这个块**：`tools/publish_release.ps1` 的第 6.5 步会按本次
+> 产物就地同步 `version` / `buildDate` / 四个同源下载文件名 / 四个 sha256，
+> 所以版本号不可能与产物脱节。手工改只在需要调整链接形式时才有必要。
 
 - HTML 里的 `href` 已预置 GitHub Releases 兜底，**JS 出错也能正常下载**（渐进增强）
 - `promo/download/` 里的 Windows 包由 `tools/deploy_promo.ps1` 从 `dist/` 自动拷入并改名成 ASCII

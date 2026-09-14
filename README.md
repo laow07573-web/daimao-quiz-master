@@ -7,9 +7,9 @@
 题库自己建 · 数据自己管 · AI 讲透 · 算法记住
 
 [![平台](https://img.shields.io/badge/平台-Android%20%7C%20Windows-2563EB?style=flat-square)](#下载安装)
-[![版本](https://img.shields.io/badge/版本-v1.28.0-2F7D5B?style=flat-square)](../../releases)
-[![许可](https://img.shields.io/badge/许可-CC%20BY--NC--SA%204.0-2DA8A6?style=flat-square)](LICENSE)
-[![测试](https://img.shields.io/badge/自动化测试-222%20项-22C55E?style=flat-square)](#工程质量)
+[![版本](https://img.shields.io/github/v/release/laow07573-web/daimao-quiz-master?style=flat-square&label=版本&color=2F7D5B)](../../releases)
+[![许可](https://img.shields.io/badge/许可-AGPL--3.0-2DA8A6?style=flat-square)](LICENSE)
+[![CI](https://github.com/laow07573-web/daimao-quiz-master/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/laow07573-web/daimao-quiz-master/actions/workflows/ci.yml)
 
 </div>
 
@@ -104,16 +104,19 @@
 
 ## 下载安装
 
-前往 **[Releases](https://github.com/laow07573-web/daimao-quiz-master/releases)** 下载最新版本。
+前往 **[Releases](https://github.com/laow07573-web/daimao-quiz-master/releases/latest)** 下载最新版本。
 
 | 平台 | 文件 | 说明 |
 |------|------|------|
-| Android | `MaoJuan-v1.28.0-android.apk` | Android 7.0 及以上，约 35 MB |
-| Windows | `MaoJuan-v1.28.0-windows-setup.exe` | Windows 10/11 64 位安装包，约 21 MB |
-| Windows | `MaoJuan-v1.28.0-windows-portable.zip` | 绿色免安装版，解压即用，约 23 MB |
+| Android | `MaoJuan-v<版本>-android-arm64.apk` | 2017 年后绝大多数手机，约 20 MB |
+| Android | `MaoJuan-v<版本>-android-universal.apk` | 含全部 CPU 架构，不确定机型时用，约 35 MB |
+| Windows | `MaoJuan-v<版本>-windows-setup.exe` | Windows 10/11 64 位安装包 |
+| Windows | `MaoJuan-v<版本>-windows-portable.zip` | 绿色免安装版，解压即用 |
 
-> 安装包不放在源码仓库里，统一由 Releases 分发。
-> 每个 Release 的说明中都附有 SHA-256 校验值，下载后可自行核对完整性。
+> 文件名中的 `<版本>` 随版本变化（例如 `MaoJuan-v1.28.1-android-arm64.apk`），
+> 所以这里不写死版本号——请以 Releases 页面上的实际文件名为准。
+> 每个 Release 都附 `SHA256SUMS.txt` 校验值，下载后可自行核对完整性
+> （校验方法见下方[安装与校验](#安装与校验)）。
 
 > **基础刷题功能完全离线可用**，无需联网、无需配置任何东西。
 > 只有 AI 讲解、追问、薄弱诊断这些功能需要你在设置里填入自己的 API Key。
@@ -156,7 +159,8 @@
 
 ## 工程质量
 
-- **222 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
+- **227 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
+  （每次 push 由 [GitHub Actions](https://github.com/laow07573-web/daimao-quiz-master/actions) 自动执行，见上方 CI 徽章）
 - 数据库 schema v11，外键级联、索引优化、事务一致性
 - 每次发版依次执行：静态分析（0 问题）→ 全量测试 → 混淆构建 → **组件 / 权限 / 文案 / 资源四维基线对照校验** → 签名校验
 
@@ -176,10 +180,18 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 ```bash
 flutter pub get
 flutter analyze                 # 应输出 0 issues
-flutter test                    # 222 项测试
+flutter test                    # 全量测试（当前 227 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release
 ```
+
+> 版本号的唯一来源是 `pubspec.yaml` 的 `version:` 字段（形如 `1.28.1+20`）。
+> 发布构建会通过 `--dart-define=APP_VERSION=v<版本名>.<构建号>` 把它注入应用
+> 内展示，不需要在任何 Dart 文件里手工改版本号。
+> `test/version_single_source_test.dart` 会校验两者一致，防止版本号漂移。
+>
+> 本地开发直接 `flutter run` 时应用内显示的是 `kAppVersion` 的默认值（不带
+> `--dart-define`），与正式包的展示一致即可，无需特殊处理。
 
 > ⚠️ **签名文件与密钥永不入库**：`android/key.properties`、`**/*.jks`、`**/*.keystore`
 > 均已在 `.gitignore` 中排除。请自行生成签名并妥善离线备份。
@@ -214,10 +226,15 @@ flutter build windows --release
 
 ## 许可
 
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) —— 署名 · 非商业性使用 · 相同方式共享
+[GNU AGPL-3.0](LICENSE) —— 自由使用 · 修改 · 分发，衍生作品须同样开源
 
-- **署名** —— 必须标注原作者（B 站：笨蛋鱼坏蛋猫）
-- **非商业性使用** —— 禁止任何商业用途
-- **相同方式共享** —— 衍生作品须使用相同许可
+- **自由使用** —— 可自由使用、修改、分发本项目，包括商业用途
+- **相同方式共享** —— 修改后的衍生作品必须以同样的 AGPL-3.0 开源
+- **网络服务须开源** —— 若把修改版作为网络服务提供，须向使用者提供完整源码
+- **无担保** —— 按「现状」提供，不附带任何明示或暗示的担保
 
 Copyright (c) 2026 笨蛋鱼坏蛋猫
+
+> 完整协议文本见 [LICENSE](LICENSE)。选择 AGPL-3.0 而非 MIT 这类宽松协议，
+> 是为了确保猫卷与它的任何衍生版本**始终对使用者保持开源**——
+> 任何人都可以拿去用、拿去改，但不能改完就闭源。
