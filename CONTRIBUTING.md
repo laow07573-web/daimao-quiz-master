@@ -24,7 +24,7 @@
 3. 提交前请确保本地全部通过：
    ```bash
    flutter analyze   # 应输出 0 issues
-   flutter test      # 全部测试通过（当前 230 项）
+   flutter test      # 全部测试通过（当前 244 项）
    ```
 4. 发起 Pull Request，描述清楚「改了什么、为什么改、怎么验证」
 

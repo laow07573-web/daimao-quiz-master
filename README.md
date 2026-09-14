@@ -28,6 +28,20 @@
 
 ---
 
+## 界面预览
+
+<div align="center">
+  <img src="docs/screenshots/home.png" width="168" alt="首页：本周战绩与打卡日历">
+  <img src="docs/screenshots/quiz.png" width="168" alt="答题页：单选与多选">
+  <img src="docs/screenshots/quiz-feedback.png" width="168" alt="答完即判：对错配色与解析入口">
+  <img src="docs/screenshots/errorbook.png" width="168" alt="错题本：薄弱知识点分组">
+  <img src="docs/screenshots/stats.png" width="168" alt="统计页：年度热力图与趋势">
+</div>
+
+<p align="center"><sub>首页 · 答题 · 答完即判 · 错题本 · 统计（真实运行截图，非示意图）</sub></p>
+
+---
+
 ## 功能特性
 
 ### 📥 智能建库
@@ -183,7 +197,7 @@ Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
 | 项 | 说明 |
 |----|------|
 | 数据存储 | 全部数据存在设备本地 SQLite 数据库，离线可用，卸载即彻底删除 |
-| 备份迁移 | 一键导出数据库，换设备导入即可原样恢复（含 API Key） |
+| 备份迁移 | 一键导出数据库，换设备导入即可恢复题库、记录与批注。**默认不含 API Key**（换机后重填一次即可）；如需连 Key 一起迁移，可设置备份口令，整个备份文件会被加密 |
 | API Key 加密 | AES-256-GCM 加密，Android 上优先存入系统 Keystore |
 | 无账号体系 | 不采集任何个人信息，无登录、无云端上传 |
 | 防篡改 | 签名校验锁定，被二次打包会拒绝启动 |
@@ -193,7 +207,7 @@ Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
 
 ## 工程质量
 
-- **227 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
+- **244 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
   （每次 push 由 [GitHub Actions](https://github.com/laow07573-web/daimao-quiz-master/actions) 自动执行，见上方 CI 徽章）
 - 数据库 schema v11，外键级联、索引优化、事务一致性
 - 每次发版依次执行：静态分析（0 问题）→ 全量测试 → 混淆构建 → **组件 / 权限 / 文案 / 资源四维基线对照校验** → 签名校验
@@ -214,7 +228,7 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 ```bash
 flutter pub get
 flutter analyze                 # 应输出 0 issues
-flutter test                    # 全量测试（当前 227 项）
+flutter test                    # 全量测试（当前 244 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release
 ```
@@ -245,10 +259,43 @@ flutter build windows --release
 设置 →「AI 回答风格」→ 回答详细程度可选简洁 / 标准 / 详细，并可开关关键词高亮。
 
 **Q：怎么备份到新手机？**
-设置 → 导出数据库备份 → 在新机导入即可原样恢复（含题库、记录、批注与 API Key）。
+设置 → 导出数据库备份 → 在新机导入即可恢复题库、记录与批注。
+
+默认导出的备份**不含 API Key**（避免"把备份发给别人 = 把 Key 也给了别人"），
+换机后重新填一次 Key 即可。如果你希望连 Key 一起迁移，导出时选择「含 API Key」，
+并设置一个备份口令——整个备份文件会用该口令加密（AES-256-GCM），
+导入时需要输入同一口令。**口令丢失则备份无法恢复**，请自行记牢。
 
 **Q：支持哪些题型？**
 单选、多选、判断、填空、名词解释、简答、问答，共七种。
+
+---
+
+## Roadmap
+
+| 方向 | 状态 | 说明 |
+|---|---|---|
+| iOS 版本 | 评估中 | 代码已具备大部分平台判断，缺 Xcode 构建链与 iOS 侧适配（数据库路径、提醒、通知权限） |
+| Web 体验版 | 计划中 | 无需安装即可试用核心刷题流程，降低第一次尝试的门槛 |
+| 题库分享 | 计划中 | 仅限**用户自制题库**的分享，规避第三方教辅版权风险 |
+| 代码签名证书 | 评估中 | 消除 Windows SmartScreen 与 Android「未知来源」提示 |
+
+有想优先做的方向，欢迎开 Issue 讨论——尤其欢迎来自真实备考场景的需求。
+
+---
+
+## 参与贡献
+
+- 发现 Bug 或有建议：提 [Issue](https://github.com/laow07573-web/daimao-quiz-master/issues)
+- 想改代码：先看 [CONTRIBUTING.md](CONTRIBUTING.md)，从 `main` 开分支即可
+- 安全问题：请勿公开提交，见 [SECURITY.md](SECURITY.md)
+
+---
+
+## Star
+
+如果猫卷帮你省下了买题库会员的钱、或者让你少抄了一本错题——
+**给个 Star 就是最实在的支持**。它能让更多正在备考的同学搜到这个项目。
 
 ---
 

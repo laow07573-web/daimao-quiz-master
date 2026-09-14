@@ -8,6 +8,7 @@ import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
+import 'backup_crypto.dart';
 import 'device_service.dart';
 import 'fsrs_service.dart';
 
@@ -2152,60 +2153,180 @@ class DatabaseService {
   /// 导入备份：校验后关闭当前库，用备份文件替换，下次访问自动重开。
   /// v1.0.2 设计审查修复：全程 try/catch、旧库先改名留底（失败可还原）、
   /// 清理 wal/shm 残留，异常不再冒泡为未捕获错误
-  Future<String?> importBackup(String filePath) async {
+  ///
+  /// 口令加密的备份（见 [BackupCrypto]）需传入 [password]：先用口令解出明文
+  /// 落成临时文件，再走与明文备份相同的替换流程。调用方可以先用
+  /// [isEncryptedBackup] 判断是否需要向用户索要口令。
+  Future<String?> importBackup(String filePath, {String? password}) async {
     try {
-      final err = await validateBackupFile(filePath);
-      if (err != null) return err;
-      final db = await database;
-      await db.close();
-      _database = null;
-      final target = db.path;
-      // 先复制到临时文件，成功后再替换，避免复制中断产生半写入库
-      final tmpPath = '$target.importing';
-      await File(filePath).copy(tmpPath);
-      final tmpErr = await validateBackupFile(tmpPath);
-      if (tmpErr != null) {
-        try { await File(tmpPath).delete(); } catch (_) {}
-        return '导入失败：临时文件校验未通过（$tmpErr）';
+      var effectivePath = filePath;
+      File? decryptedTmp;
+
+      if (await isEncryptedBackup(filePath)) {
+        if (password == null || password.isEmpty) {
+          return '这是口令加密的备份，请输入导出时设置的备份口令';
+        }
+        final container = await File(filePath).readAsBytes();
+        final plain = BackupCrypto.decrypt(container, password);
+        if (plain == null) {
+          return '口令错误，或备份文件已损坏';
+        }
+        decryptedTmp = File('$filePath.decrypted');
+        await decryptedTmp.writeAsBytes(plain, flush: true);
+        effectivePath = decryptedTmp.path;
       }
-      final backupOld = '$target.pre-import';
-      if (File(target).existsSync()) {
-        try { await File(backupOld).delete(); } catch (_) {}
-        await File(target).rename(backupOld);
-      }
+
       try {
-        await File(tmpPath).rename(target);
-      } catch (e) {
-        // 替换失败：还原旧库，数据不丢
-        try { await File(backupOld).rename(target); } catch (_) {}
-        try { await File(tmpPath).delete(); } catch (_) {}
-        return '导入失败：替换数据库失败（已还原原库）';
-      }
-      // 清理旧库残留的 wal/shm（防下次打开读取旧事务日志）
-      for (final p in ['$target-wal', '$target-shm']) {
-        final f = File(p);
-        if (f.existsSync()) {
-          try { await f.delete(); } catch (_) {}
+        final err = await validateBackupFile(effectivePath);
+        if (err != null) return err;
+        final db = await database;
+        await db.close();
+        _database = null;
+        final target = db.path;
+        // 先复制到临时文件，成功后再替换，避免复制中断产生半写入库
+        final tmpPath = '$target.importing';
+        await File(effectivePath).copy(tmpPath);
+        final tmpErr = await validateBackupFile(tmpPath);
+        if (tmpErr != null) {
+          try {
+            await File(tmpPath).delete();
+          } catch (_) {}
+          return '导入失败：临时文件校验未通过（$tmpErr）';
+        }
+        final backupOld = '$target.pre-import';
+        if (File(target).existsSync()) {
+          try {
+            await File(backupOld).delete();
+          } catch (_) {}
+          await File(target).rename(backupOld);
+        }
+        try {
+          await File(tmpPath).rename(target);
+        } catch (e) {
+          // 替换失败：还原旧库，数据不丢
+          try {
+            await File(backupOld).rename(target);
+          } catch (_) {}
+          try {
+            await File(tmpPath).delete();
+          } catch (_) {}
+          return '导入失败：替换数据库失败（已还原原库）';
+        }
+        // 清理旧库残留的 wal/shm（防下次打开读取旧事务日志）
+        for (final p in ['$target-wal', '$target-shm']) {
+          final f = File(p);
+          if (f.existsSync()) {
+            try {
+              await f.delete();
+            } catch (_) {}
+          }
+        }
+        try {
+          await File(backupOld).delete();
+        } catch (_) {}
+        return null;
+      } finally {
+        // 解密出的明文副本用完即删，不留在磁盘上
+        if (decryptedTmp != null) {
+          try {
+            if (decryptedTmp.existsSync()) await decryptedTmp.delete();
+          } catch (_) {}
         }
       }
-      try { await File(backupOld).delete(); } catch (_) {}
-      return null;
     } catch (e) {
       return '导入失败：${e.toString().split('\n').first}';
     }
   }
 
-  /// 导出当前数据库备份到指定路径
-  Future<String?> exportBackup(String destPath) async {
+  /// 导出当前数据库备份到指定路径。
+  ///
+  /// [includeApiKey] 默认 false：备份是整库拷贝，`settings` 表里的 `api_key`
+  /// 密文会随之进入备份，而那条密文的密钥是写死在 App 里的（见 [KeyCrypto]）
+  /// ——**拿到备份就能解出 API Key**。所以默认在副本里清掉该行；
+  /// 只有在用户明确选择「包含 API Key」时才保留，并且必须提供 [password]
+  /// 对整个备份文件加密（[BackupCrypto]），否则拒绝导出。
+  ///
+  /// [password] 非空时，导出完成后把文件整体加密为该口令保护的容器。
+  Future<String?> exportBackup(
+    String destPath, {
+    bool includeApiKey = false,
+    String? password,
+  }) async {
     try {
+      if (includeApiKey && (password == null || password.isEmpty)) {
+        // 不允许「带 Key 但不加密」——那等于把 Key 明文交出去
+        return '导出失败：包含 API Key 时必须设置备份口令';
+      }
       final db = await database;
       // v1.0.2 设计审查修复：WAL 检查点先把未落盘的页写回主文件，
       // 保证直接 copy 得到的是完整快照（不再是名不副实的一致性快照）
       await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
       await File(db.path).copy(destPath);
+
+      if (!includeApiKey) {
+        final err = await _stripApiKeyFromBackup(destPath);
+        if (err != null) return err;
+      }
+
+      if (password != null && password.isNotEmpty) {
+        final err = await _encryptBackupFile(destPath, password);
+        if (err != null) return err;
+      }
       return null;
     } catch (e) {
       return '导出失败：${e.toString().split('\n').first}';
+    }
+  }
+
+  /// 在备份副本里删除 API Key 行（副本是独立文件，不影响在用数据库）。
+  Future<String?> _stripApiKeyFromBackup(String path) async {
+    Database? copy;
+    try {
+      copy = await openDatabase(path);
+      await copy.delete('settings', where: 'key = ?', whereArgs: ['api_key']);
+      return null;
+    } catch (e) {
+      // 清不掉就当作导出失败：宁可让用户重试，也不能悄悄导出带 Key 的备份
+      try {
+        await File(path).delete();
+      } catch (_) {}
+      return '导出失败：无法从备份中移除 API Key（${e.toString().split('\n').first}）';
+    } finally {
+      try {
+        await copy?.close();
+      } catch (_) {}
+    }
+  }
+
+  /// 把已生成的明文备份就地加密为口令保护容器。
+  Future<String?> _encryptBackupFile(String path, String password) async {
+    try {
+      final plain = await File(path).readAsBytes();
+      final sealed = BackupCrypto.encrypt(plain, password);
+      await File(path).writeAsBytes(sealed, flush: true);
+      return null;
+    } catch (e) {
+      try {
+        await File(path).delete(); // 加密失败不留半成品
+      } catch (_) {}
+      return '导出失败：加密备份时出错（${e.toString().split('\n').first}）';
+    }
+  }
+
+  /// 判断备份文件是否为口令加密容器（只读文件头，用于导入前决定是否索要口令）。
+  Future<bool> isEncryptedBackup(String filePath) async {
+    try {
+      final f = File(filePath);
+      if (!f.existsSync()) return false;
+      final raf = await f.open();
+      try {
+        final head = await raf.read(BackupCrypto.headerLength);
+        return BackupCrypto.looksEncrypted(head);
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return false;
     }
   }
 }

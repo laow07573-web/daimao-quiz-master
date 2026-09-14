@@ -1,0 +1,63 @@
+name: Bug 反馈
+description: 报告一个可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量把下面的信息填完整——尤其是**复现步骤**和**版本号**，
+        这能省下大量来回确认的时间。
+
+        > 安全漏洞请**不要**在这里提交，见 [SECURITY.md](../blob/main/SECURITY.md)。
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - Android
+        - Windows
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      description: 在「我的 → 关于」里可以看到，形如 v1.28.1.20
+      placeholder: v1.28.1.20
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 按顺序写清每一步，让我能照着走一遍
+      placeholder: |
+        1. 导入一份 DOCX 题库
+        2. 首页勾选该题库 → 定向爆破 → 开始刷题
+        3. 答第 3 题后点「下一题」
+        4. 出现……
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为 vs 实际行为
+      placeholder: |
+        期望：……
+        实际：……
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息（可选）
+      description: 截图 / 录屏 / 日志（设置 → 高级 → 导出日志）都会很有帮助
+    validations:
+      required: false
