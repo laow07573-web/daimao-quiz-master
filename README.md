@@ -31,14 +31,13 @@
 ## 界面预览
 
 <div align="center">
-  <img src="docs/screenshots/home.png" width="168" alt="首页：本周战绩与打卡日历">
-  <img src="docs/screenshots/quiz.png" width="168" alt="答题页：单选与多选">
-  <img src="docs/screenshots/quiz-feedback.png" width="168" alt="答完即判：对错配色与解析入口">
-  <img src="docs/screenshots/errorbook.png" width="168" alt="错题本：薄弱知识点分组">
-  <img src="docs/screenshots/stats.png" width="168" alt="统计页：年度热力图与趋势">
+  <img src="docs/screenshots/home.png" width="168" alt="首页：问候卡（含累计数据）与本周战绩，一屏不滚动">
+  <img src="docs/screenshots/start.png" width="168" alt="开始页：定向爆破 / 题库管理 / 错题本 / 导入">
+  <img src="docs/screenshots/errorbook.png" width="168" alt="错题本：薄弱知识点分组与到期提示">
+  <img src="docs/screenshots/stats.png" width="168" alt="统计页：年度坚持热力图与近一年趋势">
 </div>
 
-<p align="center"><sub>首页 · 答题 · 答完即判 · 错题本 · 统计（真实运行截图，非示意图）</sub></p>
+<p align="center"><sub>首页 · 开始 · 错题本 · 统计（真机实拍，非示意图）</sub></p>
 
 ---
 
