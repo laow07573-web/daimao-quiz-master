@@ -74,3 +74,6 @@ docs/*计数草稿*.txt
 docs/*项目计划书*.docx
 docs/maojuan_plan/
 tools/planbook_gen/
+
+# 开发期截图：不入库（用户要求仓库只保留源码；成品图只放 README 引用的那几张）
+docs/ui_new/
