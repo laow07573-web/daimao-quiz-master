@@ -45,7 +45,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
       build: ${{ steps.check.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: check
         name: 校验 pubspec.yaml 与 tag
         run: |
@@ -67,7 +67,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装 JDK
         uses: actions/setup-java@v4
@@ -157,7 +157,7 @@ jobs:
     needs: verify
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 安装 Flutter
         uses: subosito/flutter-action@v2
