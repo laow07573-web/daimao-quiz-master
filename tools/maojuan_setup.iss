@@ -12,13 +12,18 @@
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
 #endif
+; 项目根目录 = 本文件所在目录的上级。用 SourcePath 推导而不是写死绝对路径，
+; 这样本地（D:\dev\flashcard_app）与 CI（windows-latest 的检出目录）都能编译。
+#define ProjectRoot SourcePath + ".."
 #ifndef SrcDir
-  #define SrcDir "d:\dev\flashcard_app\dist\猫卷-Windows-未指定"
+  #define SrcDir ProjectRoot + "\dist\猫卷-Windows-未指定"
+#endif
+#ifndef OutDir
+  #define OutDir ProjectRoot + "\dist"
 #endif
 #define MyAppName "猫卷"
 #define MyAppPublisher "Damao"
 #define MyAppExeName "flashcard_app.exe"
-#define OutDir "d:\dev\flashcard_app\dist"
 
 [Setup]
 ; 固定 AppId：升级安装时识别为同一应用（不随版本变化）
@@ -32,7 +37,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir={#OutDir}
 OutputBaseFilename=猫卷-Setup-{#MyAppVersion}-Windows-x64
-SetupIconFile=d:\dev\flashcard_app\windows\runner\resources\app_icon.ico
+SetupIconFile={#ProjectRoot}\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 Compression=lzma2/max
@@ -48,7 +53,7 @@ RestartApplications=no
 ; 数据目录提示：卸载保留 %LOCALAPPDATA%\flashcard_app 的题库数据
 VersionInfoVersion={#MyAppVersion}
 VersionInfoProductName={#MyAppName}
-LicenseFile=d:\dev\flashcard_app\tools\setup_license.txt
+LicenseFile={#ProjectRoot}\tools\setup_license.txt
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

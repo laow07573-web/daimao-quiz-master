@@ -1,0 +1,275 @@
+# ============================================================
+# 猫卷 · 自动发版流水线
+# 放置位置：.github/workflows/release.yml
+#
+# 使用方式：本地打 tag 并推送，例如：
+#     git tag v1.28.1 && git push origin v1.28.1
+# 流程：tag 校验 → 构建 Android（arm64 + 通用）→ 构建 Windows（便携版 + 安装版）
+#       → 汇总 SHA-256 → 创建 GitHub Release
+#
+# 需要配置的 Repository Secrets（Settings → Secrets and variables → Actions）：
+#   ANDROID_KEYSTORE_BASE64   keystore 文件（.jks）的 base64 编码
+#   ANDROID_STORE_PASSWORD    keystore 密码
+#   ANDROID_KEY_ALIAS         密钥别名
+#   ANDROID_KEY_PASSWORD      密钥密码
+# 生成 base64（PowerShell）：
+#   [Convert]::ToBase64String([IO.File]::ReadAllBytes("release.jks"))
+#
+# 版本号约定：与 tools/publish_release.ps1 完全一致 —— pubspec.yaml 的 version
+# 字段是唯一来源，tag 必须与之匹配（不一致直接终止）。应用内展示的版本号由
+# --dart-define=APP_VERSION 注入，不需要改任何 Dart 文件。
+#
+# 说明：本地发布用 tools/publish_release.ps1（构建+校验+发布+部署一条龙，
+# 含四维基线对照与签名校验）；本流水线是**不依赖本地环境**的等价通道，
+# 便于外部核验与无本地环境时发版。
+# ============================================================
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # 创建 Release 需要
+
+env:
+  APP_NAME: MaoJuan
+  FLUTTER_VERSION: '3.24.x'
+
+jobs:
+  # ── 0. 校验 tag 与 pubspec 版本一致（防 versionName 误标） ──
+  verify:
+    name: 版本一致性校验
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        name: 校验 pubspec.yaml 与 tag
+        run: |
+          PUB=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          PUB_NAME=${PUB%%+*}
+          PUB_BUILD=${PUB##*+}
+          TAG=${GITHUB_REF_NAME#v}
+          echo "pubspec=$PUB_NAME (build $PUB_BUILD)  tag=$TAG"
+          if [ "$PUB_NAME" != "$TAG" ]; then
+            echo "::error::pubspec.yaml 版本（$PUB_NAME）与 tag（$TAG）不一致，已终止发布"
+            exit 1
+          fi
+          echo "version=$PUB_NAME" >> "$GITHUB_OUTPUT"
+          echo "build=$PUB_BUILD" >> "$GITHUB_OUTPUT"
+
+  # ── 1. Android 构建 ──
+  build-android:
+    name: 构建 Android
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # gradle-wrapper.properties 里是腾讯镜像（方便国内本地构建），
+      # 但 CI runner 在境外，从腾讯拉 200MB 的 Gradle 分发会很慢，这里改回官方源。
+      - name: 改用官方 Gradle 分发源
+        run: |
+          sed -i 's#mirrors\.cloud\.tencent\.com/gradle/#services.gradle.org/distributions/#g' \
+            android/gradle/wrapper/gradle-wrapper.properties
+          grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: 注入签名配置（从 Secrets 还原 keystore）
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::缺少 ANDROID_KEYSTORE_BASE64，请先在仓库 Secrets 中配置（见本文件头部说明）"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: 拉取依赖并测试
+        run: |
+          flutter pub get
+          flutter test
+
+      - name: 构建通用版 APK（含全部 CPU 架构）
+        run: |
+          flutter build apk --release \
+            --obfuscate --split-debug-info=build/symbols \
+            --dart-define=APP_VERSION=v${{ needs.verify.outputs.version }}.${{ needs.verify.outputs.build }}
+
+      - name: 暂存通用版（构建 arm64 会覆盖同名产物）
+        run: |
+          V=${{ needs.verify.outputs.version }}
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "${APP_NAME}-v${V}-android-universal.apk"
+
+      - name: 构建 arm64 版 APK
+        run: |
+          flutter build apk --release \
+            --obfuscate --split-debug-info=build/symbols \
+            --target-platform android-arm64 \
+            --dart-define=APP_VERSION=v${{ needs.verify.outputs.version }}.${{ needs.verify.outputs.build }}
+          V=${{ needs.verify.outputs.version }}
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "${APP_NAME}-v${V}-android-arm64.apk"
+          ls -lh *.apk
+
+      - name: 归档符号文件（仅供崩溃定位，不随发布上传）
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-symbols
+          path: build/symbols
+          if-no-files-found: ignore
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-android
+          path: '*.apk'
+          if-no-files-found: error
+
+  # ── 2. Windows 构建 ──
+  build-windows:
+    name: 构建 Windows
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 拉取依赖并构建
+        run: |
+          flutter pub get
+          flutter build windows --release --dart-define=APP_VERSION=v${{ needs.verify.outputs.version }}.${{ needs.verify.outputs.build }}
+
+      - name: 安装 Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe')) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: 打包便携版 + 编译安装版
+        shell: pwsh
+        run: |
+          $V = "${{ needs.verify.outputs.version }}"
+          $stamp = Get-Date -Format 'yyyyMMdd'
+          $pkgDir = Join-Path "$PWD\dist" "猫卷-Windows-$stamp"
+
+          # 便携版：复用本地同款脚本（会顺带附上 LICENSE.txt）
+          & "$PWD\tools\package_windows.ps1" -PkgDir $pkgDir
+          if ($LASTEXITCODE -ne 0) { throw "package_windows.ps1 failed" }
+          Copy-Item "$pkgDir.zip" "$env:APP_NAME-v$V-windows-portable.zip"
+
+          # 安装版：版本号与源目录都由 /D 传入（.iss 里不再写死绝对路径）
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          & $iscc "/DMyAppVersion=$V" "/DSrcDir=$pkgDir" "/DOutDir=$PWD\dist" "$PWD\tools\maojuan_setup.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed" }
+
+          $setup = Get-ChildItem "$PWD\dist" -Filter "猫卷-Setup-$V-Windows-x64.exe" |
+                   Select-Object -First 1
+          if (-not $setup) { throw "未找到安装包产物，请检查 .iss 的 OutputBaseFilename" }
+          Copy-Item $setup.FullName "$env:APP_NAME-v$V-windows-setup.exe"
+          Get-ChildItem *.zip, *.exe | Select-Object Name, Length
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: |
+            *-windows-portable.zip
+            *-windows-setup.exe
+          if-no-files-found: error
+
+  # ── 3. 汇总校验并创建 Release ──
+  publish:
+    name: 创建 Release
+    needs: [verify, build-android, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载全部产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+
+      - name: 生成 SHA256SUMS.txt
+        run: |
+          cd dist
+          sha256sum *.apk *.zip *.exe > SHA256SUMS.txt
+          echo "=== 即将发布 ==="
+          ls -lh
+          echo "=== 校验值 ==="
+          cat SHA256SUMS.txt
+
+      - name: 生成发布说明
+        env:
+          V: ${{ needs.verify.outputs.version }}
+          APP: ${{ env.APP_NAME }}
+        run: |
+          cd dist
+          {
+            echo "## 猫卷 v${V}"
+            echo ""
+            echo "更新内容见仓库 [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)。"
+            echo ""
+            echo "### 下载"
+            echo ""
+            echo "| 平台 | 文件 | 说明 |"
+            echo "|---|---|---|"
+            echo "| Android（推荐） | \`${APP}-v${V}-android-arm64.apk\` | 2017 年后绝大多数手机 |"
+            echo "| Android（通用） | \`${APP}-v${V}-android-universal.apk\` | 含全部 CPU 架构，不确定机型时用 |"
+            echo "| Windows 安装版 | \`${APP}-v${V}-windows-setup.exe\` | Windows 10/11 64 位 |"
+            echo "| Windows 免安装 | \`${APP}-v${V}-windows-portable.zip\` | 解压即用 |"
+            echo ""
+            echo "### 校验（SHA-256）"
+            echo ""
+            echo "完整校验值见本 Release 资产中的 \`SHA256SUMS.txt\`。Windows 校验命令："
+            echo ""
+            echo "\`Get-FileHash .\\${APP}-v${V}-windows-setup.exe -Algorithm SHA256\`"
+            echo ""
+            echo "### 安装提示"
+            echo ""
+            echo "- **Windows**：未签名安装包首次运行可能触发 SmartScreen 提示——点「更多信息」→「仍要运行」即可；建议先核对上方 SHA-256。"
+            echo "- **Android**：首次安装需允许「安装未知应用」。"
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "猫卷 ${GITHUB_REF_NAME}" \
+            --notes-file dist/RELEASE_NOTES.md \
+            dist/MaoJuan-*.apk dist/MaoJuan-*.zip dist/MaoJuan-*.exe dist/SHA256SUMS.txt

@@ -1780,6 +1780,18 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       Windows 版提供「安装包」与「绿色免安装」两种形态；需要 AI 讲解时在设置中填入你自己的 API Key
     </div>
 
+    <!-- 安装提示（折叠，避免干扰普通用户） -->
+    <details class="dl-hash">
+      <summary>提示「不安全」？这是未签名，不是有问题</summary>
+      <div style="padding:12px 4px 4px;line-height:1.9">
+        安装包暂未购买代码签名证书，两个平台首次安装都会给出提示，按下面处理即可：<br>
+        · <b>Windows</b>：SmartScreen 蓝屏 → 点「<b>更多信息</b>」→「<b>仍要运行</b>」<br>
+        · <b>Android</b>：提示「未知来源」→ 在系统设置里为当前文件管理器开启「允许安装未知应用」<br>
+        不放心就先核对下面的 SHA-256 再安装；也请只从本页或 GitHub Releases 下载，
+        别用第三方转载的安装包。
+      </div>
+    </details>
+
     <!-- 校验值（可折叠，避免干扰普通用户） -->
     <details class="dl-hash">
       <summary>下载后核对完整性（SHA-256）</summary>
