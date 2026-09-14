@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全漏洞（请勿公开提交）
+    url: https://github.com/laow07573-web/daimao-quiz-master/blob/main/SECURITY.md
+    about: 发现安全问题请按 SECURITY.md 私下联系，不要开公开 Issue。
+  - name: 使用说明与常见问题
+    url: https://github.com/laow07573-web/daimao-quiz-master#常见问题
+    about: 安装、API Key、备份迁移等常见问题先看 README。

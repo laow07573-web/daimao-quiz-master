@@ -28,6 +28,20 @@
 
 ---
 
+## 界面预览
+
+<div align="center">
+  <img src="docs/screenshots/home.png" width="168" alt="首页：本周战绩与打卡日历">
+  <img src="docs/screenshots/quiz.png" width="168" alt="答题页：单选与多选">
+  <img src="docs/screenshots/quiz-feedback.png" width="168" alt="答完即判：对错配色与解析入口">
+  <img src="docs/screenshots/errorbook.png" width="168" alt="错题本：薄弱知识点分组">
+  <img src="docs/screenshots/stats.png" width="168" alt="统计页：年度热力图与趋势">
+</div>
+
+<p align="center"><sub>首页 · 答题 · 答完即判 · 错题本 · 统计（真实运行截图，非示意图）</sub></p>
+
+---
+
 ## 功能特性
 
 ### 📥 智能建库
@@ -249,6 +263,34 @@ flutter build windows --release
 
 **Q：支持哪些题型？**
 单选、多选、判断、填空、名词解释、简答、问答，共七种。
+
+---
+
+## Roadmap
+
+| 方向 | 状态 | 说明 |
+|---|---|---|
+| iOS 版本 | 评估中 | 代码已具备大部分平台判断，缺 Xcode 构建链与 iOS 侧适配（数据库路径、提醒、通知权限） |
+| Web 体验版 | 计划中 | 无需安装即可试用核心刷题流程，降低第一次尝试的门槛 |
+| 题库分享 | 计划中 | 仅限**用户自制题库**的分享，规避第三方教辅版权风险 |
+| 代码签名证书 | 评估中 | 消除 Windows SmartScreen 与 Android「未知来源」提示 |
+
+有想优先做的方向，欢迎开 Issue 讨论——尤其欢迎来自真实备考场景的需求。
+
+---
+
+## 参与贡献
+
+- 发现 Bug 或有建议：提 [Issue](https://github.com/laow07573-web/daimao-quiz-master/issues)
+- 想改代码：先看 [CONTRIBUTING.md](CONTRIBUTING.md)，从 `main` 开分支即可
+- 安全问题：请勿公开提交，见 [SECURITY.md](SECURITY.md)
+
+---
+
+## Star
+
+如果猫卷帮你省下了买题库会员的钱、或者让你少抄了一本错题——
+**给个 Star 就是最实在的支持**。它能让更多正在备考的同学搜到这个项目。
 
 ---
 

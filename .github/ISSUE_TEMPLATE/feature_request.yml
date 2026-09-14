@@ -1,0 +1,36 @@
+name: 功能建议
+description: 提一个功能想法或改进建议
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提建议！说清**使用场景**比说清方案更有价值——
+        知道你在什么情况下遇到什么麻烦，我才能想到更合适的做法。
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 你遇到的场景
+      description: 什么时候、做什么事的时候觉得不方便？
+      placeholder: |
+        比如：我习惯在图书馆用平板刷题，但……
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你希望怎么做（可选）
+      description: 如果有具体想法可以写在这里；没有也没关系
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 目前你是怎么绕过的（可选）
+      description: 现在有没有替代做法？这能帮我判断优先级
+    validations:
+      required: false
