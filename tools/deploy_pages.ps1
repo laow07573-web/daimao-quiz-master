@@ -60,6 +60,8 @@ Copy-Item (Join-Path $promo 'index.html') $stage -Force
 Copy-Item (Join-Path $promo '404.html')   $stage -Force
 Copy-Item (Join-Path $promo '.nojekyll')  $stage -Force
 Copy-Item (Join-Path $promo 'assets\logo.png') (Join-Path $stage 'assets') -Force
+# favicon.png：index.html 与 404.html 都引用它，必须一并部署（曾漏掉导致线上 404）
+Copy-Item (Join-Path $promo 'favicon.png') $stage -Force
 
 # Ship the installers alongside the page: GitHub Pages allows up to 100MB per
 # file (unlike Cloudflare Pages' 25MB), so all four fit and download same-origin.
@@ -96,9 +98,8 @@ foreach ($key in 'android','androidUniversal','windowsSetup','windowsPortable') 
 }
 Utf8NoBom $f $s
 
-# 404 references favicon.png which does not exist - point it at the logo
-$f404 = Join-Path $stage '404.html'
-Utf8NoBom $f404 ([System.IO.File]::ReadAllText($f404, [System.Text.Encoding]::UTF8).Replace('href="favicon.png"', 'href="assets/logo.png"'))
+# 说明：此处原有「favicon.png 不存在，把 404 页引用改指向 logo」的兜底。
+# 现已提供真实的 favicon.png（并随本脚本部署），该兜底不再需要，且会掩盖漏部署问题。
 
 # ---- 3. commit to gh-pages via a temp index (working tree untouched) -----------
 Step '3/4' 'committing to the gh-pages branch'
