@@ -67,3 +67,10 @@ tools/reference_check/reference_check_report.txt
 # 推广页的安装包副本与部署暂存目录（由 tools/deploy_promo.ps1 生成）
 promo/download/
 /build/promo_deploy/
+
+# 参赛材料与内部草稿：不入公开仓库（已从历史中清除，勿再提交）
+# 原件保存在仓库外的私有目录（见 docs/上线操作手册.md）
+docs/*计数草稿*.txt
+docs/*项目计划书*.docx
+docs/maojuan_plan/
+tools/planbook_gen/

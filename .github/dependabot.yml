@@ -1,0 +1,39 @@
+# ============================================================
+# 猫卷 · 依赖自动更新
+# 放置位置：.github/dependabot.yml
+#
+# Dependabot 会按下面的节奏开 PR 升级依赖；PR 同样会跑 CI（analyze + test）。
+# 建议优先合入 patch / minor，major 升级先本地验证再合。
+# ============================================================
+version: 2
+updates:
+  # Dart / Flutter 依赖
+  - package-ecosystem: "pub"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps):"
+    labels:
+      - "dependencies"
+
+  # GitHub Actions 自身
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(ci):"
+    labels:
+      - "dependencies"
+
+  # Android Gradle 依赖
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"

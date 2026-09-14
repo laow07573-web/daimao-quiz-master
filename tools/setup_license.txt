@@ -9,3 +9,5 @@
 4. 请勿将本软件用于任何违反当地法律法规的用途。
 
 5. 卸载软件不会删除你的数据文件（位于 %LOCALAPPDATA%\flashcard_app），如需彻底清除请手动删除该目录。
+
+6. 本软件以 GNU AGPL-3.0 许可开源发布，源码与完整协议文本见 https://github.com/laow07573-web/daimao-quiz-master （安装目录内亦附 LICENSE.txt）。

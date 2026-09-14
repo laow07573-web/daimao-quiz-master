@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>猫卷 · 本地优先的 AI 备考刷题平台</title>
 <meta name="description" content="猫卷 —— 题库自建、数据自有、AI 讲透、算法记住。离线可用的医学备考刷题 App，开源免费，无广告无会员。">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
 <!--
   ═══════════════════════════════════════════════════════════════
   猫卷 · 功能展示页（自包含，无外部依赖，可直接双击打开）
@@ -40,7 +42,7 @@ window.MAOJUAN = {
   androidUniversal: "download/MaoJuan-v1.28.1-android-universal.apk",
   windowsSetup:     "download/MaoJuan-v1.28.1-windows-setup.exe",
   windowsPortable:  "download/MaoJuan-v1.28.1-windows-portable.zip",
-  githubRelease:    "https://github.com/laow07573-web/daimao-quiz-master/releases/tag/v1.28.1",
+  githubRelease:    "https://github.com/laow07573-web/daimao-quiz-master/releases/latest",
   repo:             "https://github.com/laow07573-web/daimao-quiz-master",
   sha256: {
     apk:      "a6ba71234d711a581ee3d604aec2ccfb4e333d11c80a527ecfb00e6385f3c29d",
@@ -1778,6 +1780,18 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       Windows 版提供「安装包」与「绿色免安装」两种形态；需要 AI 讲解时在设置中填入你自己的 API Key
     </div>
 
+    <!-- 安装提示（折叠，避免干扰普通用户） -->
+    <details class="dl-hash">
+      <summary>提示「不安全」？这是未签名，不是有问题</summary>
+      <div style="padding:12px 4px 4px;line-height:1.9">
+        安装包暂未购买代码签名证书，两个平台首次安装都会给出提示，按下面处理即可：<br>
+        · <b>Windows</b>：SmartScreen 蓝屏 → 点「<b>更多信息</b>」→「<b>仍要运行</b>」<br>
+        · <b>Android</b>：提示「未知来源」→ 在系统设置里为当前文件管理器开启「允许安装未知应用」<br>
+        不放心就先核对下面的 SHA-256 再安装；也请只从本页或 GitHub Releases 下载，
+        别用第三方转载的安装包。
+      </div>
+    </details>
+
     <!-- 校验值（可折叠，避免干扰普通用户） -->
     <details class="dl-hash">
       <summary>下载后核对完整性（SHA-256）</summary>
@@ -1790,7 +1804,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <footer>
   <div class="fb"><img src="assets/logo.png" alt="猫卷"><span>猫卷</span></div>
   <p>本地优先的 AI 备考刷题平台 · 题库自建 · 数据自有 · 开源免费</p>
-  <p>作者：B 站 笨蛋鱼坏蛋猫 · 许可：CC BY-NC-SA 4.0（署名 · 非商业 · 相同方式共享）</p>
+  <p>作者：B 站 笨蛋鱼坏蛋猫 · 许可：AGPL-3.0（可自由使用 / 修改 / 分发，衍生作品须同样开源）</p>
   <p>开源仓库：<a id="foot-repo" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener" style="color:#8FB0FF">github.com/laow07573-web/daimao-quiz-master</a></p>
   <p style="margin-top:14px;color:#4A5470">本页面为功能展示用途 · 界面均由代码矢量重绘，可任意缩放</p>
 </footer>

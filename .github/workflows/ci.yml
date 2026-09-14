@@ -1,0 +1,49 @@
+# ============================================================
+# 猫卷 · 持续集成（最小版）
+# 放置位置：.github/workflows/ci.yml
+#
+# 作用：每次推送 / PR 自动执行静态分析与全量测试，
+#       把「0 issues」「227 项测试全绿」从本地声明变成外部可验证的事实。
+#       徽章见 README 首屏（badge.svg 直连本文件）。
+#
+# 不需要任何 Secrets。
+# Flutter 版本与本地开发保持一致（当前 3.24.5，见 pubspec 的 sdk 约束）。
+# ============================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  analyze-and-test:
+    name: 静态分析 + 全量测试
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'   # 与本地开发版本保持一致
+          channel: stable
+          cache: true
+
+      # 测试用 sqflite_common_ffi 跑真实 SQLite；Ubuntu runner 自带
+      # libsqlite3.so.0，装上 dev 包是为了拿到无版本号的 .so 软链，避免
+      # 个别镜像上 DynamicLibrary.open 失败。
+      - name: 安装 SQLite 运行库
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
+      - name: 拉取依赖
+        run: flutter pub get
+
+      - name: 静态分析（目标 0 issues）
+        run: flutter analyze
+
+      - name: 全量测试
+        run: flutter test

@@ -11,7 +11,8 @@
 #   8. deploy the promo site to GitHub Pages (tools\deploy_pages.ps1)
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1 -Version 1.29.0
+#   powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1
+#   ... -Version 1.29.0   # 可不传：默认取 pubspec.yaml；传了则必须与之一致
 #   ... -Note '更新说明'   # text shown in the release notes
 #   ... -SkipTests        # skip analyze/test (only if you just ran them)
 #   ... -SkipGithub       # local build + deploy only
@@ -28,8 +29,11 @@
 #   MaoJuan-v<Version>-windows-setup.exe      installer
 #   MaoJuan-v<Version>-windows-portable.zip   portable zip
 #
+# 版本号约定：pubspec.yaml 的 version 字段是**唯一来源**。App 内展示的版本号
+# 由下面的 $appVersionDefine 通过 --dart-define 注入（见 lib/utils/app_constants.dart），
+# 因此不需要在任何 Dart 文件里手工改版本号。
 param(
-    [Parameter(Mandatory = $true)][string]$Version,
+    [string]$Version = '',
     [string]$Note = '',
     [switch]$SkipTests,
     [switch]$SkipGithub,
@@ -48,6 +52,27 @@ function Step($n, $msg) { Write-Host ''; Write-Host ("=== [{0}] {1}" -f $n, $msg
 function Fail($msg) { Write-Host $msg -ForegroundColor Red; throw $msg }
 function Hash($p) { (Get-FileHash -Algorithm SHA256 $p).Hash.ToLower() }
 function SaveHash($p) { (Hash $p) | Set-Content ($p + '.sha256') -Encoding ascii -NoNewline }
+
+# ---- 版本号单一来源（pubspec.yaml）+ 一致性闸门 --------------------------------
+# 为什么不直接信任 -Version 参数：v1.28.0 曾发生「APK versionName 误标」事故，
+# 根因就是版本号有多处手工来源。现在 pubspec.yaml 是唯一来源：
+#   · 不传 -Version  → 取 pubspec
+#   · 传了 -Version  → 必须与 pubspec 一致，否则终止发布
+#   · App 内展示的版本号由 $appVersionDefine 注入，无第二处手工填写
+$pubLine = Select-String -Path (Join-Path $root 'pubspec.yaml') -Pattern '^version:' |
+    Select-Object -First 1
+if (-not $pubLine) { Fail 'pubspec.yaml 缺少 version: 字段' }
+$pubVersion = $pubLine.Line.Split(':')[-1].Trim()          # 形如 1.28.1+20
+$pubParts = $pubVersion.Split('+')
+$pubName = $pubParts[0]
+$pubBuild = if ($pubParts.Length -gt 1) { $pubParts[1] } else { '0' }
+if ($Version -eq '') {
+    $Version = $pubName
+    Write-Host ("version from pubspec.yaml: {0} (build {1})" -f $pubName, $pubBuild) -ForegroundColor DarkGray
+} elseif ($Version -ne $pubName) {
+    Fail ("version mismatch: -Version {0} != pubspec.yaml {1} —— 先改 pubspec.yaml（唯一来源）再发布" -f $Version, $pubName)
+}
+$appVersionDefine = 'APP_VERSION=v{0}.{1}' -f $pubName, $pubBuild
 
 Set-Location $root
 Write-Host ("MaoJuan release v{0}" -f $Version) -ForegroundColor Green
@@ -83,9 +108,9 @@ if (-not $SkipTests) {
 # ---- 3. build Windows + universal APK ------------------------------------------
 Step '3/8' 'building Windows + universal APK'
 $env:JAVA_HOME = 'D:\dev\jdk21'
-& flutter build apk --release --obfuscate --split-debug-info=build/symbols
+& flutter build apk --release --obfuscate --split-debug-info=build/symbols --dart-define=$appVersionDefine
 if ($LASTEXITCODE -ne 0) { Fail 'universal APK build failed' }
-& flutter build windows --release
+& flutter build windows --release --dart-define=$appVersionDefine
 if ($LASTEXITCODE -ne 0) { Fail 'Windows build failed' }
 
 $universalSrc = Join-Path $root 'build\app\outputs\flutter-apk\app-release.apk'
@@ -121,19 +146,21 @@ Step '6/8' 'building arm64 APK and staging artifacts'
 $apkUnivDst = Join-Path $dist $apkUnivName
 Copy-Item $universalSrc $apkUnivDst -Force; SaveHash $apkUnivDst
 
-& flutter build apk --release --obfuscate --split-debug-info=build/symbols --target-platform android-arm64
+& flutter build apk --release --obfuscate --split-debug-info=build/symbols --target-platform android-arm64 --dart-define=$appVersionDefine
 if ($LASTEXITCODE -ne 0) { Fail 'arm64 APK build failed' }
 $arm64Src = Join-Path $root 'build\app\outputs\flutter-apk\app-release.apk'
 $apkArm64Dst = Join-Path $dist $apkArm64Name
 Copy-Item $arm64Src $apkArm64Dst -Force; SaveHash $apkArm64Dst
 
-# Windows installers: package portable zip, bump the .iss version, compile setup
-& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'package_windows.ps1') | Out-Null
+# Windows installers: package portable zip, then compile the setup with the
+# version and the **actual** package dir passed in (see maojuan_setup.iss header:
+# SrcDir used to be hard-coded to a stale date, which could pack old content).
+$pkgDir = Join-Path $dist ("猫卷-Windows-{0}" -f (Get-Date -Format 'yyyyMMdd'))
+& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'package_windows.ps1') -PkgDir $pkgDir | Out-Null
+if (-not (Test-Path $pkgDir)) { Fail "portable package dir not produced: $pkgDir" }
 $iss = Join-Path $PSScriptRoot 'maojuan_setup.iss'
-$issText = [System.IO.File]::ReadAllText($iss, [System.Text.Encoding]::UTF8)
-$issText = $issText -replace 'MyAppVersion "[\d.]+"', ('MyAppVersion "{0}"' -f $Version)
-[System.IO.File]::WriteAllText($iss, $issText, (New-Object System.Text.UTF8Encoding($true)))
-& 'C:\Users\CTSwe\AppData\Local\Programs\Inno Setup 6\ISCC.exe' $iss | Out-Null
+& 'C:\Users\CTSwe\AppData\Local\Programs\Inno Setup 6\ISCC.exe' "/DMyAppVersion=$Version" "/DSrcDir=$pkgDir" $iss | Out-Null
+if ($LASTEXITCODE -ne 0) { Fail 'Inno Setup compile failed' }
 
 $setupSrc = Get-ChildItem $dist -Filter '*.windows-setup.exe' -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -155,9 +182,10 @@ foreach ($n in @($apkArm64Name, $apkUnivName, $setupName, $portableName)) {
     Write-Host ("    {0}  ({1:N1} MB)" -f $n, ((Get-Item (Join-Path $dist $n)).Length / 1MB))
 }
 
-# ---- 6.5 sync promo page sha256 -------------------------------------------------
-# 推广页 window.MAOJUAN.sha256 必须与本次产物一致，否则页面展示过期校验值。
-# 直接按 dist 里的四个产物就地改写 promo/index.html（无 BOM，保持原样）。
+# ---- 6.5 sync promo page (sha256 + version) -------------------------------------
+# 推广页 window.MAOJUAN 里的 sha256 与版本号必须与本次产物一致，否则页面展示
+# 过期校验值 / 下载 404。这里按 dist 里的四个产物就地改写 promo/index.html
+# （无 BOM，保持原样），版本号也一并同步——避免「改了 pubspec 忘了改推广页」。
 $promo = Join-Path $root 'promo\index.html'
 $promoText = [System.IO.File]::ReadAllText($promo, [System.Text.Encoding]::UTF8)
 $promoHashes = @{
@@ -173,8 +201,17 @@ foreach ($k in $promoHashes.Keys) {
     $promoText = [regex]::Replace($promoText, $pattern,
         ('${1}' + $promoHashes[$k] + '${3}'))
 }
+# version / buildDate 与四个同源下载文件名（download/MaoJuan-v<版本>-...）
+$promoText = [regex]::Replace($promoText, '(version:\s*")[^"]+(")',
+    ('${1}' + $Version + '${2}'))
+$promoText = [regex]::Replace($promoText, '(buildDate:\s*")[^"]+(")',
+    ('${1}' + (Get-Date -Format 'yyyyMMdd') + '${2}'))
+$promoText = [regex]::Replace($promoText, '(download/MaoJuan-)v[\d.]+(-android-)',
+    ('${1}v' + $Version + '${2}'))
+$promoText = [regex]::Replace($promoText, '(download/MaoJuan-)v[\d.]+(-windows-)',
+    ('${1}v' + $Version + '${2}'))
 [System.IO.File]::WriteAllText($promo, $promoText, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host '    promo/index.html sha256 synced to staged artifacts'
+Write-Host ("    promo/index.html synced to v{0} (sha256 + version + download names)" -f $Version)
 
 # ---- 7. GitHub Release ---------------------------------------------------------
 if (-not $SkipGithub) {
