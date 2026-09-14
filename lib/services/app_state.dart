@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -58,6 +59,17 @@ class AppState extends ChangeNotifier {
   bool _analysisLoading = false;
   bool get analysisLoading => _analysisLoading;
 
+  /// 进行中的讲解流（切题 / 重建 AI 服务 / 退出时要取消）
+  StreamSubscription<String>? _analysisSub;
+
+  /// 解析流的通知节流时间戳（见 _notifyAnalysisThrottled）
+  DateTime _lastAnalysisNotify = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 正在流式生成的追问回复（App 内对话页据此渲染「边生成边显示」的气泡）；
+  /// 生成完成后并入 followUpHistory，这里清空。
+  String _streamingReply = '';
+  String get streamingReply => _streamingReply;
+
   // 上次答题结果
   AnswerRecord? _lastAnswerRecord;
   AnswerRecord? get lastAnswerRecord => _lastAnswerRecord;
@@ -90,6 +102,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _currentQuestionStats = {};
     _currentFsrsCard = null;
     _followUpHistory = [];
+    // 流式输出改造：切题时必须掐断进行中的流，否则旧题的 chunk 会写进新题
+    _cancelAnalysisStream();
+    _streamingReply = '';
   }
 
   // 首页统计
@@ -359,7 +374,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   void _initAIService() {
     // v1.0.2 设计审查修复：重建前关闭旧实例的 http.Client，
-    // 避免每次保存设置/启动都泄漏一个 socket 连接
+    // 避免每次保存设置/启动都泄漏一个 socket 连接。
+    // 流式改造补充：先取消在途的流——旧 client 被 close 时进行中的流会抛异常，
+    // 不取消的话「保存设置」会把正在显示的解析打崩。
+    _cancelAnalysisStream();
     _aiService?.dispose();
     _aiService = AIService(_settings);
   }
@@ -1053,16 +1071,64 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _analysisLoading = true;
     notifyListeners();
 
-    // v1.0.2 设计审查修复：异常兜底 + finally 复位，防止加载圈永久卡死
+    // 流式输出：边生成边显示。命中缓存时 streamAnalysis 会整段给出（不流式），
+    // 因此这里的消费逻辑对「缓存 / 流式 / 回退一次性」三种情况都成立。
+    //
+    // 三处必须的防护：
+    //   · 切题竞态：chunk 到达时比对题号，不是当前题就丢弃（流已随切题取消，
+    //     但取消与在途 chunk 之间有窗口）
+    //   · 节流：markdown 每帧全量重解析，逐 chunk 通知会掉帧 → 60ms 合并一次
+    //   · 异常兜底：finally 复位 loading，防止加载圈永久卡死（沿用原逻辑）
+    final questionId = q.id;
+    final sub = _aiService!.streamAnalysis(q).listen(
+      (accumulated) {
+        if (currentQuestion?.id != questionId) return; // 已切题，丢弃
+        _currentAnalysis = accumulated;
+        _analysisLoading = false; // 首个 chunk 到达即撤掉转圈
+        _notifyAnalysisThrottled();
+      },
+      onError: (Object e) {
+        DebugLogService.instance.log('AI', '解析流异常: $e');
+        if (currentQuestion?.id != questionId) return;
+        _currentAnalysis = null;
+        _analysisLoading = false;
+        notifyListeners();
+      },
+      onDone: () {
+        if (currentQuestion?.id != questionId) return;
+        _analysisLoading = false;
+        notifyListeners();
+      },
+      cancelOnError: true,
+    );
+    _analysisSub = sub;
+
     try {
-      _currentAnalysis = await _aiService!.getAnalysis(q);
+      await sub.asFuture<void>();
     } catch (e) {
       DebugLogService.instance.log('AI', '解析加载失败: $e');
-      _currentAnalysis = null;
+      if (currentQuestion?.id == questionId) _currentAnalysis = null;
     } finally {
-      _analysisLoading = false;
-      notifyListeners();
+      if (currentQuestion?.id == questionId) {
+        _analysisLoading = false;
+        notifyListeners();
+      }
     }
+  }
+
+  /// 解析流的节流通知：60ms 内的多个 chunk 合并成一次 notifyListeners。
+  void _notifyAnalysisThrottled() {
+    final now = DateTime.now();
+    if (now.difference(_lastAnalysisNotify) < const Duration(milliseconds: 60)) {
+      return;
+    }
+    _lastAnalysisNotify = now;
+    notifyListeners();
+  }
+
+  void _cancelAnalysisStream() {
+    _analysisSub?.cancel();
+    _analysisSub = null;
   }
 
   /// 手动查看解析
@@ -1123,11 +1189,21 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _db.saveFollowUpMessage(qId, 'user', question);
 
     var reply = '';
+    // 流式输出：边生成边显示。_streamingReply 供对话页渲染进行中的气泡，
+    // 生成完成后清空并照旧写入历史 + 落库（数据库只存最终完整文本）。
+    _streamingReply = '';
     try {
-      reply = await _aiService!.askFollowUp(q, _currentAnalysis!, question);
+      await for (final acc
+          in _aiService!.streamFollowUp(q, _currentAnalysis!, question)) {
+        if (currentQuestion?.id != qId) break; // 期间切题：停止更新 UI
+        reply = acc;
+        _streamingReply = acc;
+        _notifyAnalysisThrottled();
+      }
     } catch (e) {
       DebugLogService.instance.log('AI', '追问失败: $e');
     }
+    _streamingReply = '';
     if (_isAiError(reply)) reply = '追问失败，请检查网络后重试。';
 
     _followUpLoading = false;
@@ -1549,6 +1625,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   @override
   void dispose() {
+    _cancelAnalysisStream();
     _aiService?.dispose();
     super.dispose();
   }

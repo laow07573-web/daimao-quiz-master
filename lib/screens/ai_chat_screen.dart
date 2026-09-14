@@ -174,7 +174,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       else
                         for (final m in history)
                           _ChatBubble(message: m, ac: ac),
-                      if (app.followUpLoading)
+                      // 流式输出：已经有内容就渲染进行中的气泡（边生成边显示），
+                      // 还没有首个 chunk 时仍用三点等待指示。
+                      // 气泡组件复用 _ChatBubble（它渲染的是传入文本，文本变长即重绘）。
+                      if (app.followUpLoading && app.streamingReply.isNotEmpty)
+                        _ChatBubble(
+                          message: FollowUpMessage(
+                              role: 'assistant', content: app.streamingReply),
+                          ac: ac,
+                        )
+                      else if (app.followUpLoading)
                         _TypingBubble(ac: ac),
                     ],
                   ),
