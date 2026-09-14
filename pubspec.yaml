@@ -1,4 +1,4 @@
-﻿name: flashcard_app
+name: flashcard_app
 description: 猫卷 - 本地题库、AI解析、间隔复习的 Android 刷题工具
 publish_to: 'none'
 version: 1.28.1+20
@@ -44,7 +44,7 @@ dependencies:
   flutter_local_notifications: ^19.5.0
   timezone: ^0.10.1
   flutter_timezone: ^4.1.1
-  flutter_foreground_task: ^6.0.0
+  flutter_foreground_task: ^11.0.0
 
   # 密钥加密（v1.0.2 新增：AES-256-GCM）
   pointycastle: ^3.9.1
