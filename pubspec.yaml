@@ -1,4 +1,4 @@
-﻿name: flashcard_app
+name: flashcard_app
 description: 猫卷 - 本地题库、AI解析、间隔复习的 Android 刷题工具
 publish_to: 'none'
 version: 1.28.1+20
@@ -36,7 +36,7 @@ dependencies:
   
   # 工具
   intl: ^0.18.1
-  shared_preferences: 2.5.3
+  shared_preferences: 2.5.5
   uuid: ^4.2.1
   path_provider: 2.1.5
 
