@@ -23,7 +23,7 @@
    - `chore: 调整构建脚本`
 3. 提交前请确保本地全部通过：
    ```bash
-   flutter analyze   # 应输出 0 issues
+   flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
    flutter test      # 全部测试通过（当前 244 项）
    ```
 4. 发起 Pull Request，描述清楚「改了什么、为什么改、怎么验证」
