@@ -4,13 +4,18 @@ import '../services/app_state.dart';
 import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../utils/responsive.dart';
+import '../widgets/command_palette.dart';
 import 'home_screen.dart';
 import 'import_preview_screen.dart';
 import 'profile_tab.dart';
-import 'settings_screen.dart';
+import 'quick_start_screen.dart';
+import 'settings_hub_screen.dart';
 import 'stats_tab.dart';
 
-/// 主壳（v1.0.2）：底部三 Tab（首页/统计/我的）
+/// 主壳：底部四 Tab（首页/开始/统计/我的）
+///
+/// 「开始」= 快速开始（原首页快速操作区独立成页）：首页只负责「看」，
+/// 开始页只负责「做」——开始刷题 / 题库管理 / 错题本 / 导入。
 /// IndexedStack 保活；切 Tab 回调刷新
 /// （首页 refreshWeeklyStats、统计 StatsTabState.refresh）
 /// v1.0.3 宽屏重设计：窗口宽 ≥ 840dp（PC/平板横屏）改用左侧竖向导航；
@@ -27,7 +32,7 @@ class _MainShellState extends State<MainShell> {
   /// 仅在显式构建参数下生效，正常包不受影响。
   static const String _goto = String.fromEnvironment('MAOJUAN_GOTO');
 
-  int _index = _goto == 'stats' ? 1 : 0;
+  int _index = _goto == 'stats' ? 2 : 0;
   final GlobalKey<StatsTabState> _statsKey = GlobalKey<StatsTabState>();
 
   /// v1.27 后台导入：完成提示弹窗防重复标志。
@@ -84,7 +89,7 @@ class _MainShellState extends State<MainShell> {
     // 切 Tab 回调刷新（两形态共用）
     if (i == 0) {
       context.read<AppState>().refreshWeeklyStats();
-    } else if (i == 1) {
+    } else if (i == 2) {
       _statsKey.currentState?.refresh();
     }
   }
@@ -93,6 +98,7 @@ class _MainShellState extends State<MainShell> {
         index: _index,
         children: [
           const HomeScreen(),
+          const QuickStartScreen(),
           StatsTab(key: _statsKey),
           const ProfileTab(),
         ],
@@ -106,7 +112,8 @@ class _MainShellState extends State<MainShell> {
 
     if (isWideLayout(context)) {
       // 宽屏形态：左侧竖向导航 + 右侧内容区（PC / 平板横屏）
-      return Scaffold(
+      return CommandPaletteShortcuts(
+        child: Scaffold(
         body: Row(
           children: [
             NavigationRail(
@@ -125,7 +132,7 @@ class _MainShellState extends State<MainShell> {
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const SettingsScreen()),
+                            builder: (_) => const SettingsHubScreen()),
                       ),
                     ),
                   ),
@@ -136,6 +143,11 @@ class _MainShellState extends State<MainShell> {
                   icon: Icon(Icons.home_outlined),
                   selectedIcon: Icon(Icons.home),
                   label: Text('首页'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.bolt_outlined),
+                  selectedIcon: Icon(Icons.bolt),
+                  label: Text('开始'),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.bar_chart_outlined),
@@ -153,11 +165,13 @@ class _MainShellState extends State<MainShell> {
             Expanded(child: _buildPages()),
           ],
         ),
+        ),
       );
     }
 
-    // 窄屏形态：底部三 Tab
-    return Scaffold(
+    // 窄屏形态：底部 Tab
+    return CommandPaletteShortcuts(
+      child: Scaffold(
       body: _buildPages(),
       bottomNavigationBar: DecoratedBox(
         // 顶部 hairline，与内容区分层（替代旧版无边界观感）
@@ -175,6 +189,11 @@ class _MainShellState extends State<MainShell> {
               label: '首页',
             ),
             NavigationDestination(
+              icon: Icon(Icons.bolt_outlined),
+              selectedIcon: Icon(Icons.bolt),
+              label: '开始',
+            ),
+            NavigationDestination(
               icon: Icon(Icons.bar_chart_outlined),
               selectedIcon: Icon(Icons.bar_chart),
               label: '统计',
@@ -186,6 +205,7 @@ class _MainShellState extends State<MainShell> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

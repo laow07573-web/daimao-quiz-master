@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自适应启动图标底色：Mao Des 2.0 clear 强调色 -->
+    <color name="ic_launcher_background">#5E6AD2</color>
+</resources>

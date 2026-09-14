@@ -17,8 +17,56 @@ import '../services/sync/sync_engine.dart';
 import '../services/theme_service.dart';
 import '../utils/responsive.dart';
 
+/// 设置分组：设置页按组拆成多个子页，由 [SettingsHubScreen] 分发。
+///
+/// 这样设置不再是一条 2000 行的长滚动，而是「中心页 → 分组子页」的两级结构。
+enum SettingsGroup {
+  /// 全部（保留给直接进入的旧路径）
+  all,
+
+  /// AI 接口配置、回答风格、保存
+  ai,
+
+  /// 主题外观、深色模式
+  appearance,
+
+  /// 局域网同步、寒暑假模式、提醒与复习
+  sync,
+
+  /// 打标签、音效、电池优化、调试日志、使用说明
+  advanced;
+
+  String get label => switch (this) {
+        SettingsGroup.all => '设置',
+        SettingsGroup.ai => 'AI 接口',
+        SettingsGroup.appearance => '外观',
+        SettingsGroup.sync => '同步与提醒',
+        SettingsGroup.advanced => '高级',
+      };
+
+  String get subtitle => switch (this) {
+        SettingsGroup.all => '全部设置',
+        SettingsGroup.ai => 'API Key、模型、回答风格',
+        SettingsGroup.appearance => '三套主题、深色模式',
+        SettingsGroup.sync => '局域网、假期、每日提醒',
+        SettingsGroup.advanced => '标签、音效、日志、说明',
+      };
+
+  /// 该组包含的 sections 顶层索引（与 build 中 sections 字面量顺序一致）
+  List<int> get indices => switch (this) {
+        SettingsGroup.all => const [],
+        SettingsGroup.ai => const [0, 1, 2, 3, 4, 5],
+        SettingsGroup.appearance => const [18, 19, 20, 21, 22, 23, 24, 25],
+        SettingsGroup.sync => const [10, 11, 12, 13, 14, 15],
+        SettingsGroup.advanced => const [6, 7, 8, 9, 16, 17, 26, 27, 28],
+      };
+}
+
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  /// [group] 为 null / all 时显示全部（旧行为）；否则只显示该分组。
+  const SettingsScreen({super.key, this.group = SettingsGroup.all});
+
+  final SettingsGroup group;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -279,7 +327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Scaffold(
         backgroundColor: ac.background,
         appBar: AppBar(
-          title: const Text('设置'),
+          title: Text(widget.group.label),
         ),
       // 平板适配：内容限宽居中（手机无影响）；
       // v1.0.3 宽屏重设计：宽屏限宽自动提升至 1080 + 分组双列并排
@@ -287,7 +335,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Builder(builder: (context) {
-          final sections = <Widget>[
+          final allSections = <Widget>[
             // API 配置卡片
             Container(
               padding: const EdgeInsets.all(16),
@@ -1604,6 +1652,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ];
+          // 按分组过滤：非 all 时只保留该组的 sections（索引表见 SettingsGroup.indices）
+          final sections = widget.group == SettingsGroup.all
+              ? allSections
+              : [for (final i in widget.group.indices) allSections[i]];
           // 窄屏：单列（原设计）；宽屏：分组交错分左右两列并排（近似平衡）
           if (!isWideLayout(context)) {
             return Column(

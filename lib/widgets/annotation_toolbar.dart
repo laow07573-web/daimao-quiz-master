@@ -194,8 +194,11 @@ class _ColorDot extends StatelessWidget {
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-            width: 2.5,
+            // 选中环走主题强调色（三套主题一致）
+            color: selected
+                ? AppThemeColors.of(context).accent
+                : Colors.transparent,
+            width: 2.2,
           ),
         ),
       ),
@@ -235,14 +238,16 @@ class _ToolIcon extends StatelessWidget {
       message: shortcut == null ? label : '$label ($shortcut)',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(MaoRadius.small),
+        borderRadius: MaoRadius.smallBorder,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+              horizontal: MaoSpace.xs, vertical: MaoSpace.xs - 3),
           decoration: BoxDecoration(
-            color: selected ? ac.accent.withOpacity(0.12) : null,
-            borderRadius: BorderRadius.circular(MaoRadius.small),
+            // accentSoft 在暗色下才有足够对比（旧版 withOpacity(0.12) 几乎看不见）
+            color: selected ? ac.accentSoft : null,
+            borderRadius: MaoRadius.smallBorder,
           ),
-          child: Icon(icon, size: 20, color: selected ? ac.accent : effective),
+          child: Icon(icon, size: 19, color: selected ? ac.accent : effective),
         ),
       ),
     );
@@ -255,10 +260,10 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 1,
-      height: 22,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: Theme.of(context).colorScheme.outlineVariant,
+      width: MaoLine.width,
+      height: 20,
+      margin: const EdgeInsets.symmetric(horizontal: MaoSpace.xs - 2),
+      color: AppThemeColors.of(context).border,
     );
   }
 }

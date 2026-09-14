@@ -25,6 +25,25 @@ String fmtClock(int s) =>
 /// 秒 → 'X分Y秒'（练习结果页）
 String fmtDurationCn(int s) => '${s ~/ 60}分${s % 60}秒';
 
+/// 秒 → 紧凑时长（窄容器专用，如首页三格指标）。
+///
+/// 相比 HomeStats.formattedDuration（'4 天 23 小时'，10 字符），
+/// 这里压到 '4天23时'（5 字符）—— 三格并排时才不会截断。
+/// 规则：省略为零的单位；不足 1 分钟显示秒。
+String fmtDurationCompact(int seconds) {
+  if (seconds <= 0) return '0';
+  final days = seconds ~/ 86400;
+  final hours = (seconds % 86400) ~/ 3600;
+  final minutes = (seconds % 3600) ~/ 60;
+  // 有界：超过 999 天就不再显示天数（否则 '1000天23时' 会撑破窄格）。
+  // 999 天 ≈ 2.7 年专注刷题，实际不可能达到，纯防御。
+  if (days >= 1000) return '999天+';
+  if (days > 0) return hours > 0 ? '$days天$hours时' : '$days天';
+  if (hours > 0) return minutes > 0 ? '$hours时$minutes分' : '$hours时';
+  if (minutes > 0) return '$minutes分';
+  return '$seconds秒';
+}
+
 /// FSRS 可见化：相对天数标签（按自然日粒度）。
 /// 返回 '已到期N天' / '今天' / '明天' / 'N天后'
 String relativeDayLabel(DateTime due, {DateTime? now}) {

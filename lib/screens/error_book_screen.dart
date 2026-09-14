@@ -750,17 +750,17 @@ class _BankErrorCard extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return InkWell(
-      borderRadius: BorderRadius.circular(MaoRadius.control),
+      borderRadius: MaoRadius.controlBorder,
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: MaoSpace.xs),
+        padding: const EdgeInsets.all(MaoSpace.sm + 2),
         decoration: BoxDecoration(
-          color: ac.surfaceAlt.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(MaoRadius.control),
+          color: ac.surface,
+          borderRadius: MaoRadius.controlBorder,
           border: Border.all(
-            color: selected ? ac.accent : Colors.transparent,
-            width: 1.5,
+            color: selected ? ac.accent : ac.border,
+            width: selected ? 1.4 : MaoLine.width,
           ),
         ),
         child: Row(

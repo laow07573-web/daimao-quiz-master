@@ -156,9 +156,11 @@ class YearHeatmap extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(3),
+                // 圆角统一走令牌；2px 是热力格在密集网格里的最佳观感
+                borderRadius: BorderRadius.circular(2),
+                // 今天：强调色细环（暗色下比填充更清晰，且不掩盖当天热力值）
                 border: isToday
-                    ? Border.all(color: ac.accent, width: 1.4)
+                    ? Border.all(color: ac.accent, width: 1.3)
                     : null,
               ),
             ),

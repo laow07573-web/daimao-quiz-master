@@ -1,4 +1,5 @@
 import '../services/theme_service.dart';
+import '../utils/design_tokens.dart';
 import 'package:flutter/material.dart';
 import '../services/debug_log_service.dart';
 
@@ -147,7 +148,7 @@ class AiResponseWidget extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Table(
-          border: TableBorder.all(color: ac.border.withOpacity(0.6), width: 0.6),
+          border: TableBorder.all(color: ac.border, width: MaoLine.width),
           columnWidths: {
             for (var c = 0; c < block.rows.first.length; c++) c: const FlexColumnWidth(),
           },
@@ -278,7 +279,7 @@ class AiResponseWidget extends StatelessWidget {
           style: base.copyWith(
             fontFamily: 'monospace',
             fontSize: (base.fontSize ?? 13) - 1,
-            backgroundColor: base.color!.withOpacity(0.08),
+            backgroundColor: ac.surfaceAlt,
           ),
         ));
       } else if (isBlueKw) {

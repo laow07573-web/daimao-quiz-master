@@ -1,5 +1,6 @@
 import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
+import '../widgets/kit/mj_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
@@ -76,7 +77,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     final ac = AppThemeColors.of(context);
     final s = _session;
     return Scaffold(
-      appBar: AppBar(title: const Text('会话详情')),
+      appBar: AppBar(
+        // 模拟数据明确标注，避免被误认为真实作答记录
+        title: Text(widget.session.source == 'simulation' ? '会话详情 · 模拟数据' : '会话详情'),
+      ),
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
         child: _records == null
@@ -85,12 +89,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               padding: const EdgeInsets.all(14),
               children: [
                 // 会话概览
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: ac.surfaceAlt.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(MaoRadius.control),
-                  ),
+                MJSurface(
+                  padding: const EdgeInsets.all(MaoSpace.sm + 2),
                   child: Row(
                     children: [
                       _Info(label: '题数', value: '${s.totalQuestions}'),
@@ -179,36 +179,18 @@ class _RecordTile extends StatelessWidget {
     final userAnswer = (record['user_answer'] as String?)?.trim() ?? '';
     final correctAnswer = (record['correct_answer'] as String?) ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ac.surfaceAlt.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(MaoRadius.small),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: MaoSpace.xs),
+      child: MJSurface(
+      padding: const EdgeInsets.all(MaoSpace.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                margin: const EdgeInsets.only(top: 2, right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: (isCorrect ? ac.accent : ac.danger).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(MaoRadius.chip),
-                ),
-                child: Text(
-                  isCorrect ? '对' : '错',
-                  style: TextStyle(
-                    fontSize: MaoType.caption,
-                    fontWeight: FontWeight.bold,
-                    color: isCorrect ? ac.accent : ac.danger,
-                  ),
-                ),
-              ),
+              MJTag(isCorrect ? '对' : '错',
+                  tone: isCorrect ? MJTagTone.success : MJTagTone.danger),
               Expanded(
                 child: Text(
                   title,
@@ -252,6 +234,7 @@ class _RecordTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

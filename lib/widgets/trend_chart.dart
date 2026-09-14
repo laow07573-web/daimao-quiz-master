@@ -333,9 +333,10 @@ class _TrendPainter extends CustomPainter {
 
   void _drawGrid(Canvas canvas) {
     // v1.0.2 UI 设计稿：左侧刻度固定 0-100（每 25 一档）代表刷题量
+    // 精密暗色：网格是最底层信息，用发丝线宽 + border 原色（不再叠加透明度）
     final gridPaint = Paint()
-      ..color = ac.border.withOpacity(0.5)
-      ..strokeWidth = 0.8;
+      ..color = ac.border
+      ..strokeWidth = MaoLine.width;
     for (final v in [0.0, 25.0, 50.0, 75.0, 100.0]) {
       final y = _yFor(v);
       canvas.drawLine(
@@ -343,16 +344,17 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: v.toInt().toString(),
-          style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary),
+          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftPad - tp.width - 4, y - tp.height / 2));
     }
     // 右侧正确率轴 0/50/100%
+    // 右侧正确率轴：比主网格再轻一档，只作参考
     final accPaint = Paint()
-      ..color = ac.border.withOpacity(0.3)
-      ..strokeWidth = 0.6;
+      ..color = ac.border.withOpacity(0.6)
+      ..strokeWidth = MaoLine.width * 0.75;
     for (final pct in [0.0, 50.0, 100.0]) {
       final y = _yFor(pct / 100 * chartMax);
       canvas.drawLine(
@@ -360,7 +362,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${pct.toInt()}%',
-          style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary),
+          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -382,7 +384,7 @@ class _TrendPainter extends CustomPainter {
       );
       canvas.drawRRect(
         rect,
-        Paint()..color = ac.accent.withOpacity(0.55),
+        Paint()..color = ac.accent.withOpacity(0.5),
       );
     }
   }
@@ -466,7 +468,7 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${date.month}/${date.day}',
-          style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary),
+          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();

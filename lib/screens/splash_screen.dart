@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
+import '../widgets/kit/mj_logo.dart';
 import 'main_shell.dart';
 
 /// 启动闪屏页（v1.0.2 对齐原版设计：App Logo + 标题 + 今日一言 + 加载圈）
@@ -54,47 +55,36 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Mao Des：闪屏用强调色双色位移渐变（品牌感），配白色文字。
-    // 旧版用「导航色向黑插值」在浅色导航下会变成脏灰（#A5A5A5），已废弃。
+    // Mao Des 2.0 精密暗色：闪屏不再用大面积渐变，
+    // 改为画布底 + 白底 logo 方块 + 大字号标题 + 发丝分隔 + 细指示。
     final ac = AppThemeColors.of(context);
-    final bgGradient = LinearGradient(
-      colors: [ac.accent, Color.lerp(ac.accent, ac.textPrimary, 0.32)!],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(gradient: bgGradient),
+      backgroundColor: ac.background,
+      body: SafeArea(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // App Logo（大圆角卡片）
-              ClipRRect(
-                borderRadius: BorderRadius.circular(MaoRadius.large),
-                child: Image.asset(
-                  'assets/app_logo.png',
-                  width: 96,
-                  height: 96,
-                  errorBuilder: (_, __, ___) =>
-                      Icon(Icons.school, size: 84, color: ac.onAccent),
-                ),
-              ),
+              // 品牌位：矢量标记 + 发丝描边方块（不再用白底位图，小尺寸不会糊）
+              const MJLogoBadge(box: 88, padding: 14),
               const SizedBox(height: MaoSpace.lg),
               // 软件名字
-              Text(
-                '猫卷',
-                style: MaoType.displayStyle.copyWith(
-                    fontSize: 26, color: ac.onAccent),
+              Text('猫卷',
+                  style: MaoType.h1Style.copyWith(
+                      fontSize: 28, color: ac.textPrimary)),
+              const SizedBox(height: MaoSpace.sm),
+              // 发丝分隔
+              Container(
+                width: 56,
+                height: MaoLine.width,
+                color: ac.border,
               ),
               const SizedBox(height: MaoSpace.sm),
               // 今日一言
-              Text(
-                '今日一言',
-                style: MaoType.captionStyle
-                    .copyWith(color: ac.onAccent.withOpacity(0.7)),
-              ),
-              const SizedBox(height: MaoSpace.xxs + 2),
+              Text('今日一言',
+                  style: MaoType.microStyle.copyWith(
+                      color: ac.textTertiary, letterSpacing: 1.2)),
+              const SizedBox(height: MaoSpace.xs),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 48),
                 child: Text(
@@ -102,18 +92,16 @@ class _SplashScreenState extends State<SplashScreen> {
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: MaoType.bodyStyle.copyWith(
-                    color: ac.onAccent.withOpacity(0.92),
-                    height: 1.5,
-                  ),
+                  style: MaoType.bodyStyle
+                      .copyWith(color: ac.textSecondary, height: 1.5),
                 ),
               ),
               const SizedBox(height: MaoSpace.xxl),
               SizedBox(
-                width: 26,
-                height: 26,
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2.6, color: ac.onAccent.withOpacity(0.9)),
+                    strokeWidth: 2, color: ac.accent),
               ),
             ],
           ),
