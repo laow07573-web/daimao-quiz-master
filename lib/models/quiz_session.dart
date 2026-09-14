@@ -9,6 +9,10 @@ class QuizSession {
   final String? endTime;
   final int durationSeconds;
 
+  /// 数据来源：'real'（真实作答）/ 'simulation'（开发者模式的模拟数据）。
+  /// 用于在历史记录等处明确标注，避免把模拟数据误当成真实记录。
+  final String source;
+
   QuizSession({
     this.id,
     required this.bankIds,
@@ -19,6 +23,7 @@ class QuizSession {
     required this.startTime,
     this.endTime,
     this.durationSeconds = 0,
+    this.source = 'real',
   });
 
   double get accuracy =>
@@ -35,6 +40,7 @@ class QuizSession {
       'start_time': startTime,
       'end_time': endTime,
       'duration_seconds': durationSeconds,
+      'source': source,
     };
   }
 
@@ -49,6 +55,7 @@ class QuizSession {
       startTime: map['start_time'] as String,
       endTime: map['end_time'] as String?,
       durationSeconds: map['duration_seconds'] as int? ?? 0,
+      source: map['source'] as String? ?? 'real',
     );
   }
 }

@@ -538,6 +538,25 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           onTap: _simulating ? null : _simulate,
         ),
         const SizedBox(height: 8),
+        // 统计口径开关：模拟数据默认不进真实统计（避免污染），
+        // 但生成后若不可见则该功能失去意义 —— 这里提供显式开关。
+        // 生成模拟数据时会自动打开，也可手动关闭以查看「只有真实数据」的效果。
+        _DevSwitchCard(
+          icon: Icons.analytics_outlined,
+          title: '统计包含模拟数据',
+          subtitle: context.watch<AppState>().includeSimulatedStats
+              ? '当前：首页与统计会显示模拟数据'
+              : '当前：统计只计入真实作答（模拟数据被排除）',
+          value: context.watch<AppState>().includeSimulatedStats,
+          onChanged: (v) async {
+            await context.read<AppState>().setIncludeSimulatedStats(v);
+            if (!mounted) return;
+            setState(() {
+              _status = v ? '统计已包含模拟数据' : '统计只计入真实作答';
+            });
+          },
+        ),
+        const SizedBox(height: 8),
         // v1.0.2：清除模拟刷题数据（只清理模拟产生的数据，不动真实数据）
         _DevCard(
           icon: Icons.delete_sweep_outlined,
@@ -659,6 +678,60 @@ class _DevCard extends StatelessWidget {
             Icon(Icons.chevron_right, size: 18, color: ac.textSecondary),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+/// 开发者选项里的开关卡片（与 _DevCard 同视觉语言，右侧为开关）。
+class _DevSwitchCard extends StatelessWidget {
+  const _DevSwitchCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: ac.surfaceAlt.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(MaoRadius.control),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: ac.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title,
+                    style: MaoType.h3Style.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: ac.textPrimary)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: MaoType.captionStyle
+                        .copyWith(color: ac.textSecondary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch(value: value, onChanged: onChanged),
+        ],
       ),
     );
   }

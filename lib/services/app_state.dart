@@ -95,6 +95,32 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   // 首页统计
   HomeStats? _homeStats;
   HomeStats? get homeStats => _homeStats;
+
+  /// 统计数据版本号。
+  ///
+  /// 任何会改变「统计口径」的写入都应调用 [bumpStatsRevision]：
+  /// 答题结束、导入/删除题库、改判、打标签、生成/清除模拟数据……
+  /// 首页（本周战绩卡是页面私有 state）与统计页据此自动重载本地统计，
+  /// 免得每个调用点都要记得手动刷新、漏一处就出现「数据不更新」。
+  int _statsRevision = 0;
+  int get statsRevision => _statsRevision;
+
+  /// 统计是否包含模拟数据（开发者选项）。默认 false：只统计真实作答。
+  bool get includeSimulatedStats => DatabaseService.includeSimulatedData;
+
+  /// 切换「统计包含模拟数据」。持久化，并立即刷新统计口径。
+  Future<void> setIncludeSimulatedStats(bool v) async {
+    DatabaseService.includeSimulatedData = v;
+    await _db.setSetting('stats_include_simulated', v ? '1' : '0');
+    await bumpStatsRevision();
+  }
+
+  /// 标记统计数据已变化：重算累计统计 + 通知所有监听者。
+  Future<void> bumpStatsRevision() async {
+    await _loadHomeStats();
+    _statsRevision++;
+    notifyListeners();
+  }
   String? _weaknessAnalysis;
   String? get weaknessAnalysis => _weaknessAnalysis;
 
@@ -272,6 +298,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     // 导入完成即可直接从「定向爆破」开刷，不用再去题库管理页勾选。
     if (_selectedBankIds.isEmpty) _selectedBankIds.add(bankId);
     notifyListeners();
+    await bumpStatsRevision();
     return questions.length;
   }
 
@@ -319,6 +346,15 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _loadBanks();
     await _loadHomeStats();
     _initAIService();
+
+    // 恢复「统计包含模拟数据」开关（开发者选项；默认关闭）
+    try {
+      final v = await _db.getSetting('stats_include_simulated');
+      DatabaseService.includeSimulatedData = v == '1';
+    } catch (_) {
+      DatabaseService.includeSimulatedData = false;
+    }
+
   }
 
   void _initAIService() {
@@ -471,10 +507,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   // ======================== v1.0.2: 统计页数据 ========================
 
-  /// 首页/统计页切换时刷新战绩数据
+  /// 首页/统计页切换时刷新战绩数据。
+  ///
+  /// 走 bumpStatsRevision 而非「_loadHomeStats + notify」：首页的续刷卡片与
+  /// 本周战绩是页面私有 state，只有版本号变了才会重载。切回首页时必须让它们
+  /// 重新取数（不然在别的 Tab 里产生的变化切回来还是旧值）。
   Future<void> refreshWeeklyStats() async {
-    await _loadHomeStats();
-    notifyListeners();
+    await bumpStatsRevision();
   }
 
   /// 最近 N 天每日刷题量（date: DateTime, total: int）
@@ -837,18 +876,32 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     int days = 90,
     bool randomWeakKp = false,
     bool dueToday = false,
-  }) =>
-      _db.simulateLongTermUse(
-          days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
+  }) async {
+    final r = await _db.simulateLongTermUse(
+        days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
+    // 生成成功即自动打开「统计包含模拟数据」——否则开发者生成完
+    // 在首页/统计看不到任何东西，等于白生成。
+    if (r.error == null && r.records > 0) {
+      await setIncludeSimulatedStats(true);
+    } else {
+      await bumpStatsRevision();
+    }
+    return r;
+  }
 
   /// 清除模拟长期使用产生的全部数据（会话/记录/复习卡/错题条目）
-  Future<int> clearSimulatedData() => _db.clearSimulatedData();
+  Future<int> clearSimulatedData() async {
+    final n = await _db.clearSimulatedData();
+    await bumpStatsRevision();
+    return n;
+  }
 
   /// 删除题库（同时清理答案记录）
   Future<void> deleteBank(int bankId) async {
     await _db.deleteBank(bankId);
     _selectedBankIds.remove(bankId);
     await _loadBanks();
+    await bumpStatsRevision();
   }
 
   void toggleBankSelection(int bankId) {
@@ -1157,7 +1210,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _quizQuestions = [];
     _clearQuestionContext();
     _lastAnswerRecord = null;
-    notifyListeners();
+    // 会话行被删掉，首页续刷入口可能需要跟着消失
+    await bumpStatsRevision();
   }
 
   /// 暂停当前会话（v1.0.2 七项改进：断点续刷）。
@@ -1175,7 +1229,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     try {
       await ReminderService.instance.rescheduleNextDay();
     } catch (_) {}
-    notifyListeners();
+    // 必须走 bumpStatsRevision：本轮的作答已落库，但没走「答题结束」路径，
+    // 而首页的续刷卡片与本周战绩都是页面私有 state，只在版本号变化时重载。
+    // 只 notifyListeners 的话首页会拿旧值渲染 —— 实测表现为「暂停退出后回首页，
+    // 续刷入口不出现、本周刷题仍显示 0，点一下刷新才出来」。
+    await bumpStatsRevision();
   }
 
   /// 断点续刷：恢复最新未完成会话（题目顺序 + 作答历史 + 跳到第一个未答题）。
@@ -1263,15 +1321,16 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   Future<QuizSession> endSession() async {
+    // 会话落库后统计口径变化（末尾统一 bump）
     _skipFSRS = false;
     _currentSession = await _quizService.endSession();
     _quizService.reset();
-    await _loadHomeStats();
     // v1.0.2: 答题完成后续排明天提醒
     try {
       await ReminderService.instance.rescheduleNextDay();
     } catch (_) {}
-    notifyListeners();
+    // 首页的续刷卡片要在这里消失、本周战绩要在这里更新，都靠版本号触发
+    await bumpStatsRevision();
     return _currentSession!;
   }
 
@@ -1387,14 +1446,24 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       _db.updateQuestionKnowledgePoint(questionId, kp);
 
   /// 改判一条作答记录（会话统计 + FSRS 同步修正）
-  Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) =>
-      _db.rejudgeAnswerRecord(recordId, isCorrect);
+  Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) async {
+    await _db.rejudgeAnswerRecord(recordId, isCorrect);
+    await bumpStatsRevision();
+  }
 
   /// 隐藏今日全部作答记录
-  Future<int> hideTodayRecords() => _db.hideTodayRecords();
+  Future<int> hideTodayRecords() async {
+    final n = await _db.hideTodayRecords();
+    await bumpStatsRevision();
+    return n;
+  }
 
   /// 恢复被隐藏的今日作答记录
-  Future<int> restoreTodayRecords() => _db.restoreTodayRecords();
+  Future<int> restoreTodayRecords() async {
+    final n = await _db.restoreTodayRecords();
+    await bumpStatsRevision();
+    return n;
+  }
 
   /// 今日被隐藏记录条数
   Future<int> getHiddenTodayRecordCount() => _db.getHiddenTodayRecordCount();

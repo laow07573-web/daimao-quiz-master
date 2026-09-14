@@ -13,6 +13,23 @@ import 'device_service.dart';
 import 'fsrs_service.dart';
 
 class DatabaseService {
+
+  // ======================== 数据来源过滤开关 ========================
+  //
+  // 默认只统计真实作答（source='real'）；模拟长期使用产生的数据带
+  // source='simulation'，默认被排除，避免污染真实刷题量/正确率/连击/
+  // 热力图（v1.0.2 设计评审决定，测试亦有断言）。
+  //
+  // 但「模拟长期使用」是开发者用来预览「有数据时界面长什么样」的工具，
+  // 若永远不可见该功能就没有意义 —— 因此提供本开关：开发者显式打开后，
+  // 统计口径包含模拟数据；关闭即恢复只认真实数据。
+  static bool includeSimulatedData = false;
+
+  /// 数据来源过滤片段（SQL 内联用）。
+  /// 注意：值来自本类静态字段，非用户输入，无注入风险。
+  static String get sourceFilter =>
+      includeSimulatedData ? "('real','simulation')" : "('real')";
+
   static DatabaseService? _instance;
   static Database? _database;
   /// 测试用：覆盖数据库文件路径（多测试文件并行时按文件隔离，防互相清库）
@@ -987,14 +1004,14 @@ class DatabaseService {
     final db = await database;
     final maps = await db.rawQuery('''
       SELECT s.*,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_correct,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_wrong,
         (SELECT COUNT(*) FROM session_questions sq WHERE sq.session_id = s.id) as q_count
       FROM quiz_sessions s
       LEFT JOIN answer_records ar ON ar.session_id = s.id
-      WHERE s.source = 'real' AND (s.end_time IS NULL OR s.end_time = '')
+      WHERE s.source IN ${DatabaseService.sourceFilter} AND (s.end_time IS NULL OR s.end_time = '')
       GROUP BY s.id
       HAVING q_count > 0
       ORDER BY s.start_time DESC
@@ -1015,7 +1032,7 @@ class DatabaseService {
     final db = await database;
     final rows = await db.query('quiz_sessions',
         columns: ['id'],
-        where: "source = 'real' AND (end_time IS NULL OR end_time = '')");
+        where: "source IN ${DatabaseService.sourceFilter} AND (end_time IS NULL OR end_time = '')");
     if (rows.isEmpty) return 0;
     final ids = rows.map((r) => r['id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(',');
@@ -1056,13 +1073,13 @@ class DatabaseService {
     final db = await database;
     final maps = await db.rawQuery('''
       SELECT s.*,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_correct,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_wrong
       FROM quiz_sessions s
       LEFT JOIN answer_records ar ON ar.session_id = s.id
-      WHERE s.source = 'real'
+      WHERE s.source IN ${DatabaseService.sourceFilter}
       GROUP BY s.id
       ORDER BY s.start_time DESC
       ${limit != null ? 'LIMIT ?' : ''}
@@ -1074,13 +1091,13 @@ class DatabaseService {
     final db = await database;
     final maps = await db.rawQuery('''
       SELECT s.*,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_correct,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_wrong
       FROM quiz_sessions s
       LEFT JOIN answer_records ar ON ar.session_id = s.id
-      WHERE s.source = 'real'
+      WHERE s.source IN ${DatabaseService.sourceFilter}
       GROUP BY s.id
       ORDER BY s.start_time DESC
       LIMIT 1
@@ -1095,9 +1112,9 @@ class DatabaseService {
     final db = await database;
     final maps = await db.rawQuery('''
       SELECT s.*,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 1 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_correct,
-        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source = 'real'
+        COALESCE(SUM(CASE WHEN ar.is_correct = 0 AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
                           THEN 1 ELSE 0 END), 0) as d_wrong
       FROM quiz_sessions s
       LEFT JOIN answer_records ar ON ar.session_id = s.id
@@ -1122,6 +1139,9 @@ class DatabaseService {
       startTime: s.startTime,
       endTime: s.endTime,
       durationSeconds: s.durationSeconds,
+      // 必须显式透传：本方法重建了 QuizSession，漏传会让 source 回落到
+      // 默认 'real'，导致模拟数据在历史记录里被当成真实记录（曾发生）。
+      source: s.source,
     );
   }
 
@@ -1169,10 +1189,10 @@ class DatabaseService {
   Future<Map<String, int>> getQuestionStats(int questionId) async {
     final db = await database;
     final total = await db.rawQuery(
-        "SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND hidden = 0 AND source = 'real'",
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND hidden = 0 AND source IN ${DatabaseService.sourceFilter}",
         [questionId]);
     final correct = await db.rawQuery(
-        "SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND is_correct = 1 AND hidden = 0 AND source = 'real'",
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE question_id = ? AND is_correct = 1 AND hidden = 0 AND source IN ${DatabaseService.sourceFilter}",
         [questionId]);
     return {
       'total': total.first['cnt'] as int,
@@ -1231,10 +1251,10 @@ class DatabaseService {
     final result = await db.rawQuery('''
       SELECT COALESCE(SUM(s.duration_seconds), 0) as total
       FROM quiz_sessions s
-      WHERE s.source = 'real'
+      WHERE s.source IN ${DatabaseService.sourceFilter}
         AND EXISTS (SELECT 1 FROM answer_records ar2
                     WHERE ar2.session_id = s.id AND ar2.hidden = 0
-                      AND ar2.source = 'real')
+                      AND ar2.source IN ${DatabaseService.sourceFilter})
     ''');
     return result.first['total'] as int;
   }
@@ -1243,7 +1263,7 @@ class DatabaseService {
   Future<int> getTotalQuestionsAnswered() async {
     final db = await database;
     final result = await db.rawQuery(
-        "SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source = 'real'");
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}");
     return result.first['cnt'] as int;
   }
 
@@ -1251,9 +1271,9 @@ class DatabaseService {
   Future<double> getOverallAccuracy() async {
     final db = await database;
     final total = await db
-        .rawQuery("SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source = 'real'");
+        .rawQuery("SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}");
     final correct = await db.rawQuery(
-        "SELECT COUNT(*) as cnt FROM answer_records WHERE is_correct = 1 AND hidden = 0 AND source = 'real'");
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE is_correct = 1 AND hidden = 0 AND source IN ${DatabaseService.sourceFilter}");
     final t = total.first['cnt'] as int;
     final c = correct.first['cnt'] as int;
     return t > 0 ? (c / t) * 100 : 0;
@@ -1271,7 +1291,7 @@ class DatabaseService {
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
       JOIN question_banks qb ON q.bank_id = qb.id
-      WHERE ar.hidden = 0 AND ar.source = 'real'
+      WHERE ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
       GROUP BY qb.id
     ''');
   }
@@ -1678,7 +1698,7 @@ class DatabaseService {
     final rows = await db.rawQuery('''
       SELECT date(answered_at) as day, COUNT(*) as total
       FROM answer_records
-      WHERE hidden = 0 AND source = 'real' AND date(answered_at) >= date(?)
+      WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter} AND date(answered_at) >= date(?)
       GROUP BY date(answered_at)
     ''', [start.toIso8601String()]);
     final byDay = <String, int>{};
@@ -1762,7 +1782,7 @@ class DatabaseService {
       SELECT date(answered_at) as day, COUNT(*) as total,
              SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
       FROM answer_records
-      WHERE hidden = 0 AND source = 'real' AND date(answered_at) >= date(?)
+      WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter} AND date(answered_at) >= date(?)
       GROUP BY date(answered_at)
     ''', [start.toIso8601String()]);
     final byDay = <String, Map<String, dynamic>>{
@@ -1790,7 +1810,7 @@ class DatabaseService {
              SUM(CASE WHEN ar.is_correct = 1 THEN 1 ELSE 0 END) as correct
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
-      WHERE ar.hidden = 0 AND ar.source = 'real' AND q.knowledge_point IS NOT NULL
+      WHERE ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter} AND q.knowledge_point IS NOT NULL
         AND q.knowledge_point != ''
         AND q.knowledge_point NOT LIKE 'AI请求失败%'
         AND q.knowledge_point NOT LIKE 'AI服务返回错误%'
@@ -1821,13 +1841,13 @@ class DatabaseService {
         COUNT(*) as questions,
         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
         COALESCE((SELECT SUM(s.duration_seconds) FROM quiz_sessions s
-          WHERE s.source = 'real'
+          WHERE s.source IN ${DatabaseService.sourceFilter}
             ${start != null ? 'AND s.start_time >= ?' : ''}
             AND EXISTS (SELECT 1 FROM answer_records ar2
                     WHERE ar2.session_id = s.id AND ar2.hidden = 0
-                      AND ar2.source = 'real')), 0) as duration
+                      AND ar2.source IN ${DatabaseService.sourceFilter})), 0) as duration
       FROM answer_records
-      WHERE hidden = 0 AND source = 'real'
+      WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}
         ${start != null ? 'AND answered_at >= ?' : ''}
     ''', start != null ? [start.toIso8601String(), start.toIso8601String()] : []);
     final r = rows.first;
@@ -1848,7 +1868,7 @@ class DatabaseService {
              q.title as question_title, q.correct_answer, q.question_type
       FROM answer_records ar
       JOIN questions q ON ar.question_id = q.id
-      WHERE ar.session_id = ? AND ar.hidden = 0 AND ar.source = 'real'
+      WHERE ar.session_id = ? AND ar.hidden = 0 AND ar.source IN ${DatabaseService.sourceFilter}
       ORDER BY ar.id
     ''', [sessionId]);
   }

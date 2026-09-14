@@ -111,12 +111,14 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                     if (appState.previewParseErrors.isNotEmpty)
                       Container(
                         width: double.infinity,
-                        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.fromLTRB(
+                            MaoSpace.sm, MaoSpace.xs, MaoSpace.sm, 0),
+                        padding: const EdgeInsets.all(MaoSpace.xs + 2),
                         decoration: BoxDecoration(
-                          color: ac.warning.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(MaoRadius.small),
-                          border: Border.all(color: ac.warning.withOpacity(0.5)),
+                          color: ac.surfaceAlt,
+                          borderRadius: MaoRadius.smallBorder,
+                          border: Border.all(
+                              color: ac.border, width: MaoLine.width),
                         ),
                         child: Text(
                           '${appState.previewParseErrors.length} 个分块解析失败（已跳过）：'
@@ -223,11 +225,13 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
           _filter = active ? _PreviewFilter.all : f;
         }),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(
+              horizontal: MaoSpace.xs, vertical: 3),
           decoration: BoxDecoration(
-            color: color.withOpacity(active ? 0.22 : 0.1),
-            borderRadius: BorderRadius.circular(MaoRadius.small),
-            border: active ? Border.all(color: color) : null,
+            color: color.withOpacity(active ? 0.16 : 0.07),
+            borderRadius: MaoRadius.chipBorder,
+            border: Border.all(
+                color: active ? color : ac.border, width: MaoLine.width),
           ),
           child: Text(text,
               style: TextStyle(

@@ -1,5 +1,6 @@
 import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
+import '../widgets/kit/mj_kit.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -247,38 +248,30 @@ class _BankCard extends StatelessWidget {
     final ac = AppThemeColors.of(context);
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: ac.surfaceAlt,
-          borderRadius: BorderRadius.circular(MaoRadius.small),
-          border: Border.all(
-            color: isSelected ? ac.accent : ac.border,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
+      child: Padding(
+      padding: const EdgeInsets.only(bottom: MaoSpace.xs),
+      child: MJSurface(
+        onTap: onTap,
+        padding: const EdgeInsets.all(MaoSpace.sm),
         child: Row(
           children: [
-            GestureDetector(
-              onTap: onTap,
-              child: Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: isSelected ? ac.accent : Colors.transparent,
-                  border: Border.all(
-                    color: isSelected ? ac.accent : ac.border,
-                    width: 2,
-                  ),
-                  borderRadius: BorderRadius.circular(MaoRadius.chip),
+            // Linear 式小方块选择器（与答题页选项一致）
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: isSelected ? ac.accent : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? ac.accent : ac.border,
+                  width: 1.2,
                 ),
-                child: isSelected
-                    ? Icon(Icons.check, size: 16, color: ac.onAccent)
-                    : null,
+                borderRadius: MaoRadius.chipBorder,
               ),
+              child: isSelected
+                  ? Icon(Icons.check, size: 12, color: ac.onAccent)
+                  : null,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: MaoSpace.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,6 +299,7 @@ class _BankCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

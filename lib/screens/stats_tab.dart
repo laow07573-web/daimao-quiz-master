@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
+import '../widgets/kit/mj_kit.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
 import '../widgets/monthly_calendar.dart';
@@ -23,6 +24,9 @@ class StatsTab extends StatefulWidget {
 }
 
 class StatsTabState extends State<StatsTab> {
+  /// 上次已加载的统计数据版本号（见 AppState.statsRevision）：
+  /// 变更时自动重载，保证从「开始」页操作后切回统计能看到新数据。
+  int _loadedStatsRevision = -1;
   String _period = 'week';
 
   Map<String, int> _yearlyTotals = {};
@@ -162,6 +166,14 @@ class StatsTabState extends State<StatsTab> {
 
   @override
   Widget build(BuildContext context) {
+    // 统计口径变化时自动重载（答题结束 / 导入 / 改判 / 模拟数据…）
+    final rev = context.select<AppState, int>((s) => s.statsRevision);
+    if (rev != _loadedStatsRevision) {
+      _loadedStatsRevision = rev;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) refresh();
+      });
+    }
     final ac = AppThemeColors.of(context);
     return Scaffold(
       appBar: AppBar(
@@ -192,6 +204,8 @@ class StatsTabState extends State<StatsTab> {
                     children: isWideLayout(context)
                         ? _buildWideSections(ac)
                         : [
+                      // 统计口径包含模拟数据时明确提示，避免把模拟数字当成真实成绩
+                      ..._simulatedNotice(ac),
                       _buildOverview(context),
                       const SizedBox(height: 14),
                       _SectionCard(
@@ -246,6 +260,8 @@ class StatsTabState extends State<StatsTab> {
   /// v1.0.3 窗口自适应：并排区块改用 AdaptivePair，窗口拖窄时自动上下堆叠。
   List<Widget> _buildWideSections(AppThemeColors ac) {
     return [
+      // 提示条在宽屏同样置顶
+      ..._simulatedNotice(ac),
       _buildOverview(context),
       const SizedBox(height: 14),
       // v1.28：并排时两卡片等高（用户反馈要求与趋势卡持平）。
@@ -476,13 +492,41 @@ class StatsTabState extends State<StatsTab> {
     );
   }
 
-  String _formatDuration(int seconds) {
-    final hours = seconds ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-    if (hours > 0) return '${hours}h${minutes}m';
-    if (minutes > 0) return '${minutes}m';
-    return '${seconds}s';
+  /// 统计包含模拟数据时的提示条（开发者模式生成模拟数据后自动启用）。
+  /// 有提示才不会把模拟出来的成绩误当成真实学习数据。
+  List<Widget> _simulatedNotice(AppThemeColors ac) {
+    if (!context.watch<AppState>().includeSimulatedStats) return const [];
+    return [
+      Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: MaoSpace.sm, vertical: MaoSpace.xs),
+        decoration: BoxDecoration(
+          color: ac.warning.withOpacity(0.10),
+          borderRadius: MaoRadius.controlBorder,
+          border: Border.all(
+              color: ac.warning.withOpacity(0.45), width: MaoLine.width),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.science_outlined, size: 15, color: ac.warning),
+            const SizedBox(width: MaoSpace.xs),
+            Expanded(
+              child: Text(
+                '当前统计包含模拟数据（开发者模式生成），并非真实学习记录',
+                style: MaoType.captionStyle.copyWith(color: ac.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
+    ];
   }
+
+  /// 时长格式化（概览四格专用）。
+  /// 用紧凑写法：四格并排时 '119h25m' 这类长值会被截断，
+  /// 紧凑格式（'4天23时'）能放下且不丢信息。
+  String _formatDuration(int seconds) => fmtDurationCompact(seconds);
 }
 
 class _PeriodChips extends StatelessWidget {
@@ -552,15 +596,23 @@ class _OverviewStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value + suffix,
-          style: TextStyle(
-              fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: color),
+        // 等宽数字：四个指标并排时数位对齐；FittedBox 兜底防截断
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: MaoNumber(value,
+              size: MaoType.h1,
+              weight: FontWeight.w700,
+              color: color,
+              suffix: suffix),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: MaoSpace.xxs + 1),
         Text(label,
-            style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
       ],
     );
   }
@@ -614,37 +666,20 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: fillHeight ? MainAxisSize.max : MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: MaoType.body,
-                fontWeight: FontWeight.bold,
-                color: ac.textPrimary,
-              ),
-            ),
-            const Spacer(),
-            if (trailing != null) trailing!,
-          ],
-        ),
+        MJSectionHeader(title: title, trailing: trailing),
         const SizedBox(height: MaoSpace.sm),
         // v1.28：不用 flex（单列/堆叠时高度无界会报错）。
         // 等高通过 AdaptivePair 给两侧统一的固定高度实现。
         child,
       ],
     );
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: ac.surfaceAlt.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(MaoRadius.control),
-      ),
+    // 精密暗色：区块容器统一为发丝描边面板
+    return MJSurface(
+      padding: const EdgeInsets.all(MaoSpace.sm + 2),
       child: content,
     );
   }
@@ -920,7 +955,14 @@ class _HistorySection extends StatelessWidget {
   // v1.0.2 七项改进：session_id → 关联题库名
   final Map<int, List<String>> bankNames;
 
-  String _modeLabel(String mode) {
+  /// 会话标签。模拟数据优先标注——它的 source='simulation' 而 mode 仍是
+  /// single/mixed，只看 mode 会把它显示成「单题库」，让人误以为是真实记录。
+  String _modeLabel(QuizSession s) {
+    if (s.source == 'simulation') return '模拟数据';
+    return _modeByMode(s.mode);
+  }
+
+  String _modeByMode(String mode) {
     switch (mode) {
       case 'kp_review':
         return '知识点复习';
@@ -975,11 +1017,14 @@ class _HistorySection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _modeLabel(s.mode),
+                          _modeLabel(s),
                           style: TextStyle(
                               fontSize: MaoType.body,
                               fontWeight: FontWeight.w600,
-                              color: ac.textPrimary),
+                              // 模拟数据用弱化色，和真实记录一眼可分
+                              color: s.source == 'simulation'
+                                  ? ac.textTertiary
+                                  : ac.textPrimary),
                         ),
                         // v1.0.2 七项改进：会话关联题库名副标题
                         if (s.id != null &&

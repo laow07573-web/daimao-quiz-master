@@ -515,13 +515,16 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mscr{position:absolute;inset:0;overflow:hidden;background:var(--m-bg,#F0F4F8);
   opacity:0;transition:opacity .85s ease}
 .mscr.on{opacity:1}
-/* 3 套主题 token（Mao Des，取自 lib/services/theme_service.dart） */
-.mscr[data-t="clear"]{--m-nav:#FFFFFF;--m-bg:#F5F7FA;--m-accent:#2563EB;--m-card:#FFFFFF;--m-bd:#E2E8F0;--m-s2:#EDF1F7;--m-navfg:#111827;--m-fg:#111827;--m-fg2:#566072;--m-fg3:#8A94A6}
-.mscr[data-t="sage"]{--m-nav:#FFFFFF;--m-bg:#F6F8F5;--m-accent:#2F7D5B;--m-card:#FFFFFF;--m-bd:#E1E8DF;--m-s2:#EDF2EC;--m-navfg:#1A211C;--m-fg:#1A211C;--m-fg2:#556057;--m-fg3:#8A948C}
-.mscr[data-t="ink"]{--m-nav:#FFFFFF;--m-bg:#FAF8F4;--m-accent:#1F6F5C;--m-card:#FFFFFF;--m-bd:#E6E1D7;--m-s2:#F1EEE7;--m-navfg:#17181A;--m-fg:#17181A;--m-fg2:#565A60;--m-fg3:#8C9098}
-.mscr[data-dark="1"]{--m-nav:#151D2E;--m-bg:#0B1220;--m-accent:#5B9BFF;--m-card:#151D2E;--m-bd:#2A3549;--m-s2:#1D2739;--m-navfg:#F1F4F9;--m-fg:#F1F4F9;--m-fg2:#A3AEC2;--m-fg3:#6F7C93}
-.mscr{--m-ok:#15803D;--m-okbg:#DCFCE7;--m-bad:#B91C1C;--m-badbg:#FEE2E2;--m-warn:#F59E0B;--m-fg:#1F2933;--m-fg2:#6B7280}
-.mscr[data-dark="1"]{--m-ok:#4ADE80;--m-okbg:#14532D;--m-bad:#F87171;--m-badbg:#7F1D1D}
+/* 3 套主题 × 明/暗 token（Mao Des 2.0，逐值取自 lib/services/theme_service.dart）
+   注意：这套设计语言暗色为主态，强调色单一、画布近黑、层次靠发丝描边而非阴影 */
+.mscr[data-t="clear"]{--m-nav:#FFFFFF;--m-bg:#FAFAFA;--m-accent:#5E6AD2;--m-card:#FFFFFF;--m-bd:#E4E4E7;--m-s2:#F4F4F5;--m-navfg:#18181B;--m-fg:#18181B;--m-fg2:#71717A;--m-fg3:#A1A1AA}
+.mscr[data-t="sage"]{--m-nav:#FFFFFF;--m-bg:#FAFBFB;--m-accent:#1F8A63;--m-card:#FFFFFF;--m-bd:#E3E8E4;--m-s2:#F2F5F3;--m-navfg:#161B18;--m-fg:#161B18;--m-fg2:#5F6B64;--m-fg3:#98A29C}
+.mscr[data-t="ink"]{--m-nav:#FFFFFF;--m-bg:#FAFAFA;--m-accent:#18181B;--m-card:#FFFFFF;--m-bd:#E4E4E7;--m-s2:#F4F4F5;--m-navfg:#18181B;--m-fg:#18181B;--m-fg2:#71717A;--m-fg3:#A1A1AA}
+.mscr[data-t="clear"][data-dark="1"]{--m-nav:#0B0C0E;--m-bg:#08090A;--m-accent:#5E6AD2;--m-card:#101113;--m-bd:#23252A;--m-s2:#16171A;--m-navfg:#F7F8F8;--m-fg:#F7F8F8;--m-fg2:#8A8F98;--m-fg3:#5C6069}
+.mscr[data-t="sage"][data-dark="1"]{--m-nav:#0A0C0B;--m-bg:#080A09;--m-accent:#2FA37A;--m-card:#101312;--m-bd:#232825;--m-s2:#161A18;--m-navfg:#F6F8F7;--m-fg:#F6F8F7;--m-fg2:#8A948E;--m-fg3:#5C665F}
+.mscr[data-t="ink"][data-dark="1"]{--m-nav:#0B0C0D;--m-bg:#08090A;--m-accent:#E8E8EA;--m-card:#0F1011;--m-bd:#242628;--m-s2:#16181A;--m-navfg:#F7F8F8;--m-fg:#F7F8F8;--m-fg2:#8A8F98;--m-fg3:#5C6069}
+.mscr{--m-ok:#1A7F37;--m-okbg:#DAFBE1;--m-bad:#CF222E;--m-badbg:#FFEBE9;--m-warn:#9A6700;--m-fg:#18181B;--m-fg2:#71717A}
+.mscr[data-dark="1"]{--m-ok:#3FB950;--m-okbg:#0D2818;--m-bad:#F85149;--m-badbg:#2D1214;--m-warn:#D29922}
 
 .mroot{position:absolute;top:0;left:0;width:390px;height:calc(390px / var(--ratio,.45));
   transform:scale(var(--s,1));transform-origin:top left;display:flex;flex-direction:column;
@@ -549,7 +552,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mapp .sp{flex:1}
 .mapp .ic{width:22px;height:22px;display:grid;place-items:center;opacity:.95}
 .mapp .cnt{font-size:14px;font-weight:600;opacity:.95}
-.mapp .pill{font-size:11px;font-weight:600;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,.22)}
+.mapp .pill{font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,.22)}
 .mprog{height:4px;flex:0 0 4px;background:var(--m-s2);position:relative}
 .mprog i{position:absolute;left:0;top:0;bottom:0;background:var(--m-accent);border-radius:0 2px 2px 0}
 
@@ -560,7 +563,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mbody[data-pan]::-webkit-scrollbar{display:none}
 
 /* —— Hero 问候卡 —— */
-.mhero{border-radius:18px;padding:20px;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.07);
+.mhero{border-radius:10px;padding:20px;color:#fff;
   background:linear-gradient(135deg,color-mix(in srgb,var(--m-accent) 92%,#000),color-mix(in srgb,var(--m-accent) 72%,#000))}
 .mhero .hi{font-size:20px;font-weight:600}
 .mhero .hn{font-size:13px;opacity:.85;margin-top:2px}
@@ -572,7 +575,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* —— 通用卡片 —— */
-.mcard{background:var(--m-card);border:1px solid var(--m-bd);border-radius:18px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.mcard{background:var(--m-card);border:1px solid var(--m-bd);border-radius:10px;padding:16px}
 .mch{display:flex;align-items:center;gap:8px}
 .mch .v4{width:4px;height:18px;border-radius:2px;background:var(--m-accent)}
 .mch b{font-size:16px;font-weight:600}
@@ -625,7 +628,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 
 /* —— 三指标 —— */
 .m3{display:flex;gap:10px}
-.m3>div{flex:1;background:var(--m-card);border:1px solid var(--m-bd);border-radius:14px;padding:12px 10px;text-align:center}
+.m3>div{flex:1;background:var(--m-card);border:1px solid var(--m-bd);border-radius:8px;padding:12px 10px;text-align:center}
 .m3 b{display:block;font-size:16px;font-weight:700;color:var(--m-accent)}
 .m3 em{font-size:11.5px;color:var(--m-fg2);font-style:normal}
 
@@ -633,7 +636,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mqt{font-size:16px;font-weight:600;margin-bottom:-2px}
 .mq{display:flex;flex-direction:column;gap:10px}
 .mqi{display:flex;align-items:center;gap:12px;background:var(--m-card);border:1px solid var(--m-bd);
-  border-radius:14px;padding:14px 16px}
+  border-radius:8px;padding:14px 16px}
 .mqi .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:0 0 38px}
 .mqi .tx{flex:1;min-width:0}
 .mqi .tx b{display:block;font-size:15px;font-weight:600}
@@ -801,16 +804,10 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div><b>1284 题</b><em>总刷题量</em></div>
       <div><b>76%</b><em>平均正确率</em></div>
     </div>
-    <div class="mqt">快速操作</div>
-    <div class="mq">
-      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/><circle cx="15" cy="9" r="1.7"/></svg></span><span class="tx"><b>定向爆破</b><em>已选 2 个题库，全部</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
-      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 10%,transparent);color:color-mix(in srgb,var(--m-accent) 80%,transparent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg></span><span class="tx"><b>管理题库</b><em>3 个题库</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
-      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-bad) 12%,transparent);color:var(--m-bad)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 1 0 2.3-5.4M4.5 3.5v4.2h4.2"/></svg></span><span class="tx"><b>错题本</b><em>智能排期，只显示应复习的错题</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
-      <div class="mqi"><span class="ic" style="background:rgba(124,58,237,.12);color:#7C3AED"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17v3h16v-3M12 3v12M8 7l4-4 4 4"/></svg></span><span class="tx"><b>导入题库</b><em>AI 解析 DOCX，JSON 直接入库</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
-    </div>
   </div>
   <div class="mnav">
     <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5 5 13.5h5.5l-1 8L18 10.5h-5.5z"/></svg>开始</div>
     <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
     <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
   </div>
@@ -819,17 +816,13 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 </template>
 
 <!-- 首次安装首页（v1.28.1 新生引导：零题库 + 新生第一步卡片） -->
-<template id="tpl-home-new">
+<template id="tpl-start">
 <div class="mscr" data-t="clear">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
+  <div class="mapp"><b>快速开始</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg></span></div>
   <div class="mbody" data-pan="1">
-    <div class="mhero">
-      <div class="hi">下午好！</div>
-      <div class="hn">备考的小猫</div>
-      <div class="hr"><div class="lg">猫</div><div><div class="ht">猫卷</div><div class="hq">为你，千千万万遍。</div></div></div>
-    </div>
+    <div class="mqt">开始刷题</div>
     <div class="mcard">
       <div class="mch"><i class="v4"></i><b>本周战绩</b><span class="sp"></span><span class="lk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>历史报告</span></div>
       <div class="mduo"><div><b>0</b><s> 道</s><em>本周刷题</em></div><div><b>0</b><s>%</s><em>平均正确率</em></div></div>
@@ -838,13 +831,14 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     </div>
     <div class="mqt">快速操作</div>
     <div class="mq">
-      <div class="mqi" style="border:1.5px solid color-mix(in srgb,var(--m-accent) 55%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--m-accent) 14%,transparent)"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg></span><span class="tx"><b>新生第一步</b><em>导入示例题库（10 道医学题），无需注册立即体验</em></span><span class="lk" style="background:var(--m-accent);color:#fff;border-radius:12px;padding:7px 15px;font-weight:600;font-size:13.5px">导入</span></div>
+      <div class="mqi" style="border:1.5px solid color-mix(in srgb,var(--m-accent) 55%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--m-accent) 14%,transparent)"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 4l9.5 5.5L12 15z"/><path d="M6.5 12v4.2c0 1.3 2.5 2.8 5.5 2.8s5.5-1.5 5.5-2.8V12"/><path d="M21.5 9.5V15"/></svg></span><span class="tx"><b>新生第一步</b><em>导入示例题库（10 道医学题），无需注册立即体验</em></span><span class="lk" style="background:var(--m-accent);color:#fff;border-radius:8px;padding:7px 15px;font-weight:600;font-size:13.5px">导入</span></div>
       <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/><circle cx="15" cy="9" r="1.7"/></svg></span><span class="tx"><b>定向爆破</b><em>请先选择题库</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
       <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 10%,transparent);color:color-mix(in srgb,var(--m-accent) 80%,transparent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg></span><span class="tx"><b>管理题库</b><em>还没有题库，先去导入</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
     </div>
   </div>
   <div class="mnav">
-    <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5 5 13.5h5.5l-1 8L18 10.5h-5.5z"/></svg>开始</div>
     <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
     <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
   </div>
@@ -996,6 +990,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   </div>
   <div class="mnav">
     <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5 5 13.5h5.5l-1 8L18 10.5h-5.5z"/></svg>开始</div>
     <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
     <div><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
   </div>
@@ -1115,6 +1110,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   </div>
   <div class="mnav">
     <div class="on"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/></svg>首页</div>
+    <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5 5 13.5h5.5l-1 8L18 10.5h-5.5z"/></svg>开始</div>
     <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 20V11M10 20V4M16 20v-6M2 20h20"/></svg>统计</div>
     <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</div>
   </div>
@@ -1211,7 +1207,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div><b>7</b>种题型</div>
       <div><b>3</b>种刷题模式</div>
       <div><b>3</b>套主题 / 6 色板</div>
-      <div><b>221</b>项自动化测试</div>
+      <div><b>263</b>项自动化测试</div>
       <div><b>0</b>广告 / 0 会员</div>
     </div>
   </div>
@@ -1646,7 +1642,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     <p class="lead" style="margin:0 auto">免费不等于将就。每一轮改动都经过自动化测试与发布前校验，保证你手上的版本行为稳定、可追溯。</p>
   </div>
   <div class="stats-grid">
-    <div class="stat reveal"><div class="n"><span class="num" data-to="220">0</span></div><div class="l">项自动化测试</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="263">0</span></div><div class="l">项自动化测试</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="11">0</span></div><div class="l">张数据表（schema v11）</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="7">0</span></div><div class="l">种题型判定</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="3">0</span></div><div class="l">套主题 × 深浅 = 6 色板</div></div>
@@ -1749,7 +1745,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="dl-wrap reveal">
     <div class="eyebrow" style="margin-bottom:16px">免费下载</div>
     <h2 style="margin-bottom:10px">现在就把题库<em>搬进自己手机</em></h2>
-    <p class="lead" style="margin:0 auto 8px">无需注册，下载即用。导入一份文档，就能开始你的第一轮刷题。</p>
+    <p class="lead" style="margin:0 auto 8px">无需注册，下载即用。导入一份 JSON 题库或示例题库就能开刷；DOCX 文档需要先在设置里配好 API Key。</p>
 
     <!-- 主渠道 -->
     <div class="dl-btns">
@@ -1775,9 +1771,9 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     </div>
 
     <div class="dl-note">
-      Android 7.0 及以上 · 完全离线可用 · 不需要账号，也不需要联网<br>
+      Android 7.0 及以上 · 刷题与统计完全离线可用 · 不需要账号<br>
       推荐用 arm64 版（20.4 MB，2017 年后绝大多数手机）；不确定机型就下「通用版 APK」<br>
-      Windows 版提供「安装包」与「绿色免安装」两种形态；需要 AI 讲解时在设置中填入你自己的 API Key
+      Windows 版提供「安装包」与「绿色免安装」两种形态；<b>DOCX 导入与 AI 讲解需要你在设置中填入自己的 API Key</b>（JSON 题库与示例题库无需 Key，不用联网）
     </div>
 
     <!-- 安装提示（折叠，避免干扰普通用户） -->
@@ -2503,8 +2499,8 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 
   // mock: [模板名, 可选的主题覆盖]
   var STEPS = [
-    { label:'打开就有引导',   desc:'首次打开首页就有「新生第一步」：一键导入示例题库（10 道医学题），无需注册',
-      mock:'home-new', ms:5000 },
+    { label:'开始页一键导入', desc:'首次打开「开始」页就有「新生第一步」：一键导入示例题库（10 道医学题），无需注册、不用 Key',
+      mock:'start', ms:5000 },
     { label:'导入完成直接开刷', desc:'示例题库自动勾选，「定向爆破」立刻可刷，答完马上判对错',
       mock:'quiz',     ms:5200 },
     { label:'配置 API Key', desc:'AI 解析与 DOCX 导入都需要它：设置页填一个 Key（DeepSeek 等，有免费额度）',

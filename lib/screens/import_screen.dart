@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
+import '../widgets/kit/mj_kit.dart';
 import '../utils/responsive.dart';
 import 'settings_screen.dart';
 
@@ -74,34 +75,27 @@ class _ImportScreenState extends State<ImportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 流程说明
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [ac.accent, ac.accent.withOpacity(0.8)],
-                    ),
-                    borderRadius: BorderRadius.circular(MaoRadius.control),
-                  ),
+                // 流程说明：发丝面板 + 左强调条（精密风格不用大色块）
+                MJSurface(
+                  accentEdge: true,
+                  padding: const EdgeInsets.all(MaoSpace.sm + 2),
                   child: Row(
                     children: [
-                      Icon(Icons.auto_awesome, color: ac.onAccent, size: 22),
-                      const SizedBox(width: 12),
+                      Icon(Icons.auto_awesome, color: ac.accent, size: 18),
+                      const SizedBox(width: MaoSpace.sm),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('AI 智能解析',
-                                style: TextStyle(
-                                    color: ac.onAccent,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: MaoType.h3)),
-                            const SizedBox(height: 4),
+                                style: MaoType.h3Style.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: ac.textPrimary)),
+                            const SizedBox(height: 2),
                             Text(
                               '自动提取题干、选项、答案，兼容各种 DOCX 格式',
-                              style: TextStyle(
-                                  color: ac.onAccent.withOpacity(0.7),
-                                  fontSize: MaoType.caption),
+                              style: MaoType.captionStyle
+                                  .copyWith(color: ac.textSecondary),
                             ),
                           ],
                         ),
@@ -113,23 +107,19 @@ class _ImportScreenState extends State<ImportScreen> {
                 const SizedBox(height: 16),
 
                 // 格式说明
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: ac.warning.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(MaoRadius.small),
-                    border: Border.all(color: ac.warning.withOpacity(0.5)),
-                  ),
+                MJSurface(
+                  tone: MJTone.alt,
+                  padding: const EdgeInsets.all(MaoSpace.sm),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: ac.warning),
-                      const SizedBox(width: 8),
+                      Icon(Icons.info_outline, size: 15, color: ac.warning),
+                      const SizedBox(width: MaoSpace.xs),
                       Expanded(
                         child: Text(
                           '支持 .docx 格式。解析后先预览题目，可编辑、删除后再确认入库。\n旧版 .doc 文件请先用 Word 另存为 .docx。',
-                          style: TextStyle(
-                              fontSize: MaoType.body, color: ac.textSecondary),
+                          style: MaoType.captionStyle
+                              .copyWith(color: ac.textSecondary, height: 1.6),
                         ),
                       ),
                     ],
@@ -365,7 +355,7 @@ class _ImportScreenState extends State<ImportScreen> {
                                             context,
                                             MaterialPageRoute(
                                                 builder: (_) =>
-                                                    const SettingsScreen()),
+                                                    const SettingsScreen(group: SettingsGroup.ai)),
                                           );
                                         },
                                       ),

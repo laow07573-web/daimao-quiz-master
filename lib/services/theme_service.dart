@@ -102,116 +102,137 @@ class ThemeService extends ChangeNotifier {
     return [c.background, c.surface, c.accent];
   }
 
-  // ======================== 三套主题色板 ========================
+  // ======================== 三套主题色板（Mao Des 2.0 · 精密） ========================
+  //
+  // 六套色板的共同规则（精密暗色的地基）：
+  //   1. 背景 ↔ 面板 ↔ 次级面 之间只差 2~4 级明度，层级靠极小的明度差 + 描边
+  //   2. 描边是唯一的分隔手段：暗色 #23xxxx 级、浅色 #E4xxxx 级
+  //   3. 文字三级层次拉开（主 100% / 次 ~50% / 弱 ~30%），但都压在冷灰上
+  //   4. 语义色（success/danger/warning）跨主题保持认知一致，只换深浅
 
   static AppThemeColors _lightOf(AppTheme t) => switch (t) {
-        // 清蓝：清爽专业（默认）
+        // 清蓝-浅：白底 + 精密靛蓝（Linear 亮色）
         AppTheme.clear => const AppThemeColors(
-            background: Color(0xFFF5F7FA),
+            background: Color(0xFFFAFAFA),
             surface: Color(0xFFFFFFFF),
-            surfaceAlt: Color(0xFFEDF1F7),
-            border: Color(0xFFE2E8F0),
-            textPrimary: Color(0xFF111827),
-            textSecondary: Color(0xFF566072),
-            textTertiary: Color(0xFF8A94A6),
-            accent: Color(0xFF2563EB),
-            accentSoft: Color(0xFFE8EFFE),
+            surfaceAlt: Color(0xFFF4F4F5),
+            border: Color(0xFFE4E4E7),
+            textPrimary: Color(0xFF18181B),
+            textSecondary: Color(0xFF71717A),
+            textTertiary: Color(0xFFA1A1AA),
+            accent: Color(0xFF5E6AD2),
+            accentSoft: Color(0xFFEEF0FB),
             onAccent: Color(0xFFFFFFFF),
             navBackground: Color(0xFFFFFFFF),
-            navForeground: Color(0xFF111827),
+            navForeground: Color(0xFF18181B),
+            success: Color(0xFF1A7F37),
+            successSoft: Color(0xFFDAFBE1),
+            danger: Color(0xFFCF222E),
+            dangerSoft: Color(0xFFFFEBE9),
+            warning: Color(0xFF9A6700),
           ),
-        // 松绿：护眼低疲劳
+        // 松绿-浅：白底 + 精密青绿
         AppTheme.sage => const AppThemeColors(
-            background: Color(0xFFF6F8F5),
+            background: Color(0xFFFAFBFB),
             surface: Color(0xFFFFFFFF),
-            surfaceAlt: Color(0xFFEDF2EC),
-            border: Color(0xFFE1E8DF),
-            textPrimary: Color(0xFF1A211C),
-            textSecondary: Color(0xFF556057),
-            textTertiary: Color(0xFF8A948C),
-            accent: Color(0xFF2F7D5B),
-            accentSoft: Color(0xFFE5F2EB),
+            surfaceAlt: Color(0xFFF2F5F3),
+            border: Color(0xFFE3E8E4),
+            textPrimary: Color(0xFF161B18),
+            textSecondary: Color(0xFF5F6B64),
+            textTertiary: Color(0xFF98A29C),
+            accent: Color(0xFF1F8A63),
+            accentSoft: Color(0xFFE7F4EF),
             onAccent: Color(0xFFFFFFFF),
             navBackground: Color(0xFFFFFFFF),
-            navForeground: Color(0xFF1A211C),
+            navForeground: Color(0xFF161B18),
+            success: Color(0xFF1A7F37),
+            successSoft: Color(0xFFDAFBE1),
+            danger: Color(0xFFCF222E),
+            dangerSoft: Color(0xFFFFEBE9),
+            warning: Color(0xFF9A6700),
           ),
-        // 墨黑：宣纸浅色版
+        // 墨黑-浅：Vercel 亮色（黑按钮 + 中性灰阶）
         AppTheme.ink => const AppThemeColors(
-            background: Color(0xFFFAF8F4),
+            background: Color(0xFFFAFAFA),
             surface: Color(0xFFFFFFFF),
-            surfaceAlt: Color(0xFFF1EEE7),
-            border: Color(0xFFE6E1D7),
-            textPrimary: Color(0xFF17181A),
-            textSecondary: Color(0xFF565A60),
-            textTertiary: Color(0xFF8C9098),
-            accent: Color(0xFF1F6F5C),
-            accentSoft: Color(0xFFE3F0EC),
+            surfaceAlt: Color(0xFFF4F4F5),
+            border: Color(0xFFE4E4E7),
+            textPrimary: Color(0xFF18181B),
+            textSecondary: Color(0xFF71717A),
+            textTertiary: Color(0xFFA1A1AA),
+            accent: Color(0xFF18181B),
+            accentSoft: Color(0xFFF4F4F5),
             onAccent: Color(0xFFFFFFFF),
             navBackground: Color(0xFFFFFFFF),
-            navForeground: Color(0xFF17181A),
+            navForeground: Color(0xFF18181B),
+            success: Color(0xFF1A7F37),
+            successSoft: Color(0xFFDAFBE1),
+            danger: Color(0xFFCF222E),
+            dangerSoft: Color(0xFFFFEBE9),
+            warning: Color(0xFF9A6700),
           ),
       };
 
   static AppThemeColors _darkOf(AppTheme t) => switch (t) {
-        // 清蓝-dark：深海军蓝
+        // 清蓝-深：近黑画布 + 精密靛蓝（默认主态，最 Linear）
         AppTheme.clear => const AppThemeColors(
-            background: Color(0xFF0B1220),
-            surface: Color(0xFF151D2E),
-            surfaceAlt: Color(0xFF1D2739),
-            border: Color(0xFF2A3549),
-            textPrimary: Color(0xFFF1F4F9),
-            textSecondary: Color(0xFFA3AEC2),
-            textTertiary: Color(0xFF6F7C93),
-            accent: Color(0xFF5B9BFF),
-            accentSoft: Color(0xFF1B2942),
-            onAccent: Color(0xFF0B1220),
-            navBackground: Color(0xFF151D2E),
-            navForeground: Color(0xFFF1F4F9),
-            success: Color(0xFF4ADE80),
-            successSoft: Color(0xFF14361F),
-            danger: Color(0xFFF87171),
-            dangerSoft: Color(0xFF3B1D1D),
-            warning: Color(0xFFFBBF24),
+            background: Color(0xFF08090A),
+            surface: Color(0xFF101113),
+            surfaceAlt: Color(0xFF16171A),
+            border: Color(0xFF23252A),
+            textPrimary: Color(0xFFF7F8F8),
+            textSecondary: Color(0xFF8A8F98),
+            textTertiary: Color(0xFF5C6069),
+            accent: Color(0xFF5E6AD2),
+            accentSoft: Color(0xFF1C1F3A),
+            onAccent: Color(0xFFFFFFFF),
+            navBackground: Color(0xFF0B0C0E),
+            navForeground: Color(0xFFF7F8F8),
+            success: Color(0xFF3FB950),
+            successSoft: Color(0xFF0D2818),
+            danger: Color(0xFFF85149),
+            dangerSoft: Color(0xFF2D1214),
+            warning: Color(0xFFD29922),
           ),
-        // 松绿-dark：暗林
+        // 松绿-深：近黑画布 + 精密青绿
         AppTheme.sage => const AppThemeColors(
-            background: Color(0xFF0C1310),
-            surface: Color(0xFF161F19),
-            surfaceAlt: Color(0xFF1E2822),
-            border: Color(0xFF2B372F),
-            textPrimary: Color(0xFFF0F4F1),
-            textSecondary: Color(0xFFA2AFA6),
-            textTertiary: Color(0xFF6E7C72),
-            accent: Color(0xFF58BE8E),
-            accentSoft: Color(0xFF1A2E25),
-            onAccent: Color(0xFF0C1310),
-            navBackground: Color(0xFF161F19),
-            navForeground: Color(0xFFF0F4F1),
-            success: Color(0xFF6EE7A0),
-            successSoft: Color(0xFF14361F),
-            danger: Color(0xFFFCA5A5),
-            dangerSoft: Color(0xFF3B1D1D),
-            warning: Color(0xFFFCD34D),
+            background: Color(0xFF080A09),
+            surface: Color(0xFF101312),
+            surfaceAlt: Color(0xFF161A18),
+            border: Color(0xFF232825),
+            textPrimary: Color(0xFFF6F8F7),
+            textSecondary: Color(0xFF8A948E),
+            textTertiary: Color(0xFF5C665F),
+            accent: Color(0xFF2FA37A),
+            accentSoft: Color(0xFF10251D),
+            onAccent: Color(0xFFFFFFFF),
+            navBackground: Color(0xFF0A0C0B),
+            navForeground: Color(0xFFF6F8F7),
+            success: Color(0xFF3FB950),
+            successSoft: Color(0xFF0D2818),
+            danger: Color(0xFFF85149),
+            dangerSoft: Color(0xFF2D1214),
+            warning: Color(0xFFD29922),
           ),
-        // 墨黑-dark：纯墨
+        // 墨黑-深：中性石墨 + 单色强调（最 Vercel：白按钮 + 灰阶）
         AppTheme.ink => const AppThemeColors(
-            background: Color(0xFF0C0D10),
-            surface: Color(0xFF16181C),
-            surfaceAlt: Color(0xFF1E2126),
-            border: Color(0xFF2B2F36),
-            textPrimary: Color(0xFFF2F3F5),
-            textSecondary: Color(0xFFA5AAB3),
-            textTertiary: Color(0xFF71767F),
-            accent: Color(0xFF4ECDC4),
-            accentSoft: Color(0xFF14302E),
-            onAccent: Color(0xFF0C0D10),
-            navBackground: Color(0xFF16181C),
-            navForeground: Color(0xFFF2F3F5),
-            success: Color(0xFF5EEAD4),
-            successSoft: Color(0xFF12332E),
-            danger: Color(0xFFFCA5A5),
-            dangerSoft: Color(0xFF3B1D1D),
-            warning: Color(0xFFFCD34D),
+            background: Color(0xFF08090A),
+            surface: Color(0xFF0F1011),
+            surfaceAlt: Color(0xFF16181A),
+            border: Color(0xFF242628),
+            textPrimary: Color(0xFFF7F8F8),
+            textSecondary: Color(0xFF8A8F98),
+            textTertiary: Color(0xFF5C6069),
+            accent: Color(0xFFE8E8EA),
+            accentSoft: Color(0xFF1F2124),
+            onAccent: Color(0xFF0A0A0B),
+            navBackground: Color(0xFF0B0C0D),
+            navForeground: Color(0xFFF7F8F8),
+            success: Color(0xFF3FB950),
+            successSoft: Color(0xFF0D2818),
+            danger: Color(0xFFF85149),
+            dangerSoft: Color(0xFF2D1214),
+            warning: Color(0xFFD29922),
           ),
       };
 
@@ -265,23 +286,25 @@ class ThemeService extends ChangeNotifier {
       textTheme: textTheme,
       extensions: [c],
 
-      // ---- 导航栏：与页面同色 + 底部 hairline（不再用深色色块） ----
+      // ---- 导航栏：与页面同色 + 底部 hairline（精密暗色的分隔靠这条线） ----
       appBarTheme: AppBarTheme(
         backgroundColor: c.navBackground,
         foregroundColor: c.navForeground,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        titleSpacing: MaoSpace.lg,
+        toolbarHeight: 56,
         titleTextStyle: MaoType.h2Style.copyWith(
           fontFamily: 'MiSans',
           fontSize: MaoType.h1,
           color: c.navForeground,
         ),
-        iconTheme: IconThemeData(color: c.navForeground, size: 22),
-        shape: Border(bottom: BorderSide(color: c.border, width: 1)),
+        iconTheme: IconThemeData(color: c.navForeground, size: 20),
+        shape: Border(bottom: BorderSide(color: c.border, width: MaoLine.width)),
       ),
 
-      // ---- 卡片：18 圆角 + 实色 hairline + L1 阴影 ----
+      // ---- 卡片：10 圆角 + 实色 hairline，无阴影（层级靠描边与明度差） ----
       cardTheme: CardTheme(
         elevation: 0,
         color: c.surface,
@@ -299,7 +322,7 @@ class ThemeService extends ChangeNotifier {
           foregroundColor: c.onAccent,
           disabledBackgroundColor: c.surfaceAlt,
           disabledForegroundColor: c.textTertiary,
-          minimumSize: const Size(0, 46),
+          minimumSize: const Size(0, 44),
           padding: const EdgeInsets.symmetric(horizontal: MaoSpace.lg),
           shape: const RoundedRectangleBorder(
               borderRadius: MaoRadius.controlBorder),
@@ -312,7 +335,7 @@ class ThemeService extends ChangeNotifier {
           backgroundColor: c.accent,
           foregroundColor: c.onAccent,
           disabledBackgroundColor: c.surfaceAlt,
-          minimumSize: const Size(0, 46),
+          minimumSize: const Size(0, 44),
           padding: const EdgeInsets.symmetric(horizontal: MaoSpace.lg),
           shape: const RoundedRectangleBorder(
               borderRadius: MaoRadius.controlBorder),
@@ -324,9 +347,9 @@ class ThemeService extends ChangeNotifier {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: c.accent,
-          minimumSize: const Size(0, 46),
+          minimumSize: const Size(0, 44),
           padding: const EdgeInsets.symmetric(horizontal: MaoSpace.lg),
-          side: BorderSide(color: c.border, width: 1.2),
+          side: BorderSide(color: c.border, width: MaoLine.width),
           shape: const RoundedRectangleBorder(
               borderRadius: MaoRadius.controlBorder),
           textStyle: MaoType.h3Style.copyWith(color: c.accent),
@@ -343,53 +366,58 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
 
-      // ---- 输入框：14 圆角 + focus 强调环 ----
+      // ---- 输入框：8 圆角 + 细 focus 环（精密界面用细线而非粗环） ----
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: c.surface,
+        fillColor: c.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: MaoSpace.md, vertical: MaoSpace.sm + 2),
+            horizontal: MaoSpace.sm, vertical: MaoSpace.sm),
         hintStyle: MaoType.bodyStyle.copyWith(color: c.textTertiary),
         border: OutlineInputBorder(
           borderRadius: MaoRadius.controlBorder,
-          borderSide: BorderSide(color: c.border, width: 1.2),
+          borderSide: BorderSide(color: c.border, width: MaoLine.width),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: MaoRadius.controlBorder,
-          borderSide: BorderSide(color: c.border, width: 1.2),
+          borderSide: BorderSide(color: c.border, width: MaoLine.width),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: MaoRadius.controlBorder,
-          borderSide: BorderSide(color: c.accent, width: 2),
+          borderSide: BorderSide(color: c.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: MaoRadius.controlBorder,
-          borderSide: BorderSide(color: c.danger, width: 1.2),
+          borderSide: BorderSide(color: c.danger, width: MaoLine.width),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: MaoRadius.controlBorder,
-          borderSide: BorderSide(color: c.danger, width: 2),
+          borderSide: BorderSide(color: c.danger, width: 1.5),
         ),
       ),
 
-      // ---- 弹窗：24 圆角 + L3 阴影 ----
+      // ---- 弹窗：12 圆角 + 发丝描边 ----
       dialogTheme: DialogTheme(
         backgroundColor: c.surface,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: MaoRadius.largeBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: MaoRadius.largeBorder,
+          side: BorderSide(color: c.border, width: MaoLine.width),
+        ),
         titleTextStyle:
             MaoType.h2Style.copyWith(fontFamily: 'MiSans', color: c.textPrimary),
         contentTextStyle:
-            MaoType.bodyStyle.copyWith(color: c.textSecondary, fontSize: 14.5),
+            MaoType.bodyStyle.copyWith(color: c.textSecondary, fontSize: 14),
       ),
 
-      // ---- 底部弹层：顶部 24 圆角 ----
+      // ---- 底部弹层：顶部 12 圆角 + 发丝上边 ----
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: c.surface,
         elevation: 0,
         modalElevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.large)),
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(MaoRadius.large)),
+          side: BorderSide(color: c.border, width: MaoLine.width),
         ),
         showDragHandle: true,
         dragHandleColor: c.border,
@@ -399,9 +427,13 @@ class ThemeService extends ChangeNotifier {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: dark ? c.surfaceAlt : c.textPrimary,
-        contentTextStyle: MaoType.bodyStyle.copyWith(color: c.surface),
+        contentTextStyle: MaoType.bodyStyle.copyWith(
+            color: dark ? c.textPrimary : c.surface, fontSize: 13),
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: MaoRadius.controlBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: MaoRadius.controlBorder,
+          side: BorderSide(color: c.border, width: MaoLine.width),
+        ),
         insetPadding: const EdgeInsets.all(MaoSpace.md),
       ),
 
@@ -409,11 +441,12 @@ class ThemeService extends ChangeNotifier {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: c.navBackground,
         elevation: 0,
-        height: 64,
+        height: 58,
         indicatorColor: c.accentSoft,
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(MaoRadius.small),
         ),
+        surfaceTintColor: Colors.transparent,
         labelTextStyle: WidgetStateProperty.resolveWith((states) => states
                 .contains(WidgetState.selected)
             ? MaoType.microStyle.copyWith(
@@ -460,20 +493,20 @@ class ThemeService extends ChangeNotifier {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: MaoSpace.md),
         iconColor: c.textSecondary,
-        titleTextStyle:
-            MaoType.h3Style.copyWith(color: c.textPrimary, fontSize: 14.5),
+        titleTextStyle: MaoType.h3Style.copyWith(color: c.textPrimary),
         subtitleTextStyle:
             MaoType.captionStyle.copyWith(color: c.textSecondary),
       ),
       dividerTheme: DividerThemeData(
         color: c.border,
-        thickness: 1,
-        space: 1,
+        thickness: MaoLine.width,
+        space: MaoLine.width,
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: c.accent,
         linearTrackColor: c.surfaceAlt,
         circularTrackColor: Colors.transparent,
+        linearMinHeight: MaoLine.barHeight,
       ),
       iconTheme: IconThemeData(color: c.textSecondary, size: 20),
 

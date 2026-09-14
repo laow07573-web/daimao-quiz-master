@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import '../utils/design_tokens.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -12,6 +12,8 @@ import '../services/annotation_service.dart';
 import '../services/quiz_service.dart';
 import '../services/theme_service.dart';
 import '../utils/format_utils.dart';
+import '../widgets/kit/mj_kit.dart';
+import '../widgets/quiz/quiz_question_card.dart';
 import '../utils/responsive.dart';
 import '../widgets/ai_response_widget.dart';
 import '../widgets/annotation_canvas.dart';
@@ -57,8 +59,7 @@ class _QuizScreenState extends State<QuizScreen> {
   // v1.0.3 手写批注同期优化：AudioPlayer 懒加载（首次播声音才创建，
   // 避免静音/测试环境白建 EventChannel）
   AudioPlayer? _audioPlayerInstance;
-  AudioPlayer get _audioPlayer =>
-      _audioPlayerInstance ??= AudioPlayer();
+  AudioPlayer get _audioPlayer => _audioPlayerInstance ??= AudioPlayer();
   bool _showManualAnalysis = false;
   bool _inErrorBook = false;
   int? _lastQuestionId;
@@ -108,7 +109,8 @@ class _QuizScreenState extends State<QuizScreen> {
     _practiceTimer?.cancel();
     _practiceStartAt = DateTime.now();
     _practiceDeadline = widget.practiceTiming == PracticeTiming.timed
-        ? _practiceStartAt!.add(Duration(minutes: widget.practiceDurationMinutes))
+        ? _practiceStartAt!
+            .add(Duration(minutes: widget.practiceDurationMinutes))
         : null;
     _elapsedSeconds.value = 0;
     _remainingSeconds.value = widget.practiceTiming == PracticeTiming.timed
@@ -160,14 +162,20 @@ class _QuizScreenState extends State<QuizScreen> {
     _remainingSeconds.dispose();
     // v1.0.3 手写批注：退出页面时持久批注兑底保存（fire-and-forget；
     // 正常路径已在切题/完成处保存，此处只覆盖直接退出页面的场景）
-    if (_annoPersistent && _anno.strokes.isNotEmpty && _lastQuestionId != null) {
+    if (_annoPersistent &&
+        _anno.strokes.isNotEmpty &&
+        _lastQuestionId != null) {
       AnnotationService.instance.save(_lastQuestionId!, _anno.strokes);
     }
     _anno.dispose();
     _followUpController.dispose();
-    for (final c in _fillBlankControllers) { c.dispose(); }
+    for (final c in _fillBlankControllers) {
+      c.dispose();
+    }
     _fillBlankControllers.clear();
-    for (final f in _fillBlankFocusNodes) { f.dispose(); }
+    for (final f in _fillBlankFocusNodes) {
+      f.dispose();
+    }
     _fillBlankFocusNodes.clear();
     _textAnswerController.dispose();
     _scrollController.dispose();
@@ -228,7 +236,8 @@ class _QuizScreenState extends State<QuizScreen> {
           }
         }
 
-        if (isPractice && _practiceAnswers.length != appState.quizQuestions.length) {
+        if (isPractice &&
+            _practiceAnswers.length != appState.quizQuestions.length) {
           _practiceAnswers.clear();
           for (int i = 0; i < appState.quizQuestions.length; i++) {
             _practiceAnswers.add(PracticeAnswerState());
@@ -241,8 +250,7 @@ class _QuizScreenState extends State<QuizScreen> {
           if (_annoPersistent &&
               _anno.strokes.isNotEmpty &&
               _lastQuestionId != null) {
-            AnnotationService.instance
-                .save(_lastQuestionId!, _anno.strokes);
+            AnnotationService.instance.save(_lastQuestionId!, _anno.strokes);
           }
           _annotating = false;
           _annoPersistent = false;
@@ -287,275 +295,314 @@ class _QuizScreenState extends State<QuizScreen> {
           },
           child: Scaffold(
             backgroundColor: ac.background,
-          appBar: AppBar(
-            title: Text(
-                '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
-            actions: [
-              // v1.0.2 统一重构：练习模式计时徽标
-              // v1.0.2 设计审查修复：ValueListenableBuilder 只重建徽标，不重建整页
-              if (isPractice)
-                ValueListenableBuilder<int>(
-                  valueListenable: _elapsedSeconds,
-                  builder: (context, elapsed, _) =>
-                      ValueListenableBuilder<int>(
-                    valueListenable: _remainingSeconds,
-                    builder: (context, remaining, _) {
-                      final warn = _isPracticeTimeWarn(remaining);
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: warn ? ac.danger : ac.accent.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(MaoRadius.control),
+            appBar: AppBar(
+              title: Text(
+                  '第 ${appState.currentQuestionIndex + 1}/${appState.quizQuestions.length} 题'),
+              actions: [
+                // v1.0.2 统一重构：练习模式计时徽标
+                // v1.0.2 设计审查修复：ValueListenableBuilder 只重建徽标，不重建整页
+                if (isPractice)
+                  ValueListenableBuilder<int>(
+                    valueListenable: _elapsedSeconds,
+                    builder: (context, elapsed, _) =>
+                        ValueListenableBuilder<int>(
+                      valueListenable: _remainingSeconds,
+                      builder: (context, remaining, _) {
+                        final warn = _isPracticeTimeWarn(remaining);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: warn
+                                    ? ac.danger
+                                    : ac.accent.withOpacity(0.2),
+                                borderRadius:
+                                    BorderRadius.circular(MaoRadius.control),
+                              ),
+                              child: Text(
+                                widget.practiceTiming == PracticeTiming.timed
+                                    ? '剩余 ${_fmtTime(remaining)}'
+                                    : '已用 ${_fmtTime(elapsed)}',
+                                style: TextStyle(
+                                  fontSize: warn ? 14 : 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: warn ? Colors.white : ac.textPrimary,
+                                ),
+                              ),
                             ),
-                            child: Text(
-                              widget.practiceTiming == PracticeTiming.timed
-                                  ? '剩余 ${_fmtTime(remaining)}'
-                                  : '已用 ${_fmtTime(elapsed)}',
-                              style: TextStyle(
-                                fontSize: warn ? 14 : 12,
-                                fontWeight: FontWeight.bold,
-                                color: warn ? Colors.white : ac.textPrimary,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (!isPractice)
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    tooltip: '编辑此题',
+                    onPressed: () => _showEditDialog(context, appState),
+                  ),
+                if (isPractice)
+                  IconButton(
+                    icon: const Icon(Icons.list_alt, size: 20),
+                    tooltip: '答题卡',
+                    onPressed: () => _showAnswerSheet(context, appState, ac),
+                  ),
+                // v1.0.2 设计审查修复：仅正常刷题可切背题
+                // （练习模式切背题高亮答案属作弊路径）
+                if (widget.quizMode == QuizMode.normal)
+                  IconButton(
+                    icon: Icon(
+                        _isMemorizeMode
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 20),
+                    tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
+                    onPressed: () =>
+                        setState(() => _isMemorizeMode = !_isMemorizeMode),
+                  ),
+                // v1.0.3 手写批注（REQ-001/005）：正常刷题与背题模式可入，
+                // 练习模式不显示
+                if (!isPractice)
+                  IconButton(
+                    icon: Icon(Icons.draw,
+                        size: 20, color: _annotating ? ac.accent : null),
+                    tooltip: '手写批注',
+                    onPressed: () => _toggleAnnotate(appState),
+                  ),
+                if (widget.quizMode == QuizMode.memorize)
+                  TextButton(
+                    onPressed: () => _handleExit(appState),
+                    // v1.0.2 设计审查修复：跟随导航栏前景色（浅色导航栏主题下
+                    // 白字不可见）
+                    child: Text('结束',
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).appBarTheme.foregroundColor)),
+                  ),
+              ],
+            ),
+            // 平板适配：内容限宽居中（手机无影响）；
+            // v1.0.3 宽屏重设计：宽屏限宽 920（选项双列后信息密度更合理）
+            body: ResponsivePage(
+              maxWidth: isWideLayout(context) ? 920 : kContentMaxWidth,
+              child: Column(
+                children: [
+                  // v1.0.3 手写批注：批注模式工具栏（REQ-014）
+                  if (_annotating)
+                    AnnotationToolbar(
+                      controller: _anno,
+                      persistent: _annoPersistent,
+                      onFinish: () => _finishAnnotate(appState),
+                      // v1.0.3 PC 快捷键：桌面平台按钮提示追快捷键标注
+                      shortcuts: _isDesktop,
+                    ),
+                  // 进度条
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(
+                      begin: 0,
+                      end: (appState.currentQuestionIndex +
+                              (isAnswered ? 1 : 0)) /
+                          appState.quizQuestions.length,
+                    ),
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeInOut,
+                    builder: (context, value, _) {
+                      return LinearProgressIndicator(
+                        value: value,
+                        backgroundColor: ac.surfaceAlt,
+                        color: ac.accent,
+                        minHeight: 4,
+                      );
+                    },
+                  ),
+
+                  // 滚动区域
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        GestureDetector(
+                          onHorizontalDragEnd: (details) {
+                            // v1.27 需求纠偏：批注模式下禁止左右滑动切题（画布接管全部指针）；
+                            // 非批注态整个答题区域（本手势包裹全部滚动内容）均可左右拖动切题。
+                            if (_annotating) return;
+                            // 鼠标慢速拖动：速度为 0 时按累计位移切题（REQ：鼠标左右拖动切题）
+                            final dd = _hDragOuter;
+                            _hDragOuter = 0;
+                            doSwipe(details, dd);
+                          },
+                          onHorizontalDragUpdate: (details) {
+                            // 非批注态累计横向位移（批注态上方直接 return，不累计）
+                            if (!_annotating) _hDragOuter += details.delta.dx;
+                          },
+                          onHorizontalDragCancel: () => _hDragOuter = 0,
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            // v1.0.3 手写批注：批注中锁滚动（画布接管手势）
+                            physics: _annotating
+                                ? const NeverScrollableScrollPhysics()
+                                : null,
+                            padding: const EdgeInsets.all(16),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder:
+                                  (Widget child, Animation<double> animation) {
+                                return SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.25, 0),
+                                    end: Offset.zero,
+                                  ).animate(CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeOutCubic)),
+                                  child: FadeTransition(
+                                      opacity: animation, child: child),
+                                );
+                              },
+                              // v1.0.3 手写批注：渲染条件——持久批注仅答案展示时显示
+                              // （REQ-006）；即时批注本题内持续可见（REQ-004 只约束跨题）
+                              child: Stack(
+                                key: ValueKey(question.id),
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildQuestionCard(
+                                          question, appState, ac),
+                                      const SizedBox(height: 16),
+                                      // v1.0.2 统一重构：练习模式选项区恒可修改（不显示判定结果）
+                                      if (_isMemorizeMode)
+                                        _buildMemorizeOptions(
+                                            question, ac, appState)
+                                      else if (isPractice || !isAnswered) ...[
+                                        _buildOptionsArea(
+                                            appState, question, ac),
+                                        // v1.0.2 UI 审查修复：未作答时下方大片空白，
+                                        // 加轻提示引导答题
+                                        if (!isPractice && !isAnswered) ...[
+                                          const SizedBox(height: 20),
+                                          Center(
+                                            child: Text(
+                                              '点击选项提交答案，答对自动进入下一题',
+                                              style: TextStyle(
+                                                  fontSize: MaoType.body,
+                                                  color: ac.textSecondary),
+                                            ),
+                                          ),
+                                        ],
+                                      ] else ...[
+                                        _buildAnsweredResult(
+                                            appState, question, ac),
+                                        const SizedBox(height: 12),
+                                        _buildResultFeedback(
+                                            appState, question, ac),
+                                        // v1.0.2 完善：已答题目可重新作答（更新原记录，不新增）
+                                        if (isAnswered &&
+                                            widget.quizMode !=
+                                                QuizMode.memorize &&
+                                            !isPractice) ...[
+                                          const SizedBox(height: 4),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton.icon(
+                                              icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 15),
+                                              label: const Text('重新作答',
+                                                  style: TextStyle(
+                                                      fontSize:
+                                                          MaoType.caption)),
+                                              style: TextButton.styleFrom(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                foregroundColor:
+                                                    ac.textSecondary,
+                                              ),
+                                              onPressed: () {
+                                                if (_submitting)
+                                                  return; // 提交期间禁重做
+                                                _selectedOptions.clear();
+                                                for (final c
+                                                    in _fillBlankControllers) {
+                                                  c.clear();
+                                                }
+                                                _textAnswerController.clear();
+                                                _showAnalysis = false;
+                                                _showManualAnalysis = false;
+                                                appState.resetCurrentAnswer();
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 8),
+                                        if (_showAnalysis ||
+                                            appState.currentAnalysis != null)
+                                          _buildAnalysisArea(
+                                              appState, question, ac)
+                                        else
+                                          _buildShowAnalysisButton(
+                                              appState, ac),
+                                        if (appState.currentAnalysis !=
+                                            null) ...[
+                                          const SizedBox(height: 4),
+                                          _buildRegenerateButton(appState, ac),
+                                        ],
+                                      ],
+                                    ],
+                                  ),
+                                  // v1.0.3 手写批注：画布叠放题区上方（REQ-002 题目区域标注），
+                                  // 随内容滚动（位于滚动区内部）。
+                                  // v1.0.3 画布扩区：宽屏下题区层只渲染存量旧笔迹（question 坐标系，只读），
+                                  // 交互画布上移到页面层（见滚动区 Stack）；窄屏维持单层全交互。
+                                  if (wide
+                                      ? (_anno.strokes.any((s) =>
+                                              s.frame == kFrameQuestion) &&
+                                          (_annotating || showPersistCond))
+                                      : (_annotating ||
+                                          (_anno.strokes.isNotEmpty &&
+                                              showPersistCond)))
+                                    Positioned.fill(
+                                      child: AnnotationCanvas(
+                                        controller: _anno,
+                                        interactive: _annotating && !wide,
+                                        frameFilter:
+                                            wide ? kFrameQuestion : null,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              if (!isPractice)
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 18),
-                  tooltip: '编辑此题',
-                  onPressed: () => _showEditDialog(context, appState),
-                ),
-              if (isPractice)
-                IconButton(
-                  icon: const Icon(Icons.list_alt, size: 20),
-                  tooltip: '答题卡',
-                  onPressed: () => _showAnswerSheet(context, appState, ac),
-                ),
-              // v1.0.2 设计审查修复：仅正常刷题可切背题
-              // （练习模式切背题高亮答案属作弊路径）
-              if (widget.quizMode == QuizMode.normal)
-                IconButton(
-                  icon: Icon(_isMemorizeMode ? Icons.visibility_off : Icons.visibility, size: 20),
-                  tooltip: _isMemorizeMode ? '切回刷题' : '背题模式',
-                  onPressed: () => setState(() => _isMemorizeMode = !_isMemorizeMode),
-                ),
-              // v1.0.3 手写批注（REQ-001/005）：正常刷题与背题模式可入，
-              // 练习模式不显示
-              if (!isPractice)
-                IconButton(
-                  icon: Icon(Icons.draw, size: 20,
-                      color: _annotating ? ac.accent : null),
-                  tooltip: '手写批注',
-                  onPressed: () => _toggleAnnotate(appState),
-                ),
-              if (widget.quizMode == QuizMode.memorize)
-                TextButton(
-                  onPressed: () => _handleExit(appState),
-                  // v1.0.2 设计审查修复：跟随导航栏前景色（浅色导航栏主题下
-                  // 白字不可见）
-                  child: Text('结束',
-                      style: TextStyle(color: Theme.of(context).appBarTheme.foregroundColor)),
-                ),
-            ],
-          ),
-          // 平板适配：内容限宽居中（手机无影响）；
-          // v1.0.3 宽屏重设计：宽屏限宽 920（选项双列后信息密度更合理）
-          body: ResponsivePage(
-            maxWidth: isWideLayout(context) ? 920 : kContentMaxWidth,
-            child: Column(
-            children: [
-              // v1.0.3 手写批注：批注模式工具栏（REQ-014）
-              if (_annotating)
-                AnnotationToolbar(
-                  controller: _anno,
-                  persistent: _annoPersistent,
-                  onFinish: () => _finishAnnotate(appState),
-                  // v1.0.3 PC 快捷键：桌面平台按钮提示追快捷键标注
-                  shortcuts: _isDesktop,
-                ),
-              // 进度条
-              TweenAnimationBuilder<double>(
-                tween: Tween(
-                  begin: 0,
-                  end: (appState.currentQuestionIndex + (isAnswered ? 1 : 0)) /
-                      appState.quizQuestions.length,
-                ),
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeInOut,
-                builder: (context, value, _) {
-                  return LinearProgressIndicator(
-                    value: value,
-                    backgroundColor: ac.surfaceAlt,
-                    color: ac.accent,
-                    minHeight: 4,
-                  );
-                },
-              ),
-
-              // 滚动区域
-              Expanded(
-                child: Stack(
-                  children: [
-                  GestureDetector(
-                  onHorizontalDragEnd: (details) {
-                    // v1.27 需求纠偏：批注模式下禁止左右滑动切题（画布接管全部指针）；
-                    // 非批注态整个答题区域（本手势包裹全部滚动内容）均可左右拖动切题。
-                    if (_annotating) return;
-                    // 鼠标慢速拖动：速度为 0 时按累计位移切题（REQ：鼠标左右拖动切题）
-                    final dd = _hDragOuter;
-                    _hDragOuter = 0;
-                    doSwipe(details, dd);
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    // 非批注态累计横向位移（批注态上方直接 return，不累计）
-                    if (!_annotating) _hDragOuter += details.delta.dx;
-                  },
-                  onHorizontalDragCancel: () => _hDragOuter = 0,
-                  child: SingleChildScrollView(
-                  controller: _scrollController,
-                  // v1.0.3 手写批注：批注中锁滚动（画布接管手势）
-                  physics: _annotating
-                      ? const NeverScrollableScrollPhysics()
-                      : null,
-                  padding: const EdgeInsets.all(16),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (Widget child, Animation<double> animation) {
-                      return SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0.25, 0),
-                          end: Offset.zero,
-                        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-                        child: FadeTransition(opacity: animation, child: child),
-                      );
-                    },
-                    // v1.0.3 手写批注：渲染条件——持久批注仅答案展示时显示
-                    // （REQ-006）；即时批注本题内持续可见（REQ-004 只约束跨题）
-                    child: Stack(
-                      key: ValueKey(question.id),
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        _buildQuestionCard(question, appState, ac),
-                        const SizedBox(height: 16),
-                        // v1.0.2 统一重构：练习模式选项区恒可修改（不显示判定结果）
-                        if (_isMemorizeMode)
-                          _buildMemorizeOptions(question, ac, appState)
-                        else if (isPractice || !isAnswered) ...[
-                          _buildOptionsArea(appState, question, ac),
-                          // v1.0.2 UI 审查修复：未作答时下方大片空白，
-                          // 加轻提示引导答题
-                          if (!isPractice && !isAnswered) ...[
-                            const SizedBox(height: 20),
-                            Center(
-                              child: Text(
-                                '点击选项提交答案，答对自动进入下一题',
-                                style: TextStyle(
-                                    fontSize: MaoType.body, color: ac.textSecondary),
-                              ),
-                            ),
-                          ],
-                        ]
-                        else ...[
-                          _buildAnsweredResult(appState, question, ac),
-                          const SizedBox(height: 12),
-                          _buildResultFeedback(appState, question, ac),
-                          // v1.0.2 完善：已答题目可重新作答（更新原记录，不新增）
-                          if (isAnswered &&
-                              widget.quizMode != QuizMode.memorize &&
-                              !isPractice) ...[
-                            const SizedBox(height: 4),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                icon: const Icon(Icons.edit_outlined, size: 15),
-                                label: const Text('重新作答',
-                                    style: TextStyle(fontSize: MaoType.caption)),
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  foregroundColor: ac.textSecondary,
-                                ),
-                                onPressed: () {
-                                  if (_submitting) return; // 提交期间禁重做
-                                  _selectedOptions.clear();
-                                  for (final c in _fillBlankControllers) {
-                                    c.clear();
-                                  }
-                                  _textAnswerController.clear();
-                                  _showAnalysis = false;
-                                  _showManualAnalysis = false;
-                                  appState.resetCurrentAnswer();
-                                },
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          if (_showAnalysis || appState.currentAnalysis != null)
-                            _buildAnalysisArea(appState, question, ac)
-                          else
-                            _buildShowAnalysisButton(appState, ac),
-                          if (appState.currentAnalysis != null) ...[
-                            const SizedBox(height: 4),
-                            _buildRegenerateButton(appState, ac),
-                          ],
-                          ],
-                          ],
-                        ),
-                        // v1.0.3 手写批注：画布叠放题区上方（REQ-002 题目区域标注），
-                        // 随内容滚动（位于滚动区内部）。
-                        // v1.0.3 画布扩区：宽屏下题区层只渲染存量旧笔迹（question 坐标系，只读），
-                        // 交互画布上移到页面层（见滚动区 Stack）；窄屏维持单层全交互。
-                        if (wide
-                            ? (_anno.strokes.any((s) => s.frame == kFrameQuestion) &&
-                                (_annotating || showPersistCond))
-                            : (_annotating ||
-                                (_anno.strokes.isNotEmpty && showPersistCond)))
+                        // v1.0.3 画布扩区（宽屏）：页面层画布覆盖整个滚动区（含题目上下空白），
+                        // 可写范围不再局限于题目卡片；批注中滚动已锁，
+                        // 坐标以可视区为准（进入批注时已归顶，保证回显位置一致）。
+                        if (wide &&
+                            (_annotating ||
+                                (_anno.strokes
+                                        .any((s) => s.frame == kFramePage) &&
+                                    showPersistCond)))
                           Positioned.fill(
                             child: AnnotationCanvas(
                               controller: _anno,
-                              interactive: _annotating && !wide,
-                              frameFilter: wide ? kFrameQuestion : null,
+                              interactive: _annotating,
+                              frameFilter: kFramePage,
                             ),
                           ),
                       ],
                     ),
                   ),
-                ),
-                ),
-                  // v1.0.3 画布扩区（宽屏）：页面层画布覆盖整个滚动区（含题目上下空白），
-                  // 可写范围不再局限于题目卡片；批注中滚动已锁，
-                  // 坐标以可视区为准（进入批注时已归顶，保证回显位置一致）。
-                  if (wide &&
-                      (_annotating ||
-                          (_anno.strokes.any((s) => s.frame == kFramePage) &&
-                              showPersistCond)))
-                    Positioned.fill(
-                      child: AnnotationCanvas(
-                        controller: _anno,
-                        interactive: _annotating,
-                        frameFilter: kFramePage,
-                      ),
-                    ),
-                  ],
-                ),
-            ),
 
-              // 底部按钮：已答或背题模式均显示
-              if (isAnswered || widget.quizMode == QuizMode.memorize) _buildBottomBar(appState, ac),
-            ],
+                  // 底部按钮：已答或背题模式均显示
+                  if (isAnswered || widget.quizMode == QuizMode.memorize)
+                    _buildBottomBar(appState, ac),
+                ],
+              ),
+            ),
           ),
-          ),
-        ),
-      );
+        );
         // v1.0.3 PC 快捷键：桌面平台包 CallbackShortcuts（A/1-4/Q/W/E/R/S/
         // Delete/Ctrl+Delete/Esc）；手机/平板不包，避免误触发。
         if (!_isDesktop) return page;
@@ -658,14 +705,14 @@ class _QuizScreenState extends State<QuizScreen> {
         if (_focusInEditable()) return;
         _toggleAnnotate(appState);
       },
-      const SingleActivator(LogicalKeyboardKey.digit1):
-          () => guarded(() => _anno.setColor(kAnnoColors[0])),
-      const SingleActivator(LogicalKeyboardKey.digit2):
-          () => guarded(() => _anno.setColor(kAnnoColors[1])),
-      const SingleActivator(LogicalKeyboardKey.digit3):
-          () => guarded(() => _anno.setColor(kAnnoColors[2])),
-      const SingleActivator(LogicalKeyboardKey.digit4):
-          () => guarded(() => _anno.setColor(kAnnoColors[3])),
+      const SingleActivator(LogicalKeyboardKey.digit1): () =>
+          guarded(() => _anno.setColor(kAnnoColors[0])),
+      const SingleActivator(LogicalKeyboardKey.digit2): () =>
+          guarded(() => _anno.setColor(kAnnoColors[1])),
+      const SingleActivator(LogicalKeyboardKey.digit3): () =>
+          guarded(() => _anno.setColor(kAnnoColors[2])),
+      const SingleActivator(LogicalKeyboardKey.digit4): () =>
+          guarded(() => _anno.setColor(kAnnoColors[3])),
       const SingleActivator(LogicalKeyboardKey.keyQ): () => guarded(() {
             _anno.setPenType(PenType.fine);
             _anno.setTool(AnnoTool.pen);
@@ -678,18 +725,18 @@ class _QuizScreenState extends State<QuizScreen> {
             _anno.setPenType(PenType.highlighter);
             _anno.setTool(AnnoTool.pen);
           }),
-      const SingleActivator(LogicalKeyboardKey.keyR):
-          () => guarded(() => _anno.setTool(AnnoTool.eraser)),
+      const SingleActivator(LogicalKeyboardKey.keyR): () =>
+          guarded(() => _anno.setTool(AnnoTool.eraser)),
       const SingleActivator(LogicalKeyboardKey.keyS): () => guarded(() {
             // 选择工具仅持久批注提供（与工具栏一致）
             if (_annoPersistent) _anno.setTool(AnnoTool.select);
           }),
-      const SingleActivator(LogicalKeyboardKey.delete):
-          () => guarded(() => _anno.deleteSelected()),
+      const SingleActivator(LogicalKeyboardKey.delete): () =>
+          guarded(() => _anno.deleteSelected()),
       LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.delete):
           () => guarded(_confirmClearByShortcut),
-      const SingleActivator(LogicalKeyboardKey.escape):
-          () => guarded(() => _finishAnnotate(appState)),
+      const SingleActivator(LogicalKeyboardKey.escape): () =>
+          guarded(() => _finishAnnotate(appState)),
     };
   }
 
@@ -741,77 +788,94 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   /// 背题模式：选项中高亮正确选项
-  Widget _buildMemorizeOptions(Question question, AppThemeColors ac, AppState appState) {
+  Widget _buildMemorizeOptions(
+      Question question, AppThemeColors ac, AppState appState) {
     // v1.0.2 设计审查修复：硬编码绿色 → 主题语义色（success 系列）
     final ac = AppThemeColors.of(context);
-    final options = question.questionType == 'true_false' ? ['对', '错'] : question.options;
+    final options =
+        question.questionType == 'true_false' ? ['对', '错'] : question.options;
     if (options.isEmpty) {
       return Container(
-        width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: ac.successContainer, borderRadius: BorderRadius.circular(MaoRadius.small), border: Border.all(color: ac.success)),
-        child: Text('正确答案: ${question.correctAnswer}', style: TextStyle(fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.success)),
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: ac.successContainer,
+            borderRadius: BorderRadius.circular(MaoRadius.small),
+            border: Border.all(color: ac.success)),
+        child: Text('正确答案: ${question.correctAnswer}',
+            style: TextStyle(
+                fontSize: MaoType.h3,
+                fontWeight: FontWeight.bold,
+                color: ac.success)),
       );
     }
-    final correctSet = question.questionType == 'multi_choice' ? question.correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {question.correctAnswer.toUpperCase().trim()};
-    return Column(children: List.generate(options.length, (i) {
-      final label = question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : String.fromCharCode(65 + i);
-      final isCorrect = correctSet.contains(question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : label);
-      return Padding(padding: const EdgeInsets.only(bottom: 8), child: Container(
-        width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: isCorrect ? ac.successContainer : ac.surfaceAlt, borderRadius: BorderRadius.circular(MaoRadius.small), border: Border.all(color: isCorrect ? ac.success : ac.border)),
-        child: Row(children: [
-          Container(width: 26, height: 26, decoration: BoxDecoration(color: isCorrect ? ac.success : ac.surfaceAlt, shape: BoxShape.circle), child: Center(child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent) : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.body, color: ac.textSecondary)))),
-          const SizedBox(width: 12),
-          Expanded(child: Text(options[i], style: TextStyle(fontSize: MaoType.body, color: isCorrect ? ac.success : ac.textPrimary, height: 1.4))),
-        ]),
-      ));
+    final correctSet = question.questionType == 'multi_choice'
+        ? question.correctAnswer
+            .split(',')
+            .map((e) => e.trim().toUpperCase())
+            .toSet()
+        : {question.correctAnswer.toUpperCase().trim()};
+    return Column(
+        children: List.generate(options.length, (i) {
+      final label = question.questionType == 'true_false'
+          ? (i == 0 ? '对' : '错')
+          : String.fromCharCode(65 + i);
+      final isCorrect = correctSet.contains(
+          question.questionType == 'true_false' ? (i == 0 ? '对' : '错') : label);
+      return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+                color: isCorrect ? ac.successContainer : ac.surfaceAlt,
+                borderRadius: BorderRadius.circular(MaoRadius.small),
+                border: Border.all(color: isCorrect ? ac.success : ac.border)),
+            child: Row(children: [
+              Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                      color: isCorrect ? ac.success : ac.surfaceAlt,
+                      shape: BoxShape.circle),
+                  child: Center(
+                      child: isCorrect
+                          ? Icon(Icons.check, size: 14, color: ac.onAccent)
+                          : Text(label,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: MaoType.body,
+                                  color: ac.textSecondary)))),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Text(options[i],
+                      style: TextStyle(
+                          fontSize: MaoType.body,
+                          color: isCorrect ? ac.success : ac.textPrimary,
+                          height: 1.4))),
+            ]),
+          ));
     }));
   }
 
-  Widget _buildQuestionCard(Question question, AppState appState, AppThemeColors ac) {
+  Widget _buildQuestionCard(
+      Question question, AppState appState, AppThemeColors ac) {
     final stats = appState.currentQuestionStats;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(MaoRadius.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: ac.accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(MaoRadius.chip),
-                ),
-                child: Text(
-                  // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
-                  question.typeLabel,
-                  style: TextStyle(fontSize: MaoType.body, color: ac.accent),
-                ),
-              ),
-              const Spacer(),
-              if (stats.isNotEmpty)
-                Text(
-                  '作答${stats['total']}次  正确率${stats['total']! > 0 ? ((stats['correct']! / stats['total']!) * 100).toStringAsFixed(0) : 0}%'
-                  // v1.0.2 FSRS 可见化：答完题展示下次复习时间
-                  '${appState.currentFsrsCard != null ? ' · 下次复习：${relativeDayLabel(appState.currentFsrsCard!.nextReviewAt)}' : ''}',
-                  style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(question.title,
-              style: TextStyle(fontSize: MaoType.h3, height: 1.6, fontWeight: FontWeight.w500, color: ac.textPrimary)),
-        ],
-      ),
+    final attempts = stats['total'] ?? 0;
+    final correct = stats['correct'] ?? 0;
+    return QuizQuestionCard(
+      question: question,
+      attempts: attempts,
+      accuracyPercent: attempts > 0 ? (correct / attempts * 100).round() : 0,
+      // v1.0.2 FSRS 可见化：答完题展示下次复习时间
+      nextReviewLabel: appState.currentFsrsCard == null
+          ? null
+          : relativeDayLabel(appState.currentFsrsCard!.nextReviewAt),
     );
   }
 
-  Widget _buildOptionsArea(AppState appState, Question question, AppThemeColors ac) {
+  Widget _buildOptionsArea(
+      AppState appState, Question question, AppThemeColors ac) {
     final qt = question.questionType;
     if (qt == 'fill_blank') {
       return _buildFillBlankInput(appState, ac);
@@ -826,7 +890,8 @@ class _QuizScreenState extends State<QuizScreen> {
     final isMulti = question.questionType == 'multi_choice';
     final isPractice = widget.quizMode == QuizMode.practice;
     // 练习模式已选内容（可修改）
-    final practiceAnswer = _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
+    final practiceAnswer =
+        _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
     final practiceSel = isMulti
         ? practiceAnswer.split(',').where((e) => e.isNotEmpty).toSet()
         : {practiceAnswer};
@@ -835,73 +900,40 @@ class _QuizScreenState extends State<QuizScreen> {
       final int idx = entry.key;
       final option = entry.value;
       final label = String.fromCharCode(65 + idx);
-      final selected =
-          isPractice ? practiceSel.contains(label) : _selectedOptions.contains(label);
+      final selected = isPractice
+          ? practiceSel.contains(label)
+          : _selectedOptions.contains(label);
 
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            if (isPractice) {
-              // v1.0.2 统一重构：练习只记录答案，不提交不判定
-              if (isMulti) {
-                final x = practiceSel.toSet();
-                x.contains(label) ? x.remove(label) : x.add(label);
-                _recordPracticeAnswer(appState, (x.toList()..sort()).join(','));
-              } else {
-                _recordPracticeAnswer(appState, label);
-              }
-              return;
-            }
+      return QuizOptionRow(
+        label: label,
+        text: option,
+        selected: selected,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          if (isPractice) {
+            // v1.0.2 统一重构：练习只记录答案，不提交不判定
             if (isMulti) {
-              setState(() {
-                if (selected) {
-                  _selectedOptions.remove(label);
-                } else {
-                  _selectedOptions.add(label);
-                }
-              });
+              final x = practiceSel.toSet();
+              x.contains(label) ? x.remove(label) : x.add(label);
+              _recordPracticeAnswer(appState, (x.toList()..sort()).join(','));
             } else {
-              _selectedOptions.clear();
-              _handleSubmitAnswer(appState, label);
+              _recordPracticeAnswer(appState, label);
             }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: selected ? ac.accent.withOpacity(0.08) : ac.surfaceAlt,
-              borderRadius: BorderRadius.circular(MaoRadius.control),
-              border: Border.all(
-                color: selected ? ac.accent : ac.border,
-                width: selected ? 1.5 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: selected ? ac.accent : ac.accent.withOpacity(0.12),
-                    shape: isMulti ? BoxShape.rectangle : BoxShape.circle,
-                    borderRadius: isMulti ? BorderRadius.circular(MaoRadius.chip) : null,
-                  ),
-                  child: Center(
-                    child: selected
-                        ? Icon(Icons.check, size: 16, color: ac.onAccent)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: ac.accent, fontSize: MaoType.body)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(option, style: TextStyle(fontSize: MaoType.h3, height: 1.4, color: ac.textPrimary)),
-                ),
-              ],
-            ),
-          ),
-        ),
+            return;
+          }
+          if (isMulti) {
+            setState(() {
+              if (selected) {
+                _selectedOptions.remove(label);
+              } else {
+                _selectedOptions.add(label);
+              }
+            });
+          } else {
+            _selectedOptions.clear();
+            _handleSubmitAnswer(appState, label);
+          }
+        },
       );
     }).toList();
 
@@ -915,16 +947,21 @@ class _QuizScreenState extends State<QuizScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.check_circle),
-              label: Text('确认提交 (已选${_selectedOptions.length}项)', style: const TextStyle(fontSize: MaoType.h3)),
+              label: Text('确认提交 (已选${_selectedOptions.length}项)',
+                  style: const TextStyle(fontSize: MaoType.h3)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedOptions.isEmpty ? ac.surfaceAlt : ac.accent,
-                foregroundColor: _selectedOptions.isEmpty ? ac.textSecondary : ac.onAccent,
+                backgroundColor:
+                    _selectedOptions.isEmpty ? ac.surfaceAlt : ac.accent,
+                foregroundColor:
+                    _selectedOptions.isEmpty ? ac.textSecondary : ac.onAccent,
               ),
-              onPressed: _selectedOptions.isEmpty ? null : () {
-                final answer = _selectedOptions.toList()..sort();
-                _selectedOptions.clear();
-                _handleSubmitAnswer(appState, answer.join(','));
-              },
+              onPressed: _selectedOptions.isEmpty
+                  ? null
+                  : () {
+                      final answer = _selectedOptions.toList()..sort();
+                      _selectedOptions.clear();
+                      _handleSubmitAnswer(appState, answer.join(','));
+                    },
             ),
           ),
         ],
@@ -979,7 +1016,8 @@ class _QuizScreenState extends State<QuizScreen> {
             focusNode: _fillBlankFocusNodes[i],
             decoration: InputDecoration(
               hintText: n == 1 ? '请输入答案...' : '第 ${i + 1} 空',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.control)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(MaoRadius.control)),
               prefixIcon: const Icon(Icons.edit),
             ),
             style: TextStyle(fontSize: MaoType.h3, color: ac.textPrimary),
@@ -1007,7 +1045,8 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildTextAnswerInput(AppState appState, AppThemeColors ac, String type) {
+  Widget _buildTextAnswerInput(
+      AppState appState, AppThemeColors ac, String type) {
     // v1.0.2 设计审查修复：题型中文标签统一走 Question.typeLabel
     final label = appState.currentQuestion?.typeLabel ?? '题目';
     final isPractice = widget.quizMode == QuizMode.practice;
@@ -1018,7 +1057,8 @@ class _QuizScreenState extends State<QuizScreen> {
           maxLines: 6,
           decoration: InputDecoration(
             hintText: '请输入$label答案...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(MaoRadius.control)),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(MaoRadius.control)),
             alignLabelWithHint: true,
           ),
           style: TextStyle(fontSize: MaoType.h3, color: ac.textPrimary),
@@ -1048,73 +1088,21 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildTrueFalseButtons(AppState appState, AppThemeColors ac) {
     final isPractice = widget.quizMode == QuizMode.practice;
-    final ac = AppThemeColors.of(context);
     final cur = _practiceAnswersMap[appState.currentQuestionIndex] ?? '';
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              if (isPractice) {
-                _recordPracticeAnswer(appState, '对');
-                return;
-              }
-              _handleSubmitAnswer(appState, '对');
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isPractice && cur == '对'
-                    ? ac.successContainer
-                    : ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(MaoRadius.control),
-                border: Border.all(
-                    color: isPractice && cur == '对' ? ac.success : ac.success),
-              ),
-              child: Center(
-                // v1.0.2 设计审查修复：硬编码绿色 → 语义色
-                child: Text('✓  正确',
-                    style: TextStyle(
-                        fontSize: MaoType.h2,
-                        fontWeight: FontWeight.bold,
-                        color: ac.success)),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              if (isPractice) {
-                _recordPracticeAnswer(appState, '错');
-                return;
-              }
-              _handleSubmitAnswer(appState, '错');
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isPractice && cur == '错'
-                    ? ac.dangerContainer
-                    : ac.surfaceAlt,
-                borderRadius: BorderRadius.circular(MaoRadius.control),
-                border: Border.all(color: ac.danger),
-              ),
-              child: Center(
-                child: Text('✗  错误',
-                    style: TextStyle(
-                        fontSize: MaoType.h2,
-                        fontWeight: FontWeight.bold,
-                        color: ac.danger)),
-              ),
-            ),
-          ),
-        ),
-      ],
+    void answer(String v) {
+      if (isPractice) {
+        _recordPracticeAnswer(appState, v);
+        return;
+      }
+      _handleSubmitAnswer(appState, v);
+    }
+
+    return QuizTrueFalseButtons(
+      practiceSelected: isPractice ? cur : null,
+      onTrue: () => answer('对'),
+      onFalse: () => answer('错'),
     );
   }
-
   void _submitFillBlank(AppState appState) {
     // v1.0.2: 填空提交要求所有空填满（与逐空判定一致）
     final texts = _fillBlankControllers.map((c) => c.text.trim()).toList();
@@ -1125,7 +1113,9 @@ class _QuizScreenState extends State<QuizScreen> {
       return;
     }
     final answer = texts.join('；');
-    for (final c in _fillBlankControllers) { c.clear(); }
+    for (final c in _fillBlankControllers) {
+      c.clear();
+    }
     if (widget.quizMode == QuizMode.practice) {
       // v1.0.2 统一重构：练习只记录答案
       _recordPracticeAnswer(appState, answer);
@@ -1203,7 +1193,8 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  void _showAnswerSheet(BuildContext context, AppState appState, AppThemeColors ac) {
+  void _showAnswerSheet(
+      BuildContext context, AppState appState, AppThemeColors ac) {
     _modalOpen = true;
     showModalBottomSheet(
       context: context,
@@ -1226,8 +1217,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void _syncPracticeSheet(AppState appState) {
     final i = appState.currentQuestionIndex;
     if (i < _practiceAnswers.length) {
-      _practiceAnswers[i].answered =
-          _practiceAnswersMap.containsKey(i);
+      _practiceAnswers[i].answered = _practiceAnswersMap.containsKey(i);
     }
   }
 
@@ -1275,7 +1265,8 @@ class _QuizScreenState extends State<QuizScreen> {
     _scrollController.jumpTo(0);
   }
 
-  Widget _buildAnsweredResult(AppState appState, Question question, AppThemeColors ac) {
+  Widget _buildAnsweredResult(
+      AppState appState, Question question, AppThemeColors ac) {
     final qt = question.questionType;
     // v1.0.2 UI 审查修复：对/错反馈统一用语义色 success(绿)/danger(红)，
     // 原 tertiary/error 在部分主题下呈现粉紫/橙，与"绿对红错"心智不符
@@ -1312,19 +1303,29 @@ class _QuizScreenState extends State<QuizScreen> {
             const SizedBox(height: 10),
             if (qt == 'fill_blank') ...[
               Text('你的答案: $userAnswer',
-                  style: TextStyle(fontSize: MaoType.body, color: isCorrect ? ac.success : ac.danger)),
+                  style: TextStyle(
+                      fontSize: MaoType.body,
+                      color: isCorrect ? ac.success : ac.danger)),
               if (!isCorrect) ...[
                 const SizedBox(height: 4),
                 Text('正确答案: $correctAnswer',
-                    style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.bold, color: ac.success)),
+                    style: TextStyle(
+                        fontSize: MaoType.body,
+                        fontWeight: FontWeight.bold,
+                        color: ac.success)),
               ],
             ],
             if (qt == 'true_false') ...[
               Text('你选择了: ${userAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
-                  style: TextStyle(fontSize: MaoType.body, color: isCorrect ? ac.success : ac.danger)),
+                  style: TextStyle(
+                      fontSize: MaoType.body,
+                      color: isCorrect ? ac.success : ac.danger)),
               if (!isCorrect)
                 Text('正确答案: ${correctAnswer == "对" ? "✓ 正确" : "✗ 错误"}',
-                    style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.bold, color: ac.success)),
+                    style: TextStyle(
+                        fontSize: MaoType.body,
+                        fontWeight: FontWeight.bold,
+                        color: ac.success)),
             ],
           ],
         ),
@@ -1333,13 +1334,18 @@ class _QuizScreenState extends State<QuizScreen> {
     return _buildAnsweredOptions(appState, question, ac);
   }
 
-  Widget _buildAnsweredOptions(AppState appState, Question question, AppThemeColors ac) {
+  Widget _buildAnsweredOptions(
+      AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     final userAnswer = lastRecord?.userAnswer ?? '';
     final correctAnswer = question.correctAnswer.toUpperCase().trim();
     final isMulti = question.questionType == 'multi_choice';
-    final userAnswers = isMulti ? userAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {userAnswer.toUpperCase().trim()};
-    final correctAnswers = isMulti ? correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet() : {correctAnswer};
+    final userAnswers = isMulti
+        ? userAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet()
+        : {userAnswer.toUpperCase().trim()};
+    final correctAnswers = isMulti
+        ? correctAnswer.split(',').map((e) => e.trim().toUpperCase()).toSet()
+        : {correctAnswer};
 
     final options = question.options;
     if (options.isEmpty) return const SizedBox.shrink();
@@ -1348,81 +1354,86 @@ class _QuizScreenState extends State<QuizScreen> {
     final ac = AppThemeColors.of(context);
 
     final optionWidgets = options.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final label = String.fromCharCode(65 + idx);
-        final isCorrect = correctAnswers.contains(label);
-        final isUserWrong = !isCorrect && userAnswers.contains(label);
+      final idx = entry.key;
+      final label = String.fromCharCode(65 + idx);
+      final isCorrect = correctAnswers.contains(label);
+      final isUserWrong = !isCorrect && userAnswers.contains(label);
 
-        Color bgColor = ac.surfaceAlt;
-        Color textColor = ac.textPrimary;
-        Color borderColor = ac.border;
-        if (isCorrect) {
-          bgColor = ac.successContainer;
-          textColor = ac.success;
-          borderColor = ac.success;
-        } else if (isUserWrong) {
-          bgColor = ac.dangerContainer;
-          textColor = ac.danger;
-          borderColor = ac.danger;
-        }
+      Color bgColor = ac.surfaceAlt;
+      Color textColor = ac.textPrimary;
+      Color borderColor = ac.border;
+      if (isCorrect) {
+        bgColor = ac.successContainer;
+        textColor = ac.success;
+        borderColor = ac.success;
+      } else if (isUserWrong) {
+        bgColor = ac.dangerContainer;
+        textColor = ac.danger;
+        borderColor = ac.danger;
+      }
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(MaoRadius.control),
-              border: Border.all(color: borderColor),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 26, height: 26,
-                  decoration: BoxDecoration(
-                    color: isCorrect ? ac.success : isUserWrong ? ac.danger : ac.border,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: isCorrect ? Icon(Icons.check, size: 14, color: ac.onAccent)
-                        : isUserWrong ? Icon(Icons.close, size: 14, color: ac.onAccent)
-                        : Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.body, color: ac.textSecondary)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(entry.value,
-                    style: TextStyle(fontSize: MaoType.body, color: textColor, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(MaoRadius.control),
+            border: Border.all(color: borderColor),
           ),
-        );
-      }).toList();
+          child: Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: isCorrect
+                      ? ac.success
+                      : isUserWrong
+                          ? ac.danger
+                          : ac.border,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: isCorrect
+                      ? Icon(Icons.check, size: 14, color: ac.onAccent)
+                      : isUserWrong
+                          ? Icon(Icons.close, size: 14, color: ac.onAccent)
+                          : Text(label,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: MaoType.body,
+                                  color: ac.textSecondary)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                      fontSize: MaoType.body, color: textColor, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList();
     return _arrangeOptionWidgets(optionWidgets);
   }
 
-  Widget _buildResultFeedback(AppState appState, Question question, AppThemeColors ac) {
+  Widget _buildResultFeedback(
+      AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     if (lastRecord == null) return const SizedBox.shrink();
     final correct = question.correctAnswer;
     final user = lastRecord.userAnswer;
     DebugLogService.instance.logResultFeedback(correct, user ?? 'null');
-    // v1.0.2 UI 审查修复：tertiary/error → success/danger（绿对红错语义）
-    final ac = AppThemeColors.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('正确答案: $correct',
-          style: TextStyle(fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.success)),
-        const SizedBox(height: 4),
-        // v1.0.2 设计审查修复：答对时"你的答案"不再恒显示错误红色
-        Text('你的答案: $user',
-          style: TextStyle(fontSize: MaoType.h3, fontWeight: FontWeight.bold,
-              color: lastRecord.isCorrect ? ac.success : ac.danger)),
-      ],
+    return QuizResultFeedback(
+      correctAnswer: correct,
+      userAnswer: user ?? '',
+      isCorrect: lastRecord.isCorrect,
     );
   }
 
@@ -1430,17 +1441,23 @@ class _QuizScreenState extends State<QuizScreen> {
   Future<void> _openSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+      MaterialPageRoute(
+          builder: (_) => const SettingsScreen(group: SettingsGroup.ai)),
     );
     if (mounted) setState(() {});
   }
 
   Widget _buildShowAnalysisButton(AppState appState, AppThemeColors ac) {
+    // 无 Key 时展开的是题目自带解析（见 _loadAnalysis 的回落），标题也照此写明，
+    // 免得用户以为点了会调 AI——与 _buildAnalysisArea 里的小条/面板标题保持同一口径。
+    final bool noKey = !appState.settings.isConfigured;
+    final bool hasBuiltin =
+        (appState.currentQuestion?.analysis?.trim() ?? '').isNotEmpty;
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.psychology, size: 18),
-        label: const Text('查看 AI 解析'),
+        label: Text(noKey && hasBuiltin ? '查看示例解析' : '查看 AI 解析'),
         onPressed: () {
           setState(() => _showAnalysis = true);
           appState.showAnalysis();
@@ -1458,7 +1475,8 @@ class _QuizScreenState extends State<QuizScreen> {
         style: OutlinedButton.styleFrom(
           foregroundColor: ac.textSecondary,
           padding: const EdgeInsets.symmetric(vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(MaoRadius.small)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(MaoRadius.small)),
         ),
         onPressed: () {
           // v1.0.2: API 未配置拦截重新生成
@@ -1467,7 +1485,8 @@ class _QuizScreenState extends State<QuizScreen> {
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再查看解析。'),
                   backgroundColor: AppThemeColors.of(context).warning,
-                  action: SnackBarAction(label: '去设置', onPressed: _openSettings)),
+                  action:
+                      SnackBarAction(label: '去设置', onPressed: _openSettings)),
             );
             return;
           }
@@ -1477,60 +1496,46 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildAnalysisArea(AppState appState, Question question, AppThemeColors ac) {
+  Widget _buildAnalysisArea(
+      AppState appState, Question question, AppThemeColors ac) {
     final lastRecord = appState.lastAnswerRecord;
     final isCorrect = lastRecord?.isCorrect ?? false;
+    final bool noKey = !appState.settings.isConfigured;
+    // 题目自带解析（示例题库每题都有）：无 Key 时也能看，_loadAnalysis 会回落到它
+    final bool hasBuiltin = (question.analysis?.trim() ?? '').isNotEmpty;
 
     if (isCorrect && !_showManualAnalysis) {
-      return GestureDetector(
+      // 答对后默认折叠解析；点卡片才展示。
+      // 注意：只有「既没 Key、又没有自带解析」时才拦截——此前这里无条件要求 Key，
+      // 导致无 Key 用户在示例题库里答对题、点开解析却被拦（而答错时同一份自带解析
+      // 能正常显示），与 _loadAnalysis 的回落逻辑及产品承诺都矛盾。
+      return QuizViewAnalysisCard(
+        exampleOnly: noKey && hasBuiltin,
         onTap: () {
-          // v1.0.2: API 未配置拦截解析请求
-          if (!appState.settings.isConfigured) {
+          if (noKey && !hasBuiltin) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再查看解析。'),
                   backgroundColor: AppThemeColors.of(context).warning,
-                  action: SnackBarAction(label: '去设置', onPressed: _openSettings)),
+                  action:
+                      SnackBarAction(label: '去设置', onPressed: _openSettings)),
             );
             return;
           }
           setState(() => _showManualAnalysis = true);
           appState.showAnalysis();
         },
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: ac.surfaceAlt,
-            borderRadius: BorderRadius.circular(MaoRadius.control),
-            border: Border.all(color: ac.border),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.lightbulb_outline, color: ac.textSecondary, size: 18),
-              const SizedBox(width: 8),
-              Text('查看AI解析',
-                  style: TextStyle(color: ac.accent, fontSize: MaoType.body)),
-            ],
-          ),
-        ),
       );
     }
 
-    final bool noKey = !appState.settings.isConfigured;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(MaoRadius.control),
-      ),
+    return MJSurface(
+      padding: const EdgeInsets.all(MaoSpace.sm + 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.psychology_outlined,
-                  color: ac.accent, size: 20),
+              Icon(Icons.psychology_outlined, color: ac.accent, size: 20),
               const SizedBox(width: 8),
               Text(noKey ? '示例解析' : 'AI解析',
                   style: TextStyle(
@@ -1542,7 +1547,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: ac.accent)),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: ac.accent)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1550,11 +1556,13 @@ class _QuizScreenState extends State<QuizScreen> {
             AiResponseWidget(text: appState.currentAnalysis!)
           else if (appState.analysisLoading)
             Text('正在生成AI解析...',
-                style: TextStyle(color: ac.textSecondary, fontSize: MaoType.body))
+                style:
+                    TextStyle(color: ac.textSecondary, fontSize: MaoType.body))
           else ...[
             // v1.28.1 新生引导：无 Key 且无自带解析 → 引导去配置，而不是裸错误
             Text('配置 API Key 后，这里会显示 AI 逐题讲解\n（题眼破题 · 关键词高亮 · 追问）。',
-                style: TextStyle(color: ac.textSecondary, fontSize: MaoType.body)),
+                style:
+                    TextStyle(color: ac.textSecondary, fontSize: MaoType.body)),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               icon: const Icon(Icons.settings, size: 16),
@@ -1562,7 +1570,6 @@ class _QuizScreenState extends State<QuizScreen> {
               onPressed: _openSettings,
             ),
           ],
-
           if (appState.currentAnalysis != null &&
               appState.currentAnalysis!.isNotEmpty) ...[
             const SizedBox(height: MaoSpace.sm + 2),
@@ -1594,7 +1601,8 @@ class _QuizScreenState extends State<QuizScreen> {
               SnackBar(
                   content: const Text('请先在设置中配置 API Key 后再追问。'),
                   backgroundColor: ac.warning,
-                  action: SnackBarAction(label: '去设置', onPressed: _openSettings)),
+                  action:
+                      SnackBarAction(label: '去设置', onPressed: _openSettings)),
             );
             return;
           }
@@ -1628,19 +1636,21 @@ class _QuizScreenState extends State<QuizScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('向 AI 追问',
-                        style: MaoType.h3Style.copyWith(
-                            color: ac.textPrimary, fontSize: 15)),
+                        style: MaoType.h3Style
+                            .copyWith(color: ac.textPrimary, fontSize: 15)),
                     const SizedBox(height: 2),
                     Text(
                       hasHistory ? '已有 $count 条对话记录' : '没看懂？直接问，对话式讲解',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: MaoType.captionStyle.copyWith(color: ac.textSecondary),
+                      style: MaoType.captionStyle
+                          .copyWith(color: ac.textSecondary),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 20, color: ac.textTertiary),
+              Icon(Icons.chevron_right_rounded,
+                  size: 20, color: ac.textTertiary),
             ],
           ),
         ),
@@ -1715,9 +1725,8 @@ class _QuizScreenState extends State<QuizScreen> {
                                       fontWeight: cur
                                           ? FontWeight.bold
                                           : FontWeight.normal,
-                                      color: cur
-                                          ? ac.onAccent
-                                          : ac.textPrimary)),
+                                      color:
+                                          cur ? ac.onAccent : ac.textPrimary)),
                             ),
                           ),
                         );
@@ -1751,37 +1760,34 @@ class _QuizScreenState extends State<QuizScreen> {
       );
     }
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(MaoSpace.md),
       decoration: BoxDecoration(
         color: ac.background,
-        boxShadow: [
-          BoxShadow(
-              color: ac.border.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, -2)),
-        ],
+        // 精密暗色：底栏与内容的分隔用一条发丝线，不用投影
+        border: Border(
+            top: BorderSide(color: ac.border, width: MaoLine.width)),
       ),
       child: appState.isLastQuestion
-          ? SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (widget.quizMode == QuizMode.memorize) {
-                    _handleExit(appState);
-                  } else {
-                    _handleEndSession(appState);
-                  }
-                },
-                child: Text(
-                    widget.quizMode == QuizMode.memorize ? '回到首页' : '完成刷题，查看小结',
-                    style: const TextStyle(fontSize: MaoType.h3)),
-              ),
+          ? MJButton(
+              expand: true,
+              label: widget.quizMode == QuizMode.memorize
+                  ? '回到首页'
+                  : '完成刷题，查看小结',
+              onPressed: () {
+                if (widget.quizMode == QuizMode.memorize) {
+                  _handleExit(appState);
+                } else {
+                  _handleEndSession(appState);
+                }
+              },
             )
           : Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    icon: Icon(_inErrorBook ? Icons.bookmark : Icons.bookmark_border, size: 17),
+                    icon: Icon(
+                        _inErrorBook ? Icons.bookmark : Icons.bookmark_border,
+                        size: 17),
                     // v1.0.2 UI 审查修复：单行不换行 + 紧凑内边距（竖排问题）
                     label: Text(_inErrorBook ? '已收藏' : '错题本',
                         maxLines: 1,
@@ -1809,7 +1815,9 @@ class _QuizScreenState extends State<QuizScreen> {
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.arrow_back, size: 18),
                       label: const Text('上一题',
-                          maxLines: 1, softWrap: false, style: TextStyle(fontSize: MaoType.body)),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(fontSize: MaoType.body)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ac.textSecondary,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1838,7 +1846,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       visualDensity: VisualDensity.compact,
                     ),
                     child: const Text('下一题',
-                        maxLines: 1, softWrap: false, style: TextStyle(fontSize: MaoType.h3)),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(fontSize: MaoType.h3)),
                   ),
                 ),
               ],
@@ -1857,11 +1867,11 @@ class _QuizScreenState extends State<QuizScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('确认提交 (已选 $answered 题)'),
-        content: Text('共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'),
+        content: Text(
+            '共$total题，已答$answered题，未答${total - answered}题。\n\n提交后将无法修改，确定提交？'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('继续检查')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('继续检查')),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -1973,10 +1983,6 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 }
-
-
-
-
 
 /// v1.0.3 窗口自适应：选项随可用宽度自动排列。
 /// 每个选项固定单元宽（300，含底部间距），宽度足够时自然形成多列，

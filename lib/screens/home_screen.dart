@@ -1,23 +1,20 @@
 ﻿import 'dart:async';
 
-import 'practice_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/quiz_session.dart';
 import '../services/app_state.dart';
+import '../models/quiz_session.dart';
 import '../services/hitokoto_service.dart';
 import '../services/theme_service.dart';
-import '../utils/app_constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
+import '../widgets/kit/mj_kit.dart';
+import '../widgets/kit/mj_logo.dart';
 import '../widgets/weekly_stats_board.dart';
-import 'bank_manage_screen.dart';
 import 'import_preview_screen.dart';
-import 'import_screen.dart';
-import 'settings_screen.dart';
 import 'quiz_screen.dart';
-import 'error_book_screen.dart';
+import 'settings_hub_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +24,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// 用于测量「战绩卡以上固定块」的真实高度：首页要恰好一屏不滚动，
+  /// 就必须知道固定块实际占了多少，才能把准确剩余高度交给战绩卡。
+  final GlobalKey _fixedBlockKey = GlobalKey();
+  double _fixedBlockHeight = 0;
+
+  /// 上次已加载的统计数据版本号：AppState 每次变更统计口径都会自增，
+  /// 首页据此自动重载「本周战绩」等本地统计（它们不在 AppState 里）。
+  int _loadedStatsRevision = -1;
   // v1.0.2: 战绩数据（本周刷题/连续打卡/年度热力）
   Map<String, int> _yearlyTotals = {};
   Set<String> _vacationDays = {};
@@ -34,12 +39,16 @@ class _HomeScreenState extends State<HomeScreen> {
   int _weekTotal = 0;
   double _weekAccuracy = 0;
   bool _statsLoaded = false; // 防横幅首帧闪现
+
+  /// 断点续刷：最新未完成会话 + 已答题数。
+  /// 首页是用户回来看见的第一个屏幕，「上次刷到一半」的续刷入口必须在这里，
+  /// 不能只在「开始」页（那里是主动去做题时才会进）。
+  (QuizSession, int)? _unfinished;
+
     // v1.0.2 扩展：今日一言（开页面显示）。
     // v1.27 PC 加载修复：首帧直接显示缓存/本地一言，不再显示「正在加载一言...」，
     // 网络结果到达后静默替换；失败也不回退占位文案。
     String _hitokoto = HitokotoService.immediateText();
-  // v1.0.2 七项改进：断点续刷（最新未完成会话 + 已答题数）
-  (QuizSession, int)? _unfinished;
 
   @override
   void initState() {
@@ -69,7 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final vacation = {
         for (final d in appState.vacationDateRange) dateKeyOf(d)
       };
-      // v1.0.2 七项改进：断点续刷卡片数据
+      // 续刷卡与统计同批加载：答题结束后 statsRevision 自增会触发本方法，
+      // 于是「完成/暂停一轮」回到首页时续刷入口自动出现或消失。
       final unfinished = await appState.getUnfinishedSessionInfo();
       if (!mounted) return;
       setState(() {
@@ -87,14 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  bool _vacationBlocked(AppState appState) {
-    if (!appState.vacationModeEnabled) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('寒暑假模式中，答题功能已暂停')),
-    );
-    return true;
-  }
-
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
@@ -104,84 +106,93 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('猫卷'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
-      ),
-      body: Consumer<AppState>(
-        builder: (context, appState, _) {
-          return RefreshIndicator(
-            onRefresh: () async {
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: '刷新',
+            onPressed: () async {
+              final appState = context.read<AppState>();
               await appState.init();
               await _loadWeeklyData(appState);
               await _loadHitokoto();
             },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(MaoSpace.md),
-              // 平板适配：内容限宽居中；宽屏双列布局
-              child: ResponsivePage(
-              child: isWideLayout(context)
-                  ? _buildWideBody(appState, ac)
-                  : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 后台导入：导入中进度卡（离开导入页后在此展示）
-                  if (appState.importTaskActive) ...[
-                    _buildImportProgressCard(appState, ac),
-                    const SizedBox(height: MaoSpace.md),
-                  ],
-                  // 后台导入：AI 解析完成待预览确认入口（入库前保留）
-                  if (!appState.importTaskActive &&
-                      appState.previewQuestions.isNotEmpty) ...[
-                    _buildPreviewConfirmCard(appState, ac),
-                    const SizedBox(height: MaoSpace.md),
-                  ],
-                  // 顶部：问候语 + 软件图标/名字 + 今日一言
-                  _buildHeroCard(appState, ac),
-                  const SizedBox(height: MaoSpace.md),
-                  // 断点续刷入口（有未完成会话时显示）
-                  if (_unfinished != null)
-                    _buildResumeCard(appState, ac),
-                  // 寒暑假模式横幅
-                  if (appState.vacationModeEnabled)
-                    _buildVacationBanner(ac),
-                  // API 余额不足警告（首帧加载完成后才显示，防闪现）
-                  if (_statsLoaded &&
-                      appState.aiService != null &&
-                      appState.aiService!.cachedBalance != null &&
-                      appState.aiService!.cachedBalance! > 0 &&
-                      appState.aiService!.cachedBalance! < 1.0)
-                    _buildBalanceWarning(ac),
-                  // 本周战绩（双数据块 + 单月打卡日历 + 连续打卡）
-                  WeeklyStatsBoard(
-                    dailyTotals: _yearlyTotals,
-                    streakDays: _streakDays,
-                    weekTotal: _weekTotal,
-                    weekAccuracy: _weekAccuracy,
-                    vacationDays: _vacationDays,
-                    onHistoryReport: () => _showHistoryReport(appState),
-                  ),
-                  const SizedBox(height: MaoSpace.md),
-                  _buildStatsCards(appState, ac),
-                  const SizedBox(height: MaoSpace.xl),
-                  _buildQuickActions(appState, ac),
-                  const SizedBox(height: MaoSpace.lg),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Text(
-                      '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
-                      style: MaoType.captionStyle
-                          .copyWith(color: ac.textTertiary),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsHubScreen()),
+            ),
+          ),
+        ],
+      ),
+      // 首页 = 「看」的一屏：问候（含累计数据）/ 待办提示 / 本周战绩 / 累计数据。
+      //
+      // 一屏策略（既「恰好铺满」又「绝不溢出」）：
+      //   1. 布局后测量固定块真实高度 _fixedBlockHeight；
+      //   2. 战绩卡高度 = 视口 − 固定块 − 间距，并夹在 [最小可用, 上限]；
+      //   3. 外层 SingleChildScrollView 兜底：空间足够时内容正好等于视口
+      //      （不滚动），空间不足（小屏/横屏/大字号）时内容略高，可滚动看全，
+      //      而不是挤压内部元素触发 overflow。
+      body: Consumer<AppState>(
+        builder: (context, appState, _) {
+          _measureFixedBlock();
+          // 统计口径变化（答题结束 / 导入删除题库 / 改判 / 生成模拟数据…）
+          // 就重载本地统计 —— 这是首页数据能自动跟上的关键。
+          if (appState.statsRevision != _loadedStatsRevision) {
+            _loadedStatsRevision = appState.statsRevision;
+            _loadWeeklyData(appState);
+          }
+          return SafeArea(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                const pad = MaoSpace.md;
+                final viewport = c.maxHeight - pad * 2;
+                // 首帧尚未测量时给一个偏大的保守估算（宁可先多滚动一点）
+                final fixed = _fixedBlockHeight > 0 ? _fixedBlockHeight : 260.0;
+                // 交给战绩卡的可用高度；它内部会保证不低于「日历可读」的最小高度，
+                // 不足时由外层滚动兜底 —— 因此既不溢出、也不把日历压扁。
+                final cardAvail = viewport - fixed - MaoSpace.sm;
+
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(pad),
+                  child: ResponsivePage(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 固定块：问候卡（含累计数据）+ 续刷入口 + 待办提示。
+                        // 续刷放在待办之前：它是"接着上次继续做"的第一顺位动作。
+                        Column(
+                          key: _fixedBlockKey,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildHeroCard(appState, ac),
+                            if (_unfinished != null) ...[
+                              const SizedBox(height: MaoSpace.sm),
+                              MJResumeCard(
+                                session: _unfinished!.$1,
+                                answered: _unfinished!.$2,
+                                onTap: () => _resumeQuiz(appState),
+                              ),
+                            ],
+                            const SizedBox(height: MaoSpace.sm),
+                            ..._buildNotices(appState, ac),
+                          ],
+                        ),
+                        // 战绩卡：拿到「可用高度」，内部据此决定是填满还是保底
+                        WeeklyStatsBoard(
+                          dailyTotals: _yearlyTotals,
+                          streakDays: _streakDays,
+                          weekTotal: _weekTotal,
+                          weekAccuracy: _weekAccuracy,
+                          vacationDays: _vacationDays,
+                          maxHeight: cardAvail,
+                          onHistoryReport: () => _showHistoryReport(appState),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              ),
+                );
+              },
             ),
           );
         },
@@ -189,152 +200,184 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// v1.0.3 宽屏重设计：双列布局。左列（flex 5）：Hero/续刷/横幅/本周战绩；
-  /// 右列（flex 4）：统计卡 + 快速操作网格。
-  Widget _buildWideBody(AppState appState, AppThemeColors ac) {
-    final left = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // v1.27 后台导入：导入中进度卡 / 待预览确认入口（宽屏左列）
-              if (appState.importTaskActive) ...[
-                _buildImportProgressCard(appState, ac),
-                const SizedBox(height: 16),
-              ],
-              if (!appState.importTaskActive &&
-                  appState.previewQuestions.isNotEmpty) ...[
-                _buildPreviewConfirmCard(appState, ac),
-                const SizedBox(height: 16),
-              ],
-              _buildHeroCard(appState, ac),
-              const SizedBox(height: 16),
-              if (_unfinished != null) _buildResumeCard(appState, ac),
-              if (appState.vacationModeEnabled) _buildVacationBanner(ac),
-              if (_statsLoaded &&
-                  appState.aiService != null &&
-                  appState.aiService!.cachedBalance != null &&
-                  appState.aiService!.cachedBalance! > 0 &&
-                  appState.aiService!.cachedBalance! < 1.0)
-                _buildBalanceWarning(ac),
-              WeeklyStatsBoard(
-                dailyTotals: _yearlyTotals,
-                streakDays: _streakDays,
-                weekTotal: _weekTotal,
-                weekAccuracy: _weekAccuracy,
-                vacationDays: _vacationDays,
-                onHistoryReport: () => _showHistoryReport(appState),
-              ),
-            ],
-          );
-    final right = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // v1.27 呼吸感：宽屏右列模块间距同步加大。
-              _buildStatsCards(appState, ac),
-              const SizedBox(height: 28),
-              _buildQuickActions(appState, ac),
-              const SizedBox(height: 28),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Text(
-                  '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
-                  style: TextStyle(
-                      fontSize: MaoType.caption,
-                      color: ac.textSecondary.withOpacity(0.7)),
-                ),
-              ),
-            ],
-          );
-    return LayoutBuilder(builder: (context, constraints) {
-      if (constraints.maxWidth >= 1100) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 5, child: left),
-            // v1.27 呼吸感：双列间距加大。
-            const SizedBox(width: 28),
-            Expanded(flex: 4, child: right),
-          ],
-        );
+  /// 布局后测量固定块高度；变化时才 setState（避免无谓重建）。
+  void _measureFixedBlock() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _fixedBlockKey.currentContext;
+      if (ctx == null || !mounted) return;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+      final h = box.size.height;
+      if ((h - _fixedBlockHeight).abs() > 0.5) {
+        setState(() => _fixedBlockHeight = h);
       }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [left, const SizedBox(height: 16), right],
-      );
     });
   }
 
-  /// 顶部问候语（第一行）+ 软件图标/名字 + 今日一言
+  /// 待办提示聚合：有内容才占位，无内容零高度。
+  /// 首页不再放动作入口，但「需要用户知道的事」仍在此提示。
+  List<Widget> _buildNotices(AppState appState, AppThemeColors ac) {
+    final list = <Widget>[];
+    if (appState.vacationModeEnabled) {
+      list.add(_buildVacationBanner(ac));
+    }
+    if (_statsLoaded &&
+        appState.aiService != null &&
+        appState.aiService!.cachedBalance != null &&
+        appState.aiService!.cachedBalance! > 0 &&
+        appState.aiService!.cachedBalance! < 1.0) {
+      list.add(_buildBalanceWarning(ac));
+    }
+    if (appState.importTaskActive) {
+      list.add(_buildImportProgressCard(appState, ac));
+    } else if (appState.previewQuestions.isNotEmpty) {
+      list.add(_buildPreviewConfirmCard(appState, ac));
+    }
+    if (list.isEmpty) return const [];
+    return [
+      for (final w in list) ...[w, const SizedBox(height: MaoSpace.sm)],
+    ];
+  }
+
   Widget _buildHeroCard(AppState appState, AppThemeColors ac) {
     final nickname = appState.settings.nickname;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(MaoSpace.lg),
-      decoration: BoxDecoration(
-        // 双色位移渐变（非透明度衰减）——避免旧版"发灰发浊"
-        gradient: LinearGradient(
-          colors: [ac.accent, Color.lerp(ac.accent, ac.textPrimary, 0.28)!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: MaoRadius.cardBorder,
-        boxShadow: MaoShadow.level2,
-      ),
+    // 精密暗色：Hero 不再用大渐变块，改为平坦面板 + 发丝描边 + 左侧强调条。
+    // 视觉重量交给排版（大字号问候语）而不是色块。
+    return MJSurface(
+      accentEdge: true,
+      padding: const EdgeInsets.fromLTRB(
+          MaoSpace.md, MaoSpace.md, MaoSpace.md, MaoSpace.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 第一行：问候语 + 昵称
-          Text(
-            _greeting,
-            style: MaoType.h1Style.copyWith(color: ac.onAccent),
-          ),
-          if (nickname.isNotEmpty) ...[
-            const SizedBox(height: MaoSpace.xxs / 2),
-            Text(
-              nickname,
-              style: MaoType.captionStyle
-                  .copyWith(color: ac.onAccent.withOpacity(0.86)),
-            ),
-          ],
-          const SizedBox(height: MaoSpace.sm),
-          // 软件图标 + 软件名字 + 今日一言
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ClipRRect(
-                borderRadius: MaoRadius.smallBorder,
-                child: Image.asset(
-                  'assets/app_logo.png',
-                  width: 42,
-                  height: 42,
-                  errorBuilder: (_, __, ___) =>
-                      Icon(Icons.school, size: 34, color: ac.onAccent),
-                ),
-              ),
-              const SizedBox(width: MaoSpace.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '猫卷',
-                      style: MaoType.h3Style.copyWith(color: ac.onAccent),
-                    ),
-                    const SizedBox(height: MaoSpace.xxs / 2),
-                    Text(
-                      _hitokoto,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: MaoType.captionStyle.copyWith(
-                        color: ac.onAccent.withOpacity(0.9),
-                        height: 1.45,
-                      ),
-                    ),
+                    Text(_greeting,
+                        style: MaoType.h1Style.copyWith(color: ac.textPrimary)),
+                    if (nickname.isNotEmpty) ...[
+                      const SizedBox(height: MaoSpace.xxs),
+                      Text(nickname,
+                          style: MaoType.captionStyle
+                              .copyWith(color: ac.textSecondary)),
+                    ],
                   ],
+                ),
+              ),
+              const SizedBox(width: MaoSpace.sm),
+              // 品牌位：矢量标记（34px 下位图字标完全糊掉，标记仍然清晰）
+              const MJLogoBadge(box: 34),
+            ],
+          ),
+          const SizedBox(height: MaoSpace.sm),
+          Container(height: MaoLine.width, color: ac.border),
+          const SizedBox(height: MaoSpace.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('猫卷',
+                  style: MaoType.microStyle.copyWith(
+                      color: ac.textSecondary, fontWeight: FontWeight.w600)),
+              const SizedBox(width: MaoSpace.xs),
+              Expanded(
+                child: Text(
+                  _hitokoto,
+                  // 一行：一屏布局下省下的每一行都直接变成日历可用高度
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: MaoType.captionStyle
+                      .copyWith(color: ac.textTertiary, height: 1.45),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: MaoSpace.sm),
+          Container(height: MaoLine.width, color: ac.border),
+          const SizedBox(height: MaoSpace.sm),
+          // 累计数据并入问候卡：一屏布局下省掉一张独立卡片的高度
+          _buildInlineStats(appState, ac),
         ],
       ),
+    );
+  }
+
+  /// 累计数据（时长 / 题量 / 正确率）：三格横向，发丝竖线分隔。
+  /// 数值用等宽数字，保证三格数位对齐。
+  Widget _buildInlineStats(AppState appState, AppThemeColors ac) {
+    final stats = appState.homeStats;
+    // 三格并排，宽度有限：时长值天生最长（'4天23时'），
+    // 因此值一律用紧凑格式（fmtDurationCompact），标签也取最简写法，
+    // 避免 '累计刷题时长 / 4 天 23 小时' 这类长文本被截断成 "累计刷题…"。
+    // 每格 flex 按内容长度分配：时长格稍宽。
+    final items = <(IconData, String, String, int)>[
+      (
+        Icons.timer_outlined,
+        '刷题时长',
+        fmtDurationCompact(stats?.totalDurationSeconds ?? 0),
+        5
+      ),
+      (
+        Icons.quiz_outlined,
+        '总题量',
+        '${stats?.totalQuestions ?? 0}',
+        4
+      ),
+      (
+        Icons.trending_up,
+        '正确率',
+        stats?.formattedAccuracy ?? '0.0%',
+        4
+      ),
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0)
+            Container(
+              width: MaoLine.width,
+              height: 30,
+              margin: const EdgeInsets.symmetric(horizontal: MaoSpace.xs),
+              color: ac.border,
+            ),
+          Expanded(
+            flex: items[i].$4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(items[i].$1, size: 12, color: ac.textTertiary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(items[i].$2,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: MaoType.microStyle
+                              .copyWith(color: ac.textTertiary)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: MaoSpace.xs - 2),
+                // 数值不设 ellipsis：宁可缩小也不截断（FittedBox 兜底）
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(items[i].$3,
+                      maxLines: 1,
+                      style: MaoType.number(MaoType.h3,
+                              weight: FontWeight.w700)
+                          .copyWith(color: ac.textPrimary)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -432,72 +475,27 @@ class _HomeScreenState extends State<HomeScreen> {
     return '正确率 ${(correct / total * 100).toStringAsFixed(0)}%';
   }
 
-  /// v1.0.2 七项改进：断点续刷卡片（最新未完成会话）
-  Widget _buildResumeCard(AppState appState, AppThemeColors ac) {
-    final u = _unfinished;
-    if (u == null) return const SizedBox.shrink();
-    final (session, answered) = u;
-    final ac = AppThemeColors.of(context);
-    final modeLabel = switch (session.mode) {
-      'error_review' => '错题复习',
-      'kp_review' => '知识点复习',
-      _ => '刷题',
-    };
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Material(
-        color: ac.card,
-        borderRadius: BorderRadius.circular(MaoRadius.control),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(MaoRadius.control),
-          onTap: () async {
-            final ok = await appState.resumeUnfinishedSession();
-            if (!ok || !mounted) return;
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QuizScreen()),
-            );
-            await _loadWeeklyData(appState);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(MaoRadius.control),
-              // v1.27 呼吸感：续刷卡边框弱化，降低视觉噪音。
-              border: Border.all(color: ac.accent.withOpacity(0.35)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.play_circle_fill, color: ac.accent, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('继续上次刷题',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: MaoType.h3,
-                              color: ac.textPrimary)),
-                      const SizedBox(height: 2),
-                      Text(
-                        '已答 $answered/${session.totalQuestions} 题 · $modeLabel',
-                        style: TextStyle(
-                            fontSize: MaoType.body, color: ac.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right,
-                    size: 20, color: ac.textSecondary),
-              ],
-            ),
-          ),
-        ),
-      ),
+  /// 断点续刷：恢复未完成会话并进入答题页。
+  /// 寒暑假模式暂停答题（与「开始」页一致），此时给提示而不是静默失败。
+  Future<void> _resumeQuiz(AppState appState) async {
+    if (appState.vacationModeEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('寒暑假模式中，答题功能已暂停')),
+      );
+      return;
+    }
+    final ok = await appState.resumeUnfinishedSession();
+    if (!ok || !mounted) return;
+    final nav = Navigator.of(context);
+    await nav.push(
+      MaterialPageRoute(builder: (_) => const QuizScreen()),
     );
+    // 回来后重算：续刷可能已完成该会话，卡片要随之消失
+    if (!mounted) return;
+    await _loadWeeklyData(appState);
   }
 
+  /// v1.0.2 七项改进：断点续刷卡片（最新未完成会话）
   /// 寒暑假模式横幅
   Widget _buildVacationBanner(AppThemeColors ac) {
     return Container(
@@ -550,435 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsCards(AppState appState, AppThemeColors ac) {
-    final stats = appState.homeStats;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                icon: Icons.timer_outlined,
-                label: '累计刷题时长',
-                value: stats?.formattedDuration ?? '0 h 0 m',
-                ac: ac,
-              ),
-            ),
-            const SizedBox(width: MaoSpace.sm),
-            Expanded(
-              child: _StatCard(
-                icon: Icons.quiz_outlined,
-                label: '总刷题量',
-                value: '${stats?.totalQuestions ?? 0} 题',
-                ac: ac,
-              ),
-            ),
-            const SizedBox(width: MaoSpace.sm),
-            Expanded(
-              child: _StatCard(
-                icon: Icons.trending_up,
-                label: '平均正确率',
-                value: stats?.formattedAccuracy ?? '0%',
-                ac: ac,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: MaoSpace.xs),
-        Text(
-          '仅统计按「结束」完成的会话时长，中途退出不计',
-          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
-        ),
-      ],
-    );
-  }
-
-  /// 快速操作列表（v1.0.2 UI 设计稿：4 项，每项带状态文案与真实路由）
-  /// v1.28.1 新生引导：一键导入示例题库（免 Key、免文件，转后台执行）
-  void _importSampleBank(AppState appState) {
-    if (appState.importTaskActive) return;
-    unawaited(appState.startBackgroundSampleImport());
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已开始导入示例题库，进度见首页')),
-    );
-  }
-
-  Widget _buildQuickActions(AppState appState, AppThemeColors ac) {
-    final vacation = appState.vacationModeEnabled;
-    final ac = AppThemeColors.of(context);
-    // v1.0.3 宽屏重设计：四个入口提取为列表，窄屏纵列 / 宽屏 2×2 网格
-    final tiles = [
-      // 1. 定向爆破
-      _QuickActionTile(
-        icon: Icons.rocket_launch_rounded,
-        label: '定向爆破',
-        subtitle: appState.selectedBankIds.isEmpty
-            ? '请先选择题库'
-            : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
-        iconColor: ac.accent,
-        onTap: appState.selectedBankIds.isEmpty
-            ? () {
-                // v1.28.1 新生引导：空态提示带直达动作——没题库去导入，
-                // 有题库（未勾选）去题库管理页勾选
-                final hasBanks = appState.banks.isNotEmpty;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(hasBanks ? '先勾选要刷的题库' : '还没有题库，先导入一份吧'),
-                      action: SnackBarAction(
-                          label: hasBanks ? '去选择' : '去导入',
-                          onPressed: () => _navigateAndRefresh(
-                              context,
-                              appState,
-                              hasBanks
-                                  ? const BankManageScreen()
-                                  : const ImportScreen()))),
-                );
-              }
-            : () {
-                if (vacation) {
-                  _vacationBlocked(appState);
-                  return;
-                }
-                _showCountPicker(context, appState);
-              },
-      ),
-      // 2. 管理题库 → 题库管理页
-      _QuickActionTile(
-        icon: Icons.library_books_outlined,
-        label: '管理题库',
-        subtitle: appState.banks.isEmpty
-            ? '还没有题库，先去导入'
-            : '${appState.banks.length} 个题库',
-        iconColor: ac.accent.withOpacity(0.8),
-        onTap: () => _navigateAndRefresh(
-            context, appState, const BankManageScreen()),
-      ),
-      // 3. 错题本 → 错题复习页
-      _QuickActionTile(
-        icon: Icons.replay_rounded,
-        label: '错题本',
-        // v1.0.2 UI 审查修复：文案生硬 → 直白说明功能
-        subtitle: '智能排期，只显示应复习的错题',
-        iconColor: ac.danger,
-        onTap: () =>
-            _navigateAndRefresh(context, appState, const ErrorBookScreen()),
-      ),
-      // 4. 导入题库 → 文件导入页（DOCX 走 AI 解析，JSON 直接入库）
-      _QuickActionTile(
-        icon: Icons.upload_file,
-        label: '导入题库',
-        subtitle: 'AI 解析 DOCX，JSON 直接入库',
-        iconColor: ac.accent,
-        onTap: () =>
-            _navigateAndRefresh(context, appState, const ImportScreen()),
-      ),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('快速操作',
-            style: TextStyle(
-                fontSize: MaoType.h3, fontWeight: FontWeight.bold, color: ac.textPrimary)),
-        const SizedBox(height: 12),
-        // v1.28.1 新生引导卡：零题库时置顶展示，一步直达示例题库导入
-        if (appState.banks.isEmpty)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: ac.surface,
-              borderRadius: BorderRadius.circular(MaoRadius.control),
-              border: Border.all(color: ac.accent.withOpacity(0.55), width: 1.4),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: ac.accentSoft,
-                    borderRadius: BorderRadius.circular(MaoRadius.small),
-                  ),
-                  child: Icon(Icons.school_rounded, color: ac.accent, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('新生第一步',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: MaoType.body,
-                              color: ac.textPrimary)),
-                      const SizedBox(height: 2),
-                      Text('导入示例题库（10 道医学题），无需任何配置立即体验',
-                          style: TextStyle(
-                              fontSize: MaoType.caption,
-                              color: ac.textSecondary,
-                              height: 1.35)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () {
-                    _importSampleBank(appState);
-                  },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                  ),
-                  child: const Text('导入',
-                      style: TextStyle(fontSize: MaoType.caption)),
-                ),
-              ],
-            ),
-          ),
-        if (isWideLayout(context))
-          // v1.0.3 窗口自适应：按最大单元宽自动决定列数（宽窗 2 列，
-          // 拖窄时自动回 1 列）
-          GridView.extent(
-            maxCrossAxisExtent: 340,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 12,
-            // v1.27 字号放大：取消固定单元高，纵横比放宽自适应，
-            // 副标题多行换行也不溢出。
-            childAspectRatio: 2.0,
-            children: tiles,
-          )
-        else
-          ...tiles,
-      ],
-    );
-  }
-
   /// 路由占位：跳转页面并返回后刷新战绩
-  Future<void> _navigateAndRefresh(
-      BuildContext context, AppState appState, Widget page) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => page),
-    );
-    await _loadWeeklyData(appState);
-  }
-
-  void _showCountPicker(BuildContext context, AppState appState) {
-    final ac = AppThemeColors.of(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ac.background,
-      // 平板适配：弹窗限宽居中
-      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: ac.textSecondary.withOpacity(0.3), borderRadius: BorderRadius.circular(MaoRadius.chip)))),
-            const SizedBox(height: 20),
-            Text('选择刷题数量', style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.bold, color: ac.textPrimary), textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            Wrap(spacing: 12, runSpacing: 12, alignment: WrapAlignment.center, children: [
-              ...[10, 20, 30, 50, 80, 100].map((n) => ChoiceChip(
-                label: Text('$n 题'), selected: appState.selectedQuestionCount == n,
-                onSelected: (_) { appState.setQuestionCount(n); Navigator.pop(ctx); _showQuizModePicker(context, appState); },
-              )),
-              // v1.0.2 设计审查修复：全部/自定义的选中态反馈
-              ChoiceChip(label: const Text('全部'), selected: appState.selectedQuestionCount >= kQuestionCountAll, onSelected: (_) { appState.setQuestionCount(kQuestionCountAll); Navigator.pop(ctx); _showQuizModePicker(context, appState); }),
-              ChoiceChip(label: const Text('自定义'), selected: false, onSelected: (_) { Navigator.pop(ctx); _showCustomCountDialog(context, appState); }),
-            ]),
-            const SizedBox(height: 12),
-            Text('当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary), textAlign: TextAlign.center),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  void _showCustomCountDialog(BuildContext context, AppState appState) {
-    final ctrl = TextEditingController();
-    // v1.0.2 修复：弹窗关闭后释放 controller
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('自定义题目数'),
-        content: TextField(controller: ctrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '输入题数', border: OutlineInputBorder())),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          FilledButton(onPressed: () {
-            final n = int.tryParse(ctrl.text);
-            // v1.0.2 设计审查修复：非法输入给出反馈，不再静默无响应
-            if (n == null || n <= 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入大于 0 的有效题数')),
-              );
-              return;
-            }
-            appState.setQuestionCount(n);
-            Navigator.pop(ctx);
-            _showQuizModePicker(context, appState);
-          }, child: const Text('确定')),
-        ],
-      ),
-    ).then((_) => ctrl.dispose());
-  }
-
-  void _showQuizModePicker(BuildContext context, AppState appState) {
-    final ac = AppThemeColors.of(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ac.background,
-      // 平板适配：弹窗限宽居中
-      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(
-                    color: ac.textSecondary.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(MaoRadius.chip),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text('选择刷题模式',
-                  style: TextStyle(fontSize: MaoType.h2, fontWeight: FontWeight.bold, color: ac.textPrimary),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text('已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
-                  style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              _ModeOption(
-                icon: Icons.flash_on_rounded,
-                label: '正常刷题',
-                desc: '答完即判，立刻校对解析',
-                color: ac.accent,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startQuiz(appState);
-                },
-              ),
-              const SizedBox(height: 10),
-              _ModeOption(
-                icon: Icons.edit_square,
-                label: '练习',
-                desc: '答题卡模式，限时/不限时，统一批改',
-                color: ac.textSecondary,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startPractice(appState);
-                },
-              ),
-              const SizedBox(height: 10),
-              _ModeOption(
-                icon: Icons.visibility_rounded,
-                label: '背题模式',
-                desc: '直接展示答案，快速浏览记忆',
-                color: ac.accent,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startMemorize(appState);
-                },
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _startQuiz(AppState appState) async {
-    if (_vacationBlocked(appState)) return;
-    // v1.0.2 修复：刷题不再强制要求 API Key（AI 解析/追问内部单独提示）
-
-    await appState.startQuiz();
-
-    if (appState.quizQuestions.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('所选题库中没有题目，请先导入题目')),
-      );
-      return;
-    }
-
-    if (!mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const QuizScreen()),
-    );
-    // 返回首页后刷新战绩（v1.0.2）
-    await _loadWeeklyData(appState);
-  }
-
-  Future<void> _startPractice(AppState appState) async {
-    if (_vacationBlocked(appState)) return;
-    if (appState.selectedBankIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在首页选择题库')),
-      );
-      return;
-    }
-    // v1.0.2 修复：练习不落会话行（退出后练习记录不保存的承诺），无需 API Key
-    await appState.startQuiz(persistSession: false);
-    if (appState.quizQuestions.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('所选题库中没有题目，请先导入题目')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => const PracticeEntryScreen(),
-    ));
-    await _loadWeeklyData(appState);
-  }
-
-  Future<void> _startMemorize(AppState appState) async {
-    if (_vacationBlocked(appState)) return;
-    // v1.0.2 修复：背题无需 API Key；不落会话行（背题不计统计）
-    if (appState.selectedBankIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在首页选择题库')),
-      );
-      return;
-    }
-    appState.noShuffle = true;
-    try {
-      await appState.startQuiz(persistSession: false);
-    } finally {
-      appState.noShuffle = false; // v1.0.2 修复：异常时也复位，防泄漏到后续会话
-    }
-    if (appState.quizQuestions.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('所选题库中没有题目，请先导入题目')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => QuizScreen(quizMode: QuizMode.memorize),
-    ));
-    await _loadWeeklyData(appState);
-  }
-
-  /// v1.27 后台导入：首页进度卡（精确进度条 + 当前状态文字）。
-  /// 刷题页是 push 路由，首页不可见，天然满足「刷题中不显示」
   Widget _buildImportProgressCard(AppState appState, AppThemeColors ac) {
     final progress = appState.importProgress.clamp(0.0, 1.0);
     return Container(
@@ -1066,191 +636,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Icon(Icons.chevron_right, color: ac.accent),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final AppThemeColors ac;
-
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.ac,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: MaoSpace.xs, vertical: MaoSpace.sm + 2),
-      decoration: BoxDecoration(
-        color: ac.background,
-        borderRadius: MaoRadius.controlBorder,
-        border: Border.all(color: ac.border, width: MaoShadow.hairline),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: ac.accent, size: 24),
-          const SizedBox(height: MaoSpace.xs),
-          AnimatedSwitcher(
-            duration: MaoMotion.normal,
-            transitionBuilder: (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-            child: Text(value,
-                key: ValueKey(value),
-                textAlign: TextAlign.center,
-                style: MaoType.h3Style.copyWith(color: ac.textPrimary)),
-          ),
-          const SizedBox(height: MaoSpace.xxs),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
-        ],
-      ),
-    );
-  }
-}
-
-/// 快速操作列表项（图标 + 标题 + 状态副标题 + 跳转）
-class _QuickActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final Color iconColor;
-  final VoidCallback onTap;
-
-  const _QuickActionTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.iconColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: MaoSpace.sm - 2),
-      child: Material(
-        color: ac.background,
-        borderRadius: MaoRadius.controlBorder,
-        child: InkWell(
-          borderRadius: MaoRadius.controlBorder,
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: MaoSpace.md, vertical: MaoSpace.sm + 2),
-            decoration: BoxDecoration(
-              borderRadius: MaoRadius.controlBorder,
-              border: Border.all(color: ac.border, width: MaoShadow.hairline),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.12),
-                    borderRadius: MaoRadius.smallBorder,
-                  ),
-                  child: Icon(icon, color: iconColor, size: 20),
-                ),
-                const SizedBox(width: MaoSpace.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label,
-                          style: MaoType.h3Style.copyWith(
-                              color: ac.textPrimary, fontSize: MaoType.h3)),
-                      const SizedBox(height: MaoSpace.xxs / 2),
-                      Text(subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: MaoType.captionStyle
-                              .copyWith(color: ac.textSecondary)),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded,
-                    color: ac.textTertiary, size: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String desc;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ModeOption({
-    required this.icon,
-    required this.label,
-    required this.desc,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: ac.surfaceAlt,
-          borderRadius: BorderRadius.circular(MaoRadius.control),
-          border: Border.all(color: ac.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(MaoRadius.small),
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(label,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: MaoType.h3,
-                              color: ac.textPrimary)),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(desc,
-                      style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: ac.textSecondary, size: 20),
           ],
         ),
       ),

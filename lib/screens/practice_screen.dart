@@ -1,5 +1,6 @@
 import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
+import '../widgets/kit/mj_kit.dart';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
 import '../utils/responsive.dart';
@@ -161,8 +162,26 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
         child: ListView(controller: _scrollController, padding: const EdgeInsets.all(20), children: [
-        Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(gradient: LinearGradient(colors: [ac.accent, ac.accent.withOpacity(0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(MaoRadius.card)),
-          child: Column(children: [Text('${widget.accuracy}%', style: MaoType.displayStyle.copyWith(fontSize: MaoType.display, color: ac.onAccent)), const SizedBox(height: 8), Text('正确${widget.correct} · 错误${widget.wrong} · 未答${widget.blank}', style: MaoType.h3Style.copyWith(color: ac.onAccent.withOpacity(0.85))), const SizedBox(height: 4), Text(widget.timing == PracticeTiming.timed ? '限时${widget.durationMinutes}分钟 · 实际${_fmt(widget.elapsedSeconds)}' : '不限时 · 用时${_fmt(widget.elapsedSeconds)}', style: MaoType.captionStyle.copyWith(color: ac.onAccent.withOpacity(0.7)))])),
+        MJSurface(
+          accentEdge: true,
+          padding: const EdgeInsets.all(MaoSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              MaoNumber('${widget.accuracy}', size: 44, weight: FontWeight.w700, suffix: '%', color: ac.accent),
+              const SizedBox(height: MaoSpace.xs),
+              Text('正确${widget.correct} · 错误${widget.wrong} · 未答${widget.blank}',
+                  style: MaoType.h3Style.copyWith(
+                      fontWeight: FontWeight.w600, color: ac.textPrimary)),
+              const SizedBox(height: MaoSpace.xxs),
+              Text(
+                  widget.timing == PracticeTiming.timed
+                      ? '限时${widget.durationMinutes}分钟 · 实际${_fmt(widget.elapsedSeconds)}'
+                      : '不限时 · 用时${_fmt(widget.elapsedSeconds)}',
+                  style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
         // v1.0.2 七项改进：复盘答题卡（答对绿/答错红/未答灰，点格子定位错题）
         if (widget.answerStates.isNotEmpty) ...[

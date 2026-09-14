@@ -684,7 +684,9 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                     crossAxisCount: 2,
                                     crossAxisSpacing: 12,
                                     mainAxisSpacing: 0,
-                                    childAspectRatio: 5.5,
+                                    // 固定行高而非 childAspectRatio：宽屏卡片里元信息
+                                    // 行改为 Wrap 后可折成两行，比例锁高会转为纵向溢出
+                                    mainAxisExtent: 100,
                                   ),
                                   itemCount: _stats!.length,
                                   itemBuilder: (context, i) => buildCard(i),
@@ -748,20 +750,22 @@ class _BankErrorCard extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return InkWell(
-      borderRadius: BorderRadius.circular(MaoRadius.control),
+      borderRadius: MaoRadius.controlBorder,
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: MaoSpace.xs),
+        padding: const EdgeInsets.all(MaoSpace.sm + 2),
         decoration: BoxDecoration(
-          color: ac.surfaceAlt.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(MaoRadius.control),
+          color: ac.surface,
+          borderRadius: MaoRadius.controlBorder,
           border: Border.all(
-            color: selected ? ac.accent : Colors.transparent,
-            width: 1.5,
+            color: selected ? ac.accent : ac.border,
+            width: selected ? 1.4 : MaoLine.width,
           ),
         ),
         child: Row(
+          // 题库名与右侧题数顶部对齐（此前默认 center 让「N 题」浮在两行文字之间）
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
               selected
@@ -783,29 +787,31 @@ class _BankErrorCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: ac.textPrimary)),
                   const SizedBox(height: 4),
-                  Row(
+                  // 用 Wrap 而非 Row：窄屏下「173 题到期 · 175 收藏 · 下次到期：已到期179天」
+                  // 总宽约 314px 而可用只有约 229px，Row 的子项不可收缩会直接溢出、
+                  // 被屏幕右缘裁断（真机表现为末尾「天」字被切）。
+                  // Wrap 信息零丢失、放不下时自然折到第二行。
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (due > 0)
                         Text('$due 题到期',
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.danger)),
-                      if (due > 0 && bookmark > 0) ...[
-                        const SizedBox(width: 8),
+                      if (due > 0 && bookmark > 0)
                         Text('·',
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.textSecondary)),
-                        const SizedBox(width: 8),
-                      ],
                       Text('$bookmark 收藏',
                           style: TextStyle(
                               fontSize: MaoType.body, color: ac.textSecondary)),
                       // v1.0.2 FSRS 可见化：下次到期（该题库最早到期卡）
                       if (nextDueAt != null) ...[
-                        const SizedBox(width: 8),
                         Text('·',
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.textSecondary)),
-                        const SizedBox(width: 8),
                         Text(
                           '下次到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
                           style: TextStyle(
