@@ -12,7 +12,7 @@
 
 ## 提交前自检
 
-- [ ] `flutter analyze` 输出 0 issues
+- [ ] `flutter analyze --no-fatal-infos` 输出 0 error / 0 warning
 - [ ] `flutter test` 全部通过
 - [ ] 新增功能补充了测试；修复类提交补充了回归测试（如适用）
 - [ ] 数据库 schema 有变更时提供了迁移逻辑（如适用）

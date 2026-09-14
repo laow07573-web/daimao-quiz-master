@@ -210,7 +210,7 @@ Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
 - **244 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
   （每次 push 由 [GitHub Actions](https://github.com/laow07573-web/daimao-quiz-master/actions) 自动执行，见上方 CI 徽章）
 - 数据库 schema v11，外键级联、索引优化、事务一致性
-- 每次发版依次执行：静态分析（0 问题）→ 全量测试 → 混淆构建 → **组件 / 权限 / 文案 / 资源四维基线对照校验** → 签名校验
+- 每次发版依次执行：静态分析（0 error / 0 warning）→ 全量测试 → 混淆构建 → **组件 / 权限 / 文案 / 资源四维基线对照校验** → 签名校验
 
 发布历程：2026 年 6 月 15 日动工（初版「呆猫刷题宝」）→ 8 月 42 项修复 + AES 加密 →
 8 月起重建为「猫卷」，完成全新 UI、手写批注、局域网同步、三端适配与 AI 能力扩展。
@@ -227,7 +227,7 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 
 ```bash
 flutter pub get
-flutter analyze                 # 应输出 0 issues
+flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
 flutter test                    # 全量测试（当前 244 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release

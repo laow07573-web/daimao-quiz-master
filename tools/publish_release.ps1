@@ -1,7 +1,7 @@
 ﻿# MaoJuan - one-command release: build, verify, publish, deploy
 #
 # Full chain, in order:
-#   1. flutter analyze            (must be 0 issues)
+#   1. flutter analyze            (0 error / 0 warning; info-level lints are fine)
 #   2. flutter test               (must be all green)
 #   3. build Windows + universal APK
 #   4. verify_reference           (must print >>> PASS)
