@@ -9,6 +9,7 @@ import 'package:flashcard_app/screens/error_book_screen.dart' show questionStatL
 import 'package:flashcard_app/services/app_state.dart';
 import 'package:flashcard_app/services/bank_file_service.dart';
 import 'package:flashcard_app/services/database_service.dart';
+import 'package:flashcard_app/services/export_storage.dart';
 import 'package:flashcard_app/services/fsrs_service.dart';
 
 /// 错题导出增强 + 逐题统计的回归测试。
@@ -23,11 +24,15 @@ void main() {
     await DatabaseService.instance.close();
     tmp = Directory.systemTemp.createTempSync('mj_error_export_');
     DatabaseService.overrideDbPath = '${tmp.path}/flashcard.db';
+    // 导出目录注入到临时目录：既不让测试往用户的「文档/猫卷导出」里写，
+    // 也让「导出落到哪个文件夹」这件事可断言（path_provider 在测试里没有实现）
+    ExportStorage.overrideDirForTest = '${tmp.path}/猫卷导出';
   });
 
   tearDown(() async {
     await DatabaseService.instance.close();
     DatabaseService.overrideDbPath = null;
+    ExportStorage.overrideDirForTest = null;
     try {
       tmp.deleteSync(recursive: true);
     } catch (_) {}
@@ -429,7 +434,7 @@ void main() {
       expect(questions[100]['title'], 'Q999');
     });
 
-    test('连续两次导出文件名不同，两份都留；陈旧导出会被回收', () async {
+    test('导出落在「猫卷导出」目录里，连续两次文件名不同且两份都留', () async {
       final appState = AppState();
       await appState.init();
       await seedErrorQuestion('导出两次', wrong: 1, correct: 0, daysAgo: 1);
@@ -439,19 +444,20 @@ void main() {
       expect(c1, 1);
       expect(c2, 1);
       expect(p1, isNot(p2), reason: '文件名撞车会让后一次覆盖前一次');
-      expect(File(p1!).existsSync(), isTrue,
-          reason: '刚导出的另一份不能立刻删掉——它可能还在分享目标手里');
+      expect(File(p1!).existsSync(), isTrue);
       expect(File(p2!).existsSync(), isTrue);
 
-      // 造一个两小时前的旧导出文件：下一次导出应把它回收
-      final stale = File('${Directory.systemTemp.path}/错题导出_1.json');
+      // 用户要能按目录自己翻出来：文件名可以不同，但都在同一个可展示的目录里
+      final dir = ExportStorage.overrideDirForTest!;
+      expect(ExportStorage.folderOf(p1), dir);
+      expect(ExportStorage.folderOf(p2), dir);
+      expect(p1.startsWith(dir), isTrue);
+      // 目录里已有的旧导出不再被自动删除（那是用户的东西，不该被清掉）
+      final stale = File('${dir}${Platform.pathSeparator}错题导出_1.json');
       stale.writeAsStringSync('{}');
-      stale.setLastModifiedSync(
-          DateTime.now().subtract(const Duration(hours: 2)));
       await appState.exportErrorQuestionsJson('all');
-      expect(stale.existsSync(), isFalse,
-          reason: '陈旧的导出文件要回收，否则缓存目录只增不减');
-      expect(File(p2).existsSync(), isTrue);
+      expect(stale.existsSync(), isTrue,
+          reason: '导出目录是用户可见目录，不能再按时间回收用户文件');
     });
   });
 

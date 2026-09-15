@@ -20,6 +20,7 @@ import 'sample_bank.dart';
 import 'stats_service.dart';
 import 'debug_log_service.dart';
 import 'docx_export_service.dart';
+import 'export_storage.dart';
 import 'fsrs_service.dart';
 import 'key_crypto.dart';
 import 'secure_key_storage.dart';
@@ -1650,13 +1651,12 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       },
       'questions': list,
     });
-    // 写在系统临时目录（Android 上即应用缓存目录），不建子目录；
-    // 文件名带毫秒 + 亚毫秒，同一毫秒内连续导出两次不会互相覆盖。
+    // 落在用户能找到的目录（见 [ExportStorage]），文件名带毫秒 + 亚毫秒，
+    // 同一毫秒内连续导出两次不会互相覆盖。
     final name = '错题导出_${stamp.millisecondsSinceEpoch}'
         '${stamp.microsecond % 1000}';
-    final dir = Directory.systemTemp;
-    _recycleOldExports(dir, stamp);
-    final file = File('${dir.path}/$name.json');
+    final dir = await ExportStorage.resolve();
+    final file = File('${dir.path}${Platform.pathSeparator}$name.json');
     await file.writeAsString(json);
     return (file.path, list.length);
   }
@@ -1696,31 +1696,10 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     final stamp = DateTime.now();
     final name = '错题练习_${stamp.millisecondsSinceEpoch}'
         '${stamp.microsecond % 1000}';
-    final dir = Directory.systemTemp;
-    _recycleOldExports(dir, stamp);
-    final file = File('${dir.path}/$name.docx');
+    final dir = await ExportStorage.resolve();
+    final file = File('${dir.path}${Platform.pathSeparator}$name.docx');
     await file.writeAsBytes(bytes, flush: true);
     return (file.path, questions.length);
-  }
-
-  /// 回收一小时前的旧导出文件。
-  ///
-  /// 分享用的是 share_plus 复制出去的副本，但刚导出那份可能还在分享目标手里，
-  /// 所以按时间留一段宽限期，而不是导一次删一次。
-  void _recycleOldExports(Directory dir, DateTime now) {
-    try {
-      final cutoff = now.subtract(const Duration(hours: 1));
-      for (final f in dir.listSync()) {
-        final base = f.path.split(RegExp(r'[\\/]')).last;
-        final ours = (base.startsWith('错题导出_') && base.endsWith('.json')) ||
-            (base.startsWith('错题练习_') && base.endsWith('.docx'));
-        if (f is File && ours && f.lastModifiedSync().isBefore(cutoff)) {
-          f.deleteSync();
-        }
-      }
-    } catch (_) {
-      // 清理失败（权限/占用）不影响导出本身
-    }
   }
 
   /// 批量取逐题作答统计（做过几次 / 正确数）。一次聚合查询，供错题列表与卡片使用。

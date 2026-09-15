@@ -9,6 +9,7 @@ import 'package:flashcard_app/models/question.dart';
 import 'package:flashcard_app/models/question_bank.dart';
 import 'package:flashcard_app/services/app_state.dart';
 import 'package:flashcard_app/services/database_service.dart';
+import 'package:flashcard_app/services/export_storage.dart';
 import 'package:flashcard_app/services/docx_export_service.dart';
 
 /// 「导出成 Word 打印稿」的回归测试。
@@ -24,11 +25,15 @@ void main() {
     await DatabaseService.instance.close();
     tmp = Directory.systemTemp.createTempSync('mj_docx_');
     DatabaseService.overrideDbPath = '${tmp.path}/flashcard.db';
+    // 导出目录注入到临时目录：既不让测试往用户的「文档/猫卷导出」里写，
+    // 也让「导出落到哪个文件夹」这件事可断言（path_provider 在测试里没有实现）
+    ExportStorage.overrideDirForTest = '${tmp.path}/猫卷导出';
   });
 
   tearDown(() async {
     await DatabaseService.instance.close();
     DatabaseService.overrideDbPath = null;
+    ExportStorage.overrideDirForTest = null;
     try {
       tmp.deleteSync(recursive: true);
     } catch (_) {}
