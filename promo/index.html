@@ -559,7 +559,12 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 /* —— 内容区（自然裁切，等同真机可视区域） —— */
 .mbody{flex:1;min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:12px}
 /* 可滚动浏览（隐藏滚动条，由 JS 缓慢上下平移，展示更多内容） */
-.mbody[data-pan]{overflow-y:auto;-ms-overflow-style:none;scrollbar-width:none}
+.mbody[data-pan]{overflow-y:auto;-ms-overflow-style:none;scrollbar-width:none;
+  /* 底部渐隐：内容长过手机壳时（首页深色 + stats 两个示意会超出一屏，
+     分别超 58px / 125px），被裁的卡片平滑淡出，而不是被硬切一刀——
+     静态看像坏了，而页面本来就靠上面的慢速滚动把它带出来 */
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 26px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 26px),transparent 100%)}
 .mbody[data-pan]::-webkit-scrollbar{display:none}
 
 /* —— Hero 问候卡 —— */
