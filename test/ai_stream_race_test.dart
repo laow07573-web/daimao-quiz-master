@@ -36,12 +36,17 @@ void main() {
     } catch (_) {}
   });
 
-  /// 等异步链路走完（数据库在后台 isolate，单靠 pumpEventQueue 有时不够）
-  Future<void> settle() async {
-    for (var i = 0; i < 8; i++) {
+  /// 轮询等到 [cond] 成立——**不要用固定次数的 pump/delay**：
+  /// 数据库在后台 isolate、流的分片要走真实事件循环，固定等待在慢 runner 上
+  /// 会不够。这条不是理论风险：CI 上曾因此把「已收到第一段」误判成空串
+  /// （同一个提交本地全绿、CI 红），根因就是这里等了固定 80ms。
+  Future<void> waitFor(bool Function() cond, {required String what}) async {
+    for (var i = 0; i < 300; i++) {
       await pumpEventQueue();
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      if (cond()) return;
     }
+    fail('等不到$what（超过 6s）');
   }
 
   /// 造一道已入库、已加入错题本、已答错一次的题
@@ -116,13 +121,13 @@ void main() {
     await appState.startErrorReview(mode: 'all');
     expect(appState.quizQuestions.length, 2);
     await appState.showAnalysis();
-    await settle();
+    await waitFor(() => appState.currentAnalysis != null, what: '缓存里的解析');
     expect(appState.currentAnalysis, isNotNull,
         reason: '缓存里的解析要先就位，否则 sendFollowUp 会直接返回');
 
     final streamedQuestionId = appState.currentQuestion!.id!;
     final send = appState.sendFollowUp('为什么选 A？');
-    await settle();
+    await waitFor(() => appState.streamingReply.isNotEmpty, what: '第一段流式内容');
     expect(appState.streamingReply, '前半',
         reason: '流式进行中应能拿到半截内容（这正是「边生成边显示」）');
 
