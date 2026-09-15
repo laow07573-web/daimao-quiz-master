@@ -6,6 +6,8 @@ import 'package:share_plus/share_plus.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
 import '../services/docx_export_service.dart';
+import '../services/export_storage.dart';
+import 'package:flutter/services.dart';
 import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
@@ -716,23 +718,56 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     await _share(messenger, path, '已导出 $count 题（$where）', '猫卷错题练习');
   }
 
-  /// 把产物交给系统分享；分享失败时把缓存路径回显出来（用户自己翻不到）。
+  /// 把产物交给系统分享，并告诉用户文件保存到了哪个文件夹。
+  ///
+  /// 提示放在分享**之后**：系统分享面板是全屏的，先弹的 SnackBar 会在用户从
+  /// 面板返回之前就超时消失，等于白提示。有了文件夹，用户即使没分享、也没记住
+  /// 文件名，也能自己按目录翻出来（打印、发同学、存档）。
   Future<void> _share(ScaffoldMessengerState messenger, String path,
       String okText, String subject) async {
-    messenger.showSnackBar(SnackBar(
-      content: Text(okText),
-      duration: const Duration(seconds: 3),
-    ));
+    var shared = true;
     try {
       await Share.shareXFiles([XFile(path)], subject: subject);
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
-      if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text('分享失败：$e\n文件已生成：$path'),
-        duration: const Duration(seconds: 6),
-      ));
+      shared = false;
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content:
+              Text('分享失败：$e\n文件已保存：${ExportStorage.fileNameOf(path)}'),
+          duration: const Duration(seconds: 6),
+        ));
+      }
     }
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      duration: const Duration(seconds: 8),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(shared ? okText : '$okText（已保存，未分享）'),
+          const SizedBox(height: 3),
+          Text('保存位置：${ExportStorage.folderOf(path)}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: MaoType.microStyle
+                  .copyWith(color: Colors.white.withOpacity(0.85))),
+        ],
+      ),
+      action: SnackBarAction(
+        label: '复制路径',
+        onPressed: () {
+          // 连文件名一起复制：目录里可能有多份导出，只有目录分不出哪份是这次的
+          Clipboard.setData(ClipboardData(text: path));
+          messenger.hideCurrentSnackBar();
+          messenger.showSnackBar(const SnackBar(
+            content: Text('已复制文件完整路径'),
+            duration: Duration(seconds: 2),
+          ));
+        },
+      ),
+    ));
   }
 
   Future<void> _startReview() async {
