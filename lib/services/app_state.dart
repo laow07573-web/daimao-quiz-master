@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/question.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
@@ -22,6 +24,12 @@ import 'key_crypto.dart';
 import 'secure_key_storage.dart';
 
 class AppState extends ChangeNotifier {
+  /// 测试注入：给定则用它构造 [AIService]（配合 MockClient 覆盖流式竞态等
+  /// 只能在 AppState 层验证的行为）。生产代码不传，行为不变。
+  AppState({http.Client? aiClient}) : _aiClientOverride = aiClient;
+
+  final http.Client? _aiClientOverride;
+
   final DatabaseService _db = DatabaseService.instance;
   final QuizService _quizService = QuizService();
   final StatsService _statsService = StatsService();
@@ -58,6 +66,21 @@ class AppState extends ChangeNotifier {
   bool _analysisLoading = false;
   bool get analysisLoading => _analysisLoading;
 
+  /// 进行中的讲解流（切题 / 重建 AI 服务 / 退出时要取消）
+  StreamSubscription<String>? _analysisSub;
+
+  /// 解析流的通知节流时间戳（见 _notifyAnalysisThrottled）
+  DateTime _lastAnalysisNotify = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 解析代次：每发起一次生成就自增。**同一题可能有多条流**（点重新生成、
+  /// 切走再切回），所以守卫要用代次而不是题号——否则旧流的 chunk 会被当成新结果。
+  int _analysisGen = 0;
+
+  /// 正在流式生成的追问回复（App 内对话页据此渲染「边生成边显示」的气泡）；
+  /// 生成完成后并入 followUpHistory，这里清空。
+  String _streamingReply = '';
+  String get streamingReply => _streamingReply;
+
   // 上次答题结果
   AnswerRecord? _lastAnswerRecord;
   AnswerRecord? get lastAnswerRecord => _lastAnswerRecord;
@@ -90,6 +113,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _currentQuestionStats = {};
     _currentFsrsCard = null;
     _followUpHistory = [];
+    // 流式输出改造：切题时必须掐断进行中的流，否则旧题的 chunk 会写进新题
+    _cancelAnalysisStream();
+    _streamingReply = '';
   }
 
   // 首页统计
@@ -359,9 +385,12 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   void _initAIService() {
     // v1.0.2 设计审查修复：重建前关闭旧实例的 http.Client，
-    // 避免每次保存设置/启动都泄漏一个 socket 连接
+    // 避免每次保存设置/启动都泄漏一个 socket 连接。
+    // 流式改造补充：先取消在途的流——旧 client 被 close 时进行中的流会抛异常，
+    // 不取消的话「保存设置」会把正在显示的解析打崩。
+    _cancelAnalysisStream();
     _aiService?.dispose();
-    _aiService = AIService(_settings);
+    _aiService = AIService(_settings, client: _aiClientOverride);
   }
 
   AIService? get aiService => _aiService;
@@ -593,8 +622,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       _db.getSessionDetail(sessionId);
 
   /// 按知识点正确率排行
-  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() =>
-      _db.getAccuracyByKnowledgePoint();
+  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint(
+          {Set<int>? bankIds}) =>
+      _db.getAccuracyByKnowledgePoint(bankIds: bankIds);
 
   /// 各题库正确率（薄弱点分析/统计页排行）
   Future<List<BankAccuracy>> getBankAccuracies() =>
@@ -1053,21 +1083,73 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _analysisLoading = true;
     notifyListeners();
 
-    // v1.0.2 设计审查修复：异常兜底 + finally 复位，防止加载圈永久卡死
+    // 流式输出：边生成边显示。命中缓存时 streamAnalysis 会整段给出（不流式），
+    // 因此这里的消费逻辑对「缓存 / 流式 / 回退一次性」三种情况都成立。
+    //
+    // 三处必须的防护：
+    //   · 切题竞态：chunk 到达时比对题号，不是当前题就丢弃（流已随切题取消，
+    //     但取消与在途 chunk 之间有窗口）
+    //   · 节流：markdown 每帧全量重解析，逐 chunk 通知会掉帧 → 60ms 合并一次
+    //   · 异常兜底：finally 复位 loading，防止加载圈永久卡死（沿用原逻辑）
+    final questionId = q.id;
+    // 必须先取消上一条流，并用**代次**而非题号做守卫：
+    // 「点重新生成解析」「切走再切回」都会让同一题有两条流在跑，题号相等挡不住，
+    // 两条流的 chunk 会交错写入 currentAnalysis（文本抖动、缓存被旧版本覆盖、
+    // 还多花一份 token）。旧订阅若只是被覆盖赋值，就再也取消不掉了。
+    _cancelAnalysisStream();
+    final gen = ++_analysisGen;
+    final sub = _aiService!.streamAnalysis(q).listen(
+      (accumulated) {
+        // 注意：不要在这里写 onError/onDone —— 下面的 `asFuture()` 会**覆盖**
+        // listen 时传入的这两个回调（Dart SDK 行为），写了也不会执行。
+        // 收尾统一由 catch / finally 负责。
+        if (gen != _analysisGen || currentQuestion?.id != questionId) return;
+        _currentAnalysis = accumulated;
+        _analysisLoading = false; // 首个 chunk 到达即撤掉转圈
+        _notifyAnalysisThrottled();
+      },
+      cancelOnError: true,
+    );
+    _analysisSub = sub;
+
     try {
-      _currentAnalysis = await _aiService!.getAnalysis(q);
+      await sub.asFuture<void>();
     } catch (e) {
       DebugLogService.instance.log('AI', '解析加载失败: $e');
-      _currentAnalysis = null;
+      if (gen == _analysisGen && currentQuestion?.id == questionId) {
+        _currentAnalysis = null;
+      }
     } finally {
-      _analysisLoading = false;
-      notifyListeners();
+      if (gen == _analysisGen && currentQuestion?.id == questionId) {
+        _analysisLoading = false;
+        notifyListeners();
+      }
     }
+  }
+
+  /// 解析流的节流通知：60ms 内的多个 chunk 合并成一次 notifyListeners。
+  void _notifyAnalysisThrottled() {
+    final now = DateTime.now();
+    if (now.difference(_lastAnalysisNotify) < const Duration(milliseconds: 60)) {
+      return;
+    }
+    _lastAnalysisNotify = now;
+    notifyListeners();
+  }
+
+  void _cancelAnalysisStream() {
+    _analysisSub?.cancel();
+    _analysisSub = null;
+    // 代次自增：让在途 chunk 的回调立刻失效（取消与在途 chunk 之间有窗口）
+    _analysisGen++;
   }
 
   /// 手动查看解析
   Future<void> showAnalysis() async {
-    await _loadAnalysis();
+    // 流式改造：**不再 await 解析**。对话页进入时会调它，若在这里等整条流结束，
+    // 页面就一直显示转圈，「边生成边显示」等于白做。解析结果通过
+    // currentAnalysis 的增量通知驱动 UI，调用方不需要等。
+    unawaited(_loadAnalysis());
     await _loadFollowUpHistory();
   }
 
@@ -1123,11 +1205,26 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     await _db.saveFollowUpMessage(qId, 'user', question);
 
     var reply = '';
+    // 流式输出：边生成边显示。_streamingReply 供对话页渲染进行中的气泡，
+    // 生成完成后清空并照旧写入历史 + 落库（数据库只存最终完整文本）。
+    //
+    // 切题时**不能 break**——break 会取消底层订阅并留下半截回答，随后被当作
+    // 最终结果落库（改造前只有完整结果才会存）。这里改成：继续把流读完，
+    // 只是不再刷新 UI，这样回到那道题看到的是完整回答。
+    _streamingReply = '';
+    final onCurrentQuestion = () => currentQuestion?.id == qId;
     try {
-      reply = await _aiService!.askFollowUp(q, _currentAnalysis!, question);
+      await for (final acc
+          in _aiService!.streamFollowUp(q, _currentAnalysis!, question)) {
+        reply = acc;
+        if (!onCurrentQuestion()) continue; // 已切题：不更新 UI，但继续收完
+        _streamingReply = acc;
+        _notifyAnalysisThrottled();
+      }
     } catch (e) {
       DebugLogService.instance.log('AI', '追问失败: $e');
     }
+    _streamingReply = '';
     if (_isAiError(reply)) reply = '追问失败，请检查网络后重试。';
 
     _followUpLoading = false;
@@ -1470,33 +1567,148 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   // ======================== v1.0.2 对齐里程碑：错题导出 JSON ========================
 
-  /// 导出当前筛选下的错题为 .json 题库文件（带 format 标记）。
-  /// 返回文件路径；失败返回 null。
-  Future<String?> exportErrorQuestionsJson(String mode,
-      {Set<int>? bankIds}) async {
-    final questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
-    if (questions.isEmpty) return null;
-    final list = questions.map((q) => {
-          'title': q.title,
-          'options': q.options,
-          'correct_answer': q.correctAnswer,
-          'analysis': q.analysis,
-          'question_type': q.questionType,
-          'knowledge_point': q.knowledgePoint,
-        }).toList();
+  /// 导出错题为 .json 题库文件（带 format 标记），返回 `(文件路径, 题数)`；
+  /// 无题可导出时返回 `(null, 0)`。
+  ///
+  /// 排序与筛选都在 SQL 里做（默认「错得最多」= `ORDER BY wrong_count DESC`），
+  /// 不把全量题拉到 Dart 再排。
+  ///
+  /// - [window]：按最近一次作答时间过滤，`'7d'` / `'30d'`
+  /// - [recentFirst]：true = 最近做过的在前；默认错得最多的在前
+  /// - [questionIds]：自定义选题导出
+  /// - [knowledgePoint]：只导出某个知识点（「最薄弱点」导出走这里）
+  /// - [includeStats]：给每题附 `stats` / `fsrs` 元数据。**向后兼容**：
+  ///   导入侧只读已知键、忽略未知键，所以带统计的导出文件仍可被当前版本导入。
+  Future<(String?, int)> exportErrorQuestionsJson(
+    String mode, {
+    Set<int>? bankIds,
+    Set<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+    bool recentFirst = false,
+    bool includeStats = false,
+  }) async {
+    final rows = await _db.getErrorQuestionsWithStats(
+      mode,
+      bankIds: bankIds,
+      questionIds: questionIds,
+      knowledgePoint: knowledgePoint,
+      window: window,
+      recentFirst: recentFirst,
+    );
+    if (rows.isEmpty) return (null, 0);
+
+    // 只有需要统计时才批量取 FSRS 卡（一次 IN 查询，不是逐题）
+    Map<int, FSRSCardState> cards = const {};
+    if (includeStats) {
+      final ids = rows.map((r) => r['id'] as int).toList();
+      cards = await _db.getFsrsCardsByIds(ids);
+    }
+
+    final list = rows.map((m) {
+      final q = Question.fromMap(m);
+      final entry = <String, dynamic>{
+        'title': q.title,
+        'options': q.options,
+        'correct_answer': q.correctAnswer,
+        'analysis': q.analysis,
+        'question_type': q.questionType,
+        'knowledge_point': q.knowledgePoint,
+      };
+      if (includeStats) {
+        entry['stats'] = {
+          'answered': (m['answered_count'] as int?) ?? 0,
+          'correct': (m['correct_count'] as int?) ?? 0,
+          'wrong': (m['wrong_count'] as int?) ?? 0,
+          'last_answered_at': m['last_answered_at'],
+        };
+        final card = q.id == null ? null : cards[q.id];
+        if (card != null) {
+          entry['fsrs'] = {
+            'stability': card.stability,
+            'difficulty': card.difficulty,
+            'review_count': card.reviewCount,
+            'last_review_at': card.lastReviewAt.toIso8601String(),
+            'next_review_at': card.nextReviewAt.toIso8601String(),
+          };
+        }
+      }
+      return entry;
+    }).toList();
+
+    final stamp = DateTime.now();
     final json = const JsonEncoder.withIndent('  ').convert({
       'format': BankFileService.formatMarker,
-      'name': '错题导出_${DateTime.now().millisecondsSinceEpoch}',
+      'name': '错题导出_${stamp.millisecondsSinceEpoch}',
       'count': list.length,
+      'exported_at': stamp.toIso8601String(),
+      'filter': {
+        'mode': mode,
+        if (window != null) 'window': window,
+        if (knowledgePoint != null) 'knowledge_point': knowledgePoint,
+      },
       'questions': list,
     });
-    // v1.0.2 修复：复用系统临时目录单文件（此前每次新建 createTempSync('export')
-    // 目录且从不清理，累积垃圾）
-    final tmp = Directory.systemTemp;
-    final file = File(
-        '${tmp.path}/错题导出_${DateTime.now().millisecondsSinceEpoch}.json');
+    // 写在系统临时目录（Android 上即应用缓存目录），不建子目录；
+    // 文件名带毫秒 + 亚毫秒，同一毫秒内连续导出两次不会互相覆盖。
+    // 顺手回收一小时前的旧导出（分享用的是 share_plus 复制出去的副本，
+    // 但刚导出那份可能还在分享目标手里，所以按时间留一段宽限期）。
+    final name = '错题导出_${stamp.millisecondsSinceEpoch}'
+        '${stamp.microsecond % 1000}';
+    final dir = Directory.systemTemp;
+    try {
+      final cutoff = stamp.subtract(const Duration(hours: 1));
+      for (final f in dir.listSync()) {
+        final base = f.path.split(RegExp(r'[\\/]')).last;
+        if (f is File &&
+            base.startsWith('错题导出_') &&
+            base.endsWith('.json') &&
+            f.lastModifiedSync().isBefore(cutoff)) {
+          f.deleteSync();
+        }
+      }
+    } catch (_) {
+      // 清理失败（权限/占用）不影响导出本身
+    }
+    final file = File('${dir.path}/$name.json');
     await file.writeAsString(json);
-    return file.path;
+    return (file.path, list.length);
+  }
+
+  /// 批量取逐题作答统计（做过几次 / 正确数）。一次聚合查询，供错题列表与卡片使用。
+  Future<Map<int, (int total, int correct)>> getQuestionStatsByIds(
+          List<int> questionIds) =>
+      _db.getQuestionStatsByIds(questionIds);
+
+  /// 错题卡片数据：题目 + 作答次数/正确数 + FSRS 卡。
+  ///
+  /// 两条批量查询（题目+统计一条、FSRS 一条），**避免 N+1**；
+  /// 卡片上要显示的「做过几次 / 正确率 / 下次复习」都来自这里。
+  Future<List<({Question question, int answered, int correct, FSRSCardState? card})>>
+      getErrorQuestionCards(
+    String mode, {
+    Set<int>? bankIds,
+    String? window,
+    bool recentFirst = false,
+  }) async {
+    final rows = await _db.getErrorQuestionsWithStats(
+      mode,
+      bankIds: bankIds,
+      window: window,
+      recentFirst: recentFirst,
+    );
+    if (rows.isEmpty) return const [];
+    final ids = rows.map((r) => r['id'] as int).toList();
+    final cards = await _db.getFsrsCardsByIds(ids);
+    return rows.map((m) {
+      final q = Question.fromMap(m);
+      return (
+        question: q,
+        answered: (m['answered_count'] as int?) ?? 0,
+        correct: (m['correct_count'] as int?) ?? 0,
+        card: q.id == null ? null : cards[q.id],
+      );
+    }).toList();
   }
 
   // ======================== 统计 ========================
@@ -1549,6 +1761,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   @override
   void dispose() {
+    _cancelAnalysisStream();
     _aiService?.dispose();
     super.dispose();
   }

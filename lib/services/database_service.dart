@@ -27,6 +27,13 @@ class DatabaseService {
 
   /// 数据来源过滤片段（SQL 内联用）。
   /// 注意：值来自本类静态字段，非用户输入，无注入风险。
+  /// 单条 SQL 里允许的最大绑定变量数（留足余量）。
+  ///
+  /// SQLite < 3.32 的 `SQLITE_MAX_VARIABLE_NUMBER` 默认是 **999**，而 Android ≤ 11
+  /// 出厂自带的 SQLite 恰在此列（12 才到 3.32）。所有 `IN (...)` 批量查询都必须
+  /// 按这个数分块，否则在旧机上抛 `too many SQL variables`。
+  static const int maxBindingVars = 500;
+
   static String get sourceFilter =>
       includeSimulatedData ? "('real','simulation')" : "('real')";
 
@@ -1396,8 +1403,7 @@ class DatabaseService {
   }
 
   /// 获取到期的 FSRS 错题（按题库分组）
-  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {
-    final db = await database;
+  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {    final db = await database;
     final results = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (
@@ -1417,17 +1423,27 @@ class DatabaseService {
   }
 
   /// 批量取题目复习卡（question_id → 卡；FSRS 可见化：错题本逐题「下次复习」显示用）
+  /// 批量取 FSRS 复习卡。
+  ///
+  /// 按 500 分块：SQLite < 3.32（Android ≤ 11 出厂版本）单条语句的绑定变量上限是
+  /// **999**，一次传入上千个 id 会抛 `too many SQL variables`——而调用方
+  /// （错题导出、知识点弹窗）传的正是全量错题 id。
   Future<Map<int, FSRSCardState>> getFsrsCardsByIds(
       List<int> questionIds) async {
     if (questionIds.isEmpty) return const {};
     final db = await database;
-    final placeholders = List.filled(questionIds.length, '?').join(',');
-    final maps = await db.query('fsrs_cards',
-        where: 'question_id IN ($placeholders)', whereArgs: questionIds);
-    return {
-      for (final m in maps)
-        (m['question_id'] as int): FSRSCardState.fromMap(m),
-    };
+    final out = <int, FSRSCardState>{};
+    for (var i = 0; i < questionIds.length; i += maxBindingVars) {
+      final chunk =
+          questionIds.sublist(i, min(i + maxBindingVars, questionIds.length));
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final maps = await db.query('fsrs_cards',
+          where: 'question_id IN ($placeholders)', whereArgs: chunk);
+      for (final m in maps) {
+        out[m['question_id'] as int] = FSRSCardState.fromMap(m);
+      }
+    }
+    return out;
   }
 
   /// 按题库获取错题统计（到期题数 + 收藏题数 + 全部去重数）。
@@ -1803,8 +1819,16 @@ class DatabaseService {
   }
 
   /// 按知识点的正确率排行（排除隐藏记录；AI 失败标记不入排行）
-  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() async {
+  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint(
+      {Set<int>? bankIds}) async {
     final db = await database;
+    // 与错题本「薄弱知识点」面板同口径：给定时只统计这些题库，
+    // 否则面板收窄后正确率仍是全库的，两者混在一起送给 AI 会得出错误结论
+    final bankWhere = (bankIds != null && bankIds.isNotEmpty)
+        ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
+        : '';
+    final args =
+        bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     return await db.rawQuery('''
       SELECT q.knowledge_point as name, COUNT(ar.id) as total,
              SUM(CASE WHEN ar.is_correct = 1 THEN 1 ELSE 0 END) as correct
@@ -1815,9 +1839,10 @@ class DatabaseService {
         AND q.knowledge_point NOT LIKE 'AI请求失败%'
         AND q.knowledge_point NOT LIKE 'AI服务返回错误%'
         AND q.knowledge_point NOT LIKE 'AI解析生成失败%'
+        $bankWhere
       GROUP BY q.knowledge_point
       ORDER BY total DESC
-    ''');
+    ''', args);
   }
 
   /// 某周期（week/month/all）的答题统计
@@ -2348,5 +2373,191 @@ class DatabaseService {
     } catch (_) {
       return false;
     }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 错题导出与逐题统计
+  // ════════════════════════════════════════════════════════════
+
+  /// 批量取「作答次数 / 正确数」。
+  ///
+  /// 一次 `GROUP BY question_id` 聚合，**不要**逐题调 [getQuestionStats]——
+  /// 那是每題两条 SQL，给几十张卡片用就是典型的 N+1。
+  /// 口径与全仓统计一致：`hidden = 0 AND source IN (sourceFilter)`。
+  /// 返回 `question_id → (作答次数, 正确次数)`；没有作答记录的题不出现。
+  Future<Map<int, (int total, int correct)>> getQuestionStatsByIds(
+      List<int> questionIds) async {
+    if (questionIds.isEmpty) return const {};
+    final db = await database;
+    final out = <int, (int total, int correct)>{};
+    // SQLite 绑定变量有上限（历史上默认 999），按 500 分块
+    for (var i = 0; i < questionIds.length; i += maxBindingVars) {
+      final chunk =
+          questionIds.sublist(i, min(i + maxBindingVars, questionIds.length));
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final rows = await db.rawQuery('''
+        SELECT question_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct
+        FROM answer_records
+        WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}
+          AND question_id IN ($placeholders)
+        GROUP BY question_id
+      ''', chunk);
+      for (final r in rows) {
+        out[r['question_id'] as int] = (
+          (r['total'] as int?) ?? 0,
+          (r['correct'] as int?) ?? 0,
+        );
+      }
+    }
+    return out;
+  }
+
+  /// 取错题（带逐题作答统计）——导出与卡片展示共用同一条查询，避免两处口径分叉。
+  ///
+  /// - [mode]：与 [getFullErrorQuestions] 同义（all / wrong / bookmark）
+  /// - [questionIds]：给定则只取这些题（自定义导出），忽略 [mode] 的错题范围
+  /// - [window]：按**最近一次作答时间**过滤，`'7d'` / `'30d'`；null 不限
+  /// - [recentFirst]：true = 最近做过的在前；false（默认）= 错得最多的在前
+  ///
+  /// 返回的每行是 `q.*` 加上 `answered_count` / `correct_count` / `wrong_count` /
+  /// `last_answered_at`，因此 `Question.fromMap(row)` 照常可用，统计字段另取。
+  Future<List<Map<String, dynamic>>> getErrorQuestionsWithStats(
+    String mode, {
+    Set<int>? bankIds,
+    Set<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+    bool recentFirst = false,
+  }) async {
+    // 自定义选题：分块查询再合并。一条 SQL 塞上千个 id 会在旧 SQLite 上抛
+    // `too many SQL variables`（见 [maxBindingVars]），而分块会打乱全局排序，
+    // 所以合并后统一在 Dart 侧重排（候选集就是用户勾选的那些，量不大）。
+    // 传空集合 = 用户一道都没选：返回空，而不是悄悄退回「当前筛选的全部」。
+    if (questionIds != null) {
+      if (questionIds.isEmpty) return const [];
+      final ids = questionIds.toList();
+      final merged = <Map<String, dynamic>>[];
+      // 每条语句的绑定变量 = questionIds + bankIds + knowledgePoint，
+      // 所以每块能放的 id 数要把 bankIds 先扣掉
+      final budget = maxBindingVars - ((bankIds?.length ?? 0) + 1);
+      final chunkSize = budget < 1 ? 1 : budget;
+      for (var i = 0; i < ids.length; i += chunkSize) {
+        final chunk = ids.sublist(i, min(i + chunkSize, ids.length));
+        merged.addAll(await _errorWithStatsQuery(
+          mode,
+          bankIds: bankIds,
+          questionIds: chunk,
+          knowledgePoint: knowledgePoint,
+          window: window,
+          recentFirst: recentFirst,
+        ));
+      }
+      _sortErrorRows(merged, recentFirst);
+      return merged;
+    }
+
+    return _errorWithStatsQuery(
+      mode,
+      bankIds: bankIds,
+      knowledgePoint: knowledgePoint,
+      window: window,
+      recentFirst: recentFirst,
+    );
+  }
+
+  /// 分块合并后的重排（与 SQL 里的 ORDER BY 保持一致）
+  void _sortErrorRows(List<Map<String, dynamic>> rows, bool recentFirst) {
+    if (recentFirst) {
+      // 并列时按 id 倒序兜底：与 SQL 的 `, q.id DESC` 一致。
+      // 少了这一条，List.sort（不稳定）在时间戳并列时可能与直接查库的顺序不同，
+      // 同一批题「自定义导出」和「当前筛选导出」的顺序就会对不上。
+      rows.sort((a, b) {
+        final t = ((b['last_answered_at'] as String?) ?? '')
+            .compareTo((a['last_answered_at'] as String?) ?? '');
+        if (t != 0) return t;
+        return ((b['id'] as int?) ?? 0).compareTo((a['id'] as int?) ?? 0);
+      });
+    } else {
+      rows.sort((a, b) {
+        final w = ((b['wrong_count'] as int?) ?? 0)
+            .compareTo((a['wrong_count'] as int?) ?? 0);
+        if (w != 0) return w;
+        final c = ((b['answered_count'] as int?) ?? 0)
+            .compareTo((a['answered_count'] as int?) ?? 0);
+        if (c != 0) return c;
+        return ((b['id'] as int?) ?? 0).compareTo((a['id'] as int?) ?? 0);
+      });
+    }
+  }
+
+  /// 内部：单条查询。调用方保证 [questionIds] 已分块，且
+  /// `questionIds + bankIds + knowledgePoint` 的绑定变量总数不超过 [maxBindingVars]
+  /// （见 [getErrorQuestionsWithStats] 里按 bankIds 扣减的 chunkSize）。
+  Future<List<Map<String, dynamic>>> _errorWithStatsQuery(
+    String mode, {
+    Set<int>? bankIds,
+    List<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+    bool recentFirst = false,
+  }) async {
+    final db = await database;
+    final where = <String>[];
+    final args = <Object>[];
+
+    if (questionIds != null && questionIds.isNotEmpty) {
+      where.add('q.id IN (${List.filled(questionIds.length, '?').join(',')})');
+      args.addAll(questionIds);
+    } else {
+      where.add('q.id IN (${_errorIdSubquery(mode)})');
+    }
+    if (bankIds != null && bankIds.isNotEmpty) {
+      where.add('q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})');
+      args.addAll(bankIds);
+    }
+    if (knowledgePoint != null && knowledgePoint.isNotEmpty) {
+      // 与 getKnowledgePointStats / getFullQuestionsByKnowledgePoint 同一约定：
+      // 分组里的「未打标签」代表**空知识点**，不是字面量标签。新导入的题库默认
+      // 没有知识点，这一组常常正是最大的一组；照字面量匹配会命中 0 行，
+      // 用户点「最薄弱知识点」导出时只会看到「暂无错题」。
+      if (knowledgePoint == '未打标签') {
+        where.add("(q.knowledge_point IS NULL OR q.knowledge_point = '')");
+      } else {
+        where.add('q.knowledge_point = ?');
+        args.add(knowledgePoint);
+      }
+    }
+    if (window == '7d' || window == '30d') {
+      final days = window == '7d' ? 7 : 30;
+      where.add("s.last_answered_at IS NOT NULL AND "
+          "datetime(s.last_answered_at) >= datetime('now', 'localtime', '-$days days')");
+    }
+
+    final orderBy = recentFirst
+        ? 's.last_answered_at DESC, q.id DESC'
+        : 'wrong_count DESC, answered_count DESC, q.id DESC';
+
+    final rows = await db.rawQuery('''
+      SELECT q.*,
+             COALESCE(s.total, 0)   AS answered_count,
+             COALESCE(s.correct, 0) AS correct_count,
+             COALESCE(s.total, 0) - COALESCE(s.correct, 0) AS wrong_count,
+             s.last_answered_at
+      FROM questions q
+      LEFT JOIN (
+        SELECT question_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct,
+               MAX(answered_at) AS last_answered_at
+        FROM answer_records
+        WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}
+        GROUP BY question_id
+      ) s ON s.question_id = q.id
+      WHERE ${where.join(' AND ')}
+      ORDER BY $orderBy
+    ''', args);
+    return rows;
   }
 }

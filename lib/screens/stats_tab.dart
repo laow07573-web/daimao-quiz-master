@@ -892,8 +892,9 @@ class _ErrorStatsSection extends StatelessWidget {
                   ),
                   Text(
                     '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}'
-                    // v1.0.2 FSRS 可见化：该题库最早到期卡
-                    '${s['next_due_at'] != null ? ' · 下次到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
+                    // v1.0.2 FSRS 可见化：该题库最早到期的卡（SQL 只取 <= now 的卡，
+                    // 只可能是「已到期/今天」，写「下次到期」语义自相矛盾）
+                    '${s['next_due_at'] != null ? ' · 最早到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
                     style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
                   ),
                 ],

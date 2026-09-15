@@ -24,7 +24,11 @@ class AIParseResult {
 class AIService {
   final AppSettings _settings;
   final DatabaseService _db = DatabaseService.instance;
-  final http.Client _client = http.Client();
+
+  /// HTTP 客户端。默认自建；**测试可注入**——流式分支要走 `send()` 拿
+  /// `StreamedResponse`，用 `package:http/testing.dart` 的 `MockClient.streaming`
+  /// 才能覆盖「服务商不支持流式」「非 200」这些兼容分支。
+  final http.Client _client;
 
   // 余额与消耗追踪
   int _totalTokensUsed = 0;
@@ -34,7 +38,8 @@ class AIService {
   double? get cachedBalance => _cachedBalance;
   static const _balanceCacheDuration = Duration(minutes: 5);
 
-  AIService(this._settings);
+  AIService(this._settings, {http.Client? client})
+      : _client = client ?? http.Client();
 
   /// 使用 AI 从原始文本中批量解析题目。
   /// 返回 [AIParseResult]（成功题目 + 失败分块原因），调用方据此显性提示。
@@ -432,16 +437,236 @@ $chunk
       }
     }
 
-    // 调用 AI 生成解析
-    final analysis = await _callAIForAnalysis(question);
+    return _generateAndCacheAnalysis(question);
+  }
 
-    // 缓存结果（失败串不入缓存：断网/401 等错误不会被永久当成解析展示，
-    // 下次点击可重新请求）
+  /// 生成解析并缓存（失败串不入缓存，下次点击可重新请求）
+  Future<String> _generateAndCacheAnalysis(Question question) async {
+    final analysis = await _callAIForAnalysis(question);
     if (question.id != null && analysis.isNotEmpty && !isAiError(analysis)) {
       await _db.cacheAnalysis(question.id!, analysis);
     }
-
     return analysis;
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 流式输出（SSE）
+  //
+  // 动机：让用户看到 AI 正在生成，而不是对着转圈等十几秒。
+  // 三条硬约束（决定了下面前两个方法为什么这么写）：
+  //   1. **已保存的解析不流式**——命中 ai_cache 就整段给出，直接展示即可；
+  //   2. **不因流式而功能退化**——任何一步失败都要回退到原有的一次性请求，
+  //      用户的最终结果与改造前一致，只是少了「边生成边看」；
+  //   3. **服务商不可信**——「任意 OpenAI 兼容接口」里有一部分不支持
+  //      `stream:true`，或用非标准 SSE（无空格、\r\n、心跳注释、delta 非字符串），
+  //      因此解析要宽容、失败要能降级。
+  // ════════════════════════════════════════════════════════════
+
+  /// 从一行 SSE 文本里取出增量内容；返回 null 表示这行不含内容
+  /// （注释行 / 心跳 / `[DONE]` / 空 delta / 非 JSON）。
+  ///
+  /// 公开为 `@visibleForTesting`：SSE 的边角情况很多，用纯函数测最划算。
+  @visibleForTesting
+  static String? deltaFromSseLine(String line) {
+    if (!line.startsWith('data:')) return null; // 还含 event:/id:/注释行
+    final payload = line.substring(5).trim();
+    if (payload.isEmpty || payload == '[DONE]') return null;
+    try {
+      final data = jsonDecode(payload);
+      if (data is! Map) return null;
+      final choices = data['choices'];
+      if (choices is! List || choices.isEmpty) return null;
+      final first = choices[0];
+      if (first is! Map) return null;
+      final delta = first['delta'];
+      if (delta is! Map) return null;
+      final content = delta['content'];
+      // 类型保护：某些实现把 content 给成数组/对象
+      return (content is String && content.isNotEmpty) ? content : null;
+    } catch (_) {
+      return null; // 半行或非 JSON 噪音
+    }
+  }
+
+  /// 是否为 SSE 的结束标记（`data: [DONE]`）
+  @visibleForTesting
+  static bool isSseDoneLine(String line) =>
+      line.startsWith('data:') && line.substring(5).trim() == '[DONE]';
+
+  /// 从一行 SSE 里取 token 用量（流式默认不返回 usage，部分服务商会在末尾补上）。
+  /// 取不到就返回 null，不影响主流程。
+  @visibleForTesting
+  static int? usageFromSseLine(String line) {
+    if (!line.startsWith('data:')) return null;
+    final payload = line.substring(5).trim();
+    if (payload.isEmpty || payload == '[DONE]') return null;
+    try {
+      final data = jsonDecode(payload);
+      if (data is! Map) return null;
+      final usage = data['usage'];
+      if (usage is! Map) return null;
+      final total = usage['total_tokens'];
+      return total is int ? total : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从一次性响应体里取正文（兼容分支复用，与 [_callAI] 的取值口径一致）
+  static String? _contentFromChatBody(String body) {
+    try {
+      final data = jsonDecode(body);
+      if (data is! Map) return null;
+      final choices = data['choices'];
+      if (choices is! List || choices.isEmpty) return null;
+      final first = choices[0];
+      if (first is! Map) return null;
+      final message = first['message'];
+      if (message is! Map) return null;
+      final content = message['content'];
+      return content is String ? content : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 流式对话：产出**累计文本**（每次都给出到目前为止的全文），
+  /// 调用方直接赋值即可，不必自己拼接。
+  ///
+  /// 任一步失败即抛异常，由 [streamAnalysis] / [streamFollowUp] 负责回退。
+  Stream<String> _streamChat(String userPrompt) async* {
+    final request = http.Request('POST', ApiEndpoint.resolve(_settings.apiEndpoint))
+      ..headers.addAll(await _headers())
+      ..headers['Accept'] = 'text/event-stream'
+      ..body = jsonEncode({
+        'model': _settings.model,
+        'messages': [
+          {
+            'role': 'system',
+            'content': '你是一个专业的学习辅导助手，擅长解析题目、分析学习薄弱点，并提供针对性建议。'
+          },
+          {'role': 'user', 'content': userPrompt},
+        ],
+        'temperature': 0.3,
+        'max_tokens': 4096,
+        'stream': true,
+      });
+
+    // 30s 只覆盖「拿到响应头」；正文的停滞由下面流上的 60s 空闲超时兜底
+    final response = await _client.send(request).timeout(const Duration(seconds: 30));
+    final contentType = response.headers['content-type'] ?? '';
+
+    // 兼容一：服务商忽略 stream:true，按老格式一次性返回整段 JSON。
+    // 这不是错误——照原样给出内容即可，用户完全无感。
+    if (response.statusCode == 200 && !contentType.contains('text/event-stream')) {
+      final body = await response.stream.bytesToString();
+      final content = _contentFromChatBody(body);
+      if (content != null && content.isNotEmpty) {
+        yield content;
+        return;
+      }
+      throw Exception('AI流式响应格式无法识别');
+    }
+
+    if (response.statusCode != 200) {
+      final body = await response.stream.bytesToString();
+      DebugLogService.instance
+          .logRawResponse(_settings.apiEndpoint, response.statusCode, body.length);
+      throw Exception('AI服务返回错误 (${response.statusCode})');
+    }
+
+    final buffer = StringBuffer();
+    var received = false;
+    // 总时长上限：只有「空闲超时」不够——网关若持续发心跳注释行（`: keep-alive`）
+    // 却永不发 [DONE]、也不关连接，空闲计时会被不断重置，流永不结束，
+    // 调用方的 loading 就永久卡住。改造前的一次性请求有 30s 硬超时，不会无限等。
+    final deadline = DateTime.now().add(const Duration(minutes: 5));
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter()) // 自动处理 \n 与 \r\n
+        .timeout(const Duration(seconds: 60)); // 流空闲超时
+
+    await for (final line in lines) {
+      if (DateTime.now().isAfter(deadline)) {
+        throw Exception('AI流式响应超时');
+      }
+      if (isSseDoneLine(line)) break;
+      // token 统计：流式默认不带 usage，但部分服务商会在末尾 chunk 里给出；
+      // 有就记，没有就算了（不主动加 stream_options，避免严格网关直接 400）
+      final usage = usageFromSseLine(line);
+      if (usage != null) _totalTokensUsed += usage;
+      final delta = deltaFromSseLine(line);
+      if (delta == null) continue;
+      received = true;
+      buffer.write(delta);
+      yield buffer.toString();
+    }
+
+    // 兼容二：流开了却一个内容字都没有（例如推理模型只给 reasoning_content，
+    // 或网关把流吞了）→ 抛给上层回退一次性请求，而不是把空结果当成功
+    if (!received) throw Exception('AI流式响应为空');
+  }
+
+  /// 单题讲解的流式版本。
+  ///
+  /// - 命中缓存：整段给出，**不流式**（已保存的内容没必要重新生成）
+  /// - 流式失败：回退到一次性的 [getAnalysis] 路径，结果与改造前一致
+  Stream<String> streamAnalysis(Question question) async* {
+    if (question.id != null) {
+      try {
+        final cached = await _db.getCachedAnalysis(question.id!);
+        if (cached != null && cached.isNotEmpty) {
+          yield cached;
+          return;
+        }
+      } catch (e) {
+        DebugLogService.instance.log('AI', '解析缓存读取失败，直连 AI: $e');
+      }
+    }
+
+    try {
+      var last = '';
+      await for (final acc in _streamChat(_analysisPrompt(question))) {
+        last = acc;
+        yield acc;
+      }
+      if (last.isEmpty || isAiError(last)) {
+        yield await _generateAndCacheAnalysis(question);
+        return;
+      }
+      // 写缓存**移出 try**：缓存写失败（磁盘满 / SQLITE_BUSY / 题行被删）不该
+      // 被当成「流式失败」，否则会再发一次完整 AI 请求、并用新文本覆盖用户
+      // 已经看完的解析（既多花钱又让内容前后不一致）。
+      if (question.id != null) {
+        try {
+          await _db.cacheAnalysis(question.id!, last);
+        } catch (e) {
+          DebugLogService.instance.log('AI', '解析写缓存失败（不影响展示）: $e');
+        }
+      }
+    } catch (e) {
+      DebugLogService.instance.log('AI', '流式讲解失败，回退一次性请求: $e');
+      yield await _generateAndCacheAnalysis(question);
+    }
+  }
+
+  /// 追问的流式版本。追问没有缓存语义，失败同样回退一次性。
+  Stream<String> streamFollowUp(
+      Question question, String analysis, String followUpQuestion) async* {
+    try {
+      var last = '';
+      await for (final acc
+          in _streamChat(_followUpPrompt(question, analysis, followUpQuestion))) {
+        last = acc;
+        yield acc;
+      }
+      if (last.isEmpty || isAiError(last)) {
+        yield await askFollowUp(question, analysis, followUpQuestion);
+      }
+    } catch (e) {
+      DebugLogService.instance.log('AI', '流式追问失败，回退一次性请求: $e');
+      yield await askFollowUp(question, analysis, followUpQuestion);
+    }
   }
 
   /// 判断是否为 AI 失败/错误串（非真实解析内容）
@@ -457,11 +682,16 @@ $chunk
   /// v1.28：篇幅随「AI 解析详细程度」档位浮动；关键词标记沿用同一套约定符号；
   /// 渲染器已支持 Markdown 表格，故不再禁止表格，仅在需要对比/罗列时使用。
   Future<String> askFollowUp(Question question, String analysis,
-      String followUpQuestion) async {
+          String followUpQuestion) async =>
+      await _callAI(_followUpPrompt(question, analysis, followUpQuestion));
+
+  /// 追问的提示词（同上：流式与一次性共用同一份）
+  String _followUpPrompt(
+      Question question, String analysis, String followUpQuestion) {
     final detail = _detailBlock;
     final marking = _markingBlock;
 
-    final prompt = '''你是一个专业的答题解析助手，正在以聊天的方式回答学生的追问。
+    return '''你是一个专业的答题解析助手，正在以聊天的方式回答学生的追问。
 
 原题：${question.title}
 ${question.options.isNotEmpty ? '选项：\n${question.optionsWithLabels.join('\n')}' : ''}
@@ -477,8 +707,6 @@ $detail$marking
 - 用 Markdown 输出，**默认用段落和列表**。
 - 只有当「对比多项、罗列多条」时，才用 Markdown 表格（| 表头 | ... | + | --- | 分隔行）；其余情况不要用表格。
 - 不要输出 JSON 或代码块包裹正文。''';
-
-    return await _callAI(prompt);
   }
 
   /// 生成薄弱点分析
@@ -666,11 +894,16 @@ $statsText
       : '';
 
   /// 核心 AI 调用方法
-  Future<String> _callAIForAnalysis(Question question) async {
+  Future<String> _callAIForAnalysis(Question question) async =>
+      await _callAI(_analysisPrompt(question));
+
+  /// 单题讲解的提示词。抽出来是因为流式与一次性两条路径必须用**完全相同**的
+  /// 提示词——否则「流式失败回退一次性」会得到口径不一致的讲解。
+  String _analysisPrompt(Question question) {
     final detail = _detailBlock;
     final marking = _markingBlock;
 
-    final prompt = '''# 角色
+    return '''# 角色
 你是一位擅长"题眼破题法"的医学考试辅导老师。你的讲解必须像临床带教老师讲病例一样，直击要害，不说废话。
 
 # 题目
@@ -704,8 +937,6 @@ $marking
 - **排除法**：[结合机制说明各干扰项错误原因]
 **避坑指南：** [直接点出易错陷阱和鉴别点]
 **一句话记忆：** [帮助快速记忆的口诀或类比]''';
-
-    return await _callAI(prompt);
   }
 
   Future<String> _callAI(String userPrompt) async {

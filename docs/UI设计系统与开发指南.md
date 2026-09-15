@@ -129,6 +129,10 @@ final ac = AppThemeColors.of(context);   // 唯一姿势
 4. **判题色不动**：success(绿)/danger(红)，不用 M3 的 tertiary/error
 5. **文案变化**：会触发 `verify_reference` 文案差异，走白名单合并
    （`REFCHECK_MERGE=1` 强制合并，见 §5），**不要改 baseline 参考 APK**
+   · 注意：release 包是 `--obfuscate` 的，字符串是从 `libapp.so` 里"扫"出来的，
+     相邻字符串会被粘成一条——所以**每次构建的文案清单都会抖动**，合并时多出
+     几百条属正常。真正要看的是两类：①【组件/权限/资源】必须全为「无」；
+     ②「原版有新版无」里有没有**本该存在**的功能文案（老版本被改写掉的措辞不算）
 6. **数据层/安全体系不碰**：schema、统计口径、密钥加密、防篡改、AI 渲染器
 7. **测试对应**：`widget_test`（闪屏/首页文案）、`trend_chart_test`（颜色断言）、
    `selection_highlight_test`（像素判据）、`wide_layout/window_adapt`（坐标断言）
@@ -141,7 +145,7 @@ final ac = AppThemeColors.of(context);   // 唯一姿势
 export PATH="/d/dev/flutter/bin:$PATH"
 
 flutter analyze --no-fatal-infos       # 必须 0 error/0 warning（info 不计）
-flutter test                           # 必须 179 项全绿
+flutter test                           # 必须 313 项全绿
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 
 # 四维基线校验（组件/权限/文案/资源）
