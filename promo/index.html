@@ -1020,6 +1020,10 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
         <span class="mtag" style="font-size:12px">解剖学 61 题</span>
         <span class="mtag" style="font-size:12px">药理学 38 题</span>
         <span class="mtag" style="font-size:12px">生理学 24 题</span>
+        <span class="mtag" style="font-size:12px">免疫学 21 题</span>
+        <span class="mtag" style="font-size:12px">补体系统 15 题</span>
+        <span class="mtag" style="font-size:12px">MHC 9 题</span>
+        <span class="mtag" style="font-size:12px">抗原 8 题</span>
       </div>
     </div>
     <div class="mcard" style="padding:12px">
@@ -1040,6 +1044,26 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
         <span style="color:var(--m-fg2)">96 收藏</span>
         <span style="color:var(--m-fg2)">·</span>
         <span style="color:var(--m-bad)">最早到期：今天</span>
+      </div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mch"><b style="font-size:14px">解剖学</b><span class="sp"></span><span style="color:var(--m-accent);font-weight:700;font-size:13px">61 题</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;margin-top:8px">
+        <span style="color:var(--m-bad)">12 题到期</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-fg2)">61 收藏</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-bad)">最早到期：已到期9天</span>
+      </div>
+    </div>
+    <div class="mcard" style="padding:12px">
+      <div class="mch"><b style="font-size:14px">免疫学</b><span class="sp"></span><span style="color:var(--m-accent);font-weight:700;font-size:13px">21 题</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;margin-top:8px">
+        <span style="color:var(--m-bad)">21 题到期</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-fg2)">21 收藏</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-bad)">最早到期：已到期29天</span>
       </div>
     </div>
     <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">全题库重刷（共 18 题）</div>
@@ -1414,8 +1438,9 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <li><b>按范围导出</b>：最薄弱知识点 / 最近做过 / 近 7 天 / 近 30 天，或自己勾选题目</li>
       <li><b>导出 Word 打印稿</b>：导成 .docx 直接打印成纸质题目，答案可以印在题目下方，也可以集中到最后一页</li>
       <li><b>题库文件导出</b>：需要把题目导回猫卷时用 .json，可再导入</li>
+      <li><b>看得到保存在哪</b>：导完直接显示保存文件夹并可一键复制路径；文件放在文件管理器能打开、数据线也能拷出的目录</li>
       <li><b>错题卡带数据</b>：每道题显示做过几次、正确率与 FSRS 复习轮数、下次复习时间</li>
-      <li><b>薄弱诊断</b>：结合统计数据生成学习建议</li>
+      <li><b>薄弱诊断</b>：结合统计数据生成学习建议，按标题 + 加粗分点排版，打开就能读</li>
     </ul>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
@@ -1434,6 +1459,14 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       </div>
       <div class="tl-labels"><span>今天</span><span>+1天</span><span>+3天</span><span>+8天</span><span>+21天</span></div>
       <div class="tl-note">答对越快、间隔越长 —— <b>把时间花在快忘的题上</b></div>
+    </div>
+    <div style="width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px">
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:10px">薄弱诊断 · AI 基于本地统计精炼</div>
+      <div style="font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:8px">最优先复习知识点</div>
+      <div style="font-size:12.5px;line-height:1.8;color:var(--tx2)">
+        <b style="color:var(--tx)">病理学</b>：错题 <b style="color:var(--tx)">53 道</b>（无正确率记录），错题量居首，基础框架与病变机制需系统重建<br>
+        <b style="color:var(--tx)">内科学</b>：错题 <b style="color:var(--tx)">52 道</b>，与病理学并列高频，建议优先强化
+      </div>
     </div>
   </div>
 </div>
