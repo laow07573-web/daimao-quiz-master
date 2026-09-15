@@ -3,6 +3,7 @@ import '../services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../models/question.dart';
 import '../services/app_state.dart';
 import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
@@ -152,8 +153,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
         await appState.getFullQuestionsByKnowledgePoint(kp, _filter,
             bankIds: bankIds);
     // v1.0.2 FSRS 可见化：逐题复习卡（下次复习时间）
-    final cards = await appState.getFsrsCardsByIds(
-        questions.map((q) => q.id).whereType<int>().toList());
+    final ids = questions.map((q) => q.id).whereType<int>().toList();
+    final cards = await appState.getFsrsCardsByIds(ids);
+    // 逐题作答统计（做过几次 / 正确率）：一次 GROUP BY 聚合，不逐题查库
+    final stats = await appState.getQuestionStatsByIds(ids);
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
@@ -197,34 +200,45 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                     itemBuilder: (context, i) {
                       final q = questions[i];
                       final card = q.id != null ? cards[q.id] : null;
+                      final st = q.id != null ? stats[q.id] : null;
+                      final due = card != null &&
+                          FSRSService.isDue(card, DateTime.now());
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 5),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Text(
-                                '${i + 1}. ${q.title}',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: MaoType.body, color: ac.textPrimary),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${i + 1}. ${q.title}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: MaoType.body,
+                                        color: ac.textPrimary),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  // 逐题统计：做过几次 · 正确率 · FSRS 复习轮数 · 下次复习
+                                  Text(
+                                    questionStatLine((
+                                      question: q,
+                                      answered: st?.$1 ?? 0,
+                                      correct: st?.$2 ?? 0,
+                                      card: card,
+                                    )),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: MaoType.caption,
+                                      color: due ? ac.danger : ac.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            // v1.0.2 FSRS 可见化：下次复习时间（到期红色）
-                            if (card != null) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                '下次复习：${relativeDayLabel(card.nextReviewAt)}',
-                                style: TextStyle(
-                                  fontSize: MaoType.caption,
-                                  color: FSRSService.isDue(
-                                          card, DateTime.now())
-                                      ? ac.danger
-                                      : ac.textSecondary,
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       );
@@ -311,26 +325,221 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     }
   }
 
-  /// v1.0.2 对齐里程碑：导出当前筛选错题为 .json 题库文件
-  Future<void> _exportJson() async {
+  /// 导出错题：先让用户选范围，再导出为 .json（可再导入）。
+  ///
+  /// 选项对应产品要求：最薄弱知识点 / 最近 / 近一周 / 近一个月 / 自定义选题；
+  /// 「错得最多的」是默认排序（`wrong DESC`），在 SQL 里完成，不拉全量到 Dart 排。
+  Future<void> _showExportOptions() async {
     final appState = context.read<AppState>();
-    final path = await appState.exportErrorQuestionsJson(_filter,
-        bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
+    final ac = AppThemeColors.of(context);
+    final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
+    // 当前筛选下的题数（用于在选项上标注规模）
+    final total = await appState.getFullErrorCount(_filter, bankIds: bankIds);
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    if (path == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('当前筛选下暂无错题')),
-      );
+
+    final kps = _kpStats;
+    final weakestKp = kps.isEmpty ? null : (kps.first['kp'] as String?);
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: ac.background,
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(MaoSpace.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('导出错题', style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+              const SizedBox(height: MaoSpace.xxs),
+              Text('导出为 .json，可再导入回猫卷；导出内容按「错得最多」排序',
+                  style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+              const SizedBox(height: MaoSpace.md),
+              _ExportOption(
+                icon: Icons.filter_alt_outlined,
+                title: '当前筛选',
+                subtitle: '共 $total 题',
+                onTap: () => Navigator.pop(ctx, 'current'),
+              ),
+              if (weakestKp != null)
+                _ExportOption(
+                  icon: Icons.local_fire_department_outlined,
+                  title: '最薄弱知识点',
+                  subtitle: '$weakestKp（错题最多）',
+                  onTap: () => Navigator.pop(ctx, 'kp:$weakestKp'),
+                ),
+              _ExportOption(
+                icon: Icons.schedule_outlined,
+                title: '近 7 天做过的',
+                subtitle: '错得最多的在前',
+                onTap: () => Navigator.pop(ctx, 'w7d'),
+              ),
+              _ExportOption(
+                icon: Icons.date_range_outlined,
+                title: '近 30 天做过的',
+                subtitle: '错得最多的在前',
+                onTap: () => Navigator.pop(ctx, 'w30d'),
+              ),
+              _ExportOption(
+                icon: Icons.checklist_outlined,
+                title: '选择题目导出…',
+                subtitle: '自己挑要导出的题',
+                onTap: () => Navigator.pop(ctx, 'pick'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+
+    switch (action) {
+      case 'current':
+        await _export(bankIds: bankIds);
+      case 'w7d':
+        await _export(bankIds: bankIds, window: '7d');
+      case 'w30d':
+        await _export(bankIds: bankIds, window: '30d');
+      case 'pick':
+        await _pickAndExport(bankIds: bankIds);
+      default:
+        if (action.startsWith('kp:')) {
+          await _export(bankIds: bankIds, knowledgePoint: action.substring(3));
+        }
+    }
+  }
+
+  /// 自定义选题导出：列表多选 → 导出所选。
+  Future<void> _pickAndExport({Set<int>? bankIds}) async {
+    final appState = context.read<AppState>();
+    final ac = AppThemeColors.of(context);
+    final cards = await appState.getErrorQuestionCards(_filter, bankIds: bankIds);
+    if (!mounted) return;
+    if (cards.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('当前筛选下暂无错题')));
       return;
     }
-    final count = await appState.getFullErrorCount(_filter,
-        bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
+    final selected = <int>{};
+
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ac.background,
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(MaoSpace.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('选择要导出的错题',
+                        style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => setSheet(() {
+                        if (selected.length == cards.length) {
+                          selected.clear();
+                        } else {
+                          selected.addAll(cards.map((c) => c.question.id!));
+                        }
+                      }),
+                      child: Text(selected.length == cards.length ? '取消全选' : '全选',
+                          style: MaoType.captionStyle.copyWith(color: ac.accent)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: MaoSpace.xs),
+                // 懒加载 + 限高：错题可能上百道，不用 Column 一次全展开
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(ctx).size.height * 0.5),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: cards.length,
+                    itemBuilder: (_, i) {
+                      final it = cards[i];
+                      final id = it.question.id!;
+                      final checked = selected.contains(id);
+                      return CheckboxListTile(
+                        dense: true,
+                        value: checked,
+                        onChanged: (v) => setSheet(() {
+                          if (v == true) {
+                            selected.add(id);
+                          } else {
+                            selected.remove(id);
+                          }
+                        }),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(it.question.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                MaoType.bodyStyle.copyWith(color: ac.textPrimary)),
+                        subtitle: Text(questionStatLine(it),
+                            style: MaoType.microStyle
+                                .copyWith(color: ac.textSecondary)),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: MaoSpace.sm),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selected.isEmpty
+                        ? null
+                        : () => Navigator.pop(ctx, true),
+                    child: Text('导出所选（${selected.length} 题）'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await _export(questionIds: selected);
+  }
+
+  /// 执行导出并分享。
+  Future<void> _export({
+    Set<int>? bankIds,
+    Set<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+  }) async {
+    final appState = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    final (path, count) = await appState.exportErrorQuestionsJson(
+      _filter,
+      bankIds: bankIds,
+      questionIds: questionIds,
+      knowledgePoint: knowledgePoint,
+      window: window,
+      includeStats: true, // 带上「做过几次/正确率/FSRS」，便于外部查看
+    );
     if (!mounted) return;
+    if (path == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('当前范围下暂无错题')));
+      return;
+    }
     messenger.showSnackBar(
       SnackBar(
-        content: Text('（共 $count 题）已导出为 .json 文件。'),
-        backgroundColor: AppThemeColors.of(context).warning,
+        content: Text('已导出 $count 题'),
         duration: const Duration(seconds: 3),
       ),
     );
@@ -339,14 +548,11 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text('分享失败：$e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('分享失败：$e')));
     }
   }
 
-  Future<void> _startReview() async {
-    final appState = context.read<AppState>();
+  Future<void> _startReview() async {    final appState = context.read<AppState>();
     if (_guard(appState)) return;
 
     final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
@@ -429,7 +635,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
           IconButton(
             tooltip: '导出错题',
             icon: const Icon(Icons.file_download_outlined),
-            onPressed: _exportJson,
+            onPressed: _showExportOptions,
           ),
         ],
       ),
@@ -833,4 +1039,71 @@ class _BankErrorCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 导出选项行（底部弹窗用）：图标 + 标题 + 副标题。
+class _ExportOption extends StatelessWidget {
+  const _ExportOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: MaoRadius.controlBorder,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: MaoSpace.sm),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: ac.accent),
+            const SizedBox(width: MaoSpace.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: MaoType.bodyStyle.copyWith(
+                          fontWeight: FontWeight.w600, color: ac.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: ac.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 逐题统计一行：`做过 N 次 · 正确率 P% · FSRS 复习 M 轮 · 下次复习：X`
+///
+/// 数据全部来自批量查询（`getErrorQuestionCards`：题目 + 作答统计 + FSRS 卡，
+/// 共两条 SQL），不要在列表里逐题查库。
+String questionStatLine(
+    ({Question question, int answered, int correct, FSRSCardState? card}) it) {
+  final parts = <String>['做过 ${it.answered} 次'];
+  if (it.answered > 0) {
+    parts.add('正确率 ${(it.correct / it.answered * 100).toStringAsFixed(0)}%');
+  }
+  final card = it.card;
+  if (card != null) {
+    parts.add('FSRS 复习 ${card.reviewCount} 轮');
+    parts.add('下次复习：${relativeDayLabel(card.nextReviewAt)}');
+  }
+  return parts.join(' · ');
 }

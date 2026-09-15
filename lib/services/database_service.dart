@@ -1396,8 +1396,7 @@ class DatabaseService {
   }
 
   /// 获取到期的 FSRS 错题（按题库分组）
-  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {
-    final db = await database;
+  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {    final db = await database;
     final results = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (
@@ -2348,5 +2347,114 @@ class DatabaseService {
     } catch (_) {
       return false;
     }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 错题导出与逐题统计
+  // ════════════════════════════════════════════════════════════
+
+  /// 批量取「作答次数 / 正确数」。
+  ///
+  /// 一次 `GROUP BY question_id` 聚合，**不要**逐题调 [getQuestionStats]——
+  /// 那是每題两条 SQL，给几十张卡片用就是典型的 N+1。
+  /// 口径与全仓统计一致：`hidden = 0 AND source IN (sourceFilter)`。
+  /// 返回 `question_id → (作答次数, 正确次数)`；没有作答记录的题不出现。
+  Future<Map<int, (int total, int correct)>> getQuestionStatsByIds(
+      List<int> questionIds) async {
+    if (questionIds.isEmpty) return const {};
+    final db = await database;
+    final out = <int, (int total, int correct)>{};
+    // SQLite 绑定变量有上限（历史上默认 999），按 500 分块
+    for (var i = 0; i < questionIds.length; i += 500) {
+      final chunk = questionIds.sublist(i, min(i + 500, questionIds.length));
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final rows = await db.rawQuery('''
+        SELECT question_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct
+        FROM answer_records
+        WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}
+          AND question_id IN ($placeholders)
+        GROUP BY question_id
+      ''', chunk);
+      for (final r in rows) {
+        out[r['question_id'] as int] = (
+          (r['total'] as int?) ?? 0,
+          (r['correct'] as int?) ?? 0,
+        );
+      }
+    }
+    return out;
+  }
+
+  /// 取错题（带逐题作答统计）——导出与卡片展示共用同一条查询，避免两处口径分叉。
+  ///
+  /// - [mode]：与 [getFullErrorQuestions] 同义（all / wrong / bookmark）
+  /// - [questionIds]：给定则只取这些题（自定义导出），忽略 [mode] 的错题范围
+  /// - [window]：按**最近一次作答时间**过滤，`'7d'` / `'30d'`；null 不限
+  /// - [recentFirst]：true = 最近做过的在前；false（默认）= 错得最多的在前
+  /// - [limit]：限量（「错得最多的 Top N」）
+  ///
+  /// 返回的每行是 `q.*` 加上 `answered_count` / `correct_count` / `wrong_count` /
+  /// `last_answered_at`，因此 `Question.fromMap(row)` 照常可用，统计字段另取。
+  Future<List<Map<String, dynamic>>> getErrorQuestionsWithStats(
+    String mode, {
+    Set<int>? bankIds,
+    Set<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+    bool recentFirst = false,
+    int? limit,
+  }) async {
+    final db = await database;
+    final where = <String>[];
+    final args = <Object>[];
+
+    if (questionIds != null && questionIds.isNotEmpty) {
+      where.add('q.id IN (${List.filled(questionIds.length, '?').join(',')})');
+      args.addAll(questionIds);
+    } else {
+      where.add('q.id IN (${_errorIdSubquery(mode)})');
+    }
+    if (bankIds != null && bankIds.isNotEmpty) {
+      where.add('q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})');
+      args.addAll(bankIds);
+    }
+    if (knowledgePoint != null && knowledgePoint.isNotEmpty) {
+      where.add('q.knowledge_point = ?');
+      args.add(knowledgePoint);
+    }
+    if (window == '7d' || window == '30d') {
+      final days = window == '7d' ? 7 : 30;
+      where.add("s.last_answered_at IS NOT NULL AND "
+          "datetime(s.last_answered_at) >= datetime('now', 'localtime', '-$days days')");
+    }
+
+    final orderBy = recentFirst
+        ? 's.last_answered_at DESC'
+        : 'wrong_count DESC, answered_count DESC, q.id DESC';
+    final limitSql = (limit != null && limit > 0) ? 'LIMIT $limit' : '';
+
+    final rows = await db.rawQuery('''
+      SELECT q.*,
+             COALESCE(s.total, 0)   AS answered_count,
+             COALESCE(s.correct, 0) AS correct_count,
+             COALESCE(s.total, 0) - COALESCE(s.correct, 0) AS wrong_count,
+             s.last_answered_at
+      FROM questions q
+      LEFT JOIN (
+        SELECT question_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct,
+               MAX(answered_at) AS last_answered_at
+        FROM answer_records
+        WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}
+        GROUP BY question_id
+      ) s ON s.question_id = q.id
+      WHERE ${where.join(' AND ')}
+      ORDER BY $orderBy
+      $limitSql
+    ''', args);
+    return rows;
   }
 }

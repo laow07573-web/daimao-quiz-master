@@ -1566,33 +1566,136 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   // ======================== v1.0.2 对齐里程碑：错题导出 JSON ========================
 
-  /// 导出当前筛选下的错题为 .json 题库文件（带 format 标记）。
-  /// 返回文件路径；失败返回 null。
-  Future<String?> exportErrorQuestionsJson(String mode,
-      {Set<int>? bankIds}) async {
-    final questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
-    if (questions.isEmpty) return null;
-    final list = questions.map((q) => {
-          'title': q.title,
-          'options': q.options,
-          'correct_answer': q.correctAnswer,
-          'analysis': q.analysis,
-          'question_type': q.questionType,
-          'knowledge_point': q.knowledgePoint,
-        }).toList();
+  /// 导出错题为 .json 题库文件（带 format 标记），返回 `(文件路径, 题数)`；
+  /// 无题可导出时返回 `(null, 0)`。
+  ///
+  /// 排序与筛选都在 SQL 里做（「错得最多」= `ORDER BY wrong_count DESC LIMIT n`），
+  /// 不把全量题拉到 Dart 再排。
+  ///
+  /// - [window]：按最近一次作答时间过滤，`'7d'` / `'30d'`
+  /// - [sortByWrong]：错得最多的在前（默认按错次排序；`recentFirst` 时改按最近做过）
+  /// - [questionIds]：自定义选题导出
+  /// - [knowledgePoint]：只导出某个知识点（「最薄弱点」导出走这里）
+  /// - [includeStats]：给每题附 `stats` / `fsrs` 元数据。**向后兼容**：
+  ///   导入侧只读已知键、忽略未知键，所以带统计的导出文件仍可被当前版本导入。
+  Future<(String?, int)> exportErrorQuestionsJson(
+    String mode, {
+    Set<int>? bankIds,
+    Set<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+    bool recentFirst = false,
+    int? limit,
+    bool includeStats = false,
+  }) async {
+    final rows = await _db.getErrorQuestionsWithStats(
+      mode,
+      bankIds: bankIds,
+      questionIds: questionIds,
+      knowledgePoint: knowledgePoint,
+      window: window,
+      recentFirst: recentFirst,
+      limit: limit,
+    );
+    if (rows.isEmpty) return (null, 0);
+
+    // 只有需要统计时才批量取 FSRS 卡（一次 IN 查询，不是逐题）
+    Map<int, FSRSCardState> cards = const {};
+    if (includeStats) {
+      final ids = rows.map((r) => r['id'] as int).toList();
+      cards = await _db.getFsrsCardsByIds(ids);
+    }
+
+    final list = rows.map((m) {
+      final q = Question.fromMap(m);
+      final entry = <String, dynamic>{
+        'title': q.title,
+        'options': q.options,
+        'correct_answer': q.correctAnswer,
+        'analysis': q.analysis,
+        'question_type': q.questionType,
+        'knowledge_point': q.knowledgePoint,
+      };
+      if (includeStats) {
+        entry['stats'] = {
+          'answered': (m['answered_count'] as int?) ?? 0,
+          'correct': (m['correct_count'] as int?) ?? 0,
+          'wrong': (m['wrong_count'] as int?) ?? 0,
+          'last_answered_at': m['last_answered_at'],
+        };
+        final card = q.id == null ? null : cards[q.id];
+        if (card != null) {
+          entry['fsrs'] = {
+            'stability': card.stability,
+            'difficulty': card.difficulty,
+            'review_count': card.reviewCount,
+            'last_review_at': card.lastReviewAt?.toIso8601String(),
+            'next_review_at': card.nextReviewAt?.toIso8601String(),
+          };
+        }
+      }
+      return entry;
+    }).toList();
+
+    final stamp = DateTime.now();
     final json = const JsonEncoder.withIndent('  ').convert({
       'format': BankFileService.formatMarker,
-      'name': '错题导出_${DateTime.now().millisecondsSinceEpoch}',
+      'name': '错题导出_${stamp.millisecondsSinceEpoch}',
       'count': list.length,
+      'exported_at': stamp.toIso8601String(),
+      'filter': {
+        'mode': mode,
+        if (window != null) 'window': window,
+        if (knowledgePoint != null) 'knowledge_point': knowledgePoint,
+        if (limit != null) 'limit': limit,
+      },
       'questions': list,
     });
     // v1.0.2 修复：复用系统临时目录单文件（此前每次新建 createTempSync('export')
     // 目录且从不清理，累积垃圾）
-    final tmp = Directory.systemTemp;
-    final file = File(
-        '${tmp.path}/错题导出_${DateTime.now().millisecondsSinceEpoch}.json');
+    // 文件名带毫秒 + 微秒：同一毫秒内连续导出两次会互相覆盖
+    final name = '错题导出_${stamp.millisecondsSinceEpoch}'
+        '${stamp.microsecond % 1000}';
+    final file = File('${Directory.systemTemp.path}/$name.json');
     await file.writeAsString(json);
-    return file.path;
+    return (file.path, list.length);
+  }
+
+  /// 批量取逐题作答统计（做过几次 / 正确数）。一次聚合查询，供错题列表与卡片使用。
+  Future<Map<int, (int total, int correct)>> getQuestionStatsByIds(
+          List<int> questionIds) =>
+      _db.getQuestionStatsByIds(questionIds);
+
+  /// 错题卡片数据：题目 + 作答次数/正确数 + FSRS 卡。  ///
+  /// 两条批量查询（题目+统计一条、FSRS 一条），**避免 N+1**；
+  /// 卡片上要显示的「做过几次 / 正确率 / 下次复习」都来自这里。
+  Future<List<({Question question, int answered, int correct, FSRSCardState? card})>>
+      getErrorQuestionCards(
+    String mode, {
+    Set<int>? bankIds,
+    String? window,
+    bool recentFirst = false,
+    int? limit,
+  }) async {
+    final rows = await _db.getErrorQuestionsWithStats(
+      mode,
+      bankIds: bankIds,
+      window: window,
+      recentFirst: recentFirst,
+      limit: limit,
+    );
+    if (rows.isEmpty) return const [];
+    final ids = rows.map((r) => r['id'] as int).toList();
+    final cards = await _db.getFsrsCardsByIds(ids);
+    return rows.map((m) {
+      final q = Question.fromMap(m);
+      return (
+        question: q,
+        answered: (m['answered_count'] as int?) ?? 0,
+        correct: (m['correct_count'] as int?) ?? 0,
+        card: q.id == null ? null : cards[q.id],
+      );
+    }).toList();
   }
 
   // ======================== 统计 ========================
