@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
+import '../widgets/ai_response_widget.dart';
 import 'quiz_screen.dart';
 
 /// 错题本（v1.0.2 重写）
@@ -331,8 +332,14 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('薄弱知识点建议'),
           content: SingleChildScrollView(
-            child: SelectableText(result,
-                style: const TextStyle(fontSize: MaoType.body, height: 1.5)),
+            // 必须走富文本渲染器：generateKpAdvice 的提示词就是让 AI
+            // 「用 ## 分标题、**粗体** 突出知识点名和关键数据」，
+            // 之前这里用 SelectableText 原样显示，用户看到的是
+            // 「## 最优先复习知识点」「**病理学**」这种源码。
+            // SelectionArea 保留可选中复制的能力。
+            child: SelectionArea(
+              child: AiResponseWidget(text: result, fontSize: MaoType.body),
+            ),
           ),
           actions: [
             TextButton(
@@ -841,6 +848,37 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     await _loadStats();
   }
 
+  /// 单张题库卡（窄屏列表与宽屏网格共用）
+  Widget _bankCard(int i, AppThemeColors ac) {
+    final s = _stats![i];
+    final bankId = s['bank_id'] as int;
+    final due = s['due_count'] as int? ?? 0;
+    final bookmark = s['bookmark_count'] as int? ?? 0;
+    final count = s[_countKey] as int? ?? 0;
+    final selected = _selectedBanks.contains(bankId);
+    return _BankErrorCard(
+      bankName: s['bank_name'] as String,
+      count: count,
+      due: due,
+      bookmark: bookmark,
+      // v1.0.2 FSRS 可见化：题库最早到期时间
+      nextDueAt: s['next_due_at'] as String?,
+      selected: selected,
+      ac: ac,
+      onTap: () {
+        setState(() {
+          if (selected) {
+            _selectedBanks.remove(bankId);
+          } else {
+            _selectedBanks.add(bankId);
+          }
+        });
+        // 知识点面板与「最薄弱知识点」导出都随已选题库收窄
+        _loadKpStats(context.read<AppState>());
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
@@ -880,253 +918,237 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                 )
               : Column(
                   children: [
-                    // 筛选栏
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-                      child: Row(
-                        children: [
-                          for (final (value, label) in _filters)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(label,
-                                    style: const TextStyle(fontSize: MaoType.caption)),
-                                selected: _filter == value,
-                                onSelected: (_) => _switchFilter(value),
-                              ),
-                            ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: _toggleSelectAll,
-                            child: Text(
-                              _allSelected ? '取消全选' : '全选',
-                              style: const TextStyle(fontSize: MaoType.caption),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // 统计条
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Row(
-                        children: [
-                          Text(
-                            '共 ${_totalCount} 题待复习',
-                            style: TextStyle(
-                                fontSize: MaoType.body, color: ac.textPrimary),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            '收藏 ${_stats!.fold<int>(0, (s, x) => s + ((x['bookmark_count'] as int?) ?? 0))} 题',
-                            style: TextStyle(
-                                fontSize: MaoType.body, color: ac.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // 知识点分组面板（v1.0.2 对齐原版：薄弱知识点标签云，点击弹题目列表）
-                    if (_kpStats.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: ac.surfaceAlt.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(MaoRadius.small),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.insights,
-                                      size: 15, color: ac.accent),
-                                  const SizedBox(width: 6),
-                                  Text('薄弱知识点',
-                                      style: TextStyle(
-                                          fontSize: MaoType.body,
-                                          fontWeight: FontWeight.w600,
-                                          color: ac.textPrimary)),
-                                  const Spacer(),
-                                  // v1.0.2 对齐里程碑：按知识点分组
-                                  Text('按知识点分组',
-                                      style: TextStyle(
-                                          fontSize: MaoType.caption,
-                                          color: ac.textSecondary)),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              // v1.0.2 对齐里程碑：优先复习知识点
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text('优先复习知识点',
-                                    style: TextStyle(
-                                        fontSize: MaoType.caption,
-                                        color: ac.textSecondary)),
-                              ),
-                              const SizedBox(height: 10),
-                              // 标签云（圆角 8px 卡片）
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  for (final kp in _kpStats.take(10))
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(MaoRadius.small),
-                                      onTap: () =>
-                                          _showKpQuestions(kp['kp'] as String),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 7),
-                                        decoration: BoxDecoration(
-                                          color: ac.accent.withOpacity(0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(MaoRadius.small),
-                                          border: Border.all(
-                                              color: ac.accent
-                                                  .withOpacity(0.25)),
+                    // 整页一起滚：筛选栏 / 统计条 / 薄弱知识点面板 / 生成建议 / 题库卡
+                    // 放在同一个滚动视图里。此前只有题库列表能滚，知识点一多（十几个
+                    // 标签）面板就把列表挤到只剩一两张卡的位置——知识点看不全、
+                    // 卡片也翻不动。底部主按钮固定，不随内容滚走。
+                    Expanded(
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Column(
+                              children: [
+                                // 筛选栏
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                                  child: Row(
+                                    children: [
+                                      for (final (value, label) in _filters)
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: ChoiceChip(
+                                            label: Text(label,
+                                                style: const TextStyle(fontSize: MaoType.caption)),
+                                            selected: _filter == value,
+                                            onSelected: (_) => _switchFilter(value),
+                                          ),
                                         ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              '${kp['kp']}',
-                                              style: TextStyle(
-                                                  fontSize: MaoType.body,
-                                                  color: ac.textPrimary),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              '${kp['cnt']} 题',
-                                              style: TextStyle(
-                                                  fontSize: MaoType.micro,
-                                                  color: ac.accent),
-                                            ),
-                                          ],
+                                      const Spacer(),
+                                      TextButton(
+                                        onPressed: _toggleSelectAll,
+                                        child: Text(
+                                          _allSelected ? '取消全选' : '全选',
+                                          style: const TextStyle(fontSize: MaoType.caption),
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    // 生成建议（v1.0.2 对齐里程碑）
-                    if (_kpStats.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: ac.accentSoft.withOpacity(0.35),
-                            borderRadius: BorderRadius.circular(MaoRadius.small),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。',
-                                style: TextStyle(
-                                    fontSize: MaoType.caption,
-                                    color: ac.textSecondary,
-                                    height: 1.4),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。',
-                                style: TextStyle(
-                                    fontSize: MaoType.caption,
-                                    color: ac.textSecondary,
-                                    height: 1.4),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton.tonalIcon(
-                                  icon: _adviceLoading
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2))
-                                      : const Icon(Icons.auto_awesome,
-                                          size: 16),
-                                  label: Text(
-                                      _adviceLoading ? '正在生成建议...' : '生成建议',
-                                      style:
-                                          const TextStyle(fontSize: MaoType.body)),
-                                  onPressed:
-                                      _adviceLoading ? null : _generateAdvice,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    // 题库列表；v1.0.3 宽屏重设计：宽屏 2 列网格，窄屏维持单列
-                    Expanded(
-                      child: _stats!.isEmpty
-                          ? const SizedBox.shrink()
-                          : Builder(builder: (context) {
-                              Widget buildCard(int i) {
-                                final s = _stats![i];
-                                final bankId = s['bank_id'] as int;
-                                final due = s['due_count'] as int? ?? 0;
-                                final bookmark =
-                                    s['bookmark_count'] as int? ?? 0;
-                                final count = s[_countKey] as int? ?? 0;
-                                final selected =
-                                    _selectedBanks.contains(bankId);
-                                return _BankErrorCard(
-                                  bankName: s['bank_name'] as String,
-                                  count: count,
-                                  due: due,
-                                  bookmark: bookmark,
-                                  // v1.0.2 FSRS 可见化：题库最早到期时间
-                                  nextDueAt: s['next_due_at'] as String?,
-                                  selected: selected,
-                                  ac: ac,
-                                  onTap: () {
-                                    setState(() {
-                                      if (selected) {
-                                        _selectedBanks.remove(bankId);
-                                      } else {
-                                        _selectedBanks.add(bankId);
-                                      }
-                                    });
-                                    // 知识点面板与「最薄弱知识点」导出都随已选题库收窄
-                                    _loadKpStats(context.read<AppState>());
-                                  },
-                                );
-                              }
-
-                              if (isWideLayout(context)) {
-                                return GridView.builder(
-                                  padding: const EdgeInsets.all(14),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 0,
-                                    // 固定行高而非 childAspectRatio：宽屏卡片里元信息
-                                    // 行改为 Wrap 后可折成两行，比例锁高会转为纵向溢出。
-                                    // 114 = 两行元信息 + 选中态描边所需高度（约 112.4）：
-                                    // 100 时折行会溢出 11.6px，卡片底部被下一张压住。
-                                    mainAxisExtent: 114,
+                                    ],
                                   ),
-                                  itemCount: _stats!.length,
-                                  itemBuilder: (context, i) => buildCard(i),
-                                );
-                              }
-                              return ListView.builder(
-                                padding: const EdgeInsets.all(14),
-                                itemCount: _stats!.length,
-                                itemBuilder: (context, i) => buildCard(i),
-                              );
-                            }),
+                                ),
+                                // 统计条
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        '共 ${_totalCount} 题待复习',
+                                        style: TextStyle(
+                                            fontSize: MaoType.body, color: ac.textPrimary),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        '收藏 ${_stats!.fold<int>(0, (s, x) => s + ((x['bookmark_count'] as int?) ?? 0))} 题',
+                                        style: TextStyle(
+                                            fontSize: MaoType.body, color: ac.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // 知识点分组面板（v1.0.2 对齐原版：薄弱知识点标签云，点击弹题目列表）
+                                if (_kpStats.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: ac.surfaceAlt.withOpacity(0.4),
+                                        borderRadius: BorderRadius.circular(MaoRadius.small),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(Icons.insights,
+                                                  size: 15, color: ac.accent),
+                                              const SizedBox(width: 6),
+                                              Text('薄弱知识点',
+                                                  style: TextStyle(
+                                                      fontSize: MaoType.body,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: ac.textPrimary)),
+                                              const Spacer(),
+                                              // v1.0.2 对齐里程碑：按知识点分组
+                                              Text('按知识点分组',
+                                                  style: TextStyle(
+                                                      fontSize: MaoType.caption,
+                                                      color: ac.textSecondary)),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          // v1.0.2 对齐里程碑：优先复习知识点
+                                          Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text('优先复习知识点',
+                                                style: TextStyle(
+                                                    fontSize: MaoType.caption,
+                                                    color: ac.textSecondary)),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          // 标签云（圆角 8px 卡片）
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              for (final kp in _kpStats.take(10))
+                                                InkWell(
+                                                  borderRadius: BorderRadius.circular(MaoRadius.small),
+                                                  onTap: () =>
+                                                      _showKpQuestions(kp['kp'] as String),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 12, vertical: 7),
+                                                    decoration: BoxDecoration(
+                                                      color: ac.accent.withOpacity(0.12),
+                                                      borderRadius:
+                                                          BorderRadius.circular(MaoRadius.small),
+                                                      border: Border.all(
+                                                          color: ac.accent
+                                                              .withOpacity(0.25)),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          '${kp['kp']}',
+                                                          style: TextStyle(
+                                                              fontSize: MaoType.body,
+                                                              color: ac.textPrimary),
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Text(
+                                                          '${kp['cnt']} 题',
+                                                          style: TextStyle(
+                                                              fontSize: MaoType.micro,
+                                                              color: ac.accent),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                // 生成建议（v1.0.2 对齐里程碑）
+                                if (_kpStats.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: ac.accentSoft.withOpacity(0.35),
+                                        borderRadius: BorderRadius.circular(MaoRadius.small),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。',
+                                            style: TextStyle(
+                                                fontSize: MaoType.caption,
+                                                color: ac.textSecondary,
+                                                height: 1.4),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。',
+                                            style: TextStyle(
+                                                fontSize: MaoType.caption,
+                                                color: ac.textSecondary,
+                                                height: 1.4),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: FilledButton.tonalIcon(
+                                              icon: _adviceLoading
+                                                  ? const SizedBox(
+                                                      width: 14,
+                                                      height: 14,
+                                                      child: CircularProgressIndicator(
+                                                          strokeWidth: 2))
+                                                  : const Icon(Icons.auto_awesome,
+                                                      size: 16),
+                                              label: Text(
+                                                  _adviceLoading ? '正在生成建议...' : '生成建议',
+                                                  style:
+                                                      const TextStyle(fontSize: MaoType.body)),
+                                              onPressed:
+                                                  _adviceLoading ? null : _generateAdvice,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          // 题库卡：宽屏两列网格，窄屏单列
+                          SliverPadding(
+                            padding: const EdgeInsets.all(14),
+                            sliver: isWideLayout(context)
+                                ? SliverGrid(
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 12,
+                                      mainAxisSpacing: 0,
+                                      // 固定行高而非 childAspectRatio：宽屏卡片里元信息
+                                      // 行改为 Wrap 后可折成两行，比例锁高会转为纵向溢出。
+                                      // 114 = 两行元信息 + 选中态描边所需高度（约 112.4）：
+                                      // 100 时折行会溢出 11.6px，卡片底部被下一张压住。
+                                      mainAxisExtent: 114,
+                                    ),
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, i) => _bankCard(i, ac),
+                                      childCount: _stats!.length,
+                                    ),
+                                  )
+                                : SliverList(
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, i) => _bankCard(i, ac),
+                                      childCount: _stats!.length,
+                                    ),
+                                  ),
+                          ),
+                          const SliverToBoxAdapter(
+                              child: SizedBox(height: MaoSpace.md)),
+                        ],
+                      ),
                     ),
                     // 底部按钮
                     SafeArea(
