@@ -51,4 +51,22 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: 全量测试
-        run: flutter test
+        # 为什么不用一句 `flutter test`：失败的**用例名**必须能被看到。
+        # Actions 的原始日志要仓库管理员权限才能下载（403），而 `::error::`
+        # 注解任何人（含 API）都能读——否则失败页只显示「N passed, M failed」，
+        # 定位不到是哪条挂的，只能本地反复重跑碰运气。
+        run: |
+          set +e
+          flutter test --reporter expanded > test_output.log 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            grep -nE "\[E\]$|\[E\] |Expected:|Actual:|Which:|Test failed" test_output.log \
+              | head -30 | sed 's/^/[failed] /' | while IFS= read -r line; do
+                echo "::error::$line"
+              done
+            echo "----- 尾部输出 -----"
+            tail -60 test_output.log
+          else
+            tail -3 test_output.log
+          fi
+          exit "$code"
