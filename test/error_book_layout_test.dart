@@ -92,11 +92,16 @@ void main() {
       value: appState,
       child: const MaterialApp(home: ErrorBookScreen()),
     ));
-    for (var i = 0; i < 12; i++) {
+    // 轮询等题库卡真正渲染出来，而不是固定 pump 若干次：
+    // 数据库在后台 isolate，固定的次数在慢 runner 上会不够——同一提交曾出现
+    // 「一次全绿、一次两条用例全红」的抖动，根因就在这里。
+    for (var i = 0; i < 150; i++) {
       await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 25)));
-      await tester.pump(const Duration(milliseconds: 20));
+          () => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await tester.pump(const Duration(milliseconds: 10));
+      if (find.textContaining('最早到期').evaluate().isNotEmpty) return;
     }
+    fail('等不到题库卡渲染：数据没加载出来（不是布局问题，是等待时间不够）');
   }
 
   testWidgets('窄屏（手机竖屏）：元信息折行而不是溢出裁断', (tester) async {
