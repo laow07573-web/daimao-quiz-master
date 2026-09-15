@@ -80,15 +80,28 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     }
   }
 
+  /// 知识点分组：范围必须与「复习 / 导出」一致（当前筛选 + 已选题库）。
+  /// 面板计数、点击下钻、导出「最薄弱知识点」三处都按同一个 [bankIds] 收窄，
+  /// 否则勾选题库后，面板列出的知识点在导出时会命中 0 行。
   Future<void> _loadKpStats(AppState appState) async {
+    final bankIds = _selectedBanks.isEmpty ? null : Set<int>.from(_selectedBanks);
     try {
       final filter = _filter;
-      final kps = await appState.getKnowledgePointStats(filter);
-      if (!mounted || _filter != filter) return; // 防竞态：筛选已切换则丢弃
+      final kps =
+          await appState.getKnowledgePointStats(filter, bankIds: bankIds);
+      // 防竞态：筛选或题库选择已变，这轮结果作废
+      if (!mounted || _filter != filter || !_sameSelection(bankIds)) return;
       setState(() => _kpStats = kps);
     } catch (_) {
       // 知识点分组失败不影响主列表
     }
+  }
+
+  /// 与上一轮查询时的题库选择是否一致（用于丢弃过期结果）
+  bool _sameSelection(Set<int>? bankIds) {
+    if (bankIds == null) return _selectedBanks.isEmpty;
+    return bankIds.length == _selectedBanks.length &&
+        bankIds.every(_selectedBanks.contains);
   }
 
   Future<void> _switchFilter(String filter) async {
@@ -131,6 +144,9 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
         _selectedBanks.addAll(ids);
       }
     });
+    // 与单题库勾选一致：知识点面板要跟着新范围重算，否则「最薄弱知识点」导出
+    // 用的还是上一轮范围（全选后范围变最大，导出的知识点可能一题都命中不了）。
+    _loadKpStats(context.read<AppState>());
   }
 
   bool _guard(AppState appState) {
@@ -229,7 +245,9 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                       correct: st?.$2 ?? 0,
                                       card: card,
                                     )),
-                                    maxLines: 1,
+                                    // 允许两行：窄屏单行放不下「下次复习」——而它正是
+                                    // FSRS 可见化要展示的内容，截掉就白做了
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: MaoType.caption,
@@ -281,7 +299,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     // v1.0.2 修复：生成建议异常时复位 loading 并提示，不再永久禁用按钮
     try {
       // 统计文本：知识点 + 错题数 + 正确率（本地精炼已按错题统计排序）
-      final accByKp = await appState.getAccuracyByKnowledgePoint();
+      // 正确率必须与错题数同范围：收窄到已选题库后，正确率若还是全库口径，
+      // 两个数字互相矛盾，AI 会据此给出错误结论
+      final accByKp = await appState.getAccuracyByKnowledgePoint(
+          bankIds: _selectedBanks.isEmpty ? null : _selectedBanks);
       // v1.0.2 对齐里程碑：各知识点数据：
       final statsText = '各知识点数据：\n' +
           _kpStats
@@ -333,8 +354,19 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     final appState = context.read<AppState>();
     final ac = AppThemeColors.of(context);
     final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
-    // 当前筛选下的题数（用于在选项上标注规模）
-    final total = await appState.getFullErrorCount(_filter, bankIds: bankIds);
+    // 先把知识点分组刷到当前范围：勾选题库触发的重算是异步的，这里直接读
+    // _kpStats 可能仍是上一轮快照，那样「最薄弱知识点」导出的范围跟弹窗上写的
+    // 名字就对不上了。
+    await _loadKpStats(appState);
+    if (!mounted) return;
+    // 当前筛选下的题数（用于在选项上标注规模）。取不到就写「题数未知」，
+    // 不让一次统计失败把整个导出入口卡死。
+    int? total;
+    try {
+      total = await appState.getFullErrorCount(_filter, bankIds: bankIds);
+    } catch (_) {
+      total = null;
+    }
     if (!mounted) return;
 
     final kps = _kpStats;
@@ -343,54 +375,68 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: ac.background,
+      // isScrollControlled：不让 sheet 高度被限制在屏高 9/16。选项按内容定高，
+      // 放得下时不出现滚动视图（Android 没有滚动条，半截选项会像渲染故障），
+      // 同时把「可拖拽关闭」的手势还给 sheet。SingleChildScrollView 只兜底大字号。
+      isScrollControlled: true,
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
       shape: const RoundedRectangleBorder(
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
       builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(MaoSpace.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('导出错题', style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
-              const SizedBox(height: MaoSpace.xxs),
-              Text('导出为 .json，可再导入回猫卷；导出内容按「错得最多」排序',
-                  style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
-              const SizedBox(height: MaoSpace.md),
-              _ExportOption(
-                icon: Icons.filter_alt_outlined,
-                title: '当前筛选',
-                subtitle: '共 $total 题',
-                onTap: () => Navigator.pop(ctx, 'current'),
-              ),
-              if (weakestKp != null)
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(MaoSpace.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('导出错题',
+                    style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+                const SizedBox(height: MaoSpace.xxs),
+                Text('导出为 .json，可再导入回猫卷；默认按「错得最多」排序，各选项另有说明',
+                    style:
+                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+                const SizedBox(height: MaoSpace.md),
                 _ExportOption(
-                  icon: Icons.local_fire_department_outlined,
-                  title: '最薄弱知识点',
-                  subtitle: '$weakestKp（错题最多）',
-                  onTap: () => Navigator.pop(ctx, 'kp:$weakestKp'),
+                  icon: Icons.filter_alt_outlined,
+                  title: '当前筛选',
+                  subtitle: total == null ? '题数未知' : '共 $total 题',
+                  onTap: () => Navigator.pop(ctx, 'current'),
                 ),
-              _ExportOption(
-                icon: Icons.schedule_outlined,
-                title: '近 7 天做过的',
-                subtitle: '错得最多的在前',
-                onTap: () => Navigator.pop(ctx, 'w7d'),
-              ),
-              _ExportOption(
-                icon: Icons.date_range_outlined,
-                title: '近 30 天做过的',
-                subtitle: '错得最多的在前',
-                onTap: () => Navigator.pop(ctx, 'w30d'),
-              ),
-              _ExportOption(
-                icon: Icons.checklist_outlined,
-                title: '选择题目导出…',
-                subtitle: '自己挑要导出的题',
-                onTap: () => Navigator.pop(ctx, 'pick'),
-              ),
-            ],
+                if (weakestKp != null)
+                  _ExportOption(
+                    icon: Icons.local_fire_department_outlined,
+                    title: '最薄弱知识点',
+                    subtitle: '$weakestKp（错题最多）',
+                    onTap: () => Navigator.pop(ctx, 'kp:$weakestKp'),
+                  ),
+                _ExportOption(
+                  icon: Icons.history_outlined,
+                  title: '最近做过的',
+                  subtitle: '当前范围内全部错题，最近作答的在前',
+                  onTap: () => Navigator.pop(ctx, 'recent'),
+                ),
+                _ExportOption(
+                  icon: Icons.schedule_outlined,
+                  title: '近 7 天做过的',
+                  subtitle: '错得最多的在前',
+                  onTap: () => Navigator.pop(ctx, 'w7d'),
+                ),
+                _ExportOption(
+                  icon: Icons.date_range_outlined,
+                  title: '近 30 天做过的',
+                  subtitle: '错得最多的在前',
+                  onTap: () => Navigator.pop(ctx, 'w30d'),
+                ),
+                _ExportOption(
+                  icon: Icons.checklist_outlined,
+                  title: '选择题目导出…',
+                  subtitle: '自己挑要导出的题',
+                  onTap: () => Navigator.pop(ctx, 'pick'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -400,6 +446,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     switch (action) {
       case 'current':
         await _export(bankIds: bankIds);
+      case 'recent':
+        await _export(bankIds: bankIds, recentFirst: true);
       case 'w7d':
         await _export(bankIds: bankIds, window: '7d');
       case 'w30d':
@@ -489,6 +537,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                             style:
                                 MaoType.bodyStyle.copyWith(color: ac.textPrimary)),
                         subtitle: Text(questionStatLine(it),
+                            // 单行：窄屏（LG G7 可用宽约 275px）下这行不截断就会
+                            // 折成两行，列表里行高参差
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: MaoType.microStyle
                                 .copyWith(color: ac.textSecondary)),
                       );
@@ -502,7 +554,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                     onPressed: selected.isEmpty
                         ? null
                         : () => Navigator.pop(ctx, true),
-                    child: Text('导出所选（${selected.length} 题）'),
+                    // 空选时说明该做什么，而不是显示自相矛盾的「导出所选（0 题）」
+                    child: Text(selected.isEmpty
+                        ? '请先选择题目（共 ${cards.length} 题）'
+                        : '导出所选（${selected.length} 题）'),
                   ),
                 ),
               ],
@@ -521,17 +576,30 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     Set<int>? questionIds,
     String? knowledgePoint,
     String? window,
+    bool recentFirst = false,
   }) async {
     final appState = context.read<AppState>();
     final messenger = ScaffoldMessenger.of(context);
-    final (path, count) = await appState.exportErrorQuestionsJson(
-      _filter,
-      bankIds: bankIds,
-      questionIds: questionIds,
-      knowledgePoint: knowledgePoint,
-      window: window,
-      includeStats: true, // 带上「做过几次/正确率/FSRS」，便于外部查看
-    );
+    // 先声明再在 try 里赋值：catch 分支一定 return，Dart 的定值分析能通过
+    (String?, int) result;
+    try {
+      result = await appState.exportErrorQuestionsJson(
+        _filter,
+        bankIds: bankIds,
+        questionIds: questionIds,
+        knowledgePoint: knowledgePoint,
+        window: window,
+        recentFirst: recentFirst,
+        includeStats: true, // 带上「做过几次/正确率/FSRS」，便于外部查看
+      );
+    } catch (e) {
+      // 导出链路里的数据库异常（例如旧机上绑定变量超限）以前会静默抛出，
+      // 用户点了没有任何反应；这里至少让他看到失败原因。
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('导出失败：$e')));
+      return;
+    }
+    final (path, count) = result;
     if (!mounted) return;
     if (path == null) {
       messenger.showSnackBar(const SnackBar(content: Text('当前范围下暂无错题')));
@@ -548,11 +616,16 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('分享失败：$e')));
+      // 文件已生成在应用缓存目录，用户自己翻不到——把路径带上
+      messenger.showSnackBar(SnackBar(
+        content: Text('分享失败：$e\n文件已生成：$path'),
+        duration: const Duration(seconds: 6),
+      ));
     }
   }
 
-  Future<void> _startReview() async {    final appState = context.read<AppState>();
+  Future<void> _startReview() async {
+    final appState = context.read<AppState>();
     if (_guard(appState)) return;
 
     final bankIds = _selectedBanks.isEmpty ? null : _selectedBanks;
@@ -878,6 +951,8 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                         _selectedBanks.add(bankId);
                                       }
                                     });
+                                    // 知识点面板与「最薄弱知识点」导出都随已选题库收窄
+                                    _loadKpStats(context.read<AppState>());
                                   },
                                 );
                               }
@@ -891,8 +966,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                     crossAxisSpacing: 12,
                                     mainAxisSpacing: 0,
                                     // 固定行高而非 childAspectRatio：宽屏卡片里元信息
-                                    // 行改为 Wrap 后可折成两行，比例锁高会转为纵向溢出
-                                    mainAxisExtent: 100,
+                                    // 行改为 Wrap 后可折成两行，比例锁高会转为纵向溢出。
+                                    // 114 = 两行元信息 + 选中态描边所需高度（约 112.4）：
+                                    // 100 时折行会溢出 11.6px，卡片底部被下一张压住。
+                                    mainAxisExtent: 114,
                                   ),
                                   itemCount: _stats!.length,
                                   itemBuilder: (context, i) => buildCard(i),
@@ -1013,13 +1090,14 @@ class _BankErrorCard extends StatelessWidget {
                       Text('$bookmark 收藏',
                           style: TextStyle(
                               fontSize: MaoType.body, color: ac.textSecondary)),
-                      // v1.0.2 FSRS 可见化：下次到期（该题库最早到期卡）
+                      // v1.0.2 FSRS 可见化：最早到期的卡（SQL 只取 <= now 的卡，
+                      // 所以这一定是「已到期/今天」，写「下次到期」自相矛盾）
                       if (nextDueAt != null) ...[
                         Text('·',
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.textSecondary)),
                         Text(
-                          '下次到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
+                          '最早到期：${relativeDayLabel(DateTime.parse(nextDueAt!))}',
                           style: TextStyle(
                               fontSize: MaoType.body, color: ac.danger),
                         ),
@@ -1062,7 +1140,9 @@ class _ExportOption extends StatelessWidget {
       onTap: onTap,
       borderRadius: MaoRadius.controlBorder,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: MaoSpace.sm),
+        // 垂直留白收在 xs：6 个选项 ≤ 640dp 短屏时不滚动，也就不会出现
+        // Android 上「没有滚动条、最后一项被切一半」的观感问题。
+        padding: const EdgeInsets.symmetric(vertical: MaoSpace.xs),
         child: Row(
           children: [
             Icon(icon, size: 20, color: ac.accent),
@@ -1102,7 +1182,9 @@ String questionStatLine(
   }
   final card = it.card;
   if (card != null) {
-    parts.add('FSRS 复习 ${card.reviewCount} 轮');
+    // 「复习 0 轮」（卡刚建立、还没复习过）不写：省下的宽度留给真正要看的
+    // 下次复习时间，窄屏上也就不会被省略号截掉
+    if (card.reviewCount > 0) parts.add('FSRS 复习 ${card.reviewCount} 轮');
     parts.add('下次复习：${relativeDayLabel(card.nextReviewAt)}');
   }
   return parts.join(' · ');

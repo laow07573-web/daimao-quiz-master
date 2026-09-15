@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -234,6 +235,128 @@ void main() {
       expect(chunks.length, 2);
       expect(chunks.last, contains('**答案：** A'));
       expect(chunks.last, contains('**题眼：** 测试'));
+    });
+  });
+
+  group('SSE 边角：字节分片 / CRLF / 结束语义 / token 统计', () {
+    /// 把整段 SSE 按**字节**切成小块（模拟 TCP 分片：一个汉字的三字节、
+    /// 一行 data: 都可能被切在两块之间）
+    http.StreamedResponse chunkedResponse(List<int> bytes, {int size = 5}) =>
+        http.StreamedResponse(
+          Stream.fromIterable([
+            for (var i = 0; i < bytes.length; i += size)
+              bytes.sublist(i, i + size > bytes.length ? bytes.length : i + size),
+          ]),
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
+
+    test('字节分片切开汉字 + CRLF 行尾，仍拼出完整文本', () async {
+      final body = utf8.encode([
+        'data: {"choices":[{"delta":{"content":"你好"}}]}',
+        '',
+        'data: {"choices":[{"delta":{"content":"，世界"}}]}',
+        '',
+        'data: [DONE]',
+        '',
+      ].join('\r\n'));
+      final service0 = service(splitClient(
+        onStream: (_) async => chunkedResponse(body, size: 5),
+        onOnce: (_) async => jsonResponse({}),
+      ));
+
+      final chunks =
+          await service0.streamFollowUp(question(), '原解析', '追问').toList();
+
+      // 逐块 utf8.decode 解不出多字节字符，必然出现乱码或丢字
+      expect(chunks.last, '你好，世界');
+      expect(chunks.last, isNot(contains('\uFFFD')));
+    });
+
+    test('[DONE] 之后网关不关连接还继续发内容 → 立刻结束，后续内容不算进来', () async {
+      final controller = StreamController<List<int>>();
+      controller.add(utf8.encode('data: {"choices":[{"delta":{"content":"正文"}}]}\n\n'
+          'data: [DONE]\n\n'));
+      // 结束标记之后继续吐内容，并且**不关闭**连接（真实网关常见）
+      controller.add(utf8.encode(
+          'data: {"choices":[{"delta":{"content":"不该出现"}}]}\n\n'));
+      final service0 = service(splitClient(
+        onStream: (_) async => http.StreamedResponse(
+          controller.stream,
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        ),
+        onOnce: (_) async => jsonResponse({}),
+      ));
+
+      final chunks = await service0
+          .streamFollowUp(question(), '原解析', '追问')
+          .toList()
+          .timeout(const Duration(seconds: 5),
+              onTimeout: () => fail('收到 [DONE] 后没有结束，一直挂到空闲超时了'));
+
+      expect(chunks.last, '正文');
+      expect(chunks.last, isNot(contains('不该出现')));
+      await controller.close();
+    });
+
+    test('只有 usage 没有 content → 仍回退一次性，但 token 要记上', () async {
+      var fallbackCalled = false;
+      final service0 = service(splitClient(
+        onStream: (_) async => http.StreamedResponse(
+          Stream.value(utf8.encode([
+            'data: ${jsonEncode({'usage': {'total_tokens': 7}})}',
+            '',
+            'data: [DONE]',
+            '',
+          ].join('\n'))),
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        ),
+        onOnce: (_) async {
+          fallbackCalled = true;
+          return jsonResponse({
+            'choices': [
+              {'message': {'content': '回退内容'}}
+            ]
+          });
+        },
+      ));
+
+      final chunks =
+          await service0.streamFollowUp(question(), '原解析', '追问').toList();
+
+      expect(fallbackCalled, isTrue, reason: '一个内容字都没有 → 必须回退');
+      expect(chunks.last, '回退内容');
+      expect(service0.totalTokensUsed, 7,
+          reason: 'usage 行不该产出内容，但 token 统计要记上');
+    });
+
+    test('content 与 usage 同一行 → 文本和统计都要更新', () async {
+      final service0 = service(splitClient(
+        onStream: (_) async => http.StreamedResponse(
+          Stream.value(utf8.encode([
+            'data: ${jsonEncode({
+                  'choices': [
+                    {'delta': {'content': '一次给全'}}
+                  ],
+                  'usage': {'total_tokens': 12},
+                })}',
+            '',
+            'data: [DONE]',
+            '',
+          ].join('\n'))),
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        ),
+        onOnce: (_) async => jsonResponse({}),
+      ));
+
+      final chunks =
+          await service0.streamFollowUp(question(), '原解析', '追问').toList();
+
+      expect(chunks.last, '一次给全');
+      expect(service0.totalTokensUsed, 12);
     });
   });
 }

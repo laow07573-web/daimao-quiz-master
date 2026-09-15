@@ -622,8 +622,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       _db.getSessionDetail(sessionId);
 
   /// 按知识点正确率排行
-  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint() =>
-      _db.getAccuracyByKnowledgePoint();
+  Future<List<Map<String, dynamic>>> getAccuracyByKnowledgePoint(
+          {Set<int>? bankIds}) =>
+      _db.getAccuracyByKnowledgePoint(bankIds: bankIds);
 
   /// 各题库正确率（薄弱点分析/统计页排行）
   Future<List<BankAccuracy>> getBankAccuracies() =>
@@ -1569,11 +1570,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 导出错题为 .json 题库文件（带 format 标记），返回 `(文件路径, 题数)`；
   /// 无题可导出时返回 `(null, 0)`。
   ///
-  /// 排序与筛选都在 SQL 里做（「错得最多」= `ORDER BY wrong_count DESC LIMIT n`），
+  /// 排序与筛选都在 SQL 里做（默认「错得最多」= `ORDER BY wrong_count DESC`），
   /// 不把全量题拉到 Dart 再排。
   ///
   /// - [window]：按最近一次作答时间过滤，`'7d'` / `'30d'`
-  /// - [sortByWrong]：错得最多的在前（默认按错次排序；`recentFirst` 时改按最近做过）
+  /// - [recentFirst]：true = 最近做过的在前；默认错得最多的在前
   /// - [questionIds]：自定义选题导出
   /// - [knowledgePoint]：只导出某个知识点（「最薄弱点」导出走这里）
   /// - [includeStats]：给每题附 `stats` / `fsrs` 元数据。**向后兼容**：
@@ -1585,7 +1586,6 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     String? knowledgePoint,
     String? window,
     bool recentFirst = false,
-    int? limit,
     bool includeStats = false,
   }) async {
     final rows = await _db.getErrorQuestionsWithStats(
@@ -1595,7 +1595,6 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       knowledgePoint: knowledgePoint,
       window: window,
       recentFirst: recentFirst,
-      limit: limit,
     );
     if (rows.isEmpty) return (null, 0);
 
@@ -1629,8 +1628,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
             'stability': card.stability,
             'difficulty': card.difficulty,
             'review_count': card.reviewCount,
-            'last_review_at': card.lastReviewAt?.toIso8601String(),
-            'next_review_at': card.nextReviewAt?.toIso8601String(),
+            'last_review_at': card.lastReviewAt.toIso8601String(),
+            'next_review_at': card.nextReviewAt.toIso8601String(),
           };
         }
       }
@@ -1647,16 +1646,31 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         'mode': mode,
         if (window != null) 'window': window,
         if (knowledgePoint != null) 'knowledge_point': knowledgePoint,
-        if (limit != null) 'limit': limit,
       },
       'questions': list,
     });
-    // v1.0.2 修复：复用系统临时目录单文件（此前每次新建 createTempSync('export')
-    // 目录且从不清理，累积垃圾）
-    // 文件名带毫秒 + 微秒：同一毫秒内连续导出两次会互相覆盖
+    // 写在系统临时目录（Android 上即应用缓存目录），不建子目录；
+    // 文件名带毫秒 + 亚毫秒，同一毫秒内连续导出两次不会互相覆盖。
+    // 顺手回收一小时前的旧导出（分享用的是 share_plus 复制出去的副本，
+    // 但刚导出那份可能还在分享目标手里，所以按时间留一段宽限期）。
     final name = '错题导出_${stamp.millisecondsSinceEpoch}'
         '${stamp.microsecond % 1000}';
-    final file = File('${Directory.systemTemp.path}/$name.json');
+    final dir = Directory.systemTemp;
+    try {
+      final cutoff = stamp.subtract(const Duration(hours: 1));
+      for (final f in dir.listSync()) {
+        final base = f.path.split(RegExp(r'[\\/]')).last;
+        if (f is File &&
+            base.startsWith('错题导出_') &&
+            base.endsWith('.json') &&
+            f.lastModifiedSync().isBefore(cutoff)) {
+          f.deleteSync();
+        }
+      }
+    } catch (_) {
+      // 清理失败（权限/占用）不影响导出本身
+    }
+    final file = File('${dir.path}/$name.json');
     await file.writeAsString(json);
     return (file.path, list.length);
   }
@@ -1666,7 +1680,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
           List<int> questionIds) =>
       _db.getQuestionStatsByIds(questionIds);
 
-  /// 错题卡片数据：题目 + 作答次数/正确数 + FSRS 卡。  ///
+  /// 错题卡片数据：题目 + 作答次数/正确数 + FSRS 卡。
+  ///
   /// 两条批量查询（题目+统计一条、FSRS 一条），**避免 N+1**；
   /// 卡片上要显示的「做过几次 / 正确率 / 下次复习」都来自这里。
   Future<List<({Question question, int answered, int correct, FSRSCardState? card})>>
@@ -1675,14 +1690,12 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     Set<int>? bankIds,
     String? window,
     bool recentFirst = false,
-    int? limit,
   }) async {
     final rows = await _db.getErrorQuestionsWithStats(
       mode,
       bankIds: bankIds,
       window: window,
       recentFirst: recentFirst,
-      limit: limit,
     );
     if (rows.isEmpty) return const [];
     final ids = rows.map((r) => r['id'] as int).toList();

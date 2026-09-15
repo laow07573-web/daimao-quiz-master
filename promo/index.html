@@ -57,9 +57,9 @@ window.MAOJUAN = {
   --bg:#070A14; --bg2:#0C1120; --surface:rgba(255,255,255,.035);
   --surface2:rgba(255,255,255,.06); --line:rgba(255,255,255,.09);
   --tx:#EEF2FA; --tx2:#9AA6BF; --tx3:#6B7794;
-  --c1:#2563EB;  /* 清蓝 */
+  --c1:#5E6AD2;  /* 清蓝 */
   --c2:#2F7D5B;  /* 松绿 */
-  --c3:#2DA8A6;  /* 极简 */
+  --c3:#2DA8A6;  /* 墨黑档 */
   --c4:#5B9BFF;  /* 清蓝-dark */
   --c5:#4ECDC4;  /* 墨黑 */
   --ok:#22C55E; --warn:#F59E0B; --dan:#EF4444;
@@ -153,7 +153,7 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 /* 注：不加假刘海，避免遮盖截图自带的顶部状态栏 */
 /* 白底截图需可见边界：浅色衬底 + 细描边 */
 .phone .scr{position:relative;width:100%;aspect-ratio:var(--ar,1116/2480);border-radius:38px;
-  overflow:hidden;background:#EDF1F7;box-shadow:inset 0 0 0 1px rgba(0,0,0,.10)}
+  overflow:hidden;background:#F4F4F5;box-shadow:inset 0 0 0 1px rgba(0,0,0,.10)}
 
 /* 桌面/平板窗口画框 */
 .window{position:relative;width:100%;max-width:640px;border-radius:15px;overflow:hidden;
@@ -163,7 +163,7 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 .window .bar i{width:10px;height:10px;border-radius:50%;background:#2A3346}
 .window .bar i:nth-child(1){background:#FF5F57}.window .bar i:nth-child(2){background:#FEBC2E}.window .bar i:nth-child(3){background:#28C840}
 /* 同类：标题栏之外的内容区按截图比例，画面完整不裁切 */
-.window .wbody{position:relative;width:100%;aspect-ratio:var(--ar,1280/800);overflow:hidden;background:#EDF1F7}
+.window .wbody{position:relative;width:100%;aspect-ratio:var(--ar,1280/800);overflow:hidden;background:#F4F4F5}
 .window .wbody img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:top center}
 
 /* ── 浮动信息卡 ── */
@@ -342,32 +342,32 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 @keyframes inkdraw{0%{stroke-dashoffset:420}42%{stroke-dashoffset:0}80%{stroke-dashoffset:0}100%{stroke-dashoffset:-420}}
 
 /* —— 宽屏布局示意（代码渲染） —— */
-.wmock{--m-accent:#2563EB;--m-bd:#E2E8F0;--m-bg:#F5F7FA;--m-card:#FFFFFF;--m-s2:#EDF1F7;
+.wmock{--m-accent:#5E6AD2;--m-bd:#E4E4E7;--m-bg:#FAFAFA;--m-card:#FFFFFF;--m-s2:#F4F4F5;
   --m-fg:#111827;--m-fg2:#566072;--m-fg3:#8A94A6;
-  width:100%;max-width:560px;border-radius:12px;overflow:hidden;background:#F5F7FA;
+  width:100%;max-width:560px;border-radius:12px;overflow:hidden;background:#FAFAFA;
   border:1px solid rgba(0,0,0,.10);display:flex;height:300px;
   font-family:"MiSans","PingFang SC",system-ui,sans-serif}
-.wmock .rail{flex:0 0 62px;background:#fff;border-right:1px solid #E2E8F0;
+.wmock .rail{flex:0 0 62px;background:#fff;border-right:1px solid #E4E4E7;
   display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0}
 .wmock .rail .ri{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
   color:#8A94A6;font-size:16px}
-.wmock .rail .ri.on{background:#E8EFFE;color:#2563EB}
+.wmock .rail .ri.on{background:#EEF0FB;color:#5E6AD2}
 .wmock .rail .sp{flex:1}
 .wmock .main{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
 .wmock .main .hd{font-size:15px;font-weight:700;color:#111827}
 .wmock .cols{display:flex;gap:12px;flex:1;min-width:0}
-.wmock .col{flex:1;min-width:0;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:12px}
-.wmock .col .t{font-size:12px;font-weight:700;color:#2563EB;margin-bottom:8px}
-.wmock .col .ln{height:8px;border-radius:4px;background:#EDF1F7;margin-bottom:7px}
+.wmock .col{flex:1;min-width:0;background:#fff;border:1px solid #E4E4E7;border-radius:12px;padding:12px}
+.wmock .col .t{font-size:12px;font-weight:700;color:#5E6AD2;margin-bottom:8px}
+.wmock .col .ln{height:8px;border-radius:4px;background:#F4F4F5;margin-bottom:7px}
 .wmock .col .ln.s{width:64%}
 .wmock .col .ln.m{width:84%}
 .wmock .opts{display:flex;flex-direction:column;gap:7px}
 .wmock .op{display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;
-  background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;padding:8px 10px}
-.wmock .op i{width:18px;height:18px;border-radius:50%;background:#E8EFFE;color:#2563EB;
+  background:#F8FAFC;border:1px solid #E4E4E7;border-radius:9px;padding:8px 10px}
+.wmock .op i{width:18px;height:18px;border-radius:50%;background:#EEF0FB;color:#5E6AD2;
   display:grid;place-items:center;font-size:10px;font-weight:700;font-style:normal;flex:0 0 18px}
-.wmock .op.ok{background:#DCFCE7;border-color:#15803D;color:#166534}
-.wmock .op.ok i{background:#15803D;color:#fff}
+.wmock .op.ok{background:#DAFBE1;border-color:#1A7F37;color:#1A7F37}
+.wmock .op.ok i{background:#1A7F37;color:#fff}
 .wmock .note{font-size:11px;color:#6B7280;line-height:1.5}
 
 /* —— 局域网同步示意 —— */
@@ -375,10 +375,10 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
   width:100%;max-width:400px;margin:0 auto;padding:26px 0}
 .sync-dev{width:88px;flex:0 0 88px}
 .sync-dev .frame{border-radius:16px;background:linear-gradient(160deg,#141A2C,#080B14);padding:5px}
-.sync-dev .scr2{border-radius:12px;background:#F5F7FA;height:126px;padding:8px;
+.sync-dev .scr2{border-radius:12px;background:#FAFAFA;height:126px;padding:8px;
   display:flex;flex-direction:column;gap:5px}
-.sync-dev .scr2 i{display:block;height:7px;border-radius:3px;background:#E2E8F0}
-.sync-dev .scr2 i.w1{width:70%;background:#BFDBFE}
+.sync-dev .scr2 i{display:block;height:7px;border-radius:3px;background:#E4E4E7}
+.sync-dev .scr2 i.w1{width:70%;background:#DDE0F7}
 .sync-dev .scr2 i.w2{width:88%}
 .sync-dev .scr2 i.w3{width:55%}
 .sync-dev .lb{text-align:center;font-size:11px;color:var(--tx3);margin-top:7px}
@@ -453,7 +453,7 @@ h1 .grad{background:linear-gradient(120deg,var(--c1),var(--c4) 45%,var(--c3));
 /* 使用说明的画框切换动画 */
 .guide-stage{position:relative}
 .guide-stage .phone{animation:none}
-.guide-stage .scr{background:#EDF1F7}
+.guide-stage .scr{background:#F4F4F5}
 .guide-stage .scr .mscr.swap{animation:swapIn .5s cubic-bezier(.22,1,.36,1)}
 @keyframes swapIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 
@@ -983,7 +983,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       </div>
       <div style="font-size:12px;color:var(--m-fg2);margin-top:12px">按题库分布</div>
       <div class="mhist" style="gap:8px;margin-top:6px">
-        <div class="h"><span class="t"><b>内科学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 12 · 收藏 5 · 下次到期：明天</span></div>
+        <div class="h"><span class="t"><b>内科学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 12 · 收藏 5 · 最早到期：今天</span></div>
         <div class="h"><span class="t"><b>病理学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 6 · 收藏 3</span></div>
       </div>
     </div>
@@ -1003,40 +1003,46 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg></span></div>
+  <div class="mapp"><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12M8 11l4 4 4-4"/></svg></span></div>
   <div class="mbody" data-pan="1">
     <div class="mseg"><span class="on">全部</span><span>错题</span><span>收藏</span></div>
+    <div style="display:flex;align-items:center;font-size:12px;gap:10px">
+      <span style="color:var(--m-fg);font-weight:600">共 18 题待复习</span>
+      <span style="color:var(--m-fg2)">收藏 167 题</span>
+      <span class="sp" style="flex:1"></span>
+      <span style="color:var(--m-accent);font-weight:600">全选</span>
+    </div>
     <div class="mcard" style="padding:12px">
-      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:8px">知识点</div>
+      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:8px">薄弱知识点</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
-        <span class="mtag" style="font-size:12px">内科学 · 12</span>
-        <span class="mtag" style="font-size:12px">病理学 · 9</span>
-        <span class="mtag" style="font-size:12px">解剖学 · 6</span>
-        <span class="mtag" style="font-size:12px">药理学 · 4</span>
-        <span class="mtag" style="font-size:12px">生理学 · 3</span>
+        <span class="mtag" style="font-size:12px">内科学 142 题</span>
+        <span class="mtag" style="font-size:12px">病理学 96 题</span>
+        <span class="mtag" style="font-size:12px">解剖学 61 题</span>
+        <span class="mtag" style="font-size:12px">药理学 38 题</span>
+        <span class="mtag" style="font-size:12px">生理学 24 题</span>
       </div>
     </div>
     <div class="mcard" style="padding:12px">
-      <div class="mch"><b style="font-size:14px">内科学</b><span class="sp"></span><span class="lk" style="color:var(--m-bad);background:color-mix(in srgb,var(--m-bad) 10%,transparent);padding:3px 8px;border-radius:8px">下次到期：明天</span></div>
-      <div style="font-size:12.5px;color:var(--m-fg);margin-top:10px;line-height:1.55">患者，男，46 岁。因“反复上腹痛 3 年，加重 2 周”就诊。胃镜检查示胃窦部黏膜变薄，血管透见。最可能的诊断是？</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px">
-        <span style="color:var(--m-bad)">你的答案 C</span><span style="color:var(--m-fg2)">·</span><span style="color:var(--m-ok)">正确答案 D</span>
-        <span class="sp" style="flex:1"></span><span style="color:var(--m-fg2)">错 3 次</span>
+      <div class="mch"><b style="font-size:14px">内科学</b><span class="sp"></span><span style="color:var(--m-accent);font-weight:700;font-size:13px">166 题</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;margin-top:8px">
+        <span style="color:var(--m-bad)">166 题到期</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-fg2)">167 收藏</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-bad)">最早到期：已到期4天</span>
       </div>
     </div>
     <div class="mcard" style="padding:12px">
-      <div class="mch"><b style="font-size:14px">病理学</b><span class="sp"></span><span class="lk" style="padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)">已到期 2 天</span></div>
-      <div style="font-size:12.5px;color:var(--m-fg);margin-top:10px;line-height:1.55">关于细胞凋亡与坏死的区别，下列哪项描述是正确的？</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px">
-        <span style="color:var(--m-bad)">你的答案 A</span><span style="color:var(--m-fg2)">·</span><span style="color:var(--m-ok)">正确答案 B</span>
-        <span class="sp" style="flex:1"></span><span style="color:var(--m-fg2)">错 2 次</span>
+      <div class="mch"><b style="font-size:14px">病理学</b><span class="sp"></span><span style="color:var(--m-accent);font-weight:700;font-size:13px">96 题</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;margin-top:8px">
+        <span style="color:var(--m-bad)">54 题到期</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-fg2)">96 收藏</span>
+        <span style="color:var(--m-fg2)">·</span>
+        <span style="color:var(--m-bad)">最早到期：今天</span>
       </div>
     </div>
-    <div class="mcard" style="padding:12px">
-      <div class="mch"><b style="font-size:14px">解剖学</b><span class="sp"></span><span class="lk" style="padding:3px 8px;border-radius:8px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)">已到期 5 天</span></div>
-      <div style="font-size:12.5px;color:var(--m-fg);margin-top:10px;line-height:1.55">穿经腮腺的结构由前向后依次为？</div>
-    </div>
-    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">开始复习（18 题）</div>
+    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">全题库重刷（共 18 题）</div>
   </div>
  </div>
 </div>
@@ -1198,6 +1204,8 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <span class="slogan-chip">✍️ 手写批注</span>
       <span class="slogan-chip">📊 学习数据可视化</span>
       <span class="slogan-chip">🌙 3 套主题 + 深色</span>
+      <span class="slogan-chip">⚡ AI 回答边生成边显示</span>
+      <span class="slogan-chip">📤 错题按范围导出</span>
     </div>
     <div class="btn-row">
       <a class="btn btn-p" href="#download">📱 立即下载体验</a>
@@ -1207,7 +1215,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div><b>7</b>种题型</div>
       <div><b>3</b>种刷题模式</div>
       <div><b>3</b>套主题 / 6 色板</div>
-      <div><b>263</b>项自动化测试</div>
+      <div><b>311</b>项自动化测试</div>
       <div><b>0</b>广告 / 0 会员</div>
     </div>
   </div>
@@ -1351,7 +1359,8 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <li><b>篇幅三档</b>：简洁（≤150 字）/ 标准（≤300 字）/ 详细，设置里随时切换</li>
       <li><b>关键词高亮</b>：答案绿、题眼蓝、避坑红，关键依据与易错否定词单独着色</li>
       <li><b>需要 API Key</b>：AI 解析要在设置里填一个 Key（DeepSeek 等，自带免费额度）；未配置时示例题库显示题目自带的静态解析</li>
-      <li><b>只看一次的钱</b>：解析本地缓存，同一道题不重复消耗 Token</li>
+      <li><b>只看一次的钱</b>：解析本地缓存，同一道题不重复消耗 Token；已存过的解析直接整段显示，不重新生成</li>
+      <li><b>边生成边显示</b>：新解析逐字出现，不用盯着转圈等整段返回</li>
     </ul>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:18px">
@@ -1373,6 +1382,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <li><b>按题保存</b>：每道题的追问历史独立存储，换题不串、重启不丢</li>
       <li><b>富文本回复</b>：支持加粗、列表、表格，长解析也读得清楚</li>
       <li><b>自动滚到底</b>：内容变长时输入框跟随对话下移，不用手动找</li>
+      <li><b>回答边生成边显示</b>：提问后 AI 逐字回复，长回答也不用干等</li>
     </ul>
   </div>
   <div class="f-visual" style="flex-direction:column;gap:16px">
@@ -1400,6 +1410,8 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <li><b>只显示到期</b>：打开错题本，看到的都是此刻该复习的题</li>
       <li><b>反应时间参与评分</b>：答得又快又对 → 判定为"简单"，间隔拉得更长</li>
       <li><b>知识点标签云</b>：按知识点聚合错误，一眼看出薄弱章节，可一键专项复习</li>
+      <li><b>按范围导出</b>：最薄弱知识点 / 最近做过 / 近 7 天 / 近 30 天，或自己勾选题目，导成 .json 可再导入</li>
+      <li><b>错题卡带数据</b>：每道题显示做过几次、正确率与 FSRS 复习轮数、下次复习时间</li>
       <li><b>薄弱诊断</b>：结合统计数据生成学习建议</li>
     </ul>
   </div>
@@ -1433,7 +1445,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <li><b>近 30 天趋势</b>：柱状题量 + 分层正确率双轴对照</li>
       <li><b>年度热力图</b>：GitHub 贡献图样式，一整年 53 周 × 7 天，累计努力一眼可见</li>
       <li><b>正确率排行</b>：按题库 / 按知识点两个维度，定位薄弱环节</li>
-      <li><b>错题统计</b>：总数、待复习、按题库分布与下次到期时间</li>
+      <li><b>错题统计</b>：总数、待复习、按题库分布与最早到期时间</li>
       <li><b>历史会话</b>：每一轮练习都可回看，支持改判修正</li>
     </ul>
   </div>
@@ -1444,7 +1456,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     </div>
     <div class="window" style="--ar:1200/620;max-width:440px">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody" style="background:#F5F7FA">
+      <div class="wbody" style="background:#FAFAFA">
         <div class="wmock" style="height:260px">
           <div class="rail">
             <div class="ri">⌂</div><div class="ri on">▤</div><div class="ri">◔</div>
@@ -1509,7 +1521,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   </div>
   <div class="f-visual" style="flex-direction:column;gap:22px">
     <div class="themes">
-      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#F5F7FA,#2563EB)"></div><div class="nm">清蓝</div></div>
+      <div class="th"><div class="sw" style="background:linear-gradient(160deg,#FAFAFA,#5E6AD2)"></div><div class="nm">清蓝</div></div>
       <div class="th"><div class="sw" style="background:linear-gradient(160deg,#F6F8F5,#2F7D5B)"></div><div class="nm">松绿</div></div>
       <div class="th"><div class="sw" style="background:linear-gradient(160deg,#FAF8F4,#1F6F5C)"></div><div class="nm">墨黑</div></div>
     </div>
@@ -1540,7 +1552,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="f-visual" style="flex-direction:column;gap:18px">
     <div class="window" style="--ar:1200/620;width:100%">
       <div class="bar"><i></i><i></i><i></i></div>
-      <div class="wbody" style="background:#F5F7FA">
+      <div class="wbody" style="background:#FAFAFA">
         <div class="wmock">
           <div class="rail">
             <div class="ri on">⌂</div><div class="ri">▤</div><div class="ri">◔</div>
@@ -1560,9 +1572,9 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
               </div>
               <div class="col">
                 <div class="t">AI 解析</div>
-                <div class="note"><b style="color:#15803D">答案：</b>B<br>
-                <b style="color:#2563EB">题眼：</b>黏膜变薄、血管透见<br>
-                <b style="color:#B91C1C">避坑：</b>别把血管透见与充血发红混淆</div>
+                <div class="note"><b style="color:#1A7F37">答案：</b>B<br>
+                <b style="color:#5E6AD2">题眼：</b>黏膜变薄、血管透见<br>
+                <b style="color:#CF222E">避坑：</b>别把血管透见与充血发红混淆</div>
               </div>
             </div>
           </div>
@@ -1642,7 +1654,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     <p class="lead" style="margin:0 auto">免费不等于将就。每一轮改动都经过自动化测试与发布前校验，保证你手上的版本行为稳定、可追溯。</p>
   </div>
   <div class="stats-grid">
-    <div class="stat reveal"><div class="n"><span class="num" data-to="263">0</span></div><div class="l">项自动化测试</div></div>
+    <div class="stat reveal"><div class="n"><span class="num" data-to="311">0</span></div><div class="l">项自动化测试</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="11">0</span></div><div class="l">张数据表（schema v11）</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="7">0</span></div><div class="l">种题型判定</div></div>
     <div class="stat reveal"><div class="n"><span class="num" data-to="3">0</span></div><div class="l">套主题 × 深浅 = 6 色板</div></div>

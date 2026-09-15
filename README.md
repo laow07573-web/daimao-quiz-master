@@ -100,7 +100,7 @@
 | 年度坚持 | GitHub 贡献图样式的年度热力图，一整年 53 周一眼看全 |
 | 近一年趋势 | 双 Y 轴对照（题量柱状 + 平滑正确率曲线），支持分页与单日明细 |
 | 正确率排行 | 按题库 / 按知识点两个维度 |
-| 错题统计 | 总数、待复习、按题库分布、下次到期时间 |
+| 错题统计 | 总数、待复习、按题库分布、最早到期时间 |
 | 历史会话 | 每轮练习可回看，支持改判修正 |
 
 ### 🔄 多端与同步
@@ -211,7 +211,7 @@ Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
 
 ## 工程质量
 
-- **244 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
+- **311 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
   （每次 push 由 [GitHub Actions](https://github.com/laow07573-web/daimao-quiz-master/actions) 自动执行，见上方 CI 徽章）
 - 数据库 schema v11，外键级联、索引优化、事务一致性
 - 每次发版依次执行：静态分析（0 error / 0 warning）→ 全量测试 → 混淆构建 → **组件 / 权限 / 文案 / 资源四维基线对照校验** → 签名校验
@@ -232,7 +232,7 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 ```bash
 flutter pub get
 flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
-flutter test                    # 全量测试（当前 244 项）
+flutter test                    # 全量测试（当前 311 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release
 ```
