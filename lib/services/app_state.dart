@@ -19,6 +19,7 @@ import 'quiz_service.dart';
 import 'sample_bank.dart';
 import 'stats_service.dart';
 import 'debug_log_service.dart';
+import 'docx_export_service.dart';
 import 'fsrs_service.dart';
 import 'key_crypto.dart';
 import 'secure_key_storage.dart';
@@ -1651,28 +1652,75 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     });
     // 写在系统临时目录（Android 上即应用缓存目录），不建子目录；
     // 文件名带毫秒 + 亚毫秒，同一毫秒内连续导出两次不会互相覆盖。
-    // 顺手回收一小时前的旧导出（分享用的是 share_plus 复制出去的副本，
-    // 但刚导出那份可能还在分享目标手里，所以按时间留一段宽限期）。
     final name = '错题导出_${stamp.millisecondsSinceEpoch}'
         '${stamp.microsecond % 1000}';
     final dir = Directory.systemTemp;
+    _recycleOldExports(dir, stamp);
+    final file = File('${dir.path}/$name.json');
+    await file.writeAsString(json);
+    return (file.path, list.length);
+  }
+
+  /// 生成打印用的错题练习卷（.docx），返回 `(文件路径, 题数)`；无题时 `(null, 0)`。
+  ///
+  /// 与 [exportErrorQuestionsJson] 共用同一套范围筛选（bankIds / questionIds /
+  /// knowledgePoint / window / recentFirst），差别只在**产物**：
+  /// JSON 是给猫卷自己再导入用的，docx 是给学生打印纸质题目的。
+  /// 两种 [DocxAnswerPlacement] 的内容完全一样，只有答案块的位置不同。
+  Future<(String?, int)> exportErrorQuestionsDocx(
+    String mode, {
+    Set<int>? bankIds,
+    Set<int>? questionIds,
+    String? knowledgePoint,
+    String? window,
+    bool recentFirst = false,
+    required DocxAnswerPlacement placement,
+    String? subtitle,
+  }) async {
+    final rows = await _db.getErrorQuestionsWithStats(
+      mode,
+      bankIds: bankIds,
+      questionIds: questionIds,
+      knowledgePoint: knowledgePoint,
+      window: window,
+      recentFirst: recentFirst,
+    );
+    if (rows.isEmpty) return (null, 0);
+    final questions = rows.map((m) => Question.fromMap(m)).toList();
+
+    final bytes = DocxExportService.build(
+      questions: questions,
+      placement: placement,
+      subtitle: subtitle,
+    );
+    final stamp = DateTime.now();
+    final name = '错题练习_${stamp.millisecondsSinceEpoch}'
+        '${stamp.microsecond % 1000}';
+    final dir = Directory.systemTemp;
+    _recycleOldExports(dir, stamp);
+    final file = File('${dir.path}/$name.docx');
+    await file.writeAsBytes(bytes, flush: true);
+    return (file.path, questions.length);
+  }
+
+  /// 回收一小时前的旧导出文件。
+  ///
+  /// 分享用的是 share_plus 复制出去的副本，但刚导出那份可能还在分享目标手里，
+  /// 所以按时间留一段宽限期，而不是导一次删一次。
+  void _recycleOldExports(Directory dir, DateTime now) {
     try {
-      final cutoff = stamp.subtract(const Duration(hours: 1));
+      final cutoff = now.subtract(const Duration(hours: 1));
       for (final f in dir.listSync()) {
         final base = f.path.split(RegExp(r'[\\/]')).last;
-        if (f is File &&
-            base.startsWith('错题导出_') &&
-            base.endsWith('.json') &&
-            f.lastModifiedSync().isBefore(cutoff)) {
+        final ours = (base.startsWith('错题导出_') && base.endsWith('.json')) ||
+            (base.startsWith('错题练习_') && base.endsWith('.docx'));
+        if (f is File && ours && f.lastModifiedSync().isBefore(cutoff)) {
           f.deleteSync();
         }
       }
     } catch (_) {
       // 清理失败（权限/占用）不影响导出本身
     }
-    final file = File('${dir.path}/$name.json');
-    await file.writeAsString(json);
-    return (file.path, list.length);
   }
 
   /// 批量取逐题作答统计（做过几次 / 正确数）。一次聚合查询，供错题列表与卡片使用。
