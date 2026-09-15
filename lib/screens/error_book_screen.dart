@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/question.dart';
 import '../services/app_state.dart';
+import '../services/docx_export_service.dart';
 import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
@@ -443,34 +444,113 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     );
     if (action == null || !mounted) return;
 
+    // 先定「导哪些题」，再问「答案怎么排」：一次只让用户做一个决定，
+    // 也避免把范围参数在两层弹窗之间反复传递出错。
+    _ExportScope? scope;
     switch (action) {
       case 'current':
-        await _export(bankIds: bankIds);
+        scope = _ExportScope(bankIds: bankIds, label: '当前筛选');
       case 'recent':
-        await _export(bankIds: bankIds, recentFirst: true);
+        scope = _ExportScope(
+            bankIds: bankIds, recentFirst: true, label: '最近做过的');
       case 'w7d':
-        await _export(bankIds: bankIds, window: '7d');
+        scope = _ExportScope(bankIds: bankIds, window: '7d', label: '近 7 天做过的');
       case 'w30d':
-        await _export(bankIds: bankIds, window: '30d');
+        scope =
+            _ExportScope(bankIds: bankIds, window: '30d', label: '近 30 天做过的');
       case 'pick':
-        await _pickAndExport(bankIds: bankIds);
+        final ids = await _pickQuestions(bankIds: bankIds);
+        if (ids == null || !mounted) return;
+        scope = _ExportScope(questionIds: ids, label: '自选 ${ids.length} 题');
       default:
         if (action.startsWith('kp:')) {
-          await _export(bankIds: bankIds, knowledgePoint: action.substring(3));
+          final kp = action.substring(3);
+          scope = _ExportScope(
+              bankIds: bankIds, knowledgePoint: kp, label: '知识点：$kp');
         }
+    }
+    if (scope == null || !mounted) return;
+
+    final style = await _showExportStyle(scope);
+    if (style == null || !mounted) return;
+    switch (style) {
+      case 'json':
+        await _exportJson(scope);
+      case 'docx_under_question':
+        await _exportDocx(scope, DocxAnswerPlacement.underQuestion);
+      case 'docx_last_page':
+        await _exportDocx(scope, DocxAnswerPlacement.lastPage);
     }
   }
 
-  /// 自定义选题导出：列表多选 → 导出所选。
-  Future<void> _pickAndExport({Set<int>? bankIds}) async {
+  /// 第二步：答案怎么排。
+  ///
+  /// 这一屏带一个示意动画，把「答案跟着题目」和「答案集中在末页」两种排布
+  /// 直接演出来——光看文字说明（尤其「最后一页」）很难立刻想象成稿什么样。
+  Future<String?> _showExportStyle(_ExportScope scope) async {
+    final ac = AppThemeColors.of(context);
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ac.background,
+      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(MaoSpace.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('答案放在哪里？',
+                    style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+                const SizedBox(height: MaoSpace.xxs),
+                Text('导出「${scope.label}」的 Word 打印稿（.docx），可以直接打印成纸质题',
+                    style:
+                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+                const SizedBox(height: MaoSpace.md),
+                const _AnswerStylePreview(),
+                const SizedBox(height: MaoSpace.md),
+                _ExportOption(
+                  icon: Icons.vertical_align_top_rounded,
+                  title: 'DOCX · 答案在题目下方',
+                  subtitle: '题目和答案连着印，适合复习背诵',
+                  onTap: () => Navigator.pop(ctx, 'docx_under_question'),
+                ),
+                _ExportOption(
+                  icon: Icons.vertical_align_bottom_rounded,
+                  title: 'DOCX · 答案在最后一页',
+                  subtitle: '先做题，翻到最后对答案',
+                  onTap: () => Navigator.pop(ctx, 'docx_last_page'),
+                ),
+                const Divider(height: MaoSpace.xl),
+                _ExportOption(
+                  icon: Icons.data_object_rounded,
+                  title: 'JSON（可再导入回猫卷）',
+                  subtitle: '要把这批题导回猫卷时选这个，不适合打印',
+                  onTap: () => Navigator.pop(ctx, 'json'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 自定义选题：列表多选，返回选中的题目 id（取消或空选返回 null）。
+  Future<Set<int>?> _pickQuestions({Set<int>? bankIds}) async {
     final appState = context.read<AppState>();
     final ac = AppThemeColors.of(context);
     final cards = await appState.getErrorQuestionCards(_filter, bankIds: bankIds);
-    if (!mounted) return;
+    if (!mounted) return null;
     if (cards.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('当前筛选下暂无错题')));
-      return;
+      return null;
     }
     final selected = <int>{};
 
@@ -554,10 +634,10 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                     onPressed: selected.isEmpty
                         ? null
                         : () => Navigator.pop(ctx, true),
-                    // 空选时说明该做什么，而不是显示自相矛盾的「导出所选（0 题）」
+                    // 空选时说明该做什么，而不是显示自相矛盾的「确定（0 题）」
                     child: Text(selected.isEmpty
                         ? '请先选择题目（共 ${cards.length} 题）'
-                        : '导出所选（${selected.length} 题）'),
+                        : '下一步（${selected.length} 题）'),
                   ),
                 ),
               ],
@@ -566,18 +646,12 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
         ),
       ),
     );
-    if (ok != true || !mounted) return;
-    await _export(questionIds: selected);
+    if (ok != true || !mounted) return null;
+    return selected;
   }
 
-  /// 执行导出并分享。
-  Future<void> _export({
-    Set<int>? bankIds,
-    Set<int>? questionIds,
-    String? knowledgePoint,
-    String? window,
-    bool recentFirst = false,
-  }) async {
+  /// 导出为 .json（可再导入回猫卷）。
+  Future<void> _exportJson(_ExportScope s) async {
     final appState = context.read<AppState>();
     final messenger = ScaffoldMessenger.of(context);
     // 先声明再在 try 里赋值：catch 分支一定 return，Dart 的定值分析能通过
@@ -585,11 +659,11 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     try {
       result = await appState.exportErrorQuestionsJson(
         _filter,
-        bankIds: bankIds,
-        questionIds: questionIds,
-        knowledgePoint: knowledgePoint,
-        window: window,
-        recentFirst: recentFirst,
+        bankIds: s.bankIds,
+        questionIds: s.questionIds,
+        knowledgePoint: s.knowledgePoint,
+        window: s.window,
+        recentFirst: s.recentFirst,
         includeStats: true, // 带上「做过几次/正确率/FSRS」，便于外部查看
       );
     } catch (e) {
@@ -605,18 +679,55 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       messenger.showSnackBar(const SnackBar(content: Text('当前范围下暂无错题')));
       return;
     }
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text('已导出 $count 题'),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    await _share(messenger, path, '已导出 $count 题', '猫卷错题导出');
+  }
+
+  /// 导出为 .docx 打印稿（纸质题目）。
+  Future<void> _exportDocx(
+      _ExportScope s, DocxAnswerPlacement placement) async {
+    final appState = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    (String?, int) result;
     try {
-      await Share.shareXFiles([XFile(path)], subject: '猫卷错题导出');
+      result = await appState.exportErrorQuestionsDocx(
+        _filter,
+        bankIds: s.bankIds,
+        questionIds: s.questionIds,
+        knowledgePoint: s.knowledgePoint,
+        window: s.window,
+        recentFirst: s.recentFirst,
+        placement: placement,
+        subtitle: s.label,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('导出失败：$e')));
+      return;
+    }
+    final (path, count) = result;
+    if (!mounted) return;
+    if (path == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('当前范围下暂无错题')));
+      return;
+    }
+    final where = placement == DocxAnswerPlacement.underQuestion
+        ? '答案在题目下方'
+        : '答案在最后一页';
+    await _share(messenger, path, '已导出 $count 题（$where）', '猫卷错题练习');
+  }
+
+  /// 把产物交给系统分享；分享失败时把缓存路径回显出来（用户自己翻不到）。
+  Future<void> _share(ScaffoldMessengerState messenger, String path,
+      String okText, String subject) async {
+    messenger.showSnackBar(SnackBar(
+      content: Text(okText),
+      duration: const Duration(seconds: 3),
+    ));
+    try {
+      await Share.shareXFiles([XFile(path)], subject: subject);
     } catch (e) {
       // v1.0.2 设计审查修复：分享失败不再静默
       if (!mounted) return;
-      // 文件已生成在应用缓存目录，用户自己翻不到——把路径带上
       messenger.showSnackBar(SnackBar(
         content: Text('分享失败：$e\n文件已生成：$path'),
         duration: const Duration(seconds: 6),
@@ -1189,3 +1300,226 @@ String questionStatLine(
   }
   return parts.join(' · ');
 }
+
+/// 一次导出要覆盖的范围：范围弹窗选完就固定下来，后面的「答案放哪」和
+/// 真正的导出都读它，避免同一个参数在两层弹窗之间来回传。
+class _ExportScope {
+  const _ExportScope({
+    this.bankIds,
+    this.questionIds,
+    this.knowledgePoint,
+    this.window,
+    this.recentFirst = false,
+    required this.label,
+  });
+
+  final Set<int>? bankIds;
+  final Set<int>? questionIds;
+  final String? knowledgePoint;
+  final String? window;
+  final bool recentFirst;
+
+  /// 写进卷头与提示文案的范围名，如「近 7 天做过的」
+  final String label;
+}
+
+/// 「答案在题目下方 ⇄ 答案在最后一页」的示意动画。
+///
+/// 纸上 3 道题：答案块在「跟着题目走」和「集中到页底」之间来回移动，
+/// 页底那条虚线代表答案区，只在末页模式显现——两种选择的差别直接演出来，
+/// 比一行文字说明直观。
+class _AnswerStylePreview extends StatefulWidget {
+  const _AnswerStylePreview();
+
+  @override
+  State<_AnswerStylePreview> createState() => _AnswerStylePreviewState();
+}
+
+class _AnswerStylePreviewState extends State<_AnswerStylePreview>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _morph;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 5200));
+    // 停 → 移到末页 → 停 → 移回题目下方 → 停：两端各留出看清的时间
+    _morph = _ctrl.drive(TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(0.0), weight: 16),
+      TweenSequenceItem(
+          tween: Tween(begin: 0.0, end: 1.0)
+              .chain(CurveTween(curve: Curves.easeInOutCubic)),
+          weight: 22),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 18),
+      TweenSequenceItem(
+          tween: Tween(begin: 1.0, end: 0.0)
+              .chain(CurveTween(curve: Curves.easeInOutCubic)),
+          weight: 22),
+      TweenSequenceItem(tween: ConstantTween(0.0), weight: 22),
+    ]));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 系统开了「减弱动态效果」就停在第一种排布，不做循环动画
+    final reduce = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduce) {
+      _ctrl.stop();
+      _ctrl.value = 0;
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
+    return Container(
+      height: 176,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: ac.surfaceAlt,
+        borderRadius: BorderRadius.circular(MaoRadius.small),
+        border: Border.all(color: ac.border, width: MaoLine.width),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+      child: AnimatedBuilder(
+        animation: _morph,
+        builder: (context, _) {
+          final atEnd = _morph.value > 0.5;
+          return Column(
+            children: [
+              Expanded(
+                child: CustomPaint(
+                  size: Size.infinite,
+                  painter: _AnswerStylePainter(
+                    t: _morph.value,
+                    paper: ac.surface,
+                    line: ac.border,
+                    accent: ac.accent,
+                    faint: ac.textTertiary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 260),
+                child: Text(
+                  atEnd ? '答案在最后一页' : '答案在题目下方',
+                  key: ValueKey(atEnd),
+                  style: MaoType.microStyle.copyWith(
+                      color: atEnd ? ac.accent : ac.textSecondary,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AnswerStylePainter extends CustomPainter {
+  _AnswerStylePainter({
+    required this.t,
+    required this.paper,
+    required this.line,
+    required this.accent,
+    required this.faint,
+  });
+
+  /// 0 = 答案跟着题目，1 = 答案集中到页底
+  final double t;
+  final Color paper;
+  final Color line;
+  final Color accent;
+  final Color faint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final sheet = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, w, h), const Radius.circular(8));
+    canvas.drawRRect(sheet, Paint()..color = paper);
+    canvas.drawRRect(
+        sheet,
+        Paint()
+          ..color = line
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1);
+
+    // 卷头小条
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          const Rect.fromLTWH(14, 12, 52, 6), const Radius.circular(3)),
+      Paint()..color = faint.withOpacity(0.45),
+    );
+
+    const qX = 14.0;
+    const qW = 96.0;
+    const qH = 7.0;
+    const gap = 22.0;
+    const qTop = 30.0;
+
+    // 页底的答案区虚线：末页模式才显现
+    if (t > 0.01) {
+      final dashY = h - 34;
+      final dash = Paint()
+        ..color = accent.withOpacity(0.35 * t)
+        ..strokeWidth = 1;
+      for (var x = 14.0; x < w - 16; x += 8) {
+        canvas.drawLine(Offset(x, dashY), Offset(x + 4, dashY), dash);
+      }
+    }
+
+    final questionPaint = Paint()..color = faint.withOpacity(0.42);
+    final answerPaint = Paint()..color = accent.withOpacity(0.9);
+    for (var i = 0; i < 3; i++) {
+      final qy = qTop + i * gap;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(qX, qy, qW * (i == 2 ? 0.68 : 1.0), qH),
+            const Radius.circular(3)),
+        questionPaint,
+      );
+      // 答案块：从「题目下方」插值到「页底堆叠」
+      final startX = qX + 10;
+      final endX = qX;
+      final startY = qy + 12;
+      final endY = h - 30 + i * 9.0;
+      final startW = qW * 0.5;
+      final endW = qW * 0.34;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(
+              startX + (endX - startX) * t,
+              startY + (endY - startY) * t,
+              startW + (endW - startW) * t,
+              6,
+            ),
+            const Radius.circular(3)),
+        answerPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnswerStylePainter old) =>
+      old.t != t ||
+      old.paper != paper ||
+      old.line != line ||
+      old.accent != accent ||
+      old.faint != faint;
+}
+
