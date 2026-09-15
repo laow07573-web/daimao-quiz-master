@@ -599,12 +599,14 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mch .lk{font-size:12px;color:var(--m-fg2);display:flex;align-items:center;gap:3px}
 
 /* —— 本周战绩双数据块 —— */
-.mduo{display:flex;gap:12px;margin-top:12px}
-.mduo>div{flex:1;background:color-mix(in srgb,var(--m-accent) 7%,transparent);border-radius:10px;
-  padding:12px 0;text-align:center}
-.mduo b{font-size:26px;font-weight:700;color:var(--m-accent);line-height:1.1}
-.mduo s{font-size:13px;color:var(--m-fg2);text-decoration:none}
-.mduo em{display:block;font-size:12px;color:var(--m-fg2);font-style:normal;margin-top:2px}
+/* 本周战绩的指标行（Mao Des 2.0：内联一行，数值走正文色、标签走弱色，
+   两组之间只有一条发丝竖线——不再用强调色底块，强调色只留给标题条/热力格/连续打卡） */
+.mduo{display:flex;align-items:baseline;gap:10px;margin-top:12px}
+.mduo>div{display:flex;align-items:baseline;gap:5px}
+.mduo>div+div{border-left:1px solid var(--m-bd);padding-left:10px}
+.mduo b{font-size:19px;font-weight:700;color:var(--m-fg);line-height:1.1}
+.mduo s{font-size:12px;color:var(--m-fg);text-decoration:none}
+.mduo em{font-size:11.5px;color:var(--m-fg3);font-style:normal}
 
 /* —— 月历热力图 —— */
 .mcal{margin-top:12px}
@@ -616,7 +618,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mcalg i{aspect-ratio:1;max-height:32px;border-radius:4px;display:grid;place-items:center;
   font-size:9.5px;font-weight:500;color:var(--m-fg)}
 .mcalg i.e{background:transparent}
-.mcalg i.l0{background:var(--m-bd)}
+.mcalg i.l0{background:transparent}
 .mcalg i.l1{background:color-mix(in srgb,var(--m-accent) 28%,#fff)}
 .mcalg i.l2{background:color-mix(in srgb,var(--m-accent) 52%,#fff);color:#fff}
 .mcalg i.l3{background:color-mix(in srgb,var(--m-accent) 85%,#000);color:#fff}
@@ -702,7 +704,11 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 .mfb .tt{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}
 .mfb.ok .tt{color:var(--m-ok)}.mfb.bad .tt{color:var(--m-bad)}
 .mfb .rr{font-size:14px;margin-top:8px}
-.mfb.ok .rr{color:var(--m-ok)}.mfb.bad .rr{color:var(--m-bad)}
+.mfb.ok .rr{color:var(--m-ok)}
+.mfb.bad .rr{color:var(--m-bad)}
+/* 正确答案恒为 success 绿：哪怕答错，正确项也不是「错误」的语义色
+   （对齐 lib/widgets/quiz/quiz_question_card.dart 的 QuizResultFeedback） */
+.mfb .rr.ca{color:var(--m-ok) !important}
 .mbtn{display:flex;align-items:center;justify-content:center;gap:7px;font-size:14px;
   border:1px solid var(--m-bd);border-radius:14px;padding:12px;color:var(--m-accent);
   background:var(--m-card);font-weight:500}
@@ -808,7 +814,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <div class="mscr" data-t="clear">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
+  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-.6 4M20 4v5h-5"/></svg></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 6.9 19.5l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 14.6H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.5 7.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.6 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"/></svg></span></div>
   <div class="mbody" data-pan="1">
     <div class="mhero">
       <div class="hrow">
@@ -822,9 +828,9 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div class="hq"><b>猫卷</b>山不让尘，川不辞盈。</div>
       <div class="hdiv"></div>
       <div class="hstats">
-        <div><em>刷题时长</em><b>6h 24m</b></div>
+        <div><em>刷题时长</em><b>6时24分</b></div>
         <div><em>总题量</em><b>1284</b></div>
-        <div><em>正确率</em><b>76%</b></div>
+        <div><em>正确率</em><b>76.0%</b></div>
       </div>
     </div>
     <div class="mcard">
@@ -890,11 +896,11 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     </div>
     <div class="mfb bad">
       <div class="tt"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>回答错误</div>
-      <div class="rr">你选择了：✓ 正确</div>
+      <div class="rr">你选择了: ✓ 正确</div>
       <div class="rr" style="opacity:.85">正确答案: ✗ 错误</div>
     </div>
     <div class="mai">
-      <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>示例解析<span class="sp"></span><span style="font-size:11px;font-weight:500;color:var(--m-fg3)">题目自带</span></div>
+      <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>示例解析<span class="sp"></span><span class="sp"></span></div>
       <div class="mtxt">内脏痛定位模糊、对切割/烧灼等刺激不敏感，但对牵拉、缺血、痉挛和炎症等刺激敏感，常伴有<b style="color:var(--m-accent)">牵涉痛</b>和情绪反应。</div>
     </div>
     <div class="mqi" style="padding:11px 13px"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.5-.7L3 21l1.8-4.6A8.4 8.4 0 1 1 21 11.5z"/></svg></span><span class="tx"><b>向 AI 追问</b><em>没看懂？直接问，对话式讲解</em></span><span class="lk"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span></div>
@@ -922,13 +928,12 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     </div>
     <div class="mopts">
       <div class="mopt"><span class="n">A</span><span class="tx">急性胃炎</span></div>
-      <div class="mopt sel"><span class="n"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="tx">慢性萎缩性胃炎</span></div>
+      <div class="mopt"><span class="n">B</span><span class="tx">慢性萎缩性胃炎</span></div>
       <div class="mopt bad"><span class="n"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span><span class="tx">胃溃疡</span></div>
       <div class="mopt ok"><span class="n"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="tx">慢性浅表性胃炎</span></div>
     </div>
     <div class="mfb bad">
-      <div class="tt"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>回答错误</div>
-      <div class="rr">正确答案: D</div>
+      <div class="rr ca">正确答案: D</div>
       <div class="rr" style="opacity:.85">你的答案: C</div>
     </div>
     <div class="mbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>查看 AI 解析</div>
@@ -947,23 +952,24 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span><span class="pill">背题模式</span></div>
+  <div class="mapp"><span class="cnt">第 2/154 题</span><span class="sp"></span>
+    <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></svg></span>
+    <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+    <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19c3.2-1 4.2-6.5 7.2-6.5s2.2 4.4 5.2 4.4 3.2-3.4 5.6-3.4"/></svg></span>
+  </div>
   <div class="mprog"><i style="width:1.3%"></i></div>
   <div class="mbody">
     <div class="mai">
       <div class="maih"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 3.6 10.8V16H8.4v-2.2A6 6 0 0 1 12 3z"/></svg>AI解析<span class="sp"></span></div>
       <div class="mtxt" id="ai-typing" data-type="**答案：** D&#10;**题眼：** 看到「黏膜变薄、血管透见」→ 直接锁定 ==萎缩性胃炎==&#10;**解析：**&#10;- **定性/计算**：正常胃黏膜厚度均匀、==血管不可见==；黏膜变薄伴血管透见是腺体萎缩的典型内镜表现&#10;- **排除法**：A/C 急性胃炎与胃溃疡均为黏膜充血水肿或溃疡凹陷，不会变薄透见血管&#10;**避坑指南：** 别把「血管透见」与「充血发红」混淆，前者提示萎缩、后者提示急性炎症。!!注意!!「最可能」提示选典型表现&#10;**一句话记忆：** ==薄到透血管 = 萎缩=="></div>
     </div>
-    <div class="mcard" style="padding:12px">
-      <div class="mbubs" id="ai-chat">
-        <div class="mbub u in">为什么黏膜变薄就能定性为萎缩性胃炎？</div>
-        <div class="mbub a in">因为 <b>腺体萎缩</b> 直接导致黏膜层变薄：腺体数量减少 → 黏膜厚度下降 → 固有层血管显露，这是萎缩的病理基础。</div>
-        <div class="mbub u in">那浅表性胃炎有什么区别？</div>
-      </div>
-      <div class="minrow">
-        <span class="minput">追问AI相关问题...</span>
-        <span class="msend"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-6z"/></svg>发送</span>
-      </div>
+    <div class="mcard" style="padding:14px;display:flex;align-items:center;gap:12px">
+      <span class="ic" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:0 0 34px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8z"/></svg></span>
+      <span style="flex:1;min-width:0">
+        <b style="display:block;font-size:15px;font-weight:600">向 AI 追问</b>
+        <em style="display:block;font-size:12px;font-style:normal;color:var(--m-fg2);margin-top:2px">没看懂？直接问，对话式讲解</em>
+      </span>
+      <span style="color:var(--m-fg3);font-size:16px">›</span>
     </div>
   </div>
  </div>
@@ -978,7 +984,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="mapp"><b>统计</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4"/></svg></span></div>
   <div class="mbody" data-pan="1" style="gap:12px">
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">统计概览</b><span class="sp"></span><span class="mseg" style="margin:0"><span class="on">本周</span><span>本月</span><span>全部</span></span></div>
+      <div class="mch"><span style="display:inline-block;width:4px;height:15px;border-radius:2px;background:var(--m-accent);vertical-align:-2px;margin-right:7px"></span><b style="font-size:14px">统计概览</b><span class="sp"></span><span class="mseg" style="margin:0"><span class="on">本周</span><span>本月</span><span>全部</span></span></div>
       <div class="mt4">
         <div><b style="color:var(--m-accent)">128</b><em>刷题量</em></div>
         <div><b style="color:var(--m-accent)">76.4%</b><em>正确率</em></div>
@@ -987,16 +993,16 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       </div>
     </div>
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">年度坚持</b><span class="sp"></span><span class="lk" style="font-size:11px">全年 53 周</span></div>
+      <div class="mch"><span style="display:inline-block;width:4px;height:15px;border-radius:2px;background:var(--m-accent);vertical-align:-2px;margin-right:7px"></span><b style="font-size:14px">年度坚持</b><span class="sp"></span><span class="sp"></span></div>
       <div class="mheat" data-year="2026" data-today="2026-09-11"></div>
       <div class="mlegend" style="margin-top:9px"><i style="background:color-mix(in srgb,var(--m-accent) 30%,#fff)"></i>少<i style="background:color-mix(in srgb,var(--m-accent) 58%,#fff)"></i>达标<i style="background:var(--m-accent)"></i>多<i style="border:1.5px solid var(--m-accent)"></i>今天<span style="margin-left:auto">68 天有记录 · 共 211 题</span></div>
     </div>
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">近一年趋势</b></div>
+      <div class="mch"><span style="display:inline-block;width:4px;height:15px;border-radius:2px;background:var(--m-accent);vertical-align:-2px;margin-right:7px"></span><b style="font-size:14px">近一年趋势</b></div>
       <div class="mchart" data-d="12,38,55,42,60,88,72,45,30,66,92,58,40,76"></div>
     </div>
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">正确率排行</b></div>
+      <div class="mch"><span style="display:inline-block;width:4px;height:15px;border-radius:2px;background:var(--m-accent);vertical-align:-2px;margin-right:7px"></span><b style="font-size:14px">正确率排行</b></div>
       <div class="mtabs"><span class="on">按题库</span><span>按知识点</span></div>
       <div class="mrank">
         <div class="r"><span class="nm">内科学</span><span class="dt" style="background:var(--m-accent);opacity:.7"></span><span class="pc">84.2%</span></div>
@@ -1005,7 +1011,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       </div>
     </div>
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">错题统计</b></div>
+      <div class="mch"><span style="display:inline-block;width:4px;height:15px;border-radius:2px;background:var(--m-accent);vertical-align:-2px;margin-right:7px"></span><b style="font-size:14px">错题统计</b></div>
       <div class="mtw">
         <div><b style="color:var(--m-bad)">46 题</b><em>错题总数</em></div>
         <div><b style="color:var(--m-accent)">18 题</b><em>待复习</em></div>
@@ -1014,6 +1020,14 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div class="mhist" style="gap:8px;margin-top:6px">
         <div class="h"><span class="t"><b>内科学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 12 · 收藏 5 · 最早到期：今天</span></div>
         <div class="h"><span class="t"><b>病理学</b></span><span class="v" style="color:var(--m-fg2);font-weight:400">到期 6 · 收藏 3</span></div>
+      </div>
+    </div>
+    <div class="mcard" style="padding:13px">
+      <div class="mch"><span style="display:inline-block;width:4px;height:15px;border-radius:2px;background:var(--m-accent);margin-right:7px"></span><b style="font-size:14px">历史记录</b><span class="sp"></span><span class="lk">最近 10 次</span></div>
+      <div class="mhist" style="gap:9px;margin-top:10px">
+        <div class="h"><span class="t"><b>单题库</b><em>生理学 · 细胞与血液　9/14 18:45</em></span><span class="v">36 题 · 75%</span></div>
+        <div class="h"><span class="t"><b>错题重刷</b><em>生理学 · 细胞与血液　9/14 16:18 · 未完成</em></span><span class="v">6 题 · 33%</span></div>
+        <div class="h"><span class="t"><b>单题库</b><em>生理学 · 细胞与血液　9/14 10:13</em></span><span class="v">36 题 · 89%</span></div>
       </div>
     </div>
   </div>
@@ -1032,17 +1046,24 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12M8 11l4 4 4-4"/></svg></span></div>
+  <div class="mapp"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span><b style="font-size:18px">错题本</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12M8 11l4 4 4-4"/></svg></span></div>
   <div class="mbody" data-pan="1">
-    <div class="mseg"><span class="on">全部</span><span>错题</span><span>收藏</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="mseg" style="flex:1"><span class="on">全部</span><span>错题</span><span>收藏</span></div>
+      <span style="color:var(--m-accent);font-weight:600;font-size:12px">全选</span>
+    </div>
     <div style="display:flex;align-items:center;font-size:12px;gap:10px">
-      <span style="color:var(--m-fg);font-weight:600">共 18 题待复习</span>
-      <span style="color:var(--m-fg2)">收藏 167 题</span>
-      <span class="sp" style="flex:1"></span>
-      <span style="color:var(--m-accent);font-weight:600">全选</span>
+      <span style="color:var(--m-fg);font-weight:600">共 253 题待复习</span>
+      <span style="color:var(--m-fg2)">收藏 345 题</span>
     </div>
     <div class="mcard" style="padding:12px">
-      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:8px">薄弱知识点</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--m-accent)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l4-6 4 3 5-8 3 4"/></svg>
+        <b style="font-size:12.5px;font-weight:600">薄弱知识点</b>
+        <span class="sp" style="flex:1"></span>
+        <span style="font-size:11.5px;color:var(--m-fg2)">按知识点分组</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--m-fg2);margin:2px 0 9px">优先复习知识点</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
         <span class="mtag" style="font-size:12px">内科学 142 题</span>
         <span class="mtag" style="font-size:12px">病理学 96 题</span>
@@ -1054,6 +1075,11 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
         <span class="mtag" style="font-size:12px">MHC 9 题</span>
         <span class="mtag" style="font-size:12px">抗原 8 题</span>
       </div>
+    </div>
+    <div class="mcard" style="padding:12px;background:color-mix(in srgb,var(--m-accent) 6%,transparent);border-color:color-mix(in srgb,var(--m-accent) 22%,var(--m-bd))">
+      <div style="font-size:11.5px;color:var(--m-fg2);line-height:1.45">本地精炼已按错题统计排序；配置 API Key 后可生成 AI 深度诊断。</div>
+      <div style="font-size:11.5px;color:var(--m-fg2);line-height:1.45;margin-top:3px">点击「生成建议」，AI 将基于上方统计精炼薄弱知识点与复习优先级。</div>
+      <div class="mbtn" style="margin-top:10px;background:var(--m-accent);color:#fff;border-color:transparent;font-weight:600">✦ 生成建议</div>
     </div>
     <div class="mcard" style="padding:12px">
       <div class="mch"><b style="font-size:14px">内科学</b><span class="sp"></span><span style="color:var(--m-accent);font-weight:700;font-size:13px">166 题</span></div>
@@ -1101,6 +1127,44 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 </div>
 </template>
 
+<template id="tpl-ai-chat">
+<div class="mscr" data-t="clear" data-compact="1">
+ <div class="mroot" style="--ratio:0.45">
+  <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
+  <div class="mapp">
+    <span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>
+    <span style="display:flex;flex-direction:column;justify-content:center">
+      <b style="font-size:17px">AI 助手</b>
+      <em style="font-size:10.5px;font-style:normal;color:var(--m-fg3)">第 2 题 · 单选</em>
+    </span>
+    <span class="sp"></span>
+    <span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></span>
+  </div>
+  <div class="mbody">
+    <div class="mcard" style="padding:12px">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--m-accent)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l4 4v12H6zM15 4v4h4"/></svg>当前题目
+        <span class="sp" style="flex:1"></span>
+        <span style="color:var(--m-fg3);font-size:15px">⌄</span>
+      </div>
+      <div style="font-size:12.5px;line-height:1.5;margin-top:8px">患者，男，46 岁。因“反复上腹痛 3 年，加重 2 周”就诊。胃镜检查示胃窦部黏膜变薄，血管透见。最可能的诊断是？</div>
+      <div style="font-size:12px;color:var(--m-ok);margin-top:6px">答案 D</div>
+    </div>
+    <div class="mbubs" id="ai-chat-bubs">
+      <div class="mbub u in">为什么黏膜变薄就能定性为萎缩性胃炎？</div>
+      <div class="mbub a in">因为 <b>腺体萎缩</b> 直接导致黏膜层变薄：腺体数量减少 → 黏膜厚度下降 → 固有层血管显露，这是萎缩的病理基础。</div>
+      <div class="mbub u in">那浅表性胃炎有什么区别？</div>
+      <div class="mbub a in">浅表性胃炎（非萎缩性）重在<b>炎症细胞浸润</b>，黏膜厚度与血管纹理基本正常；萎缩性胃炎的核心是<b>腺体减少</b>，所以才会变薄、透见血管。</div>
+    </div>
+  </div>
+  <div class="mnav" style="border-top:1px solid var(--m-bd);background:var(--m-card);gap:10px;padding:10px 12px;align-items:center">
+    <span style="flex:1;min-width:0;font-size:12.5px;color:var(--m-fg2);background:var(--m-s2);border:1px solid var(--m-bd);border-radius:20px;padding:9px 14px">继续追问…</span>
+    <span style="width:34px;height:34px;border-radius:50%;flex:0 0 34px;background:var(--m-accent);color:#fff;display:grid;place-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></span>
+  </div>
+ </div>
+</div>
+</template>
+
 <!-- 导入题库 -->
 <template id="tpl-import">
 <div class="mscr" data-t="clear" data-compact="1">
@@ -1108,34 +1172,36 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
   <div class="mapp"><b style="font-size:18px">导入题库</b></div>
   <div class="mbody" style="gap:12px">
+    <div style="font-size:12px;color:var(--m-fg2);line-height:1.6">
+      自动提取题干、选项、答案，兼容各种 DOCX 格式<br>
+      支持 .docx 格式；旧版 .doc 文件请先用 Word 另存为 .docx
+    </div>
+    <div class="mcard" style="padding:13px;border:1.5px dashed color-mix(in srgb,var(--m-accent) 45%,var(--m-bd));display:flex;align-items:center;gap:11px">
+      <span style="width:34px;height:34px;border-radius:10px;flex:0 0 34px;display:grid;place-items:center;background:color-mix(in srgb,var(--m-accent) 12%,transparent);color:var(--m-accent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg></span>
+      <span style="flex:1;min-width:0">
+        <b style="display:block;font-size:14px">一键导入示例题库</b>
+        <em style="display:block;font-size:12px;font-style:normal;color:var(--m-fg2);margin-top:3px">内置 10 道医学示例题（单选/多选/判断），无需文件立即体验</em>
+      </span>
+      <span style="flex:0 0 auto;font-size:12px;font-weight:600;color:#fff;background:var(--m-accent);border-radius:7px;padding:6px 11px">导入</span>
+    </div>
     <div class="mcard" style="padding:16px;text-align:center;border:1.5px dashed color-mix(in srgb,var(--m-accent) 45%,var(--m-bd))">
-      <div style="width:52px;height:52px;margin:0 auto 10px;border-radius:14px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);display:grid;place-items:center;color:var(--m-accent)">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17v3h16v-3M12 3v12M8 7l4-4 4 4"/></svg>
+      <div style="width:46px;height:46px;margin:0 auto 9px;border-radius:13px;background:color-mix(in srgb,var(--m-accent) 12%,transparent);display:grid;place-items:center;color:var(--m-accent)">
+        <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h6l2 2h8v9H4z"/></svg>
       </div>
-      <div style="font-size:15px;font-weight:600">选择文档文件</div>
-      <div style="font-size:12.5px;color:var(--m-fg2);margin-top:5px;line-height:1.6">支持 DOCX 自动解析、JSON 直接入库<br>AI 会提取题目、选项、答案与解析</div>
+      <div style="font-size:15px;font-weight:600">点击选择 DOCX 文件</div>
+      <div style="font-size:12px;color:var(--m-fg2);margin-top:5px;line-height:1.6">AI 将自动识别题目、选项和答案</div>
     </div>
     <div class="mcard" style="padding:12px">
-      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:9px">解析进度</div>
-      <div style="height:6px;border-radius:3px;background:var(--m-s2);overflow:hidden">
-        <div style="width:68%;height:100%;background:var(--m-accent);border-radius:3px"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px">
-        <span style="color:var(--m-accent);font-weight:600">已解析 68%</span>
-        <span style="color:var(--m-fg2)">共 5 个分块，3 路并发</span>
+      <div style="font-size:12px;color:var(--m-fg2);margin-bottom:8px">已选文件</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <span style="color:var(--m-accent);display:grid;place-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l4 4v12H6zM15 4v4h4"/></svg></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">内科学复习题.docx</span>
+        <span style="color:var(--m-fg3)">✕</span>
       </div>
     </div>
-    <div class="mcard" style="padding:12px">
-      <div class="mch"><b style="font-size:14px">文档信息</b></div>
-      <div class="mhist" style="gap:8px;margin-top:8px">
-        <div class="h"><span class="t"><b>内科学复习题.docx</b><em>1.2 MB · 320 道题</em></span></div>
-        <div class="h"><span class="t"><b>题库格式</b><em>DOCX · 已识别题号 320 处</em></span></div>
-        <div class="h"><span class="t"><b>知识点打标</b><em>已自动标注 312 道</em></span></div>
-      </div>
-    </div>
-    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">确认导入</div>
+    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">开始 AI 导入</div>
   </div>
- </div>
+</div>
 </div>
 </template>
 
@@ -1144,7 +1210,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <div class="mscr" data-t="clear" data-dark="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat" style="color:#E7EAF3"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></svg></span></div>
+  <div class="mapp"><b>猫卷</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-.6 4M20 4v5h-5"/></svg></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 6.9 19.5l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 14.6H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.5 7.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.6 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"/></svg></span></div>
   <div class="mbody">
     <div class="mhero">
       <div class="hrow">
@@ -1158,20 +1224,16 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div class="hq"><b>猫卷</b>夜色正好，来几道题。</div>
       <div class="hdiv"></div>
       <div class="hstats">
-        <div><em>刷题时长</em><b>6h 24m</b></div>
+        <div><em>刷题时长</em><b>6时24分</b></div>
         <div><em>总题量</em><b>1284</b></div>
-        <div><em>正确率</em><b>76%</b></div>
+        <div><em>正确率</em><b>76.0%</b></div>
       </div>
     </div>
     <div class="mcard">
-      <div class="mch"><i class="v4"></i><b>本周战绩</b><span class="sp"></span><span class="lk">历史报告</span></div>
+      <div class="mch"><i class="v4"></i><b>本周战绩</b><span class="sp"></span><span class="lk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>历史报告</span></div>
       <div class="mduo"><div><b>128</b><s> 道</s><em>本周刷题</em></div><div><b>76</b><s>%</s><em>平均正确率</em></div></div>
       <div class="mcal" data-y="2026" data-m="8" data-today="11" data-h="0,0,3,2,1,0,0,2,3,1,0,0,1,2,3,3,2,0,0,1,2,1,0,0,3,2,2,1,3,0,0"></div>
-      <div class="mstreak">连续打卡 3 周 2 天</div>
-    </div>
-    <div class="mq">
-      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 15%,transparent);color:var(--m-accent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 15.5 4 20l4.5-1.5M14 3.5c4.2 1 6.6 3.3 7.5 7.5-3.2 4.3-6.3 6.5-10.5 7.5l-3-3c1-4.2 3.2-7.3 6-12z"/></svg></span><span class="tx"><b>定向爆破</b><em>已选 2 个题库，全部</em></span></div>
-      <div class="mqi"><span class="ic" style="background:color-mix(in srgb,var(--m-accent) 15%,transparent);color:var(--m-accent)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h3v14H5zM10 5h3v14h-3zM16.5 5.6l3 .9-3.4 13-3-.9z"/></svg></span><span class="tx"><b>管理题库</b><em>3 个题库</em></span></div>
+      <div class="mstreak"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c2.6 3.6 5 5.1 5 8.6a5 5 0 0 1-10 0c0-2.2 1-3.4 2-4.4.3 1.2 1 2 1.8 2 1.1 0 1.4-1.2 1.4-2.2 0-1.3-.4-2.6-.2-4z"/></svg>连续打卡 3 周 2 天</div>
     </div>
   </div>
   <div class="mnav">
@@ -1192,21 +1254,17 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="mapp"><b style="font-size:18px">题库管理</b><span class="sp"></span><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></div>
   <div class="mbody">
     <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">共 3 个题库</b><span class="sp"></span><span class="lk">已选 1 个 · 10 题</span></div>
-      <div class="mbank on"><span class="cbx">✓</span><span class="nm"><b>内科学</b><em>320 题 · DOCX 导入</em></span><span class="pc">84.2%</span></div>
-      <div class="mbank"><span class="cbx"></span><span class="nm"><b>病理学</b><em>180 题 · JSON 导入</em></span><span class="pc">71.5%</span></div>
-      <div class="mbank"><span class="cbx"></span><span class="nm"><b>解剖学</b><em>96 题 · 手动录入</em></span><span class="pc">52.8%</span></div>
-    </div>
-    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">开始刷题（10 题）</div>
-    <div class="mcard" style="padding:13px">
-      <div class="mch"><b style="font-size:14px">题库文件</b></div>
-      <div class="mhist" style="gap:9px;margin-top:9px">
-        <div class="h"><span class="t"><b>内科学复习题.json</b><em>可分享给同学，导入即用</em></span><span class="v">导出</span></div>
-        <div class="h"><span class="t"><b>病理学.json</b><em>1.2 MB · 180 道题</em></span><span class="v">导出</span></div>
+      <div class="mch"><b style="font-size:14px">刷题设置</b><span class="sp"></span><span class="lk">已选 1 个题库</span></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <span style="font-size:12px;font-weight:600;color:var(--m-accent);border:1px solid var(--m-accent);border-radius:20px;padding:5px 12px">单题库刷题</span>
+        <span style="font-size:12px;color:var(--m-fg2);border:1px solid var(--m-bd);border-radius:20px;padding:5px 12px">混合刷题</span>
       </div>
+      <div class="mbank on" style="border:0;padding:11px 0;margin-top:12px"><span class="cbx">✓</span><span class="nm"><b>内科学</b><em>320 道题目</em></span><span style="color:var(--m-fg3);display:flex;gap:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></span></div>
+      <div class="mbank" style="border:0;padding:11px 0"><span class="cbx"></span><span class="nm"><b>病理学</b><em>180 道题目</em></span><span style="color:var(--m-fg3);display:flex;gap:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></span></div>
+      <div class="mbank" style="border:0;padding:11px 0"><span class="cbx"></span><span class="nm"><b>解剖学</b><em>96 道题目</em></span><span style="color:var(--m-fg3);display:flex;gap:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></span></div>
     </div>
   </div>
- </div>
+</div>
 </div>
 </template>
 
@@ -1215,9 +1273,19 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
 <div class="mscr" data-t="clear" data-compact="1">
  <div class="mroot" style="--ratio:0.45">
   <div class="mstat"><span>9:41</span><span class="mi"><span class="b"><i></i><i></i><i></i><i></i></span><span class="bat"><i></i></span></span></div>
-  <div class="mapp"><span class="cnt">第 9/10 题</span><span class="sp"></span><span class="pill">批注中</span></div>
+  <div class="mapp"><span class="cnt">第 9/10 题</span><span class="sp"></span></div>
   <div class="mprog"><i style="width:90%"></i></div>
-  <div class="mbody">
+  <div class="mbody" style="gap:12px">
+    <div class="mcard" style="padding:9px 10px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+      <span style="width:17px;height:17px;border-radius:50%;background:#CF222E"></span><span style="width:17px;height:17px;border-radius:50%;background:#5E6AD2"></span><span style="width:17px;height:17px;border-radius:50%;background:#1A7F37"></span><span style="width:17px;height:17px;border-radius:50%;background:#18181B;border:1px solid var(--m-bd)"></span>
+      <span style="width:1px;height:18px;background:var(--m-bd)"></span>
+      <span style="display:grid;place-items:center;color:var(--m-fg2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M7 16 16 7l2 2-9 9H7z"/></svg></span>
+      <span style="display:grid;place-items:center;color:#fff;background:var(--m-accent);border-radius:7px;width:26px;height:26px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M7 16 16 7l2 2-9 9H7z"/></svg></span>
+      <span style="display:grid;place-items:center;color:var(--m-fg2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h16M8 14l7-7 3 3-7 7H8z"/></svg></span>
+      <span style="display:grid;place-items:center;color:var(--m-fg2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14L8 8 5 19z"/></svg></span>
+      <span class="sp" style="flex:1"></span>
+      <span style="font-size:12.5px;color:var(--m-accent);font-weight:600">完成</span>
+    </div>
     <div class="mqcard">
       <span class="mtag">单选</span>
       <div class="mstem">患者，男，46 岁。因“反复上腹痛 3 年，加重 2 周”就诊。胃镜检查示胃窦部黏膜变薄，血管透见。最可能的诊断是？</div>
@@ -1226,9 +1294,8 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
       <div class="mopt"><span class="n">A</span><span class="tx">急性胃炎</span></div>
       <div class="mopt sel"><span class="n"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="tx">慢性萎缩性胃炎</span></div>
     </div>
-    <div class="mbtn" style="background:var(--m-accent);color:#fff;border:none;font-weight:600">完成 (Esc)</div>
   </div>
- </div>
+</div>
 </div>
 </template>
 
@@ -1449,7 +1516,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
   <div class="f-visual" style="flex-direction:column;gap:16px">
     <div class="phone" style="--ar:390/867;width:min(318px,80vw)">
       
-      <div class="scr" data-mock="ai"></div>
+      <div class="scr" data-mock="ai-chat"></div>
     </div>
     <div class="bubbles" id="chat-demo">
       <div class="bub u">为什么 PaCO₂ 升高就能定性为呼吸性酸中毒？</div>
@@ -2592,7 +2659,7 @@ html.no-motion *,html.no-motion *::before,html.no-motion *::after{
     { label:'看 AI 题眼解析', desc:'配好 Key 后，每题按四步拆解，关键词彩色标记，一眼抓到破题点',
       mock:'ai',       ms:6400, typeIt:true },
     { label:'追问不懂的点',   desc:'像聊天一样继续问，问答都留在题目旁边',
-      mock:'ai',       ms:5200, chat:true },
+      mock:'ai-chat',  ms:5200, chat:true },
     { label:'错题自动排期',   desc:'FSRS-5 按遗忘曲线排期，到期的题才出现',
       mock:'errbook',  ms:5000 },
     { label:'看进步数据',     desc:'年度贡献热力图、趋势、正确率排行、错题分布',
