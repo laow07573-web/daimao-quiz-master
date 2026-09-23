@@ -83,11 +83,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       ),
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
-        child: _records == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(14),
-              children: [
+        child: AnimatedSwitcher(
+          // 加载 → 真内容 120ms 淡切（减弱动态时零时长直接落位）
+          duration: MaoMotion.effective(context, MaoMotion.fast),
+          switchInCurve: MaoMotion.standard,
+          child: _records == null
+              ? const _DetailSkeleton(key: ValueKey('detail-loading'))
+              : ListView(
+                  key: const ValueKey('detail-body'),
+                  padding: const EdgeInsets.all(14),
+                  children: [
                 // 会话概览
                 MJSurface(
                   padding: const EdgeInsets.all(MaoSpace.sm + 2),
@@ -127,14 +132,48 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 const SizedBox(height: 20),
               ],
             ),
+          ),
       ),
     );
   }
 
+  /// 用时读数：「数字+空格+汉字」间距与全站一致（'4 分 05 秒'）
   String _fmt(int seconds) {
     final m = seconds ~/ 60;
     final sec = seconds % 60;
-    return m > 0 ? '${m}分${sec}秒' : '${sec}秒';
+    return m > 0 ? '$m 分 $sec 秒' : '$sec 秒';
+  }
+}
+
+/// 加载骨架：概览行 + 逐题卡占位，淡切到真内容时不跳版。
+class _DetailSkeleton extends StatelessWidget {
+  const _DetailSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(14),
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        const MJSurface(
+          padding: EdgeInsets.all(MaoSpace.sm + 2),
+          child: Row(
+            children: [
+              Expanded(child: MJSkeleton(height: 28)),
+              SizedBox(width: MaoSpace.xs),
+              Expanded(child: MJSkeleton(height: 28)),
+              SizedBox(width: MaoSpace.xs),
+              Expanded(child: MJSkeleton(height: 28)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (var i = 0; i < 3; i++) ...[
+          const MJSkeleton(height: 64, radius: MaoRadius.card),
+          const SizedBox(height: MaoSpace.xs),
+        ],
+      ],
+    );
   }
 }
 
@@ -150,11 +189,13 @@ class _Info extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value,
-              style: TextStyle(
-                  fontSize: MaoType.h3,
-                  fontWeight: FontWeight.bold,
-                  color: ac.textPrimary)),
+          // 等宽数字：概览五格并排时数位对齐；FittedBox 兜底防长值换行
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value,
+                style: MaoType.number(MaoType.h3, weight: FontWeight.w700)
+                    .copyWith(color: ac.textPrimary)),
+          ),
           Text(label,
               style: TextStyle(fontSize: MaoType.micro, color: ac.textSecondary)),
         ],

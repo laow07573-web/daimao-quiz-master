@@ -60,14 +60,37 @@ double niceStep(double raw) {
   return 10 * base;
 }
 
+/// 「量」的档位色（热力格 / 柱体 / 分层折线共用）：从基准色派生的实色档位。
+///
+/// [strength] 为档位强度（0..1，少→多），数值沿用旧版三档透明度的规格，
+/// 收拢到这一处集中定义。
+///
+/// 为什么不用透明度分档：透明度档位会把底色混进来——墨黑主题的 accent
+/// 是中性灰，叠出来只剩一条灰阶，「少/达标/多」只能靠明度猜。
+/// 做法：先按强度把基准色向面板色插值（明度随档位拉开；彩色基准下与旧版
+/// 透明度叠底逐像素一致，其它两主题观感不变），再对近中性基准色提饱和
+/// （沿用基准色自带色相；纯无色相灰保持中性），让墨黑的灰阶带上色觉差。
+Color levelShade(Color base, Color surface, double strength) {
+  final t = strength.clamp(0.0, 1.0);
+  final mixed = Color.lerp(surface, base, t)!;
+  final baseHsl = HSLColor.fromColor(base);
+  // 彩色基准（清蓝/松绿/danger 红）不干预：插值结果已与旧版一致
+  if (baseHsl.saturation == 0 || baseHsl.saturation >= 0.16) return mixed;
+  // 近中性但有色相倾向（墨黑的冷灰）：按档位强度提饱和，浓档更艳
+  return HSLColor.fromColor(mixed)
+      .withHue(baseHsl.hue)
+      .withSaturation((0.18 + 0.22 * t).clamp(0.0, 1.0))
+      .toColor();
+}
+
 /// 正确率三档取色（共享：趋势图/排行）
 ///
-/// 三档统一走强调色不同透明度表达"好/中/差"，最差档用 danger 语义色。
+/// 三档用 [levelShade] 实色档位表达"好/中/差"，最差档用 danger 语义色。
 /// 参数采用 Mao Des 的 [AppThemeColors]（页面已完成迁移）。
 Color accuracyTierColor(double rate, AppThemeColors ac) {
-  if (rate >= 80) return ac.accent.withOpacity(0.75);
-  if (rate >= 60) return ac.accent.withOpacity(0.45);
-  return ac.danger.withOpacity(0.75);
+  if (rate >= 80) return levelShade(ac.accent, ac.surface, 0.75);
+  if (rate >= 60) return levelShade(ac.accent, ac.surface, 0.45);
+  return levelShade(ac.danger, ac.surface, 0.75);
 }
 
 class _TrendChartState extends State<TrendChart> {
@@ -160,14 +183,14 @@ class _TrendChartState extends State<TrendChart> {
                     size: 18,
                     color: _page > 0 ? ac.accent : ac.border),
                 onPressed:
-                    _page > 0 ? () => _controller.animateToPage(_page - 1, duration: const Duration(milliseconds: 250), curve: Curves.easeOut) : null,
+                    _page > 0 ? () => _controller.animateToPage(_page - 1, duration: MaoMotion.effective(context, MaoMotion.normal), curve: MaoMotion.standard) : null,
               ),
             if (_pages.length <= 6) ...[
               for (var i = 0; i < _pages.length; i++)
                 GestureDetector(
                   key: ValueKey('trend_dot_$i'),
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => _controller.animateToPage(i, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
+                  onTap: () => _controller.animateToPage(i, duration: MaoMotion.effective(context, MaoMotion.normal), curve: MaoMotion.standard),
                   child: Container(
                     width: 16,
                     height: 12,
@@ -187,7 +210,8 @@ class _TrendChartState extends State<TrendChart> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
                   _pageRangeLabel,
-                  style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
+                  style: MaoType.number(MaoType.caption, weight: FontWeight.w500)
+                      .copyWith(color: ac.textSecondary),
                 ),
               ),
             if (_pages.length > 1)
@@ -201,7 +225,7 @@ class _TrendChartState extends State<TrendChart> {
                         ? ac.accent
                         : ac.border),
                 onPressed: _page < _pages.length - 1
-                    ? () => _controller.animateToPage(_page + 1, duration: const Duration(milliseconds: 250), curve: Curves.easeOut)
+                    ? () => _controller.animateToPage(_page + 1, duration: MaoMotion.effective(context, MaoMotion.normal), curve: MaoMotion.standard)
                     : null,
               ),
           ],
@@ -344,16 +368,19 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: v.toInt().toString(),
-          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
+          // 刻度是实义数据：等宽 + textSecondary（tertiary 只留占位/装饰）
+          style: MaoType.number(MaoType.micro, weight: FontWeight.w500)
+              .copyWith(color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftPad - tp.width - 4, y - tp.height / 2));
     }
     // 右侧正确率轴 0/50/100%
-    // 右侧正确率轴：比主网格再轻一档，只作参考
+    // 右侧正确率轴：比主网格再轻一档只作参考（轻重靠线宽表达，
+    // 不再手调透明度——墨黑主题下手调透明度会把轴线压成灰阶噪声）
     final accPaint = Paint()
-      ..color = ac.border.withOpacity(0.6)
+      ..color = ac.border
       ..strokeWidth = MaoLine.width * 0.75;
     for (final pct in [0.0, 50.0, 100.0]) {
       final y = _yFor(pct / 100 * chartMax);
@@ -362,7 +389,8 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${pct.toInt()}%',
-          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
+          style: MaoType.number(MaoType.micro, weight: FontWeight.w500)
+              .copyWith(color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -384,7 +412,7 @@ class _TrendPainter extends CustomPainter {
       );
       canvas.drawRRect(
         rect,
-        Paint()..color = ac.accent.withOpacity(0.5),
+        Paint()..color = levelShade(ac.accent, ac.surface, 0.5),
       );
     }
   }
@@ -427,7 +455,7 @@ class _TrendPainter extends CustomPainter {
     final y = _yFor(checkInThreshold.toDouble());
     if (y < topPad || y > _size.height - bottomPad) return;
     final dashPaint = Paint()
-      ..color = ac.warning.withOpacity(0.6)
+      ..color = ac.warning
       ..strokeWidth = 1.2;
     // 虚线
     const dash = 5.0, gap = 4.0;
@@ -441,8 +469,8 @@ class _TrendPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: '打卡 $checkInThreshold 题',
-        style: TextStyle(
-            fontSize: MaoType.micro, color: ac.textPrimary),
+        style: MaoType.number(MaoType.micro, weight: FontWeight.w500)
+            .copyWith(color: ac.textPrimary),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -468,7 +496,8 @@ class _TrendPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: '${date.month}/${date.day}',
-          style: MaoType.microStyle.copyWith(color: ac.textTertiary),
+          style: MaoType.number(MaoType.micro, weight: FontWeight.w500)
+              .copyWith(color: ac.textSecondary),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -488,13 +517,15 @@ class _TrendPainter extends CustomPainter {
 
     final tp = TextPainter(
       text: TextSpan(
-        text: '${date.month}/${date.day} ${total}题 ${acc.toStringAsFixed(0)}%',
-        style: MaoType.microStyle.copyWith(color: ac.onAccent),
+        // 数字+空格+汉字的混排间距与全站一致；数字等宽防气泡宽度跳动
+        text: '${date.month}/${date.day} $total 题 ${acc.toStringAsFixed(0)}%',
+        style: MaoType.number(MaoType.micro, weight: FontWeight.w500)
+            .copyWith(color: ac.onAccent),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
     final rectW = tp.width + 16;
-    final rectH = 24.0;
+    const rectH = 24.0;
     final barTop = _yFor(total.toDouble());
     // 气泡 y = max(barTop - 34, topPad) 防负值裁剪
     final bubbleY = math.max(barTop - rectH - 10, topPad);

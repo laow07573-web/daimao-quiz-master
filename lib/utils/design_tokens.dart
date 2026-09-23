@@ -257,8 +257,11 @@ class MaoLine {
 // 6. 动效（短促干脆）
 // ============================================================
 
-/// 动效时长与曲线：精密界面的动作应"快而不飘"。
-/// 相比上一版（160/240/320ms）整体提速，响应更跟手。
+/// 动效时长与曲线：精密界面的动作应"快而不飘"，像仪表指针——
+/// 只在状态真的变化时动，动就一次落定。三档时长各有适用面：
+/// [fast] 状态色变 / [normal] 组件过渡 / [slow] 转场落位；
+/// 出场一律用 [exit]（快于进场，层是"落定"不是"飘走"）。
+/// 全站禁止散落时长字面量，一律引用本类。
 class MaoMotion {
   const MaoMotion._();
 
@@ -271,9 +274,27 @@ class MaoMotion {
   /// 强调过渡（弹层、页面转场）
   static const Duration slow = Duration(milliseconds: 260);
 
+  /// 出场过渡：快于进场
+  static const Duration exit = Duration(milliseconds: 140);
+
+  /// 列表/卡片进场的错落节拍（配 [staggerMax] 限量使用）
+  static const Duration stagger = Duration(milliseconds: 30);
+
+  /// 错落进场的条目上限：超过直接显示，防长列表变开幕典礼
+  static const int staggerMax = 8;
+
   /// 标准曲线（精密界面统一用它，不用弹跳）
   static const Curve standard = Curves.easeOutCubic;
 
-  /// 弹性曲线（仅用于按压缩放反馈）
-  static const Curve emphasized = Curves.easeOutBack;
+  /// 强调曲线：M3 同款三拐点、零过冲（转场/滑块级运动用）
+  static const Curve emphasized = Curves.easeInOutCubicEmphasized;
+
+  /// 按压缩放反馈曲线（仅配 ≤3% 的缩放微反馈）
+  static const Curve press = Curves.easeOutCubic;
+
+  /// 尊重系统「减弱动态效果」：开启时返回零时长（照常 setState，只是不演）
+  static Duration effective(BuildContext context, Duration duration) =>
+      (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+          ? Duration.zero
+          : duration;
 }

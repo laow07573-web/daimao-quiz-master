@@ -157,12 +157,20 @@ class SyncEngine extends ChangeNotifier {
     notifyListeners();
     try {
       final mySnapshot = await _repository.exportSnapshot();
+      final payload = utf8.encode(jsonEncode(mySnapshot));
+      // 图片随同步走，但 64MB 单次上限是硬约束：超限给出清晰错误，
+      // 不把大半请求发过去让对端拒收
+      if (payload.length > SyncServer.maxBodyBytes) {
+        throw Exception(
+            '同步数据 ${(payload.length / 1048576).toStringAsFixed(1)}MB 超过 64MB 上限'
+            '（题库配图较多），请减少同步范围');
+      }
       final uri =
           Uri.parse('http://${peer.ip}:${peer.port}/sync/exchange');
       final response = await _httpClient
           .post(uri,
               headers: {'Content-Type': 'application/json; charset=utf-8'},
-              body: utf8.encode(jsonEncode(mySnapshot)))
+              body: payload)
           .timeout(exchangeTimeout);
       if (response.statusCode != 200) {
         throw Exception('对端返回 ${response.statusCode}');

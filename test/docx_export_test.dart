@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xml/xml.dart';
 import 'package:flashcard_app/models/answer_record.dart';
 import 'package:flashcard_app/models/question.dart';
+import 'package:flashcard_app/models/question_image.dart';
 import 'package:flashcard_app/models/question_bank.dart';
 import 'package:flashcard_app/services/app_state.dart';
 import 'package:flashcard_app/services/database_service.dart';
@@ -328,6 +330,63 @@ void main() {
           placement: DocxAnswerPlacement.underQuestion);
       expect(path, isNull);
       expect(count, 0);
+    });
+  });
+
+  group('配图随文内嵌（v12：图片是题目的一部分）', () {
+    Question imgQuestion(String title, List<QuestionImage> images) => Question(
+          bankId: 1,
+          title: title,
+          options: const ['甲', '乙'],
+          correctAnswer: 'A',
+          createdAt: '2026-09-23T00:00:00.000',
+          images: images,
+        );
+
+    test('题干占位符处出图：媒体部件 + 图片关系 + w:drawing 都在', () {
+      final bytes = DocxExportService.build(
+        questions: [
+          imgQuestion('下图所示{{img:0}}最可能的诊断是', [
+            QuestionImage(
+                position: 0,
+                width: 200,
+                height: 100,
+                content: Uint8List.fromList([1, 2, 3, 4])),
+          ]),
+        ],
+        placement: DocxAnswerPlacement.underQuestion,
+      );
+      final zip = ZipDecoder().decodeBytes(bytes);
+      expect(zip.findFile('word/media/image1.jpeg'), isNotNull);
+
+      final rels = utf8.decode(
+          zip.findFile('word/_rels/document.xml.rels')!.content as List<int>);
+      expect(rels, contains('Id="rIdImg1"'));
+      expect(rels, contains('Target="media/image1.jpeg"'));
+
+      final doc =
+          utf8.decode(zip.findFile('word/document.xml')!.content as List<int>);
+      expect(doc, contains('<w:drawing>'));
+      expect(doc, contains('r:embed="rIdImg1"'));
+    });
+
+    test('无图题目不产生媒体部件（老行为不变）', () {
+      final bytes = DocxExportService.build(
+        questions: [imgQuestion('普通题', const [])],
+        placement: DocxAnswerPlacement.underQuestion,
+      );
+      final zip = ZipDecoder().decodeBytes(bytes);
+      expect(zip.findFile('word/_rels/document.xml.rels'), isNull);
+      expect(zip.findFile('word/media/image1.jpeg'), isNull);
+    });
+
+    test('缺图槽位印「图N缺失」，不给一个空洞', () {
+      final bytes = DocxExportService.build(
+        questions: [imgQuestion('见图{{img:0}}结束', const [])],
+        placement: DocxAnswerPlacement.underQuestion,
+      );
+      final texts = paraTexts(docxOf(bytes));
+      expect(texts.any((t) => t.contains('图1缺失')), isTrue);
     });
   });
 }

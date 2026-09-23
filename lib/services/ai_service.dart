@@ -96,12 +96,13 @@ class AIService {
 
   /// 题目起始行判定（与 DocParserService._isQuestionLine 同口径，
   /// 另兼容【第N题】等括号变体）：边界切块的唯一依据。
-  /// 提升为静态公开：便于单测直接验证切块正确性。
-  static final RegExp _questionStartPattern = RegExp(
+  /// 提升为静态公开：便于单测直接验证切块正确性；
+  /// PDF 图归属（前置图挂下一题）也复用同一口径。
+  static final RegExp questionStartPattern = RegExp(
       r'^\s*(?:\d+[\.、．\)）]|第\s*\d+\s*题|[（\(]\s*\d+\s*[）\)]|【\s*第?\s*\d+\s*题\s*】)');
-  
-  static bool _isQuestionStart(String line) =>
-      _questionStartPattern.hasMatch(line);
+
+  static bool isQuestionStart(String line) =>
+      questionStartPattern.hasMatch(line);
   
   /// 题目边界感知切块（v1.27 提速 + 防切断）：
   /// 1. 按题目起始行把文本分成完整题目块（题干+选项+答案+解析永不拆散）；
@@ -119,7 +120,7 @@ class AIService {
     final header = StringBuffer();
     final cur = StringBuffer();
     for (final line in lines) {
-      if (_isQuestionStart(line)) {
+      if (isQuestionStart(line)) {
         final s = cur.toString().trim();
         if (s.isNotEmpty) blocks.add(s);
         cur.clear();
@@ -260,6 +261,7 @@ $chunk
 9. 原文中的解析内容请保留到 analysis 字段。
 10. 只返回 JSON，不要任何其他文字。
 11. 控制输出长度：题干/选项/答案如实提取即可，不要添加原文没有的冗余描述
+12. 文中形如 {{img:N}} 的图片占位符必须原样保留在对应题目的对应字段（题干/选项/解析）的对应位置，不得删改、翻译、重排或补全
 
 请直接返回 JSON：''';
 

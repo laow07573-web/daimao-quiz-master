@@ -290,11 +290,17 @@ class _BankCard extends StatelessWidget {
               tooltip: '导出题库',
               icon: Icon(Icons.file_download_outlined,
                   color: ac.textSecondary, size: 20),
+              padding: EdgeInsets.zero,
+              // 触达目标 ≥40×40（与预览页同一图标按钮口径）
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               onPressed: onExport,
             ),
             IconButton(
+              tooltip: '删除题库',
               icon: Icon(Icons.delete_outline,
                   color: ac.textSecondary, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               onPressed: onDelete,
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:uuid/uuid.dart';
 import '../models/question.dart';
+import '../models/question_image.dart';
 import '../models/question_bank.dart';
 import '../models/quiz_session.dart';
 import '../models/answer_record.dart';
@@ -79,7 +80,7 @@ class DatabaseService {
 
     return await openDatabase(
       dbPath,
-      version: 11,
+      version: 12,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -102,6 +103,7 @@ class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_answer_records_answered_at ON answer_records(answered_at)',
       'CREATE INDEX IF NOT EXISTS idx_quiz_sessions_start_time ON quiz_sessions(start_time)',
       'CREATE INDEX IF NOT EXISTS idx_ai_cache_question_id ON ai_cache(question_id)',
+      'CREATE INDEX IF NOT EXISTS idx_question_images_question ON question_images(question_id)',
     ];
     for (final s in indexes) {
       await db.execute(s);
@@ -286,6 +288,35 @@ class DatabaseService {
       // 局域网同步：全局 UID + 设备维度隔离（批注复合主键、错题按题+设备唯一）
       await _upgradeToV11(db);
     }
+    if (oldVersion < 12) {
+      // v12 题目配图：图片是题目内容的一部分（文本流 `{{img:N}}` 标位置）
+      await _createQuestionImagesTable(db);
+    }
+  }
+
+  /// 题目配图表（v12）。图片随题存取、随题级联删除；
+  /// position 为题内槽位，与题目文本里的 `{{img:N}}` 占位符对应。
+  Future<void> _createQuestionImagesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS question_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question_id INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        mime TEXT NOT NULL DEFAULT 'image/jpeg',
+        width INTEGER NOT NULL DEFAULT 0,
+        height INTEGER NOT NULL DEFAULT 0,
+        anchor TEXT,
+        content BLOB NOT NULL,
+        FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+      )
+    ''');
+    // 槽位唯一：同步合并按 (题, 槽位) 幂等补插（INSERT OR IGNORE）；
+    // 查询索引与 onCreate/升级两条路径共用（IF NOT EXISTS 幂等）
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_question_images_question '
+        'ON question_images(question_id)');
+    await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_question_images_slot '
+        'ON question_images(question_id, position)');
   }
 
   /// v10→v11 迁移：同步实体补 uid，批注改复合主键，错题改 (题,设备) 唯一。
@@ -436,6 +467,8 @@ class DatabaseService {
         FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
       )
     ''');
+
+    await _createQuestionImagesTable(db);
 
     await db.execute('''
       CREATE TABLE quiz_sessions (
@@ -814,11 +847,13 @@ class DatabaseService {
 
   // ======================== Question CRUD ========================
 
-  Future<void> insertQuestions(List<Question> questions) async {
+  /// 批量插题，返回插入后的题目 id（与入参同序）。
+  /// v12：题带配图时一并写入 question_images——图片是题目的一部分，随题落库。
+  Future<List<int>> insertQuestions(List<Question> questions) async {
     final db = await database;
     // v1.27 导入提速：包显式事务（无事务时每条插入独立 fsync，
     // 大题库导入慢一个数量级；与 simulateLongTermUse 同策略）
-    await db.transaction((txn) async {
+    return await db.transaction((txn) async {
       final batch = txn.batch();
       for (final q in questions) {
         final map = q.toMap();
@@ -827,16 +862,103 @@ class DatabaseService {
         map['updated_at'] ??= q.createdAt;
         batch.insert('questions', map);
       }
+      final results = await batch.commit(noResult: false);
+      final ids = results.map((e) => e as int).toList();
+
+      final imgBatch = txn.batch();
+      var hasImages = false;
+      for (var i = 0; i < questions.length; i++) {
+        for (final img in questions[i].images) {
+          hasImages = true;
+          imgBatch.insert('question_images', img.toMap()
+            ..['question_id'] = ids[i]
+            ..remove('id'));
+        }
+      }
+      if (hasImages) await imgBatch.commit(noResult: true);
+      return ids;
+    });
+  }
+
+  /// 批量装载题目配图（题内按 position 升序），返回 questionId → images
+  Future<Map<int, List<QuestionImage>>> getImagesForQuestions(
+      List<int> questionIds) async {
+    final db = await database;
+    if (questionIds.isEmpty) return {};
+    final placeholders = questionIds.map((_) => '?').join(',');
+    final maps = await db.query('question_images',
+        where: 'question_id IN ($placeholders)',
+        whereArgs: questionIds,
+        orderBy: 'question_id, position');
+    final out = <int, List<QuestionImage>>{};
+    for (final m in maps) {
+      final img = QuestionImage.fromMap(m);
+      out.putIfAbsent(img.questionId ?? -1, () => []).add(img);
+    }
+    return out;
+  }
+
+  /// 轻量查询：这些题各自有几张图（列表页「图 N」徽标用，不载 BLOB）
+  Future<Map<int, int>> getImageCountsByQuestions(List<int> questionIds) async {
+    final db = await database;
+    if (questionIds.isEmpty) return {};
+    final placeholders = questionIds.map((_) => '?').join(',');
+    final rows = await db.rawQuery(
+        'SELECT question_id, COUNT(*) AS cnt FROM question_images '
+        'WHERE question_id IN ($placeholders) GROUP BY question_id',
+        questionIds);
+    return {for (final r in rows) r['question_id'] as int: r['cnt'] as int};
+  }
+
+  /// 整题替换配图（编辑后删图/改槽位）
+  Future<void> replaceQuestionImages(
+      int questionId, List<QuestionImage> images) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('question_images',
+          where: 'question_id = ?', whereArgs: [questionId]);
+      if (images.isEmpty) return;
+      final batch = txn.batch();
+      for (final img in images) {
+        batch.insert('question_images', img.toMap()
+          ..['question_id'] = questionId
+          ..remove('id'));
+      }
       await batch.commit(noResult: true);
     });
   }
 
-  Future<void> updateQuestion(int id, String title, String correctAnswer, String questionType) async {
+  /// 合并配图（同步用）：本地缺的槽位补插，已有槽位不覆盖
+  /// （本地题目文本的占位符与本地槽位对齐，覆盖会错位）。
+  /// 幂等：靠 (题, 槽位) 唯一索引 INSERT OR IGNORE
+  Future<void> mergeQuestionImages(
+      int questionId, List<QuestionImage> images) async {
+    if (images.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final img in images) {
+      batch.insert(
+          'question_images',
+          img.toMap()
+            ..['question_id'] = questionId
+            ..remove('id'),
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// 更新题目内容。[options]/[analysis] 仅在传入时覆盖
+  /// （编辑配图需同步清掉不可编辑字段里的占位符）。
+  Future<void> updateQuestion(
+      int id, String title, String correctAnswer, String questionType,
+      {List<String>? options, String? analysis}) async {
     final db = await database;
     await db.update('questions', {
       'title': title,
       'correct_answer': correctAnswer,
       'question_type': questionType,
+      if (options != null) 'options': jsonEncode(options),
+      if (analysis != null) 'analysis': analysis,
       // v11 同步：编辑后对端可按 updated_at 取新合并，不被旧数据覆盖
       'updated_at': DateTime.now().toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
@@ -2141,9 +2263,10 @@ class DatabaseService {
       tmpDb = await databaseFactory.openDatabase(filePath);
       final versionRows = await tmpDb.rawQuery('PRAGMA user_version');
       final version = versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
-      if (version < 1 || version > 11) {
+      if (version < 1 || version > 12) {
         // user_version 0/非法：非本 App 生成或版本被外部重置，导入后会触发
-        // onUpgrade(0→8) 破坏性重建清空题目，拒绝导入
+        // onUpgrade(0→8) 破坏性重建清空题目，拒绝导入。
+        // 版本上界随 schema 走：当前 schema v12（题目配图）
         return '文件不是有效的数据库备份（版本信息缺失或非法）';
       }
       final tables = await tmpDb.rawQuery(

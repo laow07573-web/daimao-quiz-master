@@ -6,6 +6,7 @@ import '../services/theme_service.dart';
 import '../utils/app_constants.dart';
 import 'kit/mj_kit.dart';
 import 'monthly_calendar.dart';
+import 'trend_chart.dart' show levelShade;
 
 /// 首页本周战绩卡片（Mao Des 2.0 · 精密暗色）
 ///
@@ -154,7 +155,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               _InlineMetric(
-                value: '${widget.weekTotal}',
+                value: widget.weekTotal,
                 suffix: ' 道',
                 label: '本周刷题',
                 ac: ac,
@@ -166,7 +167,7 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 color: ac.border,
               ),
               _InlineMetric(
-                value: widget.weekAccuracy.toStringAsFixed(0),
+                value: widget.weekAccuracy,
                 suffix: '%',
                 label: '平均正确率',
                 ac: ac,
@@ -190,12 +191,29 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
             children: [
               Icon(Icons.local_fire_department, size: 15, color: ac.accent),
               const SizedBox(width: MaoSpace.xs - 2),
-              Text(
-                streakDays >= 7
-                    ? '连续打卡 ${streakDays ~/ 7} 周 ${streakDays % 7} 天'
-                    : '连续打卡 $streakDays 天',
-                style: MaoType.h3Style.copyWith(
-                    fontWeight: FontWeight.w600, color: ac.textPrimary),
+              // 数字等宽 + 「数字+空格+汉字」间距：连击读数变化时数位不跳
+              Text.rich(
+                TextSpan(
+                  style: MaoType.h3Style.copyWith(
+                      fontWeight: FontWeight.w600, color: ac.textPrimary),
+                  children: [
+                    const TextSpan(text: '连续打卡 '),
+                    if (streakDays >= 7) ...[
+                      TextSpan(
+                          text: '${streakDays ~/ 7}',
+                          style: MaoType.number(MaoType.h3)),
+                      const TextSpan(text: ' 周 '),
+                      TextSpan(
+                          text: '${streakDays % 7}',
+                          style: MaoType.number(MaoType.h3)),
+                      const TextSpan(text: ' 天'),
+                    ] else ...[
+                      TextSpan(
+                          text: '$streakDays', style: MaoType.number(MaoType.h3)),
+                      const TextSpan(text: ' 天'),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -249,9 +267,9 @@ class _WeeklyStatsBoardState extends State<WeeklyStatsBoard> {
                 rows: _visibleRows,
                 heatColors: [
                   Colors.transparent, // 空：不铺底（精密化的关键）
-                  ac.accent.withOpacity(0.22), // 少 <50
-                  ac.accent.withOpacity(0.46), // 达标 50~199
-                  ac.accent.withOpacity(0.78), // 多 200+
+                  levelShade(ac.accent, ac.surface, 0.22), // 少 <50
+                  levelShade(ac.accent, ac.surface, 0.46), // 达标 50~199
+                  levelShade(ac.accent, ac.surface, 0.78), // 多 200+
                 ],
               );
             },
@@ -271,7 +289,7 @@ class _StatBlock extends StatelessWidget {
   });
 
   final String label;
-  final String value;
+  final num value;
   final String suffix;
   final AppThemeColors ac;
 
@@ -290,7 +308,8 @@ class _StatBlock extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            MaoNumber(value,
+            // 读数滚动落位（等宽数字，滚动期间宽度不跳）
+            MaoAnimatedNumber(value,
                 size: MaoType.display,
                 weight: FontWeight.w700,
                 color: ac.textPrimary,
@@ -315,7 +334,7 @@ class _InlineMetric extends StatelessWidget {
     required this.ac,
   });
 
-  final String value;
+  final num value;
   final String suffix;
   final String label;
   final AppThemeColors ac;
@@ -327,14 +346,16 @@ class _InlineMetric extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        MaoNumber(value,
+        // 读数滚动落位（等宽数字，滚动期间宽度不跳；两项均为整数读数）
+        MaoAnimatedNumber(value,
             size: MaoType.h1,
             weight: FontWeight.w700,
             color: ac.textPrimary,
             suffix: suffix),
         const SizedBox(width: MaoSpace.xs - 2),
+        // 标签是实义说明 → textSecondary（tertiary 只留占位/装饰）
         Text(label,
-            style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
+            style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
       ],
     );
   }

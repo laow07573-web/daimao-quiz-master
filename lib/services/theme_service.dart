@@ -130,6 +130,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFCF222E),
             dangerSoft: Color(0xFFFFEBE9),
             warning: Color(0xFF9A6700),
+            warningSoft: Color(0xFFFFF8C5),
           ),
         // 松绿-浅：白底 + 精密青绿
         AppTheme.sage => const AppThemeColors(
@@ -150,6 +151,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFCF222E),
             dangerSoft: Color(0xFFFFEBE9),
             warning: Color(0xFF9A6700),
+            warningSoft: Color(0xFFFFF8C5),
           ),
         // 墨黑-浅：Vercel 亮色（黑按钮 + 中性灰阶）
         AppTheme.ink => const AppThemeColors(
@@ -170,6 +172,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFCF222E),
             dangerSoft: Color(0xFFFFEBE9),
             warning: Color(0xFF9A6700),
+            warningSoft: Color(0xFFFFF8C5),
           ),
       };
 
@@ -193,6 +196,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFF85149),
             dangerSoft: Color(0xFF2D1214),
             warning: Color(0xFFD29922),
+            warningSoft: Color(0xFF272115),
           ),
         // 松绿-深：近黑画布 + 精密青绿
         AppTheme.sage => const AppThemeColors(
@@ -213,6 +217,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFF85149),
             dangerSoft: Color(0xFF2D1214),
             warning: Color(0xFFD29922),
+            warningSoft: Color(0xFF272115),
           ),
         // 墨黑-深：中性石墨 + 单色强调（最 Vercel：白按钮 + 灰阶）
         AppTheme.ink => const AppThemeColors(
@@ -233,6 +238,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFF85149),
             dangerSoft: Color(0xFF2D1214),
             warning: Color(0xFFD29922),
+            warningSoft: Color(0xFF272115),
           ),
       };
 
@@ -510,19 +516,21 @@ class ThemeService extends ChangeNotifier {
       ),
       iconTheme: IconThemeData(color: c.textSecondary, size: 20),
 
-      // ---- 页面转场：淡入 + 轻微上移（替代默认硬切） ----
+      // ---- 页面转场：淡入 + 极轻上移（自定义 builder，见 [_MaoPageTransitionsBuilder]） ----
       pageTransitionsTheme: const PageTransitionsTheme(builders: {
-        TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.android: _MaoPageTransitionsBuilder(),
         TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-        TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
-        TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.windows: _MaoPageTransitionsBuilder(),
+        TargetPlatform.macOS: _MaoPageTransitionsBuilder(),
+        TargetPlatform.linux: _MaoPageTransitionsBuilder(),
       }),
 
       // ---- 水波反馈颜色 ----
       splashColor: c.accent.withOpacity(0.10),
       highlightColor: c.accent.withOpacity(0.06),
-      splashFactory: InkSparkle.splashFactory,
+      // InkSparkle 的粒子水波与「发丝线 + 明度分层」的精密语言冲突，
+      // 归一到 InkSplash：一层安静的圆形水波即可。
+      splashFactory: InkSplash.splashFactory,
     );
   }
 
@@ -544,6 +552,78 @@ class ThemeService extends ChangeNotifier {
         labelMedium: MaoType.captionStyle.copyWith(color: secondary),
         labelSmall: MaoType.microStyle.copyWith(color: secondary),
       ).apply(fontFamily: 'MiSans');
+}
+
+/// 出场压缩曲线：把运动压进路由窗口的前一段走完，随后保持落定值。
+///
+/// 为什么需要：页面/弹窗路由的进出场窗口写死在 Flutter 路由里（Material
+/// 页面固定 300ms，弹窗 = 进场时长），而 [CurvedAnimation.reverseCurve]
+/// 作用在**递减**的 t 上——直接用 [Interval] 会把「提前落定」翻成
+/// 「延迟开始」。本映射把出场运动压缩到 motion/window 段内走完，
+/// 是「时长对齐 MaoMotion 令牌」在固定路由窗口下的等价手段。
+class MaoExitCurve extends Curve {
+  MaoExitCurve({
+    required Duration window,
+    required Duration motion,
+    this.curve = MaoMotion.standard,
+  })  : assert(window > Duration.zero),
+        assert(motion > Duration.zero && motion <= window),
+        share = motion.inMicroseconds / window.inMicroseconds;
+
+  /// 运动占路由窗口的比例
+  final double share;
+
+  /// 运动段内使用的曲线
+  final Curve curve;
+
+  @override
+  double transformInternal(double t) {
+    if (t <= 1 - share) return 0;
+    return 1 - curve.transform((1 - t) / share);
+  }
+}
+
+/// 页面转场：淡入 + 极轻上移（Mao Des 精密版 FadeUpwards）。
+///
+/// 为什么自定义：M2 [FadeUpwardsPageTransitionsBuilder] 一次推进 0.25 屏，
+/// 在发丝线 + 明度分层的精密界面里显得"飘"。这里把进入位移收到 0.06 屏，
+/// 进/出时长对齐 [MaoMotion.slow] / [MaoMotion.exit]——层是「落定」不是「飘入」。
+/// iOS 保留系统侧滑手势语感（Cupertino 转场），其余平台用本转场。
+class _MaoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _MaoPageTransitionsBuilder();
+
+  /// Flutter 页面路由（MaterialRouteTransitionMixin）固定的转场窗口。
+  /// SDK 未导出该常量；曲线按此窗口把有效运动压进 MaoMotion 时长内落定。
+  static const Duration _routeWindow = Duration(milliseconds: 300);
+
+  /// 进入位移：0.06 屏（FadeUpwards 原为 0.25，太"飘"）
+  static const Offset _enterOffset = Offset(0, 0.06);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // 进场：窗口内前 MaoMotion.slow 段走完（曲线提前落定 = 观感时长对齐令牌）
+    final enter = CurvedAnimation(
+      parent: animation,
+      curve: Interval(0, MaoMotion.slow.inMicroseconds / _routeWindow.inMicroseconds,
+          curve: MaoMotion.standard),
+      // 出场：压缩进 MaoMotion.exit 段内落定（一启动就走，不延迟）
+      reverseCurve: MaoExitCurve(window: _routeWindow, motion: MaoMotion.exit),
+    );
+    return FadeTransition(
+      opacity: enter,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: _enterOffset, end: Offset.zero)
+            .animate(enter),
+        child: child,
+      ),
+    );
+  }
 }
 
 /// 主题语义色扩展「Mao Des」
@@ -605,6 +685,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
   /// 警告
   final Color warning;
 
+  /// 警告浅底（与 dangerSoft 同一用法：浅底承载警告标签/提示块）
+  final Color warningSoft;
+
   const AppThemeColors({
     required this.background,
     required this.surface,
@@ -624,6 +707,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     this.danger = const Color(0xFFB91C1C),
     this.dangerSoft = const Color(0xFFFEE2E2),
     this.warning = const Color(0xFFD97706),
+    this.warningSoft = const Color(0xFFFFF8C5),
   });
 
   // ---- 兼容旧字段名（页面仍在用 navBar/card/cardBorder/successContainer…） ----
@@ -662,6 +746,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     Color? danger,
     Color? dangerSoft,
     Color? warning,
+    Color? warningSoft,
   }) =>
       AppThemeColors(
         background: background ?? this.background,
@@ -681,6 +766,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
         danger: danger ?? this.danger,
         dangerSoft: dangerSoft ?? this.dangerSoft,
         warning: warning ?? this.warning,
+        warningSoft: warningSoft ?? this.warningSoft,
       );
 
   @override
@@ -704,6 +790,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       danger: Color.lerp(danger, other.danger, t)!,
       dangerSoft: Color.lerp(dangerSoft, other.dangerSoft, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
+      warningSoft: Color.lerp(warningSoft, other.warningSoft, t)!,
     );
   }
 
@@ -734,6 +821,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       danger: dark ? const Color(0xFFF87171) : const Color(0xFFB91C1C),
       dangerSoft: dark ? const Color(0xFF3B1D1D) : const Color(0xFFFEE2E2),
       warning: dark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+      warningSoft: dark ? const Color(0xFF272115) : const Color(0xFFFFF8C5),
     );
   }
 }

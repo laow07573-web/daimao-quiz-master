@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import '../database_service.dart';
 import '../device_service.dart';
+import '../../models/question_image.dart';
 
 /// 局域网同步：快照导出与合并入库
 ///
@@ -35,6 +39,21 @@ class SyncRepository {
       FROM questions q
       JOIN question_banks qb ON qb.id = q.bank_id
     ''');
+
+    // v12 配图随题同步（图片是题目的一部分）：BLOB 转 base64 走 JSON
+    final images = (await db.rawQuery('''
+      SELECT q.uid AS question_uid, qi.position, qi.mime, qi.width, qi.height,
+             qi.anchor, qi.content
+      FROM question_images qi
+      JOIN questions q ON q.id = qi.question_id
+      ORDER BY q.uid, qi.position
+    '''))
+        .map((r) {
+      final m = Map<String, dynamic>.from(r);
+      final content = m['content'];
+      m['content'] = content is List<int> ? base64Encode(content) : '';
+      return m;
+    }).toList();
 
     // 本地题库 id → uid（会话的 bank_ids 文本导出时按 uid 对应）
     final bankRows =
@@ -85,6 +104,7 @@ class SyncRepository {
       'device_name': deviceName,
       'banks': banks,
       'questions': questions,
+      'question_images': images,
       'sessions': sessions,
       'answer_records': records,
       'error_book': errors,
@@ -172,6 +192,34 @@ class SyncRepository {
         if (row == null) return null;
         questionLocalByUid[uid] = row['id'] as int;
         return questionLocalByUid[uid];
+      }
+
+      // 2b. 题目配图（图片是题目的一部分，随题合并）。
+      //     首写槽位生效、不覆盖本机已有——本地题目文本的占位符与本地
+      //     图片槽位是对齐的，覆盖会错位；删除型差异不跨设备传播
+      for (final raw in (snapshot['question_images'] as List? ?? const [])) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        final questionId = await questionIdByUid(m['question_uid'] as String?);
+        if (questionId == null) continue;
+        final data = m['content'];
+        Uint8List bytes;
+        try {
+          bytes = data is String ? base64Decode(data) : Uint8List(0);
+        } catch (_) {
+          continue;
+        }
+        if (bytes.isEmpty) continue;
+        await _db.mergeQuestionImages(questionId, [
+          QuestionImage(
+            position: (m['position'] as num?)?.toInt() ?? 0,
+            mime: m['mime'] as String? ?? 'image/jpeg',
+            width: (m['width'] as num?)?.toInt() ?? 0,
+            height: (m['height'] as num?)?.toInt() ?? 0,
+            anchor: m['anchor'] as String?,
+            content: bytes,
+          ),
+        ]);
+        merged++;
       }
 
       // 3. 会话（bank_ids 的 uid 还原为本地 id）

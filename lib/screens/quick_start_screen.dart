@@ -55,10 +55,28 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
 
   /// 一键导入内置示例题库（免 Key、免文件，转后台执行）
   void _importSampleBank(AppState appState) {
-    if (appState.importTaskActive) return;
+    // 后台导入互斥在应用层是静默 return——UI 层提前明示，别让用户干等
+    if (appState.importTaskActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已有导入任务进行中')),
+      );
+      return;
+    }
+    MJImportTask.discarded = false;
     unawaited(appState.startBackgroundSampleImport());
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已开始导入示例题库，进度见本页')),
+      const SnackBar(content: Text('已开始导入示例题库，进度见开始页顶部卡片')),
+    );
+  }
+
+  /// 取消导入：后台任务不可中止（边界见 [MJImportTask]），
+  /// 「取消」= 不再展示进度、结果与解析结果直接丢弃。
+  void _cancelImport(AppState appState) {
+    MJImportTask.discarded = true;
+    // 丢弃解析结果，并借 clearPreview 的通知让各页立即隐藏任务卡
+    appState.clearPreview();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已取消导入，解析结果将丢弃')),
     );
   }
 
@@ -77,7 +95,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
         actions: [
           // 触屏入口：窄屏没有物理键盘，这里打开同一个命令面板
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(Icons.search_rounded),
             tooltip: '搜索命令',
             onPressed: () => CommandPalette.open(context),
           ),
@@ -93,8 +111,13 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 后台导入：进行中进度卡
-                  if (appState.importTaskActive) ...[
-                    _ImportProgressCard(appState: appState),
+                  if (appState.importTaskActive &&
+                      !MJImportTask.discarded) ...[
+                    MJTaskCard(
+                      progress: appState.importProgress,
+                      status: appState.importStatus,
+                      onCancel: () => _cancelImport(appState),
+                    ),
                     const SizedBox(height: MaoSpace.sm),
                   ],
                   // 后台导入：AI 解析完成、待预览确认
@@ -112,12 +135,12 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                   if (appState.banks.isEmpty) ...[
                     MJSurface(
                       accentEdge: true,
-                      padding: const EdgeInsets.all(MaoSpace.sm + 2),
+                      padding: const EdgeInsets.all(MaoSpace.sm),
                       child: Row(
                         children: [
                           Container(
-                            width: 32,
-                            height: 32,
+                            width: 30,
+                            height: 30,
                             decoration: BoxDecoration(
                               color: ac.accentSoft,
                               borderRadius: MaoRadius.smallBorder,
@@ -125,7 +148,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                                   color: ac.border, width: MaoLine.width),
                             ),
                             child: Icon(Icons.school_rounded,
-                                color: ac.accent, size: 17),
+                                color: ac.accent, size: 18),
                           ),
                           const SizedBox(width: MaoSpace.sm),
                           Expanded(
@@ -169,10 +192,11 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                       session: _unfinished!.$1,
                       answered: _unfinished!.$2,
                       onTap: () async {
+                        // 先取 navigator 再跨异步：context 不能再用
+                        final nav = Navigator.of(context);
                         final ok = await appState.resumeUnfinishedSession();
                         if (!ok || !mounted) return;
-                        await Navigator.push(
-                          context,
+                        await nav.push(
                           MaterialPageRoute(
                               builder: (_) => const QuizScreen()),
                         );
@@ -210,11 +234,11 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                           }
                         : () {
                             if (_vacationBlocked(appState)) return;
-                            _showCountPicker(context, appState);
+                            _showStartQuizSheet(context, appState);
                           },
                   ),
                   _QuickActionTile(
-                    icon: Icons.library_books_outlined,
+                    icon: Icons.library_books_rounded,
                     label: '管理题库',
                     subtitle: appState.banks.isEmpty
                         ? '还没有题库，先去导入'
@@ -232,9 +256,9 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                         context, appState, const ErrorBookScreen()),
                   ),
                   _QuickActionTile(
-                    icon: Icons.upload_file_outlined,
+                    icon: Icons.upload_file_rounded,
                     label: '导入题库',
-                    subtitle: 'AI 解析 DOCX（需 Key），JSON 直接入库',
+                    subtitle: 'AI 解析 DOCX/PDF（需 Key），JSON 直接入库',
                     iconColor: ac.accent,
                     onTap: () => _navigateAndRefresh(
                         context, appState, const ImportScreen()),
@@ -256,178 +280,29 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
     );
   }
 
-  // ══════════ 刷题数量 / 模式选择（原首页逻辑） ══════════
+  // ══════════ 发起刷题（数量 + 模式一张面板一次确认） ══════════
 
-  void _showCountPicker(BuildContext context, AppState appState) {
-    final ac = AppThemeColors.of(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ac.surface,
-      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(MaoSpace.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('选择刷题数量',
-                  style: MaoType.h2Style.copyWith(color: ac.textPrimary),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: MaoSpace.md),
-              Wrap(
-                spacing: MaoSpace.sm,
-                runSpacing: MaoSpace.sm,
-                alignment: WrapAlignment.center,
-                children: [
-                  ...[10, 20, 30, 50, 80, 100].map((n) => _countChip(ac, '$n 题', n == appState.selectedQuestionCount, () {
-                        appState.setQuestionCount(n);
-                        Navigator.pop(ctx);
-                        _showQuizModePicker(context, appState);
-                      })),
-                  _countChip(ac, '全部', appState.selectedQuestionCount >= kQuestionCountAll, () {
-                    appState.setQuestionCount(kQuestionCountAll);
-                    Navigator.pop(ctx);
-                    _showQuizModePicker(context, appState);
-                  }),
-                  _countChip(ac, '自定义', false, () {
-                    Navigator.pop(ctx);
-                    _showCustomCountDialog(context, appState);
-                  }),
-                ],
-              ),
-              const SizedBox(height: MaoSpace.sm),
-              Text(
-                '当前: ${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}',
-                style: MaoType.captionStyle.copyWith(color: ac.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _countChip(
-      AppThemeColors ac, String label, bool selected, VoidCallback onTap) {
-    return Material(
-      color: selected ? ac.accent : ac.surfaceAlt,
-      borderRadius: MaoRadius.controlBorder,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: MaoRadius.controlBorder,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: MaoSpace.md, vertical: MaoSpace.xs),
-          decoration: BoxDecoration(
-            borderRadius: MaoRadius.controlBorder,
-            border: Border.all(
-                color: selected ? ac.accent : ac.border,
-                width: MaoLine.width),
-          ),
-          child: Text(label,
-              style: MaoType.captionStyle.copyWith(
-                  color: selected ? ac.onAccent : ac.textSecondary,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
-        ),
-      ),
-    );
-  }
-
-  void _showCustomCountDialog(BuildContext context, AppState appState) {
-    final ctrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('自定义题目数'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: '输入题数'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          FilledButton(
-            onPressed: () {
-              final n = int.tryParse(ctrl.text);
-              if (n == null || n <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入大于 0 的有效题数')),
-                );
-                return;
-              }
-              appState.setQuestionCount(n);
-              Navigator.pop(ctx);
-              _showQuizModePicker(context, appState);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    ).then((_) => ctrl.dispose());
-  }
-
-  void _showQuizModePicker(BuildContext context, AppState appState) {
-    final ac = AppThemeColors.of(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ac.surface,
-      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(MaoSpace.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('选择刷题模式',
-                  style: MaoType.h2Style.copyWith(color: ac.textPrimary),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: MaoSpace.xs),
-              Text(
-                '已选 ${appState.selectedBankIds.length} 个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount} 题'}/轮',
-                style: MaoType.captionStyle.copyWith(color: ac.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: MaoSpace.lg),
-              _ModeOption(
-                icon: Icons.flash_on_rounded,
-                label: '正常刷题',
-                desc: '答完即判，立刻校对解析',
-                color: ac.accent,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startQuiz(appState);
-                },
-              ),
-              const SizedBox(height: MaoSpace.xs),
-              _ModeOption(
-                icon: Icons.edit_square,
-                label: '练习',
-                desc: '答题卡模式，限时/不限时，统一批改',
-                color: ac.textSecondary,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startPractice(appState);
-                },
-              ),
-              const SizedBox(height: MaoSpace.xs),
-              _ModeOption(
-                icon: Icons.visibility_rounded,
-                label: '背题模式',
-                desc: '直接展示答案，快速浏览记忆',
-                color: ac.accent,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startMemorize(appState);
-                },
-              ),
-              const SizedBox(height: MaoSpace.sm),
-            ],
-          ),
-        ),
+  /// 原「数量 sheet → 自动关 → 模式 sheet」两连弹合一：连环弹层既打断节奏，
+  /// 又在两步之间丢失「我要干什么」的上下文；这里数量 chips + 模式单选 +
+  /// 底部「开始」主按钮，一次确认发起。
+  void _showStartQuizSheet(BuildContext context, AppState appState) {
+    MJSheet.show<void>(
+      context,
+      title: '发起刷题',
+      maxWidth: kSheetMaxWidth,
+      child: _StartQuizSheet(
+        appState: appState,
+        onStart: (mode, count) {
+          appState.setQuestionCount(count);
+          switch (mode) {
+            case _StartMode.quiz:
+              _startQuiz(appState);
+            case _StartMode.practice:
+              _startPractice(appState);
+            case _StartMode.memorize:
+              _startMemorize(appState);
+          }
+        },
       ),
     );
   }
@@ -449,7 +324,14 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
     if (_vacationBlocked(appState)) return;
     if (appState.selectedBankIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在首页选择题库')),
+        SnackBar(
+          content: const Text('请先选择要练习的题库'),
+          action: SnackBarAction(
+            label: '去选择',
+            onPressed: () => _navigateAndRefresh(
+                context, appState, const BankManageScreen()),
+          ),
+        ),
       );
       return;
     }
@@ -469,7 +351,14 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
     if (_vacationBlocked(appState)) return;
     if (appState.selectedBankIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先在首页选择题库')),
+        SnackBar(
+          content: const Text('请先选择要背的题库'),
+          action: SnackBarAction(
+            label: '去选择',
+            onPressed: () => _navigateAndRefresh(
+                context, appState, const BankManageScreen()),
+          ),
+        ),
       );
       return;
     }
@@ -489,7 +378,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
     await Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (_) => QuizScreen(quizMode: QuizMode.memorize)));
+            builder: (_) => const QuizScreen(quizMode: QuizMode.memorize)));
   }
 }
 
@@ -561,98 +450,164 @@ class _QuickActionTile extends StatelessWidget {
   }
 }
 
-/// 刷题模式选项
-class _ModeOption extends StatelessWidget {
-  const _ModeOption({
-    required this.icon,
-    required this.label,
-    required this.desc,
-    required this.color,
-    required this.onTap,
-  });
+/// 发起刷题的三种模式
+enum _StartMode { quiz, practice, memorize }
 
-  final IconData icon;
-  final String label;
-  final String desc;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return MJSurface(
-      tone: MJTone.alt,
-      onTap: onTap,
-      padding: const EdgeInsets.all(MaoSpace.sm + 2),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: MaoSpace.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: MaoType.h3Style.copyWith(
-                        fontWeight: FontWeight.w600, color: ac.textPrimary)),
-                const SizedBox(height: 2),
-                Text(desc,
-                    style:
-                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, color: ac.textTertiary, size: 16),
-        ],
-      ),
-    );
-  }
-}
-
-/// 后台导入进度卡
-class _ImportProgressCard extends StatelessWidget {
-  const _ImportProgressCard({required this.appState});
+/// 「发起刷题」面板内容：数量 chips + 模式单选 + 底部「开始」一次确认。
+class _StartQuizSheet extends StatefulWidget {
+  const _StartQuizSheet({required this.appState, required this.onStart});
 
   final AppState appState;
+  final void Function(_StartMode mode, int count) onStart;
+
+  @override
+  State<_StartQuizSheet> createState() => _StartQuizSheetState();
+}
+
+class _StartQuizSheetState extends State<_StartQuizSheet> {
+  late int _count = widget.appState.selectedQuestionCount;
+  bool _custom = false;
+  _StartMode _mode = _StartMode.quiz;
+  final _customCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _customCtrl.dispose();
+    super.dispose();
+  }
+
+  /// 解析最终题数；自定义输入非法时返回 null（面板不关，提示后继续改）
+  int? get _resolvedCount {
+    if (!_custom) {
+      return _count >= kQuestionCountAll ? kQuestionCountAll : _count;
+    }
+    final n = int.tryParse(_customCtrl.text.trim());
+    return (n == null || n <= 0) ? null : n;
+  }
 
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
-    final progress = appState.importProgress.clamp(0.0, 1.0);
-    return MJSurface(
-      accentEdge: true,
-      padding: const EdgeInsets.all(MaoSpace.sm + 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: ac.accent),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('每轮题数 · 已选 ${widget.appState.selectedBankIds.length} 个题库',
+            style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+        const SizedBox(height: MaoSpace.sm),
+        Wrap(
+          spacing: MaoSpace.xs,
+          runSpacing: MaoSpace.xs,
+          children: [
+            for (final n in const [10, 20, 30, 50, 80, 100])
+              MJChip(
+                label: '$n 题',
+                dense: true,
+                selected: !_custom && _count == n,
+                onTap: () => setState(() {
+                  _custom = false;
+                  _count = n;
+                }),
               ),
-              const SizedBox(width: MaoSpace.xs),
-              Expanded(
-                child: Text('正在导入题库，可先去做别的',
-                    style: MaoType.h3Style.copyWith(
-                        fontWeight: FontWeight.w600, color: ac.textPrimary)),
-              ),
-              MaoNumber('${(progress * 100).toInt()}',
-                  size: MaoType.h3, weight: FontWeight.w600),
-              Text('%',
-                  style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
-            ],
+            MJChip(
+              label: '全部',
+              dense: true,
+              selected: !_custom && _count >= kQuestionCountAll,
+              onTap: () => setState(() {
+                _custom = false;
+                _count = kQuestionCountAll;
+              }),
+            ),
+            MJChip(
+              label: '自定义',
+              dense: true,
+              selected: _custom,
+              onTap: () => setState(() => _custom = true),
+            ),
+          ],
+        ),
+        if (_custom) ...[
+          const SizedBox(height: MaoSpace.sm),
+          TextField(
+            controller: _customCtrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: '输入题数'),
+            style: const TextStyle(fontSize: MaoType.body),
           ),
-          const SizedBox(height: MaoSpace.xs),
-          MJProgress(value: progress),
-          const SizedBox(height: MaoSpace.xs),
-          Text(appState.importStatus,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
         ],
+        const SizedBox(height: MaoSpace.md),
+        Text('刷题模式',
+            style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+        _modeRow(_StartMode.quiz, Icons.flash_on_rounded, '正常刷题', '答完即判，立刻校对解析'),
+        _modeRow(_StartMode.practice, Icons.edit_note_rounded, '练习',
+            '答题卡模式，限时/不限时，统一批改'),
+        _modeRow(_StartMode.memorize, Icons.visibility_rounded, '背题模式',
+            '直接展示答案，快速浏览记忆'),
+        const SizedBox(height: MaoSpace.md),
+        MJButton(
+          label: '开始',
+          expand: true,
+          onPressed: () {
+            final count = _resolvedCount;
+            if (count == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('请输入大于 0 的有效题数')),
+              );
+              return;
+            }
+            Navigator.of(context).pop();
+            widget.onStart(_mode, count);
+          },
+        ),
+      ],
+    );
+  }
+
+  /// 模式单选行：Linear 式小方块选择器（与题库选择/答题选项同一套语言）
+  Widget _modeRow(_StartMode mode, IconData icon, String label, String desc) {
+    final ac = AppThemeColors.of(context);
+    final selected = _mode == mode;
+    return InkWell(
+      onTap: () => setState(() => _mode = mode),
+      borderRadius: MaoRadius.smallBorder,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: MaoSpace.xs),
+        child: Row(
+          children: [
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: selected ? ac.accent : Colors.transparent,
+                border: Border.all(
+                  color: selected ? ac.accent : ac.border,
+                  width: 1.2,
+                ),
+                borderRadius: MaoRadius.chipBorder,
+              ),
+              child: selected
+                  ? Icon(Icons.check_rounded, size: 12, color: ac.onAccent)
+                  : null,
+            ),
+            const SizedBox(width: MaoSpace.sm),
+            Icon(icon, size: 18, color: selected ? ac.accent : ac.textSecondary),
+            const SizedBox(width: MaoSpace.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: MaoType.h3Style.copyWith(
+                          fontWeight: FontWeight.w600, color: ac.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(desc,
+                      style: MaoType.captionStyle
+                          .copyWith(color: ac.textSecondary)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -670,10 +625,10 @@ class _PreviewConfirmCard extends StatelessWidget {
     final ac = AppThemeColors.of(context);
     return MJSurface(
       onTap: onOpen,
-      padding: const EdgeInsets.all(MaoSpace.sm + 2),
+      padding: const EdgeInsets.all(MaoSpace.sm),
       child: Row(
         children: [
-          Icon(Icons.fact_check_outlined, color: ac.accent, size: 18),
+          Icon(Icons.fact_check_rounded, color: ac.accent, size: 18),
           const SizedBox(width: MaoSpace.sm),
           Expanded(
             child: Column(
@@ -689,7 +644,7 @@ class _PreviewConfirmCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: ac.accent, size: 16),
+          Icon(Icons.chevron_right_rounded, color: ac.accent, size: 16),
         ],
       ),
     );

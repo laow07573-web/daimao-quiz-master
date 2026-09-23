@@ -47,7 +47,8 @@
 
 | 功能 | 说明 |
 |------|------|
-| DOCX 导入 | 长文档按题目边界智能切块，多路并发解析，不阻塞界面 |
+| DOCX / PDF 导入 | 长文档按题目边界智能切块，多路并发解析，不阻塞界面；PDF 本地抽图文，插图随题保留 |
+| 题目配图 | 图片是题目的一部分：随位置在题干/选项/解析里内联显示，备份、同步、导出随题带走 |
 | JSON 导入 | 结构化题库直接入库，无需 AI 解析 |
 | 可视化校对 | 入库前逐题预览、编辑、删除，附带 AI 打的知识点标签 |
 | 一键导出 | 题库导出为标准 JSON，可分享给同学直接导入 |
@@ -132,7 +133,7 @@
 > （校验方法见下方[安装与校验](#安装与校验)）。
 
 > **基础刷题功能完全离线可用**，无需联网、无需配置任何东西。
-> 需要 API Key 的只有三类：**DOCX 题库导入**（题目靠 AI 解析）、AI 逐题讲解与追问、
+> 需要 API Key 的只有三类：**DOCX/PDF 题库导入**（题目靠 AI 解析）、AI 逐题讲解与追问、
 > 错题本的「生成建议」（AI 深度诊断）。
 > **JSON 题库文件与内置示例题库都不需要 Key、也不用联网。**
 
@@ -186,7 +187,7 @@ Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
 1. 安装并打开猫卷
 2. 首页 →「导入题库」→ 选择文件：
    - **`.json` 题库** —— 直接入库，**无需 Key**
-   - **`.docx` 文档** —— 用 AI 解析题目，**需要先在设置里配好 Key**（没配 Key 时点导入会提示去配置）
+   - **`.docx` / `.pdf` 文档** —— 用 AI 解析题目，**需要先在设置里配好 Key**（没配 Key 时点导入会提示去配置）；PDF 里的插图会随题保留并在题目中显示
    - 也可以直接点「一键导入示例题库」离线体验（无需文件、无需 Key）
 3. 首页勾选题库 →「定向爆破」→ 选择题量与模式 → 开始刷题
 4. 答完看解析：题目自带解析**无需 Key** 即可查看；配了 Key 才有 AI 逐题讲解，不懂可点「向 AI 追问」
@@ -211,7 +212,7 @@ Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
 
 ## 工程质量
 
-- **311 项自动化测试**，覆盖判题、复习算法、数据层、导入解析、同步、布局自适应等
+- **378 项自动化测试**，覆盖判题、复习算法、数据层、导入解析（含 PDF 图文抽取与配图归属）、同步、布局自适应等
   （每次 push 由 [GitHub Actions](https://github.com/laow07573-web/daimao-quiz-master/actions) 自动执行，见上方 CI 徽章）
 - 数据库 schema v11，外键级联、索引优化、事务一致性
 - 每次发版依次执行：静态分析（0 error / 0 warning）→ 全量测试 → 混淆构建 → **组件 / 权限 / 文案 / 资源四维基线对照校验** → 签名校验
@@ -232,7 +233,7 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 ```bash
 flutter pub get
 flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
-flutter test                    # 全量测试（当前 311 项）
+flutter test                    # 全量测试（当前 378 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release
 ```
@@ -258,7 +259,7 @@ flutter build windows --release
 
 需要 Key 的只有三类：
 
-1. **DOCX 题库导入** —— 题目靠 AI 解析，没有 Key 无法导入（这是最容易踩的一点，导入页会直接提示去配置）；
+1. **DOCX/PDF 题库导入** —— 题目靠 AI 解析，没有 Key 无法导入（这是最容易踩的一点，导入页会直接提示去配置）；
 2. **AI 逐题讲解与「向 AI 追问」**；
 3. **错题本的「生成建议」**（AI 深度诊断）。
 

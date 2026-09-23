@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'question_image.dart';
+
 class Question {
   final int? id;
   final int bankId;
@@ -12,6 +14,10 @@ class Question {
   final String? knowledgePoint; // 知识点（v1.0.2: schema v5）
   final String createdAt;
 
+  /// 配图（v12）：题目内容的一部分，文本流里用 `{{img:N}}` 标位置。
+  /// 不进 toMap/fromMap（独立表），按需由 DatabaseService 装载/随 insert 落库。
+  final List<QuestionImage> images;
+
   Question({
     this.id,
     required this.bankId,
@@ -23,6 +29,7 @@ class Question {
     this.source,
     this.knowledgePoint,
     required this.createdAt,
+    this.images = const [],
   });
 
   /// 题型中文标签（v1.0.2 设计审查修复：页面中两套映射收敛到此）
@@ -114,6 +121,7 @@ class Question {
     String? source,
     String? knowledgePoint,
     String? createdAt,
+    List<QuestionImage>? images,
   }) {
     return Question(
       id: id ?? this.id,
@@ -126,6 +134,7 @@ class Question {
       source: source ?? this.source,
       knowledgePoint: knowledgePoint ?? this.knowledgePoint,
       createdAt: createdAt ?? this.createdAt,
+      images: images ?? this.images,
     );
   }
 }

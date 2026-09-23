@@ -10,8 +10,11 @@ import '../services/export_storage.dart';
 import 'package:flutter/services.dart';
 import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
+import '../utils/question_image_tokens.dart';
 import '../utils/responsive.dart';
 import '../widgets/ai_response_widget.dart';
+import '../widgets/kit/mj_kit.dart';
+import 'quick_start_screen.dart';
 import 'quiz_screen.dart';
 
 /// 错题本（v1.0.2 重写）
@@ -223,6 +226,13 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                       final st = q.id != null ? stats[q.id] : null;
                       final due = card != null &&
                           FSRSService.isDue(card, DateTime.now());
+                      // 摘要行放不下内联图：题干去占位符，用「图 N」提示
+                      // （进题复习时图片随题完整显示）
+                      final imgSlots = <int>{
+                        ...imageSlotsIn(q.title),
+                        for (final o in q.options) ...imageSlotsIn(o),
+                        if (q.analysis != null) ...imageSlotsIn(q.analysis!),
+                      }.length;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 5),
                         child: Row(
@@ -233,7 +243,7 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${i + 1}. ${q.title}',
+                                    '${i + 1}. ${stripImageTokens(q.title)}',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -261,6 +271,13 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                                 ],
                               ),
                             ),
+                            if (imgSlots > 0) ...[
+                              const SizedBox(width: 6),
+                              Text('图$imgSlots',
+                                  style: TextStyle(
+                                      fontSize: MaoType.micro,
+                                      color: ac.textTertiary)),
+                            ],
                           ],
                         ),
                       );
@@ -899,21 +916,32 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
         child: _loading
-          ? const Center(child: CircularProgressIndicator())
+          // 加载占位用 kit 骨架条，不再裸转圈（转圈无内容预期，骨架条给形状预期）
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MJSkeleton(width: 180),
+                  SizedBox(height: MaoSpace.sm),
+                  MJSkeleton(width: 120),
+                ],
+              ),
+            )
           : _stats == null || _stats!.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle_outline,
-                          size: 64, color: ac.accent.withOpacity(0.6)),
-                      const SizedBox(height: 16),
-                      Text(_emptyText, style: const TextStyle(fontSize: MaoType.h3)),
-                      const SizedBox(height: 8),
-                      Text('继续刷题积累吧！',
-                          style: TextStyle(
-                              fontSize: MaoType.body, color: ac.textSecondary)),
-                    ],
+              // 空态给出口（交互#12）：MJEmptyState +「去刷题」直达开始页，
+              // 不再只留一句文案让人无处可点
+              ? MJEmptyState(
+                  icon: Icons.check_circle_outline,
+                  title: _emptyText,
+                  description: '继续刷题积累吧！',
+                  action: FilledButton.icon(
+                    icon: const Icon(Icons.bolt),
+                    label: const Text('去刷题'),
+                    onPressed: () => Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const QuickStartScreen()),
+                    ),
                   ),
                 )
               : Column(
@@ -1207,11 +1235,13 @@ class _BankErrorCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: MaoSpace.xs),
         padding: const EdgeInsets.all(MaoSpace.sm + 2),
         decoration: BoxDecoration(
-          color: ac.surface,
+          // 选中权重走 accentSoft 底（对齐 MJChip），描边恒 1px——粗细随
+          // 选中变化会在点击瞬间产生 0.4px 尺寸跳动（视觉#5）
+          color: selected ? ac.accentSoft : ac.surface,
           borderRadius: MaoRadius.controlBorder,
           border: Border.all(
             color: selected ? ac.accent : ac.border,
-            width: selected ? 1.4 : MaoLine.width,
+            width: MaoLine.width,
           ),
         ),
         child: Row(
@@ -1469,7 +1499,8 @@ class _AnswerStylePreviewState extends State<_AnswerStylePreview>
               ),
               const SizedBox(height: 6),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
+                // 文案切换归动效令牌（原 260ms 散落字面量）
+                duration: MaoMotion.effective(context, MaoMotion.slow),
                 child: Text(
                   atEnd ? '答案在最后一页' : '答案在题目下方',
                   key: ValueKey(atEnd),

@@ -229,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
       list.add(_buildBalanceWarning(ac));
     }
     if (appState.importTaskActive) {
-      list.add(_buildImportProgressCard(appState, ac));
+      if (!MJImportTask.discarded) list.add(_buildImportProgressCard(appState, ac));
     } else if (appState.previewQuestions.isNotEmpty) {
       list.add(_buildPreviewConfirmCard(appState, ac));
     }
@@ -389,77 +389,53 @@ class _HomeScreenState extends State<HomeScreen> {
     final daily = await appState.getDailyStats(7);
     final acc = await appState.getDailyAccuracy(7);
     final accByDay = <String, Map<String, dynamic>>{
-      for (final a in acc) (a['day'] as String): a,
+      for (final a in acc) (a['date'] as String): a,
     };
     if (!mounted) return;
     const week = ['一', '二', '三', '四', '五', '六', '日'];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ac.background,
-      // 平板适配：弹窗限宽居中
-      constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(MaoRadius.card))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          // v1.0.2 修复：小屏/大字体下可滚动，避免溢出
-          child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: ac.textSecondary.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(MaoRadius.chip)),
+    // 统一走 MJSheet（含标准拖拽把手与进出场），不再手绘胶囊自造弹层
+    await MJSheet.show<void>(
+      context,
+      title: '历史报告（近 7 天）',
+      maxWidth: kSheetMaxWidth,
+      // v1.0.2 修复：小屏/大字体下可滚动，避免溢出
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final d in daily)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: MaoSpace.xs),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 76,
+                      child: Text(
+                        '${(d['date'] as DateTime).month}月'
+                        '${(d['date'] as DateTime).day}日 周'
+                        '${week[(d['date'] as DateTime).weekday - 1]}',
+                        style: TextStyle(
+                            fontSize: MaoType.body, color: ac.textPrimary),
+                      ),
+                    ),
+                    Text('${d['total']} 题',
+                        style: TextStyle(
+                            fontSize: MaoType.body,
+                            fontWeight: FontWeight.w600,
+                            color: (d['total'] as int) > 0
+                                ? ac.accent
+                                : ac.textSecondary)),
+                    const Spacer(),
+                    Text(
+                      _accuracyText(d, accByDay),
+                      style: TextStyle(
+                          fontSize: MaoType.body, color: ac.textSecondary),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Text('历史报告（近 7 天）',
-                  style: TextStyle(
-                      fontSize: MaoType.h3,
-                      fontWeight: FontWeight.bold,
-                      color: ac.textPrimary)),
-              const SizedBox(height: 12),
-              for (final d in daily)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 76,
-                        child: Text(
-                          '${(d['date'] as DateTime).month}月'
-                          '${(d['date'] as DateTime).day}日 周'
-                          '${week[(d['date'] as DateTime).weekday - 1]}',
-                          style: TextStyle(
-                              fontSize: MaoType.body, color: ac.textPrimary),
-                        ),
-                      ),
-                      Text('${d['total']} 题',
-                          style: TextStyle(
-                              fontSize: MaoType.body,
-                              fontWeight: FontWeight.w600,
-                              color: (d['total'] as int) > 0
-                                  ? ac.accent
-                                  : ac.textSecondary)),
-                      const Spacer(),
-                      Text(
-                        _accuracyText(d, accByDay),
-                        style: TextStyle(
-                            fontSize: MaoType.body, color: ac.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-          ),
+          ],
         ),
       ),
     );
@@ -548,96 +524,55 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 路由占位：跳转页面并返回后刷新战绩
+  /// 后台导入任务卡：与「开始」页/导入页同一套（MJTaskCard），可取消
   Widget _buildImportProgressCard(AppState appState, AppThemeColors ac) {
-    final progress = appState.importProgress.clamp(0.0, 1.0);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(MaoRadius.control),
-        border: Border.all(color: ac.accent.withOpacity(0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: ac.accent),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text('正在导入题库，可先去做别的',
-                    style: TextStyle(
-                        fontSize: MaoType.body,
-                        fontWeight: FontWeight.w600,
-                        color: ac.textPrimary)),
-              ),
-              Text('${(progress * 100).toInt()}%',
-                  style: TextStyle(
-                      fontSize: MaoType.body,
-                      fontWeight: FontWeight.w600,
-                      color: ac.accent)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(MaoRadius.chip),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(appState.importStatus,
-              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
-        ],
-      ),
+    return MJTaskCard(
+      progress: appState.importProgress,
+      status: appState.importStatus,
+      onCancel: () => _cancelImport(appState),
+    );
+  }
+
+  /// 取消导入：后台任务不可中止（边界见 [MJImportTask]），
+  /// 「取消」= 不再展示进度、结果与解析结果直接丢弃。
+  void _cancelImport(AppState appState) {
+    MJImportTask.discarded = true;
+    // 丢弃解析结果，并借 clearPreview 的通知让各页立即隐藏任务卡
+    appState.clearPreview();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已取消导入，解析结果将丢弃')),
     );
   }
 
   /// v1.27 后台导入：AI 解析完成、待预览确认入口（确认入库或放弃前常驻）
+  /// 与「开始」页的同名卡长得一样（同一套 MJSurface 语言）
   Widget _buildPreviewConfirmCard(AppState appState, AppThemeColors ac) {
-    final ac = AppThemeColors.of(context);
-    return GestureDetector(
+    return MJSurface(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ImportPreviewScreen()),
       ),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: ac.accent.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(MaoRadius.control),
-          border: Border.all(color: ac.accent.withOpacity(0.5)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.fact_check_outlined, color: ac.accent),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('已解析 ${appState.previewQuestions.length} 道题，待确认',
-                      style: TextStyle(
-                          fontSize: MaoType.body,
-                          fontWeight: FontWeight.w600,
-                          color: ac.accent)),
-                  const SizedBox(height: 2),
-                  Text('点击查看预览，确认后入库',
-                      style:
-                          TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
-                ],
-              ),
+      padding: const EdgeInsets.all(MaoSpace.sm),
+      child: Row(
+        children: [
+          Icon(Icons.fact_check_rounded, color: ac.accent, size: 18),
+          const SizedBox(width: MaoSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('已解析 ${appState.previewQuestions.length} 道题，待确认',
+                    style: MaoType.h3Style.copyWith(
+                        fontWeight: FontWeight.w600, color: ac.accent)),
+                const SizedBox(height: 2),
+                Text('点击查看预览，确认后入库',
+                    style: MaoType.captionStyle
+                        .copyWith(color: ac.textSecondary)),
+              ],
             ),
-            Icon(Icons.chevron_right, color: ac.accent),
-          ],
-        ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: ac.accent, size: 16),
+        ],
       ),
     );
   }

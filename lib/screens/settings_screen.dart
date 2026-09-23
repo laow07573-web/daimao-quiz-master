@@ -466,7 +466,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               style: TextStyle(fontSize: MaoType.body, fontWeight: FontWeight.w600, color: ac.accent)),
                           if (_estimated > 0) ...[
                             const SizedBox(width: 8),
-                            Text('≈ ${_estimated} 题',
+                            Text('≈ $_estimated 题',
                                 style: TextStyle(fontSize: MaoType.body, color: ac.accent.withOpacity(0.7))),
                           ],
                           const Spacer(),
@@ -756,6 +756,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onTap: () => setState(() => _detail = d),
                             child: AnimatedContainer(
                               duration: MaoMotion.fast,
+                              curve: MaoMotion.standard,
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
                                 color: active ? ac.accentSoft : ac.surface,

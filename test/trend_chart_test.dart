@@ -65,7 +65,7 @@ void main() {
   });
 
   group('accuracyTierColor 三档', () {
-    test('>=80 accent 0.75 / >=60 accent 0.45 / <60 danger 0.75', () {
+    test('>=80 强档 / >=60 中档 / <60 danger 档', () {
       // v1.28 新设计语言：取色改走 AppThemeColors 语义色
       const ac = AppThemeColors(
         background: Color(0xFFFFFFFF),
@@ -82,10 +82,14 @@ void main() {
         navForeground: Color(0xFF000000),
         danger: Color(0xFFEE0000),
       );
-      expect(accuracyTierColor(90, ac), const Color(0xFF000000).withOpacity(0.75));
-      expect(accuracyTierColor(70, ac), const Color(0xFF000000).withOpacity(0.45));
-      expect(accuracyTierColor(50, ac), const Color(0xFFEE0000).withOpacity(0.75));
-      expect(accuracyTierColor(0, ac), const Color(0xFFEE0000).withOpacity(0.75));
+      // 墨黑主题修复：三档由透明度改为 levelShade 实色档位
+      //（透明度叠底在中性灰 accent 下会退化成灰阶）
+      expect(accuracyTierColor(90, ac), levelShade(ac.accent, ac.surface, 0.75));
+      expect(accuracyTierColor(70, ac), levelShade(ac.accent, ac.surface, 0.45));
+      expect(accuracyTierColor(50, ac), levelShade(ac.danger, ac.surface, 0.75));
+      expect(accuracyTierColor(0, ac), levelShade(ac.danger, ac.surface, 0.75));
+      // 高/中两档必须可辨（不能塌成同一个色）
+      expect(accuracyTierColor(70, ac), isNot(accuracyTierColor(90, ac)));
     });
   });
 

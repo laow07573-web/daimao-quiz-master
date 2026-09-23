@@ -148,8 +148,9 @@ class _PracticeResultScreenState extends State<PracticeResultScreen> {
     if (key?.currentContext != null) {
       Scrollable.ensureVisible(
         key!.currentContext!,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
+        // 滚动落位归动效令牌（原 350ms 散落字面量）
+        duration: MaoMotion.effective(context, MaoMotion.slow),
+        curve: MaoMotion.standard,
       );
     }
   }

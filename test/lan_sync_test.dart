@@ -164,9 +164,9 @@ void main() {
       DeviceService.instance.overrideDeviceId('local-device');
       final migrated = await DatabaseService.instance.database;
 
-      // 版本升到 11
+      // 版本升到当前 schema（v12 题目配图）
       final version = await migrated.rawQuery('PRAGMA user_version');
-      expect(version.first.values.first, 11);
+      expect(version.first.values.first, 12);
 
       // uid 全部回填且非空
       final banks = await migrated.rawQuery('SELECT uid, updated_at FROM question_banks');

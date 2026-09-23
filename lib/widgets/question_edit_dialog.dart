@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/question.dart';
+import '../models/question_image.dart';
+import '../utils/design_tokens.dart';
 
 class QuestionEditDialog extends StatefulWidget {
   final Question question;
-  final void Function(String title, String answer, String? type) onSave;
+
+  /// [images] 为编辑后保留的配图：删图即连同题内 `{{img:N}}` 占位符一起移除
+  final void Function(
+          String title, String answer, String? type, List<QuestionImage> images)
+      onSave;
 
   const QuestionEditDialog({
     super.key,
@@ -19,6 +25,7 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
   late TextEditingController _titleCtrl;
   late TextEditingController _answerCtrl;
   late String? _type;
+  late List<QuestionImage> _images;
 
   static const _types = {
     'single_choice': '单选',
@@ -40,6 +47,7 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
     _type = _types.containsKey(widget.question.questionType)
         ? widget.question.questionType
         : 'single_choice';
+    _images = List.of(widget.question.images);
   }
 
   @override
@@ -47,6 +55,14 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
     _titleCtrl.dispose();
     _answerCtrl.dispose();
     super.dispose();
+  }
+
+  /// 删图：图片是题目的一部分，占位符随之从题干移除（挪图则直接改题干文本）
+  void _removeImage(QuestionImage img) {
+    setState(() {
+      _images = _images.where((i) => i.position != img.position).toList();
+      _titleCtrl.text = _titleCtrl.text.replaceAll('{{img:${img.position}}}', '');
+    });
   }
 
   @override
@@ -75,6 +91,64 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
               maxLines: 2,
               decoration: const InputDecoration(labelText: '答案', border: OutlineInputBorder()),
             ),
+            if (_images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('题目配图 · 题干里 {{img:N}} 标位置，可改文本挪图',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final img in _images)
+                      SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: MaoRadius.smallBorder,
+                                child: Image.memory(img.content, fit: BoxFit.cover),
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              // 删图角标：视觉维持原小角标不动，热区扩到 40×40
+                              //（触达目标下限）——原来可点区域只有十几像素，很难点中
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () => _removeImage(img),
+                                  child: Align(
+                                    alignment: Alignment.topRight,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle),
+                                      child: const Icon(Icons.close,
+                                          size: 12, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -82,7 +156,8 @@ class _QuestionEditDialogState extends State<QuestionEditDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
         FilledButton(
           onPressed: () {
-            widget.onSave(_titleCtrl.text.trim(), _answerCtrl.text.trim(), _type);
+            widget.onSave(_titleCtrl.text.trim(), _answerCtrl.text.trim(), _type,
+                _images);
             Navigator.pop(context);
           },
           child: const Text('保存'),

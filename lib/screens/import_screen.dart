@@ -25,18 +25,36 @@ class _ImportScreenState extends State<ImportScreen> {
   /// 完成后弹提示），不再阻塞在导入页。
   void _importSample() {
     final appState = context.read<AppState>();
-    if (appState.importTaskActive) return;
+    // 后台导入互斥在应用层是静默 return——UI 层提前明示，别让用户干等
+    if (appState.importTaskActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已有导入任务进行中')),
+      );
+      return;
+    }
+    MJImportTask.discarded = false;
     unawaited(appState.startBackgroundSampleImport());
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已开始导入示例题库，进度见首页')),
+      const SnackBar(content: Text('已开始导入示例题库，进度见开始页顶部卡片')),
     );
     Navigator.pop(context);
+  }
+
+  /// 取消导入：后台任务不可中止（边界见 [MJImportTask]），
+  /// 「取消」= 不再展示进度、结果与解析结果直接丢弃。
+  void _cancelImport(AppState appState) {
+    MJImportTask.discarded = true;
+    // 丢弃解析结果，并借 clearPreview 的通知让各页立即隐藏任务卡
+    appState.clearPreview();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已取消导入，解析结果将丢弃')),
+    );
   }
 
   Future<void> _pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['doc', 'docx', 'json'], // v1.0.2: 支持 JSON 题库
+      allowedExtensions: ['doc', 'docx', 'json', 'pdf'], // v1.0.2: 支持 JSON 题库；v12: 支持 PDF
       allowMultiple: true,
     );
 
@@ -46,6 +64,14 @@ class _ImportScreenState extends State<ImportScreen> {
             result.files.where((f) => f.path != null).map((f) => f.path!).toList();
       });
     }
+  }
+
+  /// DOC/DOCX/PDF 走 AI 解析；JSON 直接入库（与应用层同一口径）
+  bool _isAiDoc(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.docx') ||
+        lower.endsWith('.doc') ||
+        lower.endsWith('.pdf');
   }
 
   @override
@@ -71,14 +97,14 @@ class _ImportScreenState extends State<ImportScreen> {
           // 无法滚动查看已选文件名；现在整页可滚动，操作按钮固定在页底。
           return ResponsivePage(
             child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(MaoSpace.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 流程说明：发丝面板 + 左强调条（精密风格不用大色块）
                 MJSurface(
                   accentEdge: true,
-                  padding: const EdgeInsets.all(MaoSpace.sm + 2),
+                  padding: const EdgeInsets.all(MaoSpace.sm),
                   child: Row(
                     children: [
                       Icon(Icons.auto_awesome, color: ac.accent, size: 18),
@@ -93,7 +119,7 @@ class _ImportScreenState extends State<ImportScreen> {
                                     color: ac.textPrimary)),
                             const SizedBox(height: 2),
                             Text(
-                              '自动提取题干、选项、答案，兼容各种 DOCX 格式',
+                              '自动提取题干、选项、答案，兼容各种 DOCX/PDF 格式',
                               style: MaoType.captionStyle
                                   .copyWith(color: ac.textSecondary),
                             ),
@@ -117,7 +143,7 @@ class _ImportScreenState extends State<ImportScreen> {
                       const SizedBox(width: MaoSpace.xs),
                       Expanded(
                         child: Text(
-                          '支持 .docx 格式。解析后先预览题目，可编辑、删除后再确认入库。\n旧版 .doc 文件请先用 Word 另存为 .docx。',
+                          '支持 DOCX / PDF / JSON。DOCX/PDF 解析后先预览题目，可编辑、删除后再确认入库；PDF 自动抽图，插图随题保留。\n旧版 .doc 文件请先用 Word 另存为 .docx。',
                           style: MaoType.captionStyle
                               .copyWith(color: ac.textSecondary, height: 1.6),
                         ),
@@ -134,7 +160,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                        horizontal: MaoSpace.md, vertical: MaoSpace.sm),
                     decoration: BoxDecoration(
                       color: ac.accent.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(MaoRadius.control),
@@ -177,7 +203,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   onTap: isProcessing ? null : _pickFiles,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(MaoSpace.xxl),
                     decoration: BoxDecoration(
                       color: ac.card,
                       borderRadius: BorderRadius.circular(MaoRadius.control),
@@ -189,7 +215,7 @@ class _ImportScreenState extends State<ImportScreen> {
                         Icon(Icons.cloud_upload_outlined,
                             size: 48, color: ac.textSecondary),
                         const SizedBox(height: 12),
-                        Text('点击选择 DOCX 文件',
+                        Text('选择文件（DOCX / PDF / JSON）',
                             style: TextStyle(
                                 fontSize: MaoType.h3, color: ac.accent)),
                         const SizedBox(height: 4),
@@ -197,13 +223,13 @@ class _ImportScreenState extends State<ImportScreen> {
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.textSecondary)),
                         const SizedBox(height: 4),
-                        // v1.0.2 对齐里程碑：JSON 直导入库提示
-                        Text('导入 .json 题库文件，无需 AI 解析，题目答案直接入库',
+                        Text('PDF 自动抽图，插图随题保留',
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.textSecondary)),
                         const SizedBox(height: 4),
+                        // v1.0.2 对齐里程碑：JSON 直导入库提示
                         Text(
-                            '选择本软件导出的 .json 题库文件（可多选）。导入完成后会显示导入报告。',
+                            '导入 .json 题库文件（可多选），无需 AI 解析，题目答案直接入库，完成后显示导入报告',
                             style: TextStyle(
                                 fontSize: MaoType.body, color: ac.textSecondary)),
                       ],
@@ -220,6 +246,17 @@ class _ImportScreenState extends State<ImportScreen> {
                           fontSize: MaoType.body,
                           fontWeight: FontWeight.w600,
                           color: ac.textPrimary)),
+                  // 多选文档只解析第 1 个（应用层如此实现）——选了就得说，
+                  // 否则用户以为剩下的也会被解析
+                  if (_selectedFiles
+                          .where((f) => _isAiDoc(f))
+                          .length >
+                      1) ...[
+                    const SizedBox(height: 4),
+                    Text('多选文档将只解析第 1 个，其余文件请分次导入',
+                        style: TextStyle(
+                            fontSize: MaoType.body, color: ac.warning)),
+                  ],
                   const SizedBox(height: 8),
                   for (var index = 0; index < _selectedFiles.length; index++)
                     Card(
@@ -258,7 +295,8 @@ class _ImportScreenState extends State<ImportScreen> {
           }
           return SafeArea(
             child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(
+                  MaoSpace.md, MaoSpace.sm, MaoSpace.md, MaoSpace.md),
               decoration: BoxDecoration(
                 color: ac.background,
                 border: Border(
@@ -295,11 +333,11 @@ class _ImportScreenState extends State<ImportScreen> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       icon: isProcessing
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2, color: ac.onAccent),
                             )
                           : const Icon(Icons.auto_awesome, size: 20),
                       label: Text(
@@ -309,7 +347,8 @@ class _ImportScreenState extends State<ImportScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ac.accent,
                         foregroundColor: ac.onAccent,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: MaoSpace.sm),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(MaoRadius.small)),
                       ),
@@ -323,22 +362,27 @@ class _ImportScreenState extends State<ImportScreen> {
                                 );
                                 return;
                               }
-                              // v1.28.1 新生引导：DOCX 依赖 AI 解析，无 Key 时
+                              // 后台导入互斥在应用层是静默 return——UI 层提前明示
+                              if (appState.importTaskActive) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('已有导入任务进行中')),
+                                );
+                                return;
+                              }
+                              // v1.28.1 新生引导：DOCX/PDF 依赖 AI 解析，无 Key 时
                               // 前置拦截并直达设置页，不再让后台任务失败后
                               // 只弹一个"知道了"
-                              final docxFiles = _selectedFiles
-                                  .where((f) =>
-                                      f.toLowerCase().endsWith('.docx') ||
-                                      f.toLowerCase().endsWith('.doc'))
-                                  .toList();
-                              final hasDocx = docxFiles.isNotEmpty;
-                              if (hasDocx && !appState.settings.isConfigured) {
+                              final aiFiles =
+                                  _selectedFiles.where(_isAiDoc).toList();
+                              final hasAi = aiFiles.isNotEmpty;
+                              if (hasAi && !appState.settings.isConfigured) {
                                 showDialog<void>(
                                   context: context,
                                   builder: (dlgCtx) => AlertDialog(
                                     title: const Text('需要 API Key'),
                                     content: const Text(
-                                        'DOCX 导入使用 AI 解析题目，需要先配置 API Key。\n\n'
+                                        'DOCX/PDF 导入使用 AI 解析题目，需要先配置 API Key。\n\n'
                                         '没有 Key？可以先点「一键导入示例题库」离线体验；'
                                         'JSON 题库文件也无需 Key。'),
                                     actions: [
@@ -371,48 +415,31 @@ class _ImportScreenState extends State<ImportScreen> {
                                   .where((f) =>
                                       f.toLowerCase().endsWith('.json'))
                                   .toList();
+                              MJImportTask.discarded = false;
                               unawaited(appState.startBackgroundImport(
                                 jsonFiles: jsonFiles,
-                                docxFiles: docxFiles,
+                                aiFiles: aiFiles,
                               ));
                               setState(() => _selectedFiles.clear());
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                     content: Text(
-                                        '导入任务已开始，进度见首页，可先浏览其他页面')),
+                                        '导入任务已开始，进度见开始页顶部卡片，可先浏览其他页面')),
                               );
                               Navigator.pop(context);
                             },
                     ),
                   ),
 
-                  // v1.27 进度展示：精确进度条 + 状态文字（任务在应用层继续，
-                  // 离开本页后首页同步展示）
-                  if (isProcessing)
+                  // v1.27 进度展示：与首页/开始页同一张任务卡（任务在应用层继续，
+                  // 离开本页后开始页顶部卡片同步展示）
+                  if (isProcessing && !MJImportTask.discarded)
                     Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(MaoRadius.chip),
-                            child: LinearProgressIndicator(
-                              value: appState.importProgress.clamp(0.0, 1.0),
-                              minHeight: 6,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(appState.importStatus,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: MaoType.body, color: ac.textSecondary)),
-                          const SizedBox(height: 4),
-                          Text('可离开本页，导入会继续在后台进行，进度在首页展示',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: MaoType.body,
-                                  color: ac.textSecondary.withOpacity(0.8))),
-                        ],
+                      padding: const EdgeInsets.only(top: MaoSpace.sm),
+                      child: MJTaskCard(
+                        progress: appState.importProgress,
+                        status: appState.importStatus,
+                        onCancel: () => _cancelImport(appState),
                       ),
                     ),
                 ],

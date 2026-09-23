@@ -94,9 +94,9 @@ class AnswerSheetWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: bg,
                     borderRadius: MaoRadius.smallBorder,
-                    border: Border.all(
-                        color: bd,
-                        width: isCurrent ? 1.6 : MaoLine.width),
+                    // 描边恒 1px：粗细随当前项变化会让格子在跳题瞬间缩放
+                    // 0.6px（视觉#5）；当前项权重由 accent 实底 + onAccent 数字承担
+                    border: Border.all(color: bd, width: MaoLine.width),
                   ),
                   alignment: Alignment.center,
                   child: Text('${i + 1}',

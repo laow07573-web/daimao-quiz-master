@@ -5,6 +5,7 @@ import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../utils/responsive.dart';
 import '../widgets/command_palette.dart';
+import '../widgets/kit/mj_kit.dart';
 import 'home_screen.dart';
 import 'import_preview_screen.dart';
 import 'profile_tab.dart';
@@ -33,7 +34,13 @@ class _MainShellState extends State<MainShell> {
   static const String _goto = String.fromEnvironment('MAOJUAN_GOTO');
 
   int _index = _goto == 'stats' ? 2 : 0;
+
+  // 四个 Tab 各挂 GlobalKey：内容层淡入的 key 随 _index 换血重建时，
+  // 页面状态随 GlobalKey 迁移（保活语义不丢，见 [_buildPages]）。
+  final GlobalKey _homeKey = GlobalKey();
+  final GlobalKey _quickStartKey = GlobalKey();
   final GlobalKey<StatsTabState> _statsKey = GlobalKey<StatsTabState>();
+  final GlobalKey _profileKey = GlobalKey();
 
   /// v1.27 后台导入：完成提示弹窗防重复标志。
   bool _showingImportResult = false;
@@ -44,6 +51,17 @@ class _MainShellState extends State<MainShell> {
   void _maybeShowImportResult(AppState appState) {
     if (_showingImportResult) return;
     if (appState.pendingImportResult == null) return;
+    // 用户已取消的任务：静默丢弃完成提示与解析结果，不打扰
+    //（clearPreview 会 notifyListeners，不能在 build 里同步调用，挪到帧后）
+    if (MJImportTask.discarded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        appState.consumeImportResult();
+        appState.clearPreview();
+        MJImportTask.discarded = false;
+      });
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _showingImportResult) return;
       final route = ModalRoute.of(context);
@@ -94,14 +112,26 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  Widget _buildPages() => IndexedStack(
-        index: _index,
-        children: [
-          const HomeScreen(),
-          const QuickStartScreen(),
-          StatsTab(key: _statsKey),
-          const ProfileTab(),
-        ],
+  /// 内容层：IndexedStack 保活 + 切 Tab 轻淡入（克制版）。
+  ///
+  /// TweenAnimationBuilder 的 key 随 _index 换血触发 0→1 淡入（MaoMotion.fast）；
+  /// 四个 Tab 都挂 GlobalKey，换血重建时状态随 GlobalKey 迁移，保活不丢。
+  /// NavigationBar 的指示器不做任何动画。
+  Widget _buildPages(BuildContext context) => TweenAnimationBuilder<double>(
+        key: ValueKey(_index),
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: MaoMotion.effective(context, MaoMotion.fast),
+        curve: MaoMotion.standard,
+        builder: (context, t, child) => Opacity(opacity: t, child: child),
+        child: IndexedStack(
+          index: _index,
+          children: [
+            HomeScreen(key: _homeKey),
+            QuickStartScreen(key: _quickStartKey),
+            StatsTab(key: _statsKey),
+            ProfileTab(key: _profileKey),
+          ],
+        ),
       );
 
   @override
@@ -162,7 +192,7 @@ class _MainShellState extends State<MainShell> {
               ],
             ),
             VerticalDivider(width: 1, color: ac.border),
-            Expanded(child: _buildPages()),
+            Expanded(child: _buildPages(context)),
           ],
         ),
         ),
@@ -172,7 +202,7 @@ class _MainShellState extends State<MainShell> {
     // 窄屏形态：底部 Tab
     return CommandPaletteShortcuts(
       child: Scaffold(
-      body: _buildPages(),
+      body: _buildPages(context),
       bottomNavigationBar: DecoratedBox(
         // 顶部 hairline，与内容区分层（替代旧版无边界观感）
         decoration: BoxDecoration(

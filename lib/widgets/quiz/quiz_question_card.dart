@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../models/question.dart';
+import '../../models/question_image.dart';
 import '../../services/theme_service.dart';
 import '../../utils/design_tokens.dart';
 import '../kit/mj_kit.dart';
+import '../kit/mj_rich_question_text.dart';
 
 /// 答题页 · 题干卡（纯展示，无副作用）
 ///
@@ -61,7 +63,10 @@ class QuizQuestionCard extends StatelessWidget {
           const SizedBox(height: MaoSpace.sm),
           Container(height: MaoLine.width, color: ac.border),
           const SizedBox(height: MaoSpace.sm),
-          Text(question.title,
+          // v12 配图：图片是题目的一部分，随占位符位置内联在题干里
+          MjRichQuestionText(
+              text: question.title,
+              images: question.images,
               style: MaoType.h3Style
                   .copyWith(height: 1.65, color: ac.textPrimary)),
         ],
@@ -83,6 +88,7 @@ class QuizOptionRow extends StatelessWidget {
     required this.onTap,
     this.state = QuizOptionState.neutral,
     this.trailing,
+    this.images = const [],
   });
 
   /// 选项字母（A/B/C…）
@@ -94,6 +100,9 @@ class QuizOptionRow extends StatelessWidget {
   final QuizOptionState state;
   final VoidCallback? onTap;
   final Widget? trailing;
+
+  /// 题目配图（选项文本里含 `{{img:N}}` 时内联显示）
+  final List<QuestionImage> images;
 
   @override
   Widget build(BuildContext context) {
@@ -128,56 +137,60 @@ class QuizOptionRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: MaoSpace.xs - 2),
-      child: Material(
-        color: bg,
-        borderRadius: MaoRadius.controlBorder,
-        child: InkWell(
-          onTap: onTap,
+      // 判定/选中是状态反馈：底色与描边两色一起过渡，直接跳变会「闪」一下。
+      // 动画放最外层、Material 透明叠在其上——水波纹才能盖在渐变底色之上可见
+      child: AnimatedContainer(
+        duration: MaoMotion.effective(context, MaoMotion.fast),
+        curve: MaoMotion.standard,
+        decoration: BoxDecoration(
+          color: bg,
           borderRadius: MaoRadius.controlBorder,
-          splashColor: ac.accent.withOpacity(0.06),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: MaoSpace.sm, vertical: MaoSpace.sm + 1),
-            decoration: BoxDecoration(
-              borderRadius: MaoRadius.controlBorder,
-              border: Border.all(
-                color: bd,
-                width: (selected || state != QuizOptionState.neutral)
-                    ? 1.4
-                    : MaoLine.width,
+          // 描边恒 1px：粗细随选中变化会让盒子在点击瞬间缩放 0.4px（视觉#5），
+          // 选中/判定的权重交给 soft 底色与徽标（对齐 MJChip 的做法）
+          border: Border.all(color: bd, width: MaoLine.width),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: MaoRadius.controlBorder,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: MaoRadius.controlBorder,
+            splashColor: ac.accent.withOpacity(0.06),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: MaoSpace.sm, vertical: MaoSpace.sm + 1),
+              child: Row(
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: badge != null ? bd : Colors.transparent,
+                      borderRadius: MaoRadius.chipBorder,
+                      border: Border.all(color: bd, width: 1.2),
+                    ),
+                    child: Center(
+                      child: badge != null
+                          // 徽标底是 success/danger/accent 实底，前景一律取语义
+                          // onAccent，不写死白色（浅色主题下白图标会消失）
+                          ? Icon(badge, size: 13, color: ac.onAccent)
+                          : Text(label,
+                              style: MaoType.number(MaoType.micro,
+                                      weight: FontWeight.w600)
+                                  .copyWith(color: ac.textTertiary)),
+                    ),
+                  ),
+                  const SizedBox(width: MaoSpace.sm),
+                  Expanded(
+                    child: MjRichQuestionText(
+                        text: text,
+                        images: images,
+                        style: MaoType.bodyStyle
+                            .copyWith(height: 1.45, color: fg)),
+                  ),
+                  if (trailing != null) trailing!,
+                ],
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: badge != null ? bd : Colors.transparent,
-                    borderRadius: MaoRadius.chipBorder,
-                    border: Border.all(color: bd, width: 1.2),
-                  ),
-                  child: Center(
-                    child: badge != null
-                        ? Icon(badge,
-                            size: 13,
-                            color: state == QuizOptionState.neutral
-                                ? ac.onAccent
-                                : Colors.white)
-                        : Text(label,
-                            style: MaoType.number(MaoType.micro,
-                                    weight: FontWeight.w600)
-                                .copyWith(color: ac.textTertiary)),
-                  ),
-                ),
-                const SizedBox(width: MaoSpace.sm),
-                Expanded(
-                  child: Text(text,
-                      style: MaoType.bodyStyle
-                          .copyWith(height: 1.45, color: fg)),
-                ),
-                if (trailing != null) trailing!,
-              ],
             ),
           ),
         ),
@@ -319,9 +332,11 @@ class QuizTrueFalseButtons extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected ? softColor : ac.surface,
         borderRadius: MaoRadius.controlBorder,
+        // 描边恒 1px：粗细随选中变化会在点击瞬间产生 0.4px 尺寸跳动，
+        // 选中权重由语义浅底 + 语义色文字承担（视觉#5）
         border: Border.all(
           color: selected ? color : ac.border,
-          width: selected ? 1.4 : MaoLine.width,
+          width: MaoLine.width,
         ),
       ),
       child: Material(
