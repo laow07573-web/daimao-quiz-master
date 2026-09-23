@@ -2,8 +2,8 @@
 """猫卷 meme 宣传片《Why's this dealer taking the piss?》生成器（135 BPM 拍网格锁死）。
 
 歌与梗：Niko B - Why's this dealer?（2024，Believe UK，135 BPM、4/4、全长 129.6s）讲的是
-「雨里干等贩子半小时、贩子狂飙赶到」。猫卷就是那个题贩子——但它带着你的讲义狂飙赶到：
-讲义变题、秒判秒讲、不用等。视觉母语 = 二创圈「弹跳丰田威姿」：卡片/手机/吉祥物每个整拍
+「雨里干等贩子半小时、贩子狂飙赶到」。猫卷就是那个题贩子——但它带来的是「能刷」：
+题库文档一丢、当场开刷、不用等。视觉母语 = 二创圈「弹跳丰田威姿」：卡片/手机/吉祥物每个整拍
 一次解析式果冻 squash&stretch，多物件错相位 10~30ms，像一排威姿踩着鼓点跳舞。
 
 拍网格合同（验收线）：
@@ -182,12 +182,12 @@ def build_events(g):
     t_slg = snap(120.78)         # Hook punch 行 120.78s → 1087
 
     # ================= Intro 0.0–14.2「等」 =================
-    add('intro_scene_in', '开场：纸伞下顶讲义蹲守 + 雨丝', a_intro, 'intro', 0.0, '段落锚点')
-    add('waitcard_01_flip', '等待三连①踩拍翻面「押题资料 · 404」', bx(a_intro, 16), 'intro', None,
+    add('intro_scene_in', '开场：纸伞下顶着题库文档蹲守 + 雨丝', a_intro, 'intro', 0.0, '段落锚点')
+    add('waitcard_01_flip', '等待三连①踩拍翻面「真题文档 · 只能看」', bx(a_intro, 16), 'intro', None,
         'beat 16 整拍')
-    add('waitcard_02_flip', '等待三连②踩拍翻面「网课缓冲 · 87%」', bx(a_intro, 18), 'intro', None,
+    add('waitcard_02_flip', '等待三连②踩拍翻面「题库导入 · 87%」', bx(a_intro, 18), 'intro', None,
         'beat 18 整拍')
-    add('waitcard_03_flip', '等待三连③踩拍翻面「外卖式讲解 · 骑手正在赶」', bx(a_intro, 20), 'intro',
+    add('waitcard_03_flip', '等待三连③踩拍翻面「刷题软件 · 要手输」', bx(a_intro, 20), 'intro',
         None, 'beat 20 整拍')
     add('intro_caption_in', '大字幕 punch 进场「期末周，我在等一个救星」', bx(a_intro, 24), 'intro',
         10.667, '最后 2 小节（beat 24 = bar 7 起）')
@@ -217,7 +217,7 @@ def build_events(g):
         add(f'v1_shot_{k + 1:02d}', f'蒙太奇切镜 {k + 1:02d}（4 拍一镜）', shot0_v1 + 16 * k,
             'verse1', None, f'beat {g.beat_no(shot0_v1 + 16 * k):g} 整拍')
     add('v1_title_out', '段落标题退场', shot0_v1 + 4, 'verse1')
-    caps = ['等押题等成望夫石', '讲解比外卖还慢', '讲义 300 页，题呢？', '雨都小了，进度条没动']
+    caps = ['真题集翻烂，还是文档', '习题册想刷，只能干看', '题库 300 页，怎么刷？', '雨都小了，题还没刷上']
     for k, cap in enumerate(caps):               # 每 4 小节一句吐槽（第 4 句自拟补足 4 槽）
         add(f'v1_cap_{k + 1}_in', f'吐槽字幕「{cap}」', shot0_v1 + 64 * k, 'verse1', None,
             f'beat {g.beat_no(shot0_v1 + 64 * k):g} = 每 4 小节')
@@ -227,7 +227,7 @@ def build_events(g):
     add('phone_drift_in', '手机纸框（home.png）从右滑跳甩尾入场（急刹甩尾）', a_c2, 'chorus2', 56.82,
         'Hook punch 行；段落锚点')
     add('phone_land', '手机甩尾落定（阻尼回摆收束）', bx(a_c2, 2), 'chorus2')
-    add('brand_text_in', '大字「猫卷 · 把讲义变成能刷的题」', bx(a_c2, 2), 'chorus2')
+    add('brand_text_in', '大字「猫卷 · 题库文档，导入即刷」', bx(a_c2, 2), 'chorus2')
     add('hl_no_wait', '荧光黄涂抹 punch「不用等」', bx(a_c2, 4), 'chorus2')
     add('cards_lineup', 'PUNCH：4 张题目卡一字排开群舞（错相位 0/12/21/30ms）', t_line, 'chorus2',
         63.74, 'Hook punch 行')
@@ -240,7 +240,7 @@ def build_events(g):
         add(f'v2_shot_{k + 1:02d}', f'工作流切镜 {k + 1:02d}（4 拍一镜 × 4 轮）', shot0_v2 + 16 * k,
             'verse2', None, f'beat {g.beat_no(shot0_v2 + 16 * k):g} 整拍')
     add('v2_title_out', '段落标题退场', shot0_v2 + 4, 'verse2')
-    for c in range(4):                           # 4 轮循环 × 4 镜（讲义进炉/插图随题/秒判秒讲/FSRS）
+    for c in range(4):                           # 4 轮循环 × 4 镜（题库进炉/插图随题/秒判秒讲/FSRS）
         base, n = shot0_v2 + 64 * c, c + 1
         add(f'v2_chips_fly_{n}', f'轮{n}：DOCX/PDF 纸片飞入猫卷', base, 'verse2')
         add(f'v2_card_pop_{n}', f'轮{n}：题卡带小插图弹出', base + 16, 'verse2')
@@ -267,7 +267,7 @@ def build_events(g):
         'Hook punch 行；段落锚点；三贴纸各一拍')
     add('sticker_2', '贴纸 punch②「无广告」', bx(a_c4, 1), 'chorus4', None, '1 拍后')
     add('sticker_3', '贴纸 punch③「完全免费」', bx(a_c4, 2), 'chorus4', None, '1 拍后')
-    add('slogan_freeze', 'SLOGAN 定格「把讲义变成能刷的题」', t_slg, 'chorus4', 120.78,
+    add('slogan_freeze', 'SLOGAN 定格「题库文档，导入即刷」', t_slg, 'chorus4', 120.78,
         'Hook punch 行')
     add('download_line', '下载行「Android / Windows · AGPL-3.0 开源」', bx(t_slg, 1), 'chorus4')
 
@@ -276,7 +276,7 @@ def build_events(g):
     add('paw_1', '爪印①落印', bx(a_out, 0.5), 'outro', None, '半拍错开（咚-咚-咚）')
     add('paw_2', '爪印②落印', bx(a_out, 1.0), 'outro')
     add('paw_3', '爪印③落印', bx(a_out, 1.5), 'outro')
-    add('final_caption', '终字幕「不用等贩子 —— 讲义自己变题」', bx(a_out, 2.0), 'outro')
+    add('final_caption', '终字幕「不用等贩子 —— 题库一丢，当场开刷」', bx(a_out, 2.0), 'outro')
 
     E.sort(key=lambda e: (e.idx16, e.name))
     return E
@@ -972,14 +972,14 @@ def fake_phone_sprite():
             g.bar(46, 280 + i * 46, w2, 16, r=8)
         g.outline(44, 470, 300, 26, r=13)
         g.bar(50, 476, 208, 14, fill=STICKER['y'], r=7)
-        g.text('讲义 → 题目 · 已等 87 分钟', 46, 560, 26, bold=False, fill=INK_SOFT)
+        g.text('真题文档 → 开刷 · 已等 87 分钟', 46, 560, 26, bold=False, fill=INK_SOFT)
 
     return styled_paper('fakephone', 417.0, 640.0, content, fill=(38, 38, 35, 255),
                         line=2.5, shadow=5.0, r=22, segs=6)
 
 
 def lecture_sheet(name, tag):
-    """讲义纸片：假文本条 + PDF/DOCX/PPTX 角标"""
+    """题库文档纸片：假文本条 + PDF/DOCX/JSON 角标"""
 
     def content(g):
         g.bar(28, 30, 150, 14, fill=(150, 144, 130, 255))
@@ -1063,7 +1063,7 @@ def ai_bubble_sprite():
 
 
 def box_sprite():
-    """猫卷纸盒（讲义进炉用）"""
+    """猫卷纸盒（题库文档进炉用）"""
 
     def content(g):
         g.bar(52, 6, 316, 34, fill=SLOT_DARK, r=8)
@@ -1133,19 +1133,19 @@ def micro_jelly_frame(bg, img, t, t0):
 CAP_INTRO = '期末周，我在等一个救星'
 PUNCH_TITLE_1, PUNCH_TITLE_2 = "WHY'S THIS DEALER", 'TAKING THE PISS?'
 CAP_CN = '为什么这个题贩子让我等半天？！'
-V1_CAPS = ['等押题等成望夫石', '讲解比外卖还慢', '讲义 300 页，题呢？', '雨都小了，进度条没动']
-BRAND_LINE = '猫卷 · 把讲义变成能刷的题'
-SLOGAN = '把讲义变成能刷的题'
+V1_CAPS = ['真题集翻烂，还是文档', '习题册想刷，只能干看', '题库 300 页，怎么刷？', '雨都小了，题还没刷上']
+BRAND_LINE = '猫卷 · 题库文档，导入即刷'
+SLOGAN = '题库文档，导入即刷'
 DOWNLOAD = 'Android / Windows · AGPL-3.0 开源'
-FINAL_CAP = '不用等贩子 —— 讲义自己变题'
+FINAL_CAP = '不用等贩子 —— 题库一丢，当场开刷'
 
 
 # ---------------------------------------------------------------- 场景
 def sc_intro(img, f, t, tl):
-    """Intro 0.0–14.2「等」：纸伞下顶讲义蹲守 + 等待三连踩拍翻面 + 末 2 小节大字幕"""
+    """Intro 0.0–14.2「等」：纸伞下顶着题库文档蹲守 + 等待三连踩拍翻面 + 末 2 小节大字幕"""
     b = boil(f)
     draw_rain(img, t, n=40, speed=1250)
-    # 「顶着一摞讲义缩在纸伞下」：纸堆坐在头顶、伞罩住纸堆，三者成一组（勿散开）
+    # 「顶着一摞题库文档缩在纸伞下」：纸堆坐在头顶、伞罩住纸堆，三者成一组（勿散开）
     head_top = 730 - mascot_size('pawprint', 520)[0].height / (2 * S)
     do(img, 'umb', 240, 250, umbrella, 470, 360, f, sc=1.6)
     put_mascot(img, 'pawprint', 470, 730, 520, f)
@@ -1156,9 +1156,9 @@ def sc_intro(img, f, t, tl):
     put(img, text_img('已经等了 87 分钟', 26, bold=False, fill=INK_SOFT), 470,
         head_top + mascot_size('pawprint', 520)[0].height / S + 42, anchor='mm')
     waits = [
-        ('waitcard_01', '押题资料', '404', '考点呢？', 0.0, 300, 0.000),
-        ('waitcard_02', '网课缓冲', '87%', '加载到天荒地老', 0.87, 555, 0.014),
-        ('waitcard_03', '外卖式讲解', '骑手正在赶', '超时赔付 5 元券', 0.0, 810, 0.026),
+        ('waitcard_01', '真题文档', '只能看', '不判分也不记错题', 0.0, 300, 0.000),
+        ('waitcard_02', '题库导入', '87%', '转了一晚上还在转', 0.87, 555, 0.014),
+        ('waitcard_03', '刷题软件', '要手输', '300 题一道道敲', 0.0, 810, 0.026),
     ]
     for nm, label, value, note, bar, cy, phase in waits:
         t_in, t_out = tl.t(nm + '_flip'), tl.t(nm + '_out')
@@ -1234,7 +1234,7 @@ def sc_chorus1(img, f, t, tl):
 
 
 def _v1_scene_a(img, f, t, b):
-    """自习室干瞪讲义"""
+    """自习室干瞪题库文档"""
     do(img, 'lamp', 150, 150, lambda p: (p.line([(40, 130), (70, 40)], 6),
                                          p.arc(70, 34, 44, 190, 350, 6),
                                          p.line([(20, 132), (110, 132)], 6)), 300, 300, f, sc=1.5)
@@ -1271,7 +1271,7 @@ def _v1_scene_b(img, f, t, b):
 
 
 def _v1_scene_c(img, f, t, b):
-    """翻讲义翻到暴躁（纸页乱飞）"""
+    """翻题库文档翻到暴躁（纸页乱飞）"""
     put_mascot(img, 'wave', 600, 780, 480, f, rot=-3)
 
     def rage_content(g):
