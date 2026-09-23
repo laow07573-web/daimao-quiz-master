@@ -86,7 +86,7 @@ class AIService {
       allQuestions.addAll(r.$1);
       if (r.$2 != null) {
         // 内部降级标记不展示给用户。
-        errors.add('第 ${i + 1} 块：${r.$2!.replaceAll(_tokenLimitMarker, '')}');
+        errors.add('第 ${i + 1} 块：${r.$2!.replaceAll(_tokenLimitMarker, '').replaceAll(_permanentMarker, '')}');
       }
     }
   
@@ -190,6 +190,9 @@ class AIService {
   
   /// 内部标记：错误属于「超过模型输出上限」（可自动降级重试，不展示给用户）。
   static const String _tokenLimitMarker = '|TOKEN_LIMIT';
+
+  /// 内部标记：终态错误（Key 无效 401 / 余额不足 402），重试无益
+  static const String _permanentMarker = '|PERMANENT';
   
   /// 用 AI 解析一个文本块中的题目（失败自动重试 1 次；
   /// 输出上限错误按 [​_maxTokensFallbacks] 逐级降级重试）。
@@ -198,17 +201,28 @@ class AIService {
       String chunk, int bankId, String now) async {
     for (var i = 0; i < _maxTokensFallbacks.length; i++) {
       final mt = _maxTokensFallbacks[i];
-      var result = await _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
-      if (result.$2 == null) return result;
-      if (result.$2!.contains(_tokenLimitMarker) &&
-          i < _maxTokensFallbacks.length - 1) {
+      // 每档最多试 3 次：空响应/限流/瞬时错误都值得再试（0s / 2s / 4s 退避）。
+      // 终态错误（401/402）与「撞输出上限」不重试——前者重试无益，后者换档位
+      (List<Question>, String?) result = (<Question>[], '未尝试');
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+        result = await _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
+        if (result.$2 == null) return result;
+        if (result.$2!.contains(_tokenLimitMarker) ||
+            result.$2!.contains(_permanentMarker)) {
+          break;
+        }
+      }
+      final err = result.$2!;
+      if (err.contains(_permanentMarker) || !err.contains(_tokenLimitMarker)) {
+        return result; // 终态错误或已重试耗尽；上限错误才继续降档
+      }
+      if (i < _maxTokensFallbacks.length - 1) {
         // v1.27：超过模型输出上限——自动降级重试（用户换模型/中转站也兼容）。
         await Future.delayed(const Duration(seconds: 1));
-        continue;
       }
-      // 其余失败：沿用既有的一次重试（退避 1s）。
-      await Future.delayed(const Duration(seconds: 1));
-      return _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
     }
     return (<Question>[], 'AI请求失败: 输出上限降级重试全部失败');
   }
@@ -292,8 +306,14 @@ $chunk
         final decoded = utf8.decode(rawBytes);
         logger.logUtf8Decode(rawBytes.length, decoded.length, decoded);
         final data = jsonDecode(decoded);
-        final content = data['choices']?[0]?['message']?['content'] as String?;
-        if (content == null) return (<Question>[], 'AI 响应缺少内容');
+        final content =
+            (data['choices']?[0]?['message']?['content'] as String?) ?? '';
+        // 空内容（null/空串/只剩 ``` 围栏）：多为服务端瞬时空响应（限流、
+        // 余额临界、内容过滤）。此前空串会一路走到 jsonDecode('') 炸出
+        // "Unexpected end of input"——用户看到的是一堆异常堆栈，完全看不懂
+        if (_isBlankContent(content)) {
+          return (<Question>[], 'AI 返回了空响应（可能是限流或账户余额不足）');
+        }
         logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
         _trackUsage(data);
 
@@ -306,7 +326,9 @@ $chunk
         } catch (e) {
           final repaired = repairTruncatedJson(content);
           if (repaired == null) {
-            return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON（$e）');
+            // 不把原始异常串（带 ^ 定位符）抛给用户——它看起来像程序崩溃
+            return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON'
+                '（可能被截断或返回了异常内容，已尝试抢修仍失败）');
           }
           parsed = repaired;
           logger.log('PIPE:DECODE',
@@ -339,14 +361,30 @@ $chunk
         // v1.27：识别「输出上限」类错误（用户换模型/中转站上限低时出现），
         // 加内部标记供降级重试；其余错误如实上报。
         final bodyText = utf8.decode(response.bodyBytes, allowMalformed: true);
-        final limitSuffix =
-            isTokenLimitError(bodyText) ? _tokenLimitMarker : '';
-        return (<Question>[], 'AI服务返回错误 (${response.statusCode})$limitSuffix');
+        if (isTokenLimitError(bodyText)) {
+          return (<Question>[], 'AI服务返回错误 (${response.statusCode})$_tokenLimitMarker');
+        }
+        // 401/402 是终态错误（Key 无效/余额不足），重试无益——
+        // 打标记让重试层直接放行报错；其余状态码在统一前缀后给人话
+        final code = response.statusCode;
+        final permanent = (code == 401 || code == 402) ? _permanentMarker : '';
+        final friendly = switch (code) {
+          401 => 'API Key 无效或无权限，请在设置里核对',
+          402 => '账户余额不足，请充值或更换 API Key',
+          429 => '请求过于频繁，稍后再试',
+          >= 500 => 'AI 服务暂时不可用，稍后再试',
+          _ => '未知错误',
+        };
+        return (<Question>[], 'AI服务返回错误 ($code)：$friendly$permanent');
       }
     } catch (e) {
       return (<Question>[], 'AI请求失败: $e');
     }
   }
+
+  /// 空内容判定：null / 空白 / 只剩 ``` 围栏，都算「服务端没给东西」
+  static bool _isBlankContent(String? s) =>
+      s == null || _stripFence(s).trim().isEmpty;
 
   String? _nullIfEmpty(String? s) {
     if (s == null || s.isEmpty) return null;
@@ -673,10 +711,14 @@ $chunk
 
   /// 判断是否为 AI 失败/错误串（非真实解析内容）
   static bool isAiError(String s) {
-    return s.startsWith('AI请求失败') ||
-        s.startsWith('AI服务返回错误') ||
-        s.startsWith('AI解析生成失败') ||
-        s.startsWith('解析生成失败');
+    // 去空格后判前缀：曾因文案「AI 解析生成失败」带空格而这里查的是
+    // 「AI解析生成失败」，错误文本被当成解析内容缓存
+    final t = s.trim().replaceAll(' ', '');
+    return t.startsWith('AI请求失败') ||
+        t.startsWith('AI服务返回错误') ||
+        t.startsWith('AI解析生成失败') ||
+        t.startsWith('AI返回了空响应') ||
+        t.startsWith('解析生成失败');
   }
 
   /// 追问功能：基于原题和解析进行追问（聊天式）
