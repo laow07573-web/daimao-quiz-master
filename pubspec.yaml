@@ -57,6 +57,7 @@ dependencies:
   flutter_secure_storage: ^9.2.0
   pdfrx: ^1.0.101
   image: ^4.3.0
+  google_mlkit_text_recognition: ^0.15.0
   
 dev_dependencies:
   flutter_test:

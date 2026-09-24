@@ -14,6 +14,7 @@ import 'database_service.dart';
 import 'device_service.dart';
 import '../utils/question_image_tokens.dart';
 import 'doc_parser_service.dart';
+import 'ocr_service.dart';
 import 'pdf_import_service.dart';
 import 'bank_file_service.dart';
 import 'reminder_service.dart';
@@ -274,7 +275,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
     final AIParseResult result;
     if (scannedPdf) {
-      // 扫描件：页图 → 视觉模型切题（识别+切题一步到位，仍是用户自己的 Key）
+      // 扫描件：先端上 OCR 认出文字层（离线、免 Key），认得出就照普通
+      // 题库文档走 AI 切题——任何文本模型都能吃；认不出再退视觉切题
       _importStatus = '扫描版 PDF：提取页图...';
       notifyListeners();
       final pages = await PdfImportService.extractScannedPages(file.path,
@@ -287,13 +289,38 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         notifyListeners();
         return;
       }
-      result = await _aiService!.parseQuestionsFromPageImages(pages, 0, (d, t) {
-        _importStatus = '扫描版 PDF：视觉切题 ($d/$t 页)';
-        _importProgress =
-            (_bgProgressBase + _bgProgressSpan * (t > 0 ? d / t : 0))
-                .clamp(0.0, 1.0);
-        notifyListeners();
-      });
+
+      var ocrText = '';
+      if (OcrService.isSupported) {
+        final pageTexts = <String>[];
+        for (var i = 0; i < pages.length; i++) {
+          _importStatus = '扫描版 PDF：识别文字 (${i + 1}/${pages.length} 页)';
+          notifyListeners();
+          pageTexts.add(await OcrService.recognizeImage(pages[i]) ?? '');
+        }
+        ocrText = OcrService.mergePageTexts(pageTexts);
+      }
+
+      if (ocrText.trim().length >= 100) {
+        // OCR 认出了可用文字层：与文字版 PDF 同路，文本模型即可切题
+        result = await _aiService!.parseQuestionsFromRawText(ocrText, 0, (d, t) {
+          _importStatus = '扫描版 PDF：AI 切题 ($d/$t 块)';
+          _importProgress =
+              (_bgProgressBase + _bgProgressSpan * (t > 0 ? d / t : 0))
+                  .clamp(0.0, 1.0);
+          notifyListeners();
+        });
+      } else {
+        // OCR 不可用/认不出（如 Windows 端或版式太花）：退视觉切题
+        result =
+            await _aiService!.parseQuestionsFromPageImages(pages, 0, (d, t) {
+          _importStatus = '扫描版 PDF：视觉切题 ($d/$t 页)';
+          _importProgress =
+              (_bgProgressBase + _bgProgressSpan * (t > 0 ? d / t : 0))
+                  .clamp(0.0, 1.0);
+          notifyListeners();
+        });
+      }
     } else {
       _importStatus = 'AI 解析中...';
       notifyListeners();
