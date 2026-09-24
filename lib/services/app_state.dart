@@ -232,8 +232,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     final fileName = file.path.split('/').last.split('\\').last;
 
     final isPdf = file.path.toLowerCase().endsWith('.pdf');
-    String rawText;
+    String rawText = '';
     var imagePool = <int, QuestionImage>{};
+    var scannedPdf = false;
     if (isPdf) {
       // PDF：本地抽图文（图片是题目的一部分，随 {{img:N}} 占位符进解析流）
       _previewBankName =
@@ -245,9 +246,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         rawText = extracted.rawText;
         imagePool = extracted.imagePool;
       } on PdfExtractException catch (e) {
-        _importStatus = '「$fileName」${e.message}';
-        notifyListeners();
-        return;
+        if (!e.scanned) {
+          _importStatus = '「$fileName」${e.message}';
+          notifyListeners();
+          return;
+        }
+        // 扫描件/图片字：字画在图里、无文字层——改走视觉切题通道
+        scannedPdf = true;
       }
     } else {
       // 检测格式：不允许旧版二进制 .doc
@@ -267,17 +272,40 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       rawText = await DocParserService.extractRawText(file.path);
     }
 
-    _importStatus = 'AI 解析中...';
-    notifyListeners();
-    final result = await _aiService!.parseQuestionsFromRawText(
-        rawText, 0, (d, t) {
-      _importStatus = 'AI 解析中 ($d/$t 块)';
-      // v1.27 进度精确化：按分块推进进度条（映射到当前阶段跨度内）
-      _importProgress = (_bgProgressBase +
-              _bgProgressSpan * (t > 0 ? d / t : 0))
-          .clamp(0.0, 1.0);
+    final AIParseResult result;
+    if (scannedPdf) {
+      // 扫描件：页图 → 视觉模型切题（识别+切题一步到位，仍是用户自己的 Key）
+      _importStatus = '扫描版 PDF：提取页图...';
       notifyListeners();
-    });
+      final pages = await PdfImportService.extractScannedPages(file.path,
+          onProgress: (d, t) {
+        _importStatus = '扫描版 PDF：提取页图 ($d/$t 页)';
+        notifyListeners();
+      });
+      if (pages.isEmpty) {
+        _importStatus = '「$fileName」页面提取失败，无法识别';
+        notifyListeners();
+        return;
+      }
+      result = await _aiService!.parseQuestionsFromPageImages(pages, 0, (d, t) {
+        _importStatus = '扫描版 PDF：视觉切题 ($d/$t 页)';
+        _importProgress =
+            (_bgProgressBase + _bgProgressSpan * (t > 0 ? d / t : 0))
+                .clamp(0.0, 1.0);
+        notifyListeners();
+      });
+    } else {
+      _importStatus = 'AI 解析中...';
+      notifyListeners();
+      result = await _aiService!.parseQuestionsFromRawText(rawText, 0, (d, t) {
+        _importStatus = 'AI 解析中 ($d/$t 块)';
+        // v1.27 进度精确化：按分块推进进度条（映射到当前阶段跨度内）
+        _importProgress =
+            (_bgProgressBase + _bgProgressSpan * (t > 0 ? d / t : 0))
+                .clamp(0.0, 1.0);
+        notifyListeners();
+      });
+    }
     // 配图物化：全局槽位重编为题内槽位；丢 token 的图按期望题序补挂，
     // 挂不上的显性进「待指派」，绝不静默丢图
     final materialized = materializeQuestionImages(

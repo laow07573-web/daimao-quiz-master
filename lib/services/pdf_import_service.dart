@@ -9,10 +9,13 @@ import '../models/question_image.dart';
 import '../utils/pdf_layout.dart';
 import 'ai_service.dart';
 
-/// PDF 抽取失败（[message] 可直接展示给用户）
+/// PDF 抽取失败（[message] 可直接展示给用户）。
+/// [scanned] = 判定为扫描件/图片字（无文字层）——这不是损坏，
+/// 调用方可据此改走「视觉切题」通道而不是直接报错。
 class PdfExtractException implements Exception {
-  PdfExtractException(this.message);
+  PdfExtractException(this.message, {this.scanned = false});
   final String message;
+  final bool scanned;
   @override
   String toString() => message;
 }
@@ -46,6 +49,9 @@ class PdfImportService {
   /// （同时是局域网同步 64MB 单次快照的体积保护）
   static const int _maxImageEdge = 1280;
   static const int _maxImageBytes = 512 * 1024;
+
+  /// 扫描页单页上限（比普通插图宽，理由见 [extractScannedPages]）
+  static const int _maxScanPageBytes = 1024 * 1024;
 
   /// 无文字层判定：整册可抽字符低于此值视为扫描件/图片型 PDF
   static const int _minTextChars = 100;
@@ -137,8 +143,10 @@ class PdfImportService {
       }
 
       if (charCount < _minTextChars) {
+        // 扫描件/图片字：不是损坏，标记 scanned 让调用方改走视觉切题通道
         throw PdfExtractException(
-            '该 PDF 没有文字层（扫描件/图片型），暂不支持。\n请提供带文字层的 PDF（在电脑上能选中文字的那种）。');
+            '该 PDF 没有文字层（扫描件/图片型），文字是画在图片里的。',
+            scanned: true);
       }
       return PdfExtractResult(
         rawText: out.toString(),
@@ -146,6 +154,51 @@ class PdfImportService {
         pageCount: doc.pages.length,
         charCount: charCount,
       );
+    } finally {
+      await doc.dispose();
+    }
+  }
+
+  /// 扫描版 PDF → 逐页整页光栅化（JPEG），供视觉模型切题。
+  ///
+  /// 扫描页本身就是整页位图，渲染 1.5x 保证小字可读；编码上限放宽到
+  /// 1MB/页（扫描页信息密度高，512KB 会糊字）。逐页回调 [onProgress]——
+  /// 45 页全持内存约 20~40MB，调用方宜边取边用（当前导入是一次性流程，
+  /// 可接受；将来流式化只需把返回值改 Stream）。
+  static Future<List<Uint8List>> extractScannedPages(
+    String filePath, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final PdfDocument doc;
+    try {
+      doc = await PdfDocument.openFile(filePath);
+    } catch (_) {
+      throw PdfExtractException('无法打开 PDF 文件（可能已加密或已损坏）');
+    }
+    try {
+      final pages = <Uint8List>[];
+      final total = doc.pages.length;
+      for (var i = 0; i < total; i++) {
+        final page = doc.pages[i];
+        final fullWidth = math.max(1, (page.width * 1.5).round());
+        final fullHeight = math.max(1, (page.height * 1.5).round());
+        final rendered = await page.render(
+          x: 0,
+          y: 0,
+          width: fullWidth,
+          height: fullHeight,
+          fullWidth: fullWidth.toDouble(),
+          fullHeight: fullHeight.toDouble(),
+        );
+        if (rendered != null) {
+          final raw = _decode(rendered);
+          rendered.dispose();
+          final enc = _encodeJpeg(raw, maxBytes: _maxScanPageBytes);
+          if (enc.bytes.isNotEmpty) pages.add(enc.bytes);
+        }
+        onProgress?.call(i + 1, total);
+      }
+      return pages;
     } finally {
       await doc.dispose();
     }
@@ -292,8 +345,9 @@ class PdfImportService {
     );
   }
 
-  /// JPEG 压缩到上限内：先限长边，超 512KB 再逐级缩边（保底 128px 不死磕）
-  static ({Uint8List bytes, int width, int height}) _encodeJpeg(img.Image src) {
+  /// JPEG 压缩到上限内：先限长边，超限再逐级缩边（保底 128px 不死磕）
+  static ({Uint8List bytes, int width, int height}) _encodeJpeg(img.Image src,
+      {int maxBytes = _maxImageBytes}) {
     var im = src;
     final edge = math.max(im.width, im.height);
     if (edge > _maxImageEdge) {
@@ -305,7 +359,7 @@ class PdfImportService {
     }
     var bytes = Uint8List.fromList(img.encodeJpg(im, quality: 85));
     var w = im.width, h = im.height;
-    while (bytes.length > _maxImageBytes && (w > 128 || h > 128)) {
+    while (bytes.length > maxBytes && (w > 128 || h > 128)) {
       im = img.copyResize(im,
           width: math.max(1, (w * 0.8).round()),
           height: math.max(1, (h * 0.8).round()),
