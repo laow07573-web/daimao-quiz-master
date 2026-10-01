@@ -12,6 +12,8 @@ import '../services/fsrs_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/question_image_tokens.dart';
 import '../utils/responsive.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/ai_response_widget.dart';
 import '../widgets/kit/mj_kit.dart';
 import 'quick_start_screen.dart';
@@ -903,6 +905,12 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
     return Scaffold(
       backgroundColor: ac.background,
       appBar: AppBar(
+        // 引导锚点：返回键在加载 / 空态 / 有数据三态都存在，
+        // 二级页引导落在这里最稳（空态那一版锚筛选栏会一直等不到）
+        leading: const GuideAnchor(
+          id: GuideAnchorIds.errorbookBack,
+          child: BackButton(),
+        ),
         title: const Text('错题本'),
         actions: [
           // v1.0.2 对齐里程碑：导出错题为 .json

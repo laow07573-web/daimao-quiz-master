@@ -233,7 +233,7 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 ```bash
 flutter pub get
 flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
-flutter test                    # 全量测试（当前 413 项）
+flutter test                    # 全量测试（当前 414 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release
 ```

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../utils/responsive.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import 'settings_screen.dart';
 
@@ -26,7 +28,14 @@ class SettingsHubScreen extends StatelessWidget {
     final ac = AppThemeColors.of(context);
     return Scaffold(
       backgroundColor: ac.background,
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(
+        // 引导锚点：设置中心里唯一三态恒存在的控件，二级页引导落在这里
+        leading: const GuideAnchor(
+          id: GuideAnchorIds.settingsBack,
+          child: BackButton(),
+        ),
+        title: const Text('设置'),
+      ),
       body: ResponsivePage(
         child: ListView(
           padding: const EdgeInsets.all(MaoSpace.md),

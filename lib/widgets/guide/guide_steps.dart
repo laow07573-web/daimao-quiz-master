@@ -30,6 +30,12 @@ class GuideAnchorIds {
   /// 我的页「设置」入口
   static const String profileSettings = 'profile.settings';
 
+  /// 错题本页左上角返回（加载 / 空态 / 有数据三态恒存在）
+  static const String errorbookBack = 'errorbook.back';
+
+  /// 设置中心页左上角返回
+  static const String settingsBack = 'settings.back';
+
   /// 导入页「一键导入示例题库」（二级页锚点）
   static const String importSample = 'import.sample';
 
@@ -39,9 +45,15 @@ class GuideAnchorIds {
 
 /// 首启引导步骤（互动式：高亮真实控件，切页与前进都跟着真实操作走）
 ///
-/// 前几步是「认路」（看进度 → 认四个 Tab → 认开始页的三个入口 → 统计 → 我的），
-/// 最后四步是**真的走一遍**「导入 → 刷题」——其中第 9、11 步分别在
-/// 导入页与配置弹窗里，用户点高亮处跳进去，引导会跟着进去继续指。
+/// 结构：前 4 步认路（首页进度 → 四个 Tab → 开始页三入口），中间 5 步带用户
+/// **真的进两个二级页**（错题本、设置中心）各看一眼再返回，最后 4 步真的走一遍
+/// 「导入 → 刷题」——其中第 11、13 步分别在导入页与配置弹窗里。
+///
+/// 二级页那几步锚在**返回键**上：返回键在加载 / 空态 / 有数据三态都存在，
+/// 引导不会空等；页面内容由文案讲清（错题本首启必是空态，锚筛选栏会一直等不到）。
+///
+/// 导航步（点高亮处会推出新页面）标 `awaitAction`：不出「下一步」按钮，
+/// 免得一键跳到「页面还没打开」的下一步去。
 ///
 /// 文案只讲界面上确实存在的东西，不承诺没有的功能
 /// （例如错题本的筛选芯片实际叫「全部 / 错题 / 收藏」）。
@@ -76,10 +88,21 @@ const List<GuideStep> kGuideSteps = [
     anchorId: GuideAnchorIds.quickImport,
   ),
   GuideStep(
-    title: '错题本：到期就复习',
-    body: '答错的题会按记忆曲线排进复习，进错题本可以按「全部 / 错题 / 收藏」筛选。',
+    title: '错题本：点进去看看',
+    body: '这一页的「错题本」装的是答错的题：按记忆曲线排到期复习，可按'
+        '「全部 / 错题 / 收藏」筛。点高亮处进去，引导跟你一起进去。',
     tab: 1,
     anchorId: GuideAnchorIds.quickErrorBook,
+    awaitAction: true,
+  ),
+  GuideStep(
+    title: '错题本里存的是这些',
+    body: '答错的题到期会排进这里，可按「全部 / 错题 / 收藏」筛选、一键重刷或导出成文件。'
+        '刚上手还没答错过题，所以现在多半是空的——刷几轮再回来看就懂了。'
+        '看完点左上角返回。',
+    tab: 1,
+    anchorId: GuideAnchorIds.errorbookBack,
+    awaitAction: true,
   ),
   GuideStep(
     title: '统计：用数据找薄弱点',
@@ -88,17 +111,27 @@ const List<GuideStep> kGuideSteps = [
     anchorId: GuideAnchorIds.statsOverview,
   ),
   GuideStep(
-    title: '我的：主题、提醒、API Key',
-    body: '换主题、设学习提醒、填自己的 API Key 开启 AI 解析与追问；'
-        '也能在这里随时重看这段引导。',
+    title: '我的：点「设置」进去',
+    body: '换主题、设学习提醒、填自己的 API Key 都在「设置」里；'
+        '也能在那儿随时重看这段引导。点高亮处进去看一眼。',
     tab: 3,
     anchorId: GuideAnchorIds.profileSettings,
+    awaitAction: true,
+  ),
+  GuideStep(
+    title: '设置里分四组',
+    body: '「AI 接口」填 Key 与模型、「外观」换主题与深色模式、「同步与提醒」管局域网与'
+        '每日提醒、「高级」放标签与音效日志；每组点进去才是具体开关。看完点左上角返回。',
+    tab: 3,
+    anchorId: GuideAnchorIds.settingsBack,
+    awaitAction: true,
   ),
   GuideStep(
     title: '现在真的试一次：导入题库',
     body: '回到「开始」页——点这个入口进导入页，引导会跟着进去继续指。',
     tab: 1,
     anchorId: GuideAnchorIds.quickImport,
+    awaitAction: true,
   ),
   GuideStep(
     title: '一键导入示例题库',
@@ -106,12 +139,14 @@ const List<GuideStep> kGuideSteps = [
         '不需要 API Key，导完会自动回到「开始」页。',
     tab: 1,
     anchorId: GuideAnchorIds.importSample,
+    awaitAction: true,
   ),
   GuideStep(
     title: '有题了，开始刷题',
     body: '点「定向爆破」，选题库和题数就能开刷；单选、多选、填空、简答都支持。',
     tab: 1,
     anchorId: GuideAnchorIds.quickPrimary,
+    awaitAction: true,
   ),
   GuideStep(
     title: '弹窗里点「开始」',

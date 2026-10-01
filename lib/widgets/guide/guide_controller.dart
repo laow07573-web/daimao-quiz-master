@@ -101,6 +101,10 @@ class GuideController extends ChangeNotifier {
   bool _active = false;
   int _routeEpoch = 0;
   int _currentTab = 0;
+
+  /// 用户刚跳了页面、但「下一步」的目标还没出现（新页面在异步加载中）；
+  /// 目标一出现就把引导带过去（见 [tickPendingFollow]）
+  bool _pendingFollow = false;
   ValueChanged<int>? _tabSwitcher;
 
   bool get active => _active;
@@ -142,6 +146,7 @@ class GuideController extends ChangeNotifier {
     if (_active) return;
     _active = true;
     _index = 0;
+    _pendingFollow = false;
     _routeEpoch++;
     notifyListeners();
   }
@@ -161,6 +166,7 @@ class GuideController extends ChangeNotifier {
   Future<void> skip() async {
     if (!_active) return;
     _active = false;
+    _pendingFollow = false;
     notifyListeners();
     await GuideService.instance.markSeen();
   }
@@ -183,15 +189,38 @@ class GuideController extends ChangeNotifier {
         return;
       }
       if (_nextStepVisible()) {
+        _pendingFollow = false;
         _index++;
+      } else {
+        // 新页面可能是异步加载的（错题本首帧是骨架屏、统计要等数据），
+        // 这一刻还没有锚点：登记「等它出现就前进」，由引导层每次重试时催一次
+        _pendingFollow = true;
       }
       notifyListeners();
     });
   }
 
+  /// 引导层每次测量重试时催一下：路由变化后一直没等到的那次前进。
+  ///
+  /// 只在路由变化当时没判成功过（[_pendingFollow]）时才动作，
+  /// 且成功一次就清标志——不会「一路跳完所有步骤」。
+  void tickPendingFollow() {
+    if (!_active || !_pendingFollow) return;
+    if (!_nextStepVisible()) return;
+    _pendingFollow = false;
+    if (isLast) {
+      unawaited(skip());
+      return;
+    }
+    _index++;
+    notifyListeners();
+  }
+
   bool _nextStepVisible() {
-    final id = nextStep?.anchorId;
-    return id != null && registry.rectOf(id) != null;
+    for (final id in nextStep?.anchorIds ?? const <String>[]) {
+      if (registry.rectOf(id) != null) return true;
+    }
+    return false;
   }
 }
 

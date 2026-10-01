@@ -47,8 +47,12 @@ class _GuideTourState extends State<GuideTour> {
   Timer? _follow;
   int _tries = 0;
 
+  /// 本步最终落在哪个锚点上（可能是备选锚点之一），跟随巡检复用它
+  String? _anchorId;
+
   /// 上一次量到的矩形：连续两次一致才落定（躲开异步数据引起的位移）
   Rect? _lastMeasured;
+  String? _lastMeasuredId;
 
   /// 本步是否已经做过「滚进视区」
   bool _revealed = false;
@@ -91,6 +95,8 @@ class _GuideTourState extends State<GuideTour> {
       _tries = 0;
       _revealed = false;
       _lastMeasured = null;
+      _lastMeasuredId = null;
+      _anchorId = null;
       _measureSoon();
     }
   }
@@ -117,6 +123,8 @@ class _GuideTourState extends State<GuideTour> {
     _follow?.cancel();
     _tries = 0;
     _lastMeasured = null;
+    _lastMeasuredId = null;
+    _anchorId = null;
     _revealed = false;
     if (_built) {
       setState(() => _hole = null);
@@ -142,8 +150,8 @@ class _GuideTourState extends State<GuideTour> {
 
   /// 读锚点矩形并落定高亮洞；一切「还没有」都按节奏重试
   void _measure() {
-    final id = _step.anchorId;
-    if (id == null) {
+    final ids = _step.anchorIds;
+    if (ids.isEmpty) {
       _setHole(null); // 本步没有可指的控件
       return;
     }
@@ -153,15 +161,25 @@ class _GuideTourState extends State<GuideTour> {
       _retryLater();
       return;
     }
-    final r = _guide.registry.rectOf(id);
-    if (r == null) {
+    // 备选锚点：主锚点此刻不在（例如错题本还是空态）就退到下一个
+    String? found;
+    Rect? r;
+    for (final id in ids) {
+      final candidate = _guide.registry.rectOf(id);
+      if (candidate != null) {
+        found = id;
+        r = candidate;
+        break;
+      }
+    }
+    if (found == null || r == null) {
       _retryLater();
       return;
     }
     // 目标在列表下方时先滚进视区（零时长立即定位，避免量到滚动中途的矩形）
     if (!_revealed && !_fullyVisible(r)) {
       _revealed = true;
-      final ctx = _guide.registry.contextOf(id);
+      final ctx = _guide.registry.contextOf(found);
       if (ctx != null) {
         unawaited(Scrollable.ensureVisible(ctx,
             alignment: 0.5, duration: Duration.zero));
@@ -169,9 +187,11 @@ class _GuideTourState extends State<GuideTour> {
       _retryLater();
       return;
     }
+    _anchorId = found;
     // 异步数据 / 路由转场会让控件位移：连续两次量到同一矩形才算稳定
-    if (_lastMeasured != r) {
+    if (_lastMeasured != r || _lastMeasuredId != found) {
       _lastMeasured = r;
+      _lastMeasuredId = found;
       _retryLater();
       return;
     }
@@ -187,6 +207,8 @@ class _GuideTourState extends State<GuideTour> {
 
   void _retryLater() {
     _tries++;
+    // 路由变化当时没判成功的那次前进：新页面异步加载完（锚点出现）就补上
+    _guide.tickPendingFollow();
     if (_tries > _maxTries) {
       // 兜底：目标始终不出现就保持居中气泡——说明照讲，绝不卡住用户。
       //（也不拿屏幕外的矩形打洞：洞必须落在看得见的地方。）
@@ -204,12 +226,21 @@ class _GuideTourState extends State<GuideTour> {
     _follow?.cancel();
     _follow = Timer.periodic(_followEvery, (_) {
       if (!mounted) return;
-      final id = _step.anchorId;
+      final id = _anchorId;
       if (id == null) return;
       if (_step.tab != null && _guide.currentTab != _step.tab) return;
       final r = _guide.registry.rectOf(id);
       final visible = r == null ? null : _visiblePart(r);
-      final next = visible?.inflate(MaoSpace.xxs);
+      if (visible == null) {
+        // 落定的锚点没了（例如错题本由空态变成了有数据）：重新挑锚点
+        if (_step.anchorIds.length > 1) {
+          _measure();
+        } else {
+          _setHole(null);
+        }
+        return;
+      }
+      final next = visible.inflate(MaoSpace.xxs);
       if (next != _hole) _setHole(next);
     });
   }
@@ -236,10 +267,13 @@ class _GuideTourState extends State<GuideTour> {
 
   /// 气泡左下角的状态提示：让用户始终知道「现在该做什么」
   String _hint() {
-    if (_hole != null) return '高亮处可直接点';
-    if (_step.anchorId == null) return '读完点右边继续';
+    if (_hole != null) {
+      return _step.awaitAction ? '点高亮处继续，我们跟着你走' : '高亮处可直接点';
+    }
+    if (_step.anchorIds.isEmpty) return '读完点右边继续';
     if (_tries <= _waitingTries) return '点高亮处继续';
-    return '这步的入口还没出现，可点跳过或下一步';
+    // 导航步没有「下一步」按钮，兜底提示就不能再让人去找它
+    return _step.awaitAction ? '这步的入口还没出现，可点跳过' : '这步的入口还没出现，可点跳过或下一步';
   }
 
   void _next() => _guide.next();
@@ -262,7 +296,7 @@ class _GuideTourState extends State<GuideTour> {
     return Stack(
       children: [
         if (hole == null)
-          Positioned.fill(child: _ScrimBlock(color: scrim))
+          Positioned.fill(child: const _ScrimBlock(color: scrim))
         else ...[
           // 四块遮罩夹出洞：洞内不铺遮罩 → 高亮处的真实控件照常可点
           AnimatedPositioned(
@@ -272,7 +306,7 @@ class _GuideTourState extends State<GuideTour> {
             right: 0,
             top: 0,
             height: math.max(0, hole.top),
-            child: _ScrimBlock(color: scrim),
+            child: const _ScrimBlock(color: scrim),
           ),
           AnimatedPositioned(
             duration: anim,
@@ -281,7 +315,7 @@ class _GuideTourState extends State<GuideTour> {
             right: 0,
             top: hole.bottom,
             bottom: 0,
-            child: _ScrimBlock(color: scrim),
+            child: const _ScrimBlock(color: scrim),
           ),
           AnimatedPositioned(
             duration: anim,
@@ -290,7 +324,7 @@ class _GuideTourState extends State<GuideTour> {
             top: hole.top,
             width: math.max(0, hole.left),
             height: hole.height,
-            child: _ScrimBlock(color: scrim),
+            child: const _ScrimBlock(color: scrim),
           ),
           AnimatedPositioned(
             duration: anim,
@@ -299,7 +333,7 @@ class _GuideTourState extends State<GuideTour> {
             top: hole.top,
             right: 0,
             height: hole.height,
-            child: _ScrimBlock(color: scrim),
+            child: const _ScrimBlock(color: scrim),
           ),
           // 洞的强调描边（不拦截触摸）
           AnimatedPositioned(
@@ -386,16 +420,20 @@ class _GuideTourState extends State<GuideTour> {
                   style: MaoType.microStyle.copyWith(color: ac.textTertiary),
                 ),
               ),
-              const SizedBox(width: MaoSpace.xs),
-              MJButton(
-                label: step.nextLabel ??
-                    (index == total - 1 ? '完成' : '下一步'),
-                icon: index == total - 1
-                    ? Icons.check_rounded
-                    : Icons.arrow_forward,
-                dense: true,
-                onPressed: _next,
-              ),
+              // 导航步（awaitAction）不给「下一步」：这一步的进展是用户真的点进去，
+              // 一键跳过只会把他带到「页面还没打开」的下一步去。跳过仍在右上角。
+              if (!step.awaitAction) ...[
+                const SizedBox(width: MaoSpace.xs),
+                MJButton(
+                  label: step.nextLabel ??
+                      (index == total - 1 ? '完成' : '下一步'),
+                  icon: index == total - 1
+                      ? Icons.check_rounded
+                      : Icons.arrow_forward,
+                  dense: true,
+                  onPressed: _next,
+                ),
+              ],
             ],
           ),
         ],

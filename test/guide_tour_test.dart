@@ -406,6 +406,8 @@ void main() {
         GuideAnchorIds.quickErrorBook,
         GuideAnchorIds.statsOverview,
         GuideAnchorIds.profileSettings,
+        GuideAnchorIds.errorbookBack,
+        GuideAnchorIds.settingsBack,
         GuideAnchorIds.importSample,
         GuideAnchorIds.sheetConfirm,
       };
@@ -414,8 +416,8 @@ void main() {
           expect(step.tab, inInclusiveRange(0, 3),
               reason: '引导步骤的 Tab 下标必须是真实的四个 Tab：${step.title}');
         }
-        if (step.anchorId != null) {
-          expect(ids, contains(step.anchorId),
+        for (final id in step.anchorIds) {
+          expect(ids, contains(id),
               reason: '锚点 id 必须在 GuideAnchorIds 中定义：${step.title}');
         }
       }
@@ -430,17 +432,34 @@ void main() {
       final anchors = kGuideSteps.map((s) => s.anchorId).toList();
       expect(anchors, contains(GuideAnchorIds.importSample),
           reason: '「导入题库 → 导入页」必须有导进二级页的后续步骤');
+      expect(anchors, contains(GuideAnchorIds.errorbookBack),
+          reason: '「错题本 → 错题本页」必须有页面里的后续步骤');
+      expect(anchors, contains(GuideAnchorIds.settingsBack),
+          reason: '「我的 → 设置中心」必须有页面里的后续步骤');
       expect(anchors, contains(GuideAnchorIds.sheetConfirm),
           reason: '「定向爆破 → 开始刷题弹窗」必须有弹层里的后续步骤');
       // 弹层步骤排在最后：用户点下真实「开始」即收尾
       expect(kGuideSteps.last.anchorId, GuideAnchorIds.sheetConfirm);
     });
 
+    test('导航步必须带锚点，且末步要给「完成」出口', () {
+      // 导航步（awaitAction）不显示「下一步」：进展只能靠点高亮处。
+      // 若这样的步骤没有锚点，用户既看不到高亮、也没有按钮，只剩「跳过」。
+      for (final step in kGuideSteps) {
+        if (!step.awaitAction) continue;
+        expect(step.anchorId, isNotNull,
+            reason: '导航步必须指定高亮处：${step.title}');
+      }
+      // 末步保留「完成」：不想马上开刷的人也要有出口
+      expect(kGuideSteps.last.awaitAction, isFalse);
+      expect(kGuideSteps.last.nextLabel, isNotNull);
+    });
+
     test('带锚点的步骤必须声明 tab（主壳自带导航除外）', () {
       // 回归守卫：IndexedStack 的隐藏页每帧照常布局，锚点矩形一直取得到，
       // 若步骤不声明 tab，引导可能把洞打到当前看不见的那一页坐标上。
       for (final step in kGuideSteps) {
-        if (step.anchorId == null || step.anchorId == GuideAnchorIds.shellNav) {
+        if (step.anchorIds.isEmpty || step.anchorId == GuideAnchorIds.shellNav) {
           continue;
         }
         expect(step.tab, isNotNull,

@@ -62,7 +62,7 @@ void main() {
     // 引导覆盖在主界面之上：欢迎步是居中气泡，主界面已在下面
     expect(find.text('一分钟上手猫卷'), findsOneWidget,
         reason: '首启应在主界面上插播互动式引导');
-    expect(find.text('第 1 步 / 共 11 步'), findsOneWidget);
+    expect(find.text('第 1 步 / 共 13 步'), findsOneWidget);
     expect(find.text('跳过'), findsOneWidget);
 
     // 跳过 → 引导消失，并落「已看过」标记（下次启动不再插播）
