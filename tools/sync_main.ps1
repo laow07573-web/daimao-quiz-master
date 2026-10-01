@@ -21,9 +21,21 @@ $gitDir = Join-Path $root '.git'
 
 Set-Location $root
 
+# ---- git over HTTPS：失效代理自动改直连 ------------------------------------------
+# 本机/仓库里可能配着 http.https://github.com.proxy 指向本地代理（实测 127.0.0.1:7897）；
+# 代理进程没起来时，fetch/push 会直接失败（04 踩坑手册第 10 条）。
+# 先用现有配置执行一次，失败再清空代理直连重试——只作用于本次调用，不动用户全局配置。
+function Invoke-GitProxyAware {
+    param([string[]]$GitArgs)
+    & git @GitArgs
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host '  git 失败：配置的代理可能不可用，改用直连重试…' -ForegroundColor Yellow
+    & git -c 'http.https://github.com.proxy=' -c 'https.proxy=' @GitArgs
+    if ($LASTEXITCODE -ne 0) { throw ('git failed: git ' + ($GitArgs -join ' ')) }
+}
+
 # fetch remote tip first (needs proxy in CN; HTTPS_PROXY env is honoured)
-& git fetch origin main
-if ($LASTEXITCODE -ne 0) { throw 'git fetch failed (set HTTPS_PROXY if github.com is unreachable)' }
+Invoke-GitProxyAware @('fetch', 'origin', 'main')
 
 $remoteTip = (& git rev-parse refs/remotes/origin/main).Trim()
 $tree = (& git rev-parse 'HEAD^{tree}').Trim()
@@ -53,10 +65,10 @@ try {
 & git branch -f main $commit | Out-Null
 Write-Host ("commit     : {0}" -f $commit)
 
-& git -c credential.helper= `
-      -c 'credential.helper=D:/dev/git/mingw64/bin/git-credential-manager.exe' `
-      push origin main --force-with-lease
-if ($LASTEXITCODE -ne 0) { throw 'push failed' }
+Invoke-GitProxyAware @(
+    '-c', 'credential.helper=',
+    '-c', 'credential.helper=D:/dev/git/mingw64/bin/git-credential-manager.exe',
+    'push', 'origin', 'main', '--force-with-lease')
 
 Write-Host ''
 Write-Host 'main synced. https://github.com/laow07573-web/daimao-quiz-master' -ForegroundColor Green

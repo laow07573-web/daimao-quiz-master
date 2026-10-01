@@ -233,10 +233,17 @@ Flutter 3.24 · Dart 3.5 · SQLite (sqflite) · Provider · FSRS-5 · AES-256-GC
 ```bash
 flutter pub get
 flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
-flutter test                    # 全量测试（当前 378 项）
+flutter test                    # 全量测试（当前 392 项）
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 flutter build windows --release
 ```
+
+> Windows 上更推荐一条命令跑完整门禁：
+> `powershell -ExecutionPolicy Bypass -File tools\run_tests.ps1`
+> 它会给本次运行分配一次性的 `LOCALAPPDATA`（测试库目录）并在结束后清理。
+> 直接裸跑 `flutter test` 时，若 `%LOCALAPPDATA%\flashcard_app` 里留着旧 schema
+> 的测试库，会因 `onCreate` 不再触发而出现 `no such table: main.question_images`
+> 之类的大面积假红（清掉该目录即可恢复）。
 
 > 版本号的唯一来源是 `pubspec.yaml` 的 `version:` 字段（形如 `1.28.1+20`）。
 > 发布构建会通过 `--dart-define=APP_VERSION=v<版本名>.<构建号>` 把它注入应用

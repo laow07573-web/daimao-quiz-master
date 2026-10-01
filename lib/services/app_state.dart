@@ -1943,6 +1943,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
   /// 生成刷题小结
   Future<String> generateSessionSummary(QuizSession session) async {
+    // 未配置 Key 时给出明确指引：与「网络/接口失败」区分开，
+    // 否则用户会去排查网络，而实际只是没填 Key（其他入口同款口径）
+    if (!_settings.isConfigured) {
+      return '请先在设置中配置 API Key 后再生成小结。';
+    }
     if (_aiService == null) return '';
     final result = await _aiService!.generateSessionSummary(
       session.totalQuestions,

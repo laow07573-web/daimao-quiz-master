@@ -35,6 +35,17 @@ function Step($n, $m) { Write-Host ''; Write-Host ("=== [{0}] {1}" -f $n, $m) -F
 function Utf8NoBom($p, $text) {
     [System.IO.File]::WriteAllText($p, $text, (New-Object System.Text.UTF8Encoding($false)))
 }
+# 失效代理自动改直连（04 踩坑手册第 10 条）：git 配置里的
+# http.https://github.com.proxy 指向已退出的本地代理时，push 会直接失败。
+# 先按现有配置执行一次，失败再清空代理重试——不改用户全局配置。
+function Invoke-GitProxyAware {
+    param([string[]]$GitArgs)
+    & git @GitArgs
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host '    git 失败：配置的代理可能不可用，改用直连重试…' -ForegroundColor Yellow
+    & git -c 'http.https://github.com.proxy=' -c 'https.proxy=' @GitArgs
+    if ($LASTEXITCODE -ne 0) { throw ('git failed: git ' + ($GitArgs -join ' ')) }
+}
 
 Set-Location $root
 $idx = Join-Path $promo 'index.html'
@@ -155,12 +166,10 @@ Step '4/4' 'pushing gh-pages'
 if ($env:GH_TOKEN) {
     $basic = [Convert]::ToBase64String(
         [Text.Encoding]::ASCII.GetBytes(('laow07573-web:{0}' -f $env:GH_TOKEN)))
-    & git -c "http.extraheader=Authorization: Basic $basic" `
-        push $Repo gh-pages --force-with-lease --progress
-    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+    Invoke-GitProxyAware @('-c', "http.extraheader=Authorization: Basic $basic",
+        'push', $Repo, 'gh-pages', '--force-with-lease', '--progress')
 } else {
-    & git push $Repo gh-pages --force-with-lease --progress
-    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+    Invoke-GitProxyAware @('push', $Repo, 'gh-pages', '--force-with-lease', '--progress')
 }
 
 Write-Host ''

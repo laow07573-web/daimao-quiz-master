@@ -24,8 +24,10 @@
 3. 提交前请确保本地全部通过：
    ```bash
    flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
-   flutter test      # 全部测试通过（当前 244 项）
+   flutter test      # 全部测试通过（当前 392 项）
    ```
+   Windows 上可以直接 `powershell -ExecutionPolicy Bypass -File tools\run_tests.ps1`：
+   它会用一次性隔离的 `LOCALAPPDATA` 跑 analyze + test，避免旧测试库残留导致假红。
 4. 发起 Pull Request，描述清楚「改了什么、为什么改、怎么验证」
 
 > 推送后 GitHub Actions 会自动再跑一遍 `analyze` + `test`，见 PR 上的 CI 状态。

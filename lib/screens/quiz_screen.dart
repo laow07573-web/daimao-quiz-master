@@ -486,12 +486,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                         _buildOptionsArea(
                                             appState, question, ac),
                                         // v1.0.2 UI 审查修复：未作答时下方大片空白，
-                                        // 加轻提示引导答题
+                                        // 加轻提示引导答题（文案按题型区分，
+                                        // 见 utils/format_utils.dart 的 answerHintText）
                                         if (!isPractice && !isAnswered) ...[
                                           const SizedBox(height: 20),
                                           Center(
                                             child: Text(
-                                              '点击选项提交答案，答对自动进入下一题',
+                                              answerHintText(
+                                                  question.questionType),
                                               style: TextStyle(
                                                   fontSize: MaoType.body,
                                                   color: ac.textSecondary),

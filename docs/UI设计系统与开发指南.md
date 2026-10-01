@@ -145,7 +145,7 @@ final ac = AppThemeColors.of(context);   // 唯一姿势
 export PATH="/d/dev/flutter/bin:$PATH"
 
 flutter analyze --no-fatal-infos       # 必须 0 error/0 warning（info 不计）
-flutter test                           # 必须 313 项全绿
+flutter test                           # 必须 392 项全绿
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 
 # 四维基线校验（组件/权限/文案/资源）
