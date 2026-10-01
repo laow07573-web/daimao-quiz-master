@@ -10,6 +10,7 @@ import '../utils/responsive.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../widgets/kit/mj_logo.dart';
 import 'developer_options_screen.dart';
+import 'onboarding_screen.dart';
 import 'settings_hub_screen.dart';
 
 /// 我的页（Mao Des 2.0 · 精密暗色）
@@ -115,6 +116,18 @@ class _ProfileTabState extends State<ProfileTab> {
               const SizedBox(height: MaoSpace.xs),
               entries[2],
             ],
+            const SizedBox(height: MaoSpace.xs),
+            // 第 4 项整行：不挤进上面那排（宽屏三列 / 窄屏纵列都保持可读）
+            _EntryTile(
+              icon: Icons.school_outlined,
+              title: '重看使用引导',
+              subtitle: '导入 → 刷题 → 统计，三页看完',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const OnboardingScreen(asFirstRun: false)),
+              ),
+            ),
             const SizedBox(height: MaoSpace.lg),
             // ── 产品定位卡（消除下半屏空白） ──
             MJSurface(
