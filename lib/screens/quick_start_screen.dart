@@ -10,6 +10,8 @@ import '../utils/app_constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/responsive.dart';
 import '../widgets/command_palette.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import 'bank_manage_screen.dart';
 import 'error_book_screen.dart';
@@ -206,36 +208,40 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                   ],
                   const MJSectionHeader(title: '开始刷题'),
                   const SizedBox(height: MaoSpace.sm),
-                  _QuickActionTile(
-                    icon: Icons.rocket_launch_rounded,
-                    label: '定向爆破',
-                    subtitle: appState.selectedBankIds.isEmpty
-                        ? '请先选择题库'
-                        : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
-                    iconColor: ac.accent,
-                    onTap: appState.selectedBankIds.isEmpty
-                        ? () {
-                            final hasBanks = appState.banks.isNotEmpty;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(hasBanks ? '先勾选要刷的题库' : '还没有题库，先导入一份吧'),
-                                action: SnackBarAction(
-                                  label: hasBanks ? '去选择' : '去导入',
-                                  onPressed: () => _navigateAndRefresh(
-                                    context,
-                                    appState,
-                                    hasBanks
-                                        ? const BankManageScreen()
-                                        : const ImportScreen(),
+                  GuideAnchor(
+                    // 引导锚点：首启引导「开始刷题」那步
+                    id: GuideAnchorIds.quickPrimary,
+                    child: _QuickActionTile(
+                      icon: Icons.rocket_launch_rounded,
+                      label: '定向爆破',
+                      subtitle: appState.selectedBankIds.isEmpty
+                          ? '请先选择题库'
+                          : '已选${appState.selectedBankIds.length}个题库，${appState.selectedQuestionCount >= kQuestionCountAll ? '全部' : '${appState.selectedQuestionCount}题'}',
+                      iconColor: ac.accent,
+                      onTap: appState.selectedBankIds.isEmpty
+                          ? () {
+                              final hasBanks = appState.banks.isNotEmpty;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(hasBanks ? '先勾选要刷的题库' : '还没有题库，先导入一份吧'),
+                                  action: SnackBarAction(
+                                    label: hasBanks ? '去选择' : '去导入',
+                                    onPressed: () => _navigateAndRefresh(
+                                      context,
+                                      appState,
+                                      hasBanks
+                                          ? const BankManageScreen()
+                                          : const ImportScreen(),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }
-                        : () {
-                            if (_vacationBlocked(appState)) return;
-                            _showStartQuizSheet(context, appState);
-                          },
+                              );
+                            }
+                          : () {
+                              if (_vacationBlocked(appState)) return;
+                              _showStartQuizSheet(context, appState);
+                            },
+                    ),
                   ),
                   _QuickActionTile(
                     icon: Icons.library_books_rounded,
@@ -247,21 +253,29 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                     onTap: () => _navigateAndRefresh(
                         context, appState, const BankManageScreen()),
                   ),
-                  _QuickActionTile(
-                    icon: Icons.replay_rounded,
-                    label: '错题本',
-                    subtitle: '智能排期，只显示应复习的错题',
-                    iconColor: ac.danger,
-                    onTap: () => _navigateAndRefresh(
-                        context, appState, const ErrorBookScreen()),
+                  GuideAnchor(
+                    // 引导锚点：首启引导「错题本」那步
+                    id: GuideAnchorIds.quickErrorBook,
+                    child: _QuickActionTile(
+                      icon: Icons.replay_rounded,
+                      label: '错题本',
+                      subtitle: '智能排期，只显示应复习的错题',
+                      iconColor: ac.danger,
+                      onTap: () => _navigateAndRefresh(
+                          context, appState, const ErrorBookScreen()),
+                    ),
                   ),
-                  _QuickActionTile(
-                    icon: Icons.upload_file_rounded,
-                    label: '导入题库',
-                    subtitle: 'AI 解析 DOCX/PDF（需 Key），JSON 直接入库',
-                    iconColor: ac.accent,
-                    onTap: () => _navigateAndRefresh(
-                        context, appState, const ImportScreen()),
+                  GuideAnchor(
+                    // 引导锚点：首启引导「导入题库」那步
+                    id: GuideAnchorIds.quickImport,
+                    child: _QuickActionTile(
+                      icon: Icons.upload_file_rounded,
+                      label: '导入题库',
+                      subtitle: 'AI 解析 DOCX/PDF（需 Key），JSON 直接入库',
+                      iconColor: ac.accent,
+                      onTap: () => _navigateAndRefresh(
+                          context, appState, const ImportScreen()),
+                    ),
                   ),
                   const SizedBox(height: MaoSpace.md),
                   Align(
@@ -544,20 +558,25 @@ class _StartQuizSheetState extends State<_StartQuizSheet> {
         _modeRow(_StartMode.memorize, Icons.visibility_rounded, '背题模式',
             '直接展示答案，快速浏览记忆'),
         const SizedBox(height: MaoSpace.md),
-        MJButton(
-          label: '开始',
-          expand: true,
-          onPressed: () {
-            final count = _resolvedCount;
-            if (count == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入大于 0 的有效题数')),
-              );
-              return;
-            }
-            Navigator.of(context).pop();
-            widget.onStart(_mode, count);
-          },
+        // 首启引导的最后一步落在这个按钮上：用户在真实弹窗里点「开始」，
+        // 引导就带着他走完了「导入 → 刷题」全程（随后的页面跳转即收尾）
+        GuideAnchor(
+          id: GuideAnchorIds.sheetConfirm,
+          child: MJButton(
+            label: '开始',
+            expand: true,
+            onPressed: () {
+              final count = _resolvedCount;
+              if (count == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请输入大于 0 的有效题数')),
+                );
+                return;
+              }
+              Navigator.of(context).pop();
+              widget.onStart(_mode, count);
+            },
+          ),
         ),
       ],
     );

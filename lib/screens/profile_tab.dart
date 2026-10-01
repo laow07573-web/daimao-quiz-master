@@ -7,10 +7,11 @@ import '../utils/app_constants.dart';
 import '../utils/design_tokens.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../widgets/kit/mj_logo.dart';
 import 'developer_options_screen.dart';
-import 'onboarding_screen.dart';
 import 'settings_hub_screen.dart';
 
 /// 我的页（Mao Des 2.0 · 精密暗色）
@@ -34,12 +35,16 @@ class _ProfileTabState extends State<ProfileTab> {
     final nickname = context.watch<AppState>().settings.nickname;
     // v1.0.3 宽屏重设计：入口卡片提取为列表，窄屏纵列 / 宽屏三列并排
     final entries = [
-      _EntryTile(
-        icon: Icons.settings_outlined,
-        title: '设置',
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SettingsHubScreen()),
+      GuideAnchor(
+        // 引导锚点：首启引导末步高亮「设置」
+        id: GuideAnchorIds.profileSettings,
+        child: _EntryTile(
+          icon: Icons.settings_outlined,
+          title: '设置',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsHubScreen()),
+          ),
         ),
       ),
       _EntryTile(
@@ -118,15 +123,12 @@ class _ProfileTabState extends State<ProfileTab> {
             ],
             const SizedBox(height: MaoSpace.xs),
             // 第 4 项整行：不挤进上面那排（宽屏三列 / 窄屏纵列都保持可读）
+            // 重看引导 = 请求根节点的引导控制器再播一遍（遮罩盖在 Navigator 之上）
             _EntryTile(
               icon: Icons.school_outlined,
               title: '重看使用引导',
-              subtitle: '导入 → 刷题 → 统计，三页看完',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const OnboardingScreen(asFirstRun: false)),
-              ),
+              subtitle: '导入 → 刷题 → 统计，一步步带你走一遍',
+              onTap: () => GuideScope.maybeOf(context)?.start(),
             ),
             const SizedBox(height: MaoSpace.lg),
             // ── 产品定位卡（消除下半屏空白） ──

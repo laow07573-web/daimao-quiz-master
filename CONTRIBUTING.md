@@ -24,7 +24,7 @@
 3. 提交前请确保本地全部通过：
    ```bash
    flutter analyze --no-fatal-infos   # 应输出 0 error / 0 warning（info 级提示不计）
-   flutter test      # 全部测试通过（当前 405 项）
+   flutter test      # 全部测试通过（当前 413 项）
    ```
    Windows 上可以直接 `powershell -ExecutionPolicy Bypass -File tools\run_tests.ps1`：
    它会用一次性隔离的 `LOCALAPPDATA` 跑 analyze + test，避免旧测试库残留导致假红。

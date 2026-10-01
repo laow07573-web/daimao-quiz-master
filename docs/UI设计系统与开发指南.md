@@ -117,7 +117,7 @@ final ac = AppThemeColors.of(context);   // 唯一姿势
 | AI 渲染 | `lib/widgets/ai_response_widget.dart` | 自研渲染器，**勿换回 flutter_markdown** |
 | 统计页 | `lib/screens/stats_tab.dart` + `trend_chart.dart` | 轴 `max(20, dataMax*1.15)`；排行键 `name/accuracy` |
 | 闪屏 | `lib/screens/splash_screen.dart` | 主题底 + 浅色文字；1.4s 后按「是否首启」分流 |
-| 使用引导 | `lib/screens/onboarding_screen.dart` | 三页动效引导（仅首启插播）；时长一律走 `MaoMotion.effective`，尊重系统「减弱动态效果」；只用组件库零件拼装 |
+| 使用引导 | `lib/widgets/guide/guide_host.dart` + `guide_controller.dart` + `guide_tour.dart` + `guide_anchor.dart` + `guide_step.dart` / `guide_steps.dart` | **互动式分步引导，且跨页面连续**：遮罩挂在 Navigator 之上（`MaterialApp.builder`），用户点高亮处跳进二级页 / 弹层时引导跟过去继续指（`GuideRouteObserver` 判定「下一步目标已出现」即前进）；四块遮罩夹出「洞」高亮真实控件，洞里的控件照常可点；目标可滚动进视区、锚点未就绪先重试、缺失则退化成居中气泡；遮罩取中性黑 `MaoScrim.guide`（画布色在浅色主题下压不暗，高亮就看不出来）；位移/入场一律走 `MaoMotion.effective`，尊重系统「减弱动态效果」；只用组件库零件拼装 |
 | 推广页 | `promo/index.html` | 矢量重绘界面，须与 App 设计同步 |
 
 ---
@@ -135,7 +135,7 @@ final ac = AppThemeColors.of(context);   // 唯一姿势
      几百条属正常。真正要看的是两类：①【组件/权限/资源】必须全为「无」；
      ②「原版有新版无」里有没有**本该存在**的功能文案（老版本被改写掉的措辞不算）
 6. **数据层/安全体系不碰**：schema、统计口径、密钥加密、防篡改、AI 渲染器
-7. **测试对应**：`widget_test`（闪屏/首页文案、首启分流）、`onboarding_test`（引导三页/跳过/落标记）、
+7. **测试对应**：`widget_test`（闪屏/首页文案、首启分流）、`guide_tour_test`（引导打洞穿透 / 逐步前进 / 自动前进 / 锚点兜底 / **跨页面跟随** / 同 id 双实例不撞 key）、
    `trend_chart_test`（颜色断言）、`selection_highlight_test`（像素判据）、`wide_layout/window_adapt`（坐标断言）
 
 ---
@@ -146,7 +146,7 @@ final ac = AppThemeColors.of(context);   // 唯一姿势
 export PATH="/d/dev/flutter/bin:$PATH"
 
 flutter analyze --no-fatal-infos       # 必须 0 error/0 warning（info 不计）
-flutter test                           # 必须 405 项全绿
+flutter test                           # 必须 413 项全绿
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
 
 # 四维基线校验（组件/权限/文案/资源）

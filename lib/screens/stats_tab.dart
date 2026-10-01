@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
@@ -215,7 +217,13 @@ class StatsTabState extends State<StatsTab> {
                       // 统计口径包含模拟数据时明确提示，避免把模拟数字当成真实成绩
                       ..._simulatedNotice(ac),
                       // 区块进场：fade + 6px 上移错落（仅前几个演，见 _StaggerEnter）
-                      _StaggerEnter(index: 0, child: _buildOverview(context)),
+                      _StaggerEnter(
+                        index: 0,
+                        child: GuideAnchor(
+                          id: GuideAnchorIds.statsOverview,
+                          child: _buildOverview(context),
+                        ),
+                      ),
                       const SizedBox(height: 14),
                       _StaggerEnter(
                         index: 1,
@@ -288,7 +296,13 @@ class StatsTabState extends State<StatsTab> {
       // 提示条在宽屏同样置顶
       ..._simulatedNotice(ac),
       // 区块进场：fade + 6px 上移错落（仅前几个演，见 _StaggerEnter）
-      _StaggerEnter(index: 0, child: _buildOverview(context)),
+      _StaggerEnter(
+        index: 0,
+        child: GuideAnchor(
+          id: GuideAnchorIds.statsOverview,
+          child: _buildOverview(context),
+        ),
+      ),
       const SizedBox(height: 14),
       // v1.28：并排时两卡片等高（用户反馈要求与趋势卡持平）。
       // 趋势图内容高度固定（图表 200 + 翻页条/图例），据此给年度坚持卡

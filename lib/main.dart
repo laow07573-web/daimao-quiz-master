@@ -13,6 +13,8 @@ import 'services/reminder_service.dart';
 import 'services/sync/sync_engine.dart';
 import 'screens/splash_screen.dart';
 import 'utils/design_tokens.dart';
+import 'widgets/guide/guide_controller.dart';
+import 'widgets/guide/guide_host.dart';
 
 /// 启动兜底页（防篡改 / 单实例 / 数据库异常）专用配色。
 ///
@@ -292,8 +294,28 @@ class _DbErrorAppState extends State<_DbErrorApp> {
       );
 }
 
-class FlashcardApp extends StatelessWidget {
+class FlashcardApp extends StatefulWidget {
   const FlashcardApp({super.key});
+
+  @override
+  State<FlashcardApp> createState() => _FlashcardAppState();
+}
+
+class _FlashcardAppState extends State<FlashcardApp> {
+  /// 互动式引导控制器：与 App 同生命周期
+  /// （测试里每个 App 实例一份，互不串状态）
+  final GuideController _guide = GuideController();
+
+  /// 路由观察者：把 push/pop 转给引导，让它跟着用户跳进二级页面继续指
+  late final List<NavigatorObserver> _guideObservers = [
+    GuideRouteObserver(_guide),
+  ];
+
+  @override
+  void dispose() {
+    _guide.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -320,6 +342,13 @@ class FlashcardApp extends StatelessWidget {
       theme: theme,
       darkTheme: darkTheme,
       themeMode: themeService.themeMode,
+      navigatorObservers: _guideObservers,
+      // 引导遮罩挂在 Navigator **之上**：用户点高亮处跳进二级页面
+      // （导入页 / 开始刷题弹窗）时，引导能跟过去继续指，而不是被新路由盖住
+      builder: (context, child) => GuideHost(
+        controller: _guide,
+        child: child ?? const SizedBox.shrink(),
+      ),
       // 启动闪屏页（Logo + 标题 + 今日一言）
       home: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(

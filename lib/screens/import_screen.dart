@@ -9,6 +9,8 @@ import '../services/app_state.dart';
 import '../services/theme_service.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../utils/responsive.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import 'settings_screen.dart';
 
 class ImportScreen extends StatefulWidget {
@@ -155,43 +157,48 @@ class _ImportScreenState extends State<ImportScreen> {
                 const SizedBox(height: 16),
 
                 // 一键导入内置示例题库（新用户/演示：无需文件立即体验刷题）
-                GestureDetector(
-                  onTap: isProcessing ? null : _importSample,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: MaoSpace.md, vertical: MaoSpace.sm),
-                    decoration: BoxDecoration(
-                      color: ac.accent.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(MaoRadius.control),
-                      border:
-                          Border.all(color: ac.accent.withOpacity(0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.rocket_launch_outlined,
-                            color: ac.accent, size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('一键导入示例题库',
-                                  style: TextStyle(
-                                      fontSize: MaoType.h3,
-                                      fontWeight: FontWeight.w600,
-                                      color: ac.accent)),
-                              const SizedBox(height: 2),
-                              Text(
-                                  '内置 10 道医学示例题（单选/多选/判断），无需文件立即体验',
-                                  style: TextStyle(
-                                      fontSize: MaoType.body,
-                                      color: ac.textSecondary)),
-                            ],
+                // 首启引导的第 9 步就落在这块上——它是导入页里唯一
+                // 无条件存在、点了立刻有题可刷、还不依赖 API Key 的入口
+                GuideAnchor(
+                  id: GuideAnchorIds.importSample,
+                  child: GestureDetector(
+                    onTap: isProcessing ? null : _importSample,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: MaoSpace.md, vertical: MaoSpace.sm),
+                      decoration: BoxDecoration(
+                        color: ac.accent.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(MaoRadius.control),
+                        border:
+                            Border.all(color: ac.accent.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.rocket_launch_outlined,
+                              color: ac.accent, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('一键导入示例题库',
+                                    style: TextStyle(
+                                        fontSize: MaoType.h3,
+                                        fontWeight: FontWeight.w600,
+                                        color: ac.accent)),
+                                const SizedBox(height: 2),
+                                Text(
+                                    '内置 10 道医学示例题（单选/多选/判断），无需文件立即体验',
+                                    style: TextStyle(
+                                        fontSize: MaoType.body,
+                                        color: ac.textSecondary)),
+                              ],
+                            ),
                           ),
-                        ),
-                        Icon(Icons.chevron_right, color: ac.accent),
-                      ],
+                          Icon(Icons.chevron_right, color: ac.accent),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -5,6 +5,9 @@ import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../utils/responsive.dart';
 import '../widgets/command_palette.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_controller.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import 'home_screen.dart';
 import 'import_preview_screen.dart';
@@ -21,8 +24,14 @@ import 'stats_tab.dart';
 /// （首页 refreshWeeklyStats、统计 StatsTabState.refresh）
 /// v1.0.3 宽屏重设计：窗口宽 ≥ 840dp（PC/平板横屏）改用左侧竖向导航；
 /// 手机与平板竖屏保留底部导航。两种形态共用保活与刷新逻辑。
+/// v1.28.2：首启互动式引导由根节点的 `GuideHost` 负责遮罩，
+/// 这里只上报 Tab 状态、把切页能力交给引导，并按 [startTour] 启动。
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  const MainShell({super.key, this.startTour = false});
+
+  /// 首启插播互动式引导（启动页按 `GuideService` 的标记传入）。
+  /// 默认 false：既有调用点与测试都按「不插播」走。
+  final bool startTour;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -41,6 +50,35 @@ class _MainShellState extends State<MainShell> {
   final GlobalKey _quickStartKey = GlobalKey();
   final GlobalKey<StatsTabState> _statsKey = GlobalKey<StatsTabState>();
   final GlobalKey _profileKey = GlobalKey();
+
+  /// 引导控制器（挂在根节点；首帧后拿到并接线）
+  GuideController? _guide;
+
+  @override
+  void initState() {
+    super.initState();
+    // 帧后再接线：引导要等主壳首帧布局落定才能量锚点矩形，
+    // 也顺带避开在 initState 里访问 InheritedWidget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _bindGuide();
+    });
+  }
+
+  /// 把「切 Tab 的能力」交给引导，并上报当前 Tab / 按需启动首启引导
+  void _bindGuide() {
+    final guide = GuideScope.maybeOf(context);
+    if (guide == null) return;
+    _guide = guide;
+    guide.attachTabSwitcher(_select);
+    guide.setCurrentTab(_index);
+    if (widget.startTour) guide.start();
+  }
+
+  @override
+  void dispose() {
+    _guide?.attachTabSwitcher(null);
+    super.dispose();
+  }
 
   /// v1.27 后台导入：完成提示弹窗防重复标志。
   bool _showingImportResult = false;
@@ -63,7 +101,9 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _showingImportResult) return;
+      // 引导播放中不弹导入结果：弹窗会盖住引导，用户也没法边看引导边处理；
+      // 结果留在待消费状态，引导结束后下一次 build 自然补弹。
+      if (!mounted || _showingImportResult || (_guide?.active ?? false)) return;
       final route = ModalRoute.of(context);
       if (route == null || !route.isCurrent) return;
       final result = appState.consumeImportResult();
@@ -104,6 +144,8 @@ class _MainShellState extends State<MainShell> {
   void _select(int i) {
     if (i == _index) return;
     setState(() => _index = i);
+    // 上报给引导：某一步正等着用户自己点到这个 Tab
+    _guide?.setCurrentTab(i);
     // 切 Tab 回调刷新（两形态共用）
     if (i == 0) {
       context.read<AppState>().refreshWeeklyStats();
@@ -139,103 +181,117 @@ class _MainShellState extends State<MainShell> {
     // 后台导入：监听完成事件，主页栈顶时弹「导入完成」提示。
     _maybeShowImportResult(context.watch<AppState>());
     final ac = AppThemeColors.of(context);
+    // 引导遮罩不在这里：它挂在根节点（`GuideHost`，MaterialApp.builder 里、
+    // Navigator 之上），这样用户点高亮处跳进二级页面时引导能跟过去继续指。
+    // 这里只负责把 Tab 状态与切页能力交给引导（见 [_bindGuide]）。
+    return isWideLayout(context) ? _buildWideShell(ac) : _buildNarrowShell(ac);
+  }
 
-    if (isWideLayout(context)) {
-      // 宽屏形态：左侧竖向导航 + 右侧内容区（PC / 平板横屏）
-      return CommandPaletteShortcuts(
-        child: Scaffold(
+  /// 宽屏形态：左侧竖向导航 + 右侧内容区（PC / 平板横屏）
+  Widget _buildWideShell(AppThemeColors ac) {
+    return CommandPaletteShortcuts(
+      child: Scaffold(
         body: Row(
           children: [
-            NavigationRail(
-              selectedIndex: _index,
-              onDestinationSelected: _select,
-              labelType: NavigationRailLabelType.all,
-              // 底部设置入口（窄屏在首页 AppBar）
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: MaoSpace.md),
-                    child: IconButton(
-                      icon: const Icon(Icons.settings_outlined),
-                      tooltip: '设置',
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const SettingsHubScreen()),
+            GuideAnchor(
+              // 锚点=侧边导航（宽屏形态）；引导里「自己点一下」那一步就点它
+              id: GuideAnchorIds.shellNav,
+              child: NavigationRail(
+                selectedIndex: _index,
+                onDestinationSelected: _select,
+                labelType: NavigationRailLabelType.all,
+                // 底部设置入口（窄屏在首页 AppBar）
+                trailing: Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: MaoSpace.md),
+                      child: IconButton(
+                        icon: const Icon(Icons.settings_outlined),
+                        tooltip: '设置',
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SettingsHubScreen()),
+                        ),
                       ),
                     ),
                   ),
                 ),
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home),
+                    label: Text('首页'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.bolt_outlined),
+                    selectedIcon: Icon(Icons.bolt),
+                    label: Text('开始'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.bar_chart_outlined),
+                    selectedIcon: Icon(Icons.bar_chart),
+                    label: Text('统计'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: Text('我的'),
+                  ),
+                ],
               ),
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: Text('首页'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.bolt_outlined),
-                  selectedIcon: Icon(Icons.bolt),
-                  label: Text('开始'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.bar_chart_outlined),
-                  selectedIcon: Icon(Icons.bar_chart),
-                  label: Text('统计'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: Text('我的'),
-                ),
-              ],
             ),
             VerticalDivider(width: 1, color: ac.border),
             Expanded(child: _buildPages(context)),
           ],
         ),
-        ),
-      );
-    }
+      ),
+    );
+  }
 
-    // 窄屏形态：底部 Tab
+  /// 窄屏形态：底部 Tab
+  Widget _buildNarrowShell(AppThemeColors ac) {
     return CommandPaletteShortcuts(
       child: Scaffold(
-      body: _buildPages(context),
-      bottomNavigationBar: DecoratedBox(
-        // 顶部 hairline，与内容区分层（替代旧版无边界观感）
-        decoration: BoxDecoration(
-          border: Border(
-              top: BorderSide(color: ac.border, width: MaoShadow.hairline)),
+        body: _buildPages(context),
+        bottomNavigationBar: GuideAnchor(
+          // 锚点=整条底部导航：引导里「自己点一下开始」那一步就点它
+          id: GuideAnchorIds.shellNav,
+          child: DecoratedBox(
+            // 顶部 hairline，与内容区分层（替代旧版无边界观感）
+            decoration: BoxDecoration(
+              border: Border(
+                  top: BorderSide(color: ac.border, width: MaoShadow.hairline)),
+            ),
+            child: NavigationBar(
+              selectedIndex: _index,
+              onDestinationSelected: _select,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: '首页',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.bolt_outlined),
+                  selectedIcon: Icon(Icons.bolt),
+                  label: '开始',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.bar_chart_outlined),
+                  selectedIcon: Icon(Icons.bar_chart),
+                  label: '统计',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: '我的',
+                ),
+              ],
+            ),
+          ),
         ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: _select,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: '首页',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.bolt_outlined),
-              selectedIcon: Icon(Icons.bolt),
-              label: '开始',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.bar_chart_outlined),
-              selectedIcon: Icon(Icons.bar_chart),
-              label: '统计',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: '我的',
-            ),
-          ],
-        ),
-      ),
       ),
     );
   }

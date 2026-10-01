@@ -7,22 +7,21 @@ import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../widgets/kit/mj_logo.dart';
 import 'main_shell.dart';
-import 'onboarding_screen.dart';
-
 /// 启动闪屏页（v1.0.2 对齐原版设计：App Logo + 标题 + 今日一言 + 加载圈）
 ///
-/// 固定 1.4 秒自动进入下一步：首次启动插播使用引导（[OnboardingScreen]），
-/// 其余直接进主界面。一言异步加载不阻塞（失败回退默认文案）。
+/// 固定 1.4 秒自动进入下一步：首次启动进主界面并在其上插播互动式引导
+/// （[MainShell.startTour]），其余直接进主界面。
+/// 一言异步加载不阻塞（失败回退默认文案）。
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
-  /// 闪屏结束后的去向：首启插播引导，其余直接进主界面。
+  /// 闪屏结束后的去向：首启进主界面并插播引导，其余直接进主界面。
   ///
-  /// 抽成静态纯函数便于单测分支——校验「第二次启动不再显示引导」不需要真的
+  /// 抽成静态纯函数便于单测分支——校验「第二次启动不再插播引导」不需要真的
   /// 起数据库与 Provider 去构建 [MainShell]。
   @visibleForTesting
   static Widget nextScreen({required bool firstRun}) =>
-      firstRun ? const OnboardingScreen(asFirstRun: true) : const MainShell();
+      MainShell(startTour: firstRun);
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();

@@ -9,6 +9,8 @@ import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../widgets/kit/mj_logo.dart';
 import '../widgets/weekly_stats_board.dart';
@@ -179,14 +181,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         // 战绩卡：拿到「可用高度」，内部据此决定是填满还是保底
-                        WeeklyStatsBoard(
-                          dailyTotals: _yearlyTotals,
-                          streakDays: _streakDays,
-                          weekTotal: _weekTotal,
-                          weekAccuracy: _weekAccuracy,
-                          vacationDays: _vacationDays,
-                          maxHeight: cardAvail,
-                          onHistoryReport: () => _showHistoryReport(appState),
+                        // （引导锚点：首启引导「首页先看进度」那步高亮这张卡）
+                        GuideAnchor(
+                          id: GuideAnchorIds.homeWeekly,
+                          child: WeeklyStatsBoard(
+                            dailyTotals: _yearlyTotals,
+                            streakDays: _streakDays,
+                            weekTotal: _weekTotal,
+                            weekAccuracy: _weekAccuracy,
+                            vacationDays: _vacationDays,
+                            maxHeight: cardAvail,
+                            onHistoryReport: () => _showHistoryReport(appState),
+                          ),
                         ),
                       ],
                     ),
