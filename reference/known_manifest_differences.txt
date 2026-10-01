@@ -1,4 +1,16 @@
 android.permission.ACCESS_NETWORK_STATE
 android.permission.ACCESS_WIFI_STATE
 android.permission.CHANGE_WIFI_MULTICAST_STATE
+androidx.emoji2.text.EmojiCompatInitializer
+backend:com.google.android.datatransport.cct.CctBackendFactory
+com.google.android.datatransport.runtime.backends.TransportBackendDiscovery
+com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver
+com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService
+com.google.android.gms.common.api.GoogleApiActivity
+com.google.android.gms.version
+com.google.firebase.components:com.google.mlkit.common.internal.CommonComponentRegistrar
+com.google.firebase.components:com.google.mlkit.vision.common.internal.VisionCommonRegistrar
+com.google.firebase.components:com.google.mlkit.vision.text.internal.TextRegistrar
+com.google.mlkit.common.internal.MlKitComponentDiscoveryService
+com.google.mlkit.common.internal.MlKitInitProvider
 io.flutter.plugins.urllauncher.WebViewActivity
