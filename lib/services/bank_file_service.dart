@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import '../models/question.dart';
 import '../models/question_bank.dart';
+import '../models/question_image.dart';
 import 'database_service.dart';
 
 /// JSON 题库文件导入导出（v1.0.2）
@@ -169,7 +171,36 @@ class BankFileService {
       questionType: questionType,
       knowledgePoint: kp.isEmpty ? null : kp,
       createdAt: now,
+      // v12 配图：图片是题目的一部分，随 JSON 往返（无此键的旧文件照常）
+      images: _parseImages(m['images']),
     );
+  }
+
+  /// v12 配图解析：`images: [{position, mime, width, height, data_b64}]`。
+  /// 未知/损坏条目跳过（不整题报废）；data_b64 亦兼容 data
+  static List<QuestionImage> _parseImages(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <QuestionImage>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final data = item['data_b64'] ?? item['data'];
+      if (data is! String || data.isEmpty) continue;
+      final Uint8List bytes;
+      try {
+        bytes = base64Decode(data);
+      } catch (_) {
+        continue;
+      }
+      out.add(QuestionImage(
+        position: (item['position'] as num?)?.toInt() ?? out.length,
+        mime: item['mime'] as String? ?? 'image/jpeg',
+        width: (item['width'] as num?)?.toInt() ?? 0,
+        height: (item['height'] as num?)?.toInt() ?? 0,
+        anchor: item['anchor'] as String?,
+        content: bytes,
+      ));
+    }
+    return out;
   }
 
   static dynamic _first(Map m, List<String> keys) {
@@ -224,14 +255,31 @@ class BankFileService {
   static Future<String?> exportBank(int bankId, String bankName, String destPath) async {
     final questions = await _db.getQuestionsByBank(bankId);
     if (questions.isEmpty) return null;
-    final list = questions.map((q) => {
-          'title': q.title,
-          'options': q.options,
-          'correct_answer': q.correctAnswer,
-          'analysis': q.analysis,
-          'question_type': q.questionType,
-          'knowledge_point': q.knowledgePoint,
-        }).toList();
+    // v12：配图随题导出（图片是题目的一部分，分享/再导入都不丢图）
+    final imageMap = await _db
+        .getImagesForQuestions(questions.map((q) => q.id ?? -1).toList());
+    final list = questions.map((q) {
+      final images = imageMap[q.id] ?? const <QuestionImage>[];
+      return {
+        'title': q.title,
+        'options': q.options,
+        'correct_answer': q.correctAnswer,
+        'analysis': q.analysis,
+        'question_type': q.questionType,
+        'knowledge_point': q.knowledgePoint,
+        if (images.isNotEmpty)
+          'images': [
+            for (final img in images)
+              {
+                'position': img.position,
+                'mime': img.mime,
+                'width': img.width,
+                'height': img.height,
+                'data_b64': base64Encode(img.content),
+              },
+          ],
+      };
+    }).toList();
     final json = const JsonEncoder.withIndent('  ').convert({
       'format': formatMarker,
       'name': bankName,

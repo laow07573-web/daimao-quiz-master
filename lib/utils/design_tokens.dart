@@ -1,4 +1,3 @@
-import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 
 // 猫卷设计令牌「Mao Des 2.0 · 精密暗色」
@@ -98,20 +97,20 @@ class MaoType {
       letterSpacing: h2Spacing);
 
   /// 卡片标题
-  static const TextStyle h3Style = TextStyle(
-      fontSize: h3, fontWeight: FontWeight.w600, height: titleHeight);
+  static const TextStyle h3Style =
+      TextStyle(fontSize: h3, fontWeight: FontWeight.w600, height: titleHeight);
 
   /// 正文
-  static const TextStyle bodyStyle =
-      TextStyle(fontSize: body, fontWeight: FontWeight.w400, height: bodyHeight);
+  static const TextStyle bodyStyle = TextStyle(
+      fontSize: body, fontWeight: FontWeight.w400, height: bodyHeight);
 
   /// 次要说明
   static const TextStyle captionStyle =
       TextStyle(fontSize: caption, fontWeight: FontWeight.w400, height: 1.5);
 
   /// 标签
-  static const TextStyle microStyle = TextStyle(
-      fontSize: micro, fontWeight: FontWeight.w500, height: 1.4);
+  static const TextStyle microStyle =
+      TextStyle(fontSize: micro, fontWeight: FontWeight.w500, height: 1.4);
 
   /// 小标题式标签（疏字距，用于分组眉题「本周战绩」等）
   static const TextStyle eyebrowStyle = TextStyle(
@@ -197,11 +196,14 @@ class MaoRadius {
   /// 胶囊（999 视为全圆）
   static const double pill = 999;
 
-  static const BorderRadius chipBorder = BorderRadius.all(Radius.circular(chip));
-  static const BorderRadius smallBorder = BorderRadius.all(Radius.circular(small));
+  static const BorderRadius chipBorder =
+      BorderRadius.all(Radius.circular(chip));
+  static const BorderRadius smallBorder =
+      BorderRadius.all(Radius.circular(small));
   static const BorderRadius controlBorder =
       BorderRadius.all(Radius.circular(control));
-  static const BorderRadius cardBorder = BorderRadius.all(Radius.circular(card));
+  static const BorderRadius cardBorder =
+      BorderRadius.all(Radius.circular(card));
   static const BorderRadius largeBorder =
       BorderRadius.all(Radius.circular(large));
 }
@@ -209,6 +211,18 @@ class MaoRadius {
 // ============================================================
 // 4. 层次（发丝描边为主，阴影极轻）
 // ============================================================
+
+/// 遮罩：引导 / 模态背后的压暗层。
+///
+/// 用中性黑而不是画布色——画布色在浅色主题里等于「白色蒙版」，
+/// 压暗几乎看不见；而互动式引导恰恰要靠「洞内外的明暗差」把目标托出来。
+class MaoScrim {
+  MaoScrim._();
+
+  /// 互动式引导遮罩（约 70% 黑，明暗主题通用：暗色下四周沉到近纯黑，
+  /// 高亮洞成为屏幕上唯一亮着的地方）
+  static const Color guide = Color(0xB3000000);
+}
 
 /// 层次模型：精密暗色的签名特征是**几乎没有阴影**——层级靠
 /// 面板明度差（background < surface < surfaceAlt）+ 1px 描边表达。
@@ -257,23 +271,116 @@ class MaoLine {
 // 6. 动效（短促干脆）
 // ============================================================
 
-/// 动效时长与曲线：精密界面的动作应"快而不飘"。
-/// 相比上一版（160/240/320ms）整体提速，响应更跟手。
+/// 动效时长与曲线：精密界面的动作应"快而不飘"，像仪表指针——
+/// 只在状态真的变化时动，动就一次落定。三档时长各有适用面：
+/// [fast] 状态色变 / [normal] 组件过渡 / [slow] 转场落位；
+/// 出场一律用 [exit]（快于进场，层是"落定"不是"飘走"）。
+/// 全站禁止散落时长字面量，一律引用本类。
 class MaoMotion {
   const MaoMotion._();
 
-  /// 状态过渡（颜色/尺寸微变、悬停）
-  static const Duration fast = Duration(milliseconds: 120);
+  // ════════════════════════════════════════════════════════════
+  // 时长：按「运动语义」分层，而不是按大小命名
+  // ════════════════════════════════════════════════════════════
+  //
+  // 2026-10-09 重新设计。旧命名（fast/normal/slow）只表达"多长"，
+  // 用起来全凭感觉：180ms 到底是微交互还是内容切换？没人说得清，
+  // 于是同一个交互在不同页面用不同时长。
+  //
+  // 现在按**层级**命名：运动的"块"越大、离手指越远，时长越长。
+  // 选时长时先问自己「这是哪一层」，而不是「我想要多快」。
+  //
+  //   L0 手指直接反馈  → tap          （几乎无延迟）
+  //   L1 元素状态变化  → stateChange  （颜色/描边/开关）
+  //   L2 页面内换内容  → contentSwap  （列表/排行/标签内容）
+  //   L3 浮层与整块    → overlay      （弹层/对话框/大块淡入）
+  //   P1 一级页面      → primaryPage  （底部导航 Tab）
+  //   P2 二级及以下    → nestedPage   （从一级页面 push 进去）
+  //   OUT 任何层退出    → exit         （必须快于它的进场）
 
-  /// 常规过渡（展开、切换）
-  static const Duration normal = Duration(milliseconds: 180);
+  /// L0 直接反馈：按压、悬停、涟漪。手指下的回应必须几乎无延迟。
+  static const Duration tap = Duration(milliseconds: 90);
 
-  /// 强调过渡（弹层、页面转场）
-  static const Duration slow = Duration(milliseconds: 260);
+  /// L1 状态变化：颜色、描边、开关、选中态。
+  static const Duration stateChange = Duration(milliseconds: 120);
 
-  /// 标准曲线（精密界面统一用它，不用弹跳）
+  /// L2 内容替换：同一页内换内容（列表换数据、排行换维度、标签页内容）。
+  static const Duration contentSwap = Duration(milliseconds: 180);
+
+  /// L3 容器进出：底部弹层、对话框、整块淡入。
+  static const Duration overlay = Duration(milliseconds: 260);
+
+  /// 出场：任何层的退出都快于自己的进场（层是「落定」不是「飘走」）。
+  static const Duration exit = Duration(milliseconds: 140);
+
+  /// 页面层级过渡时长（2026-10-09 用户定义 + 要求）。
+  ///
+  /// 用户定义：
+  /// - **一级页面** = 进入应用后不需要操作、或只操作一步就能切换到的页面
+  ///   （即底部导航的四个 Tab）；一级与一级之间的切换要求「在较短的等待时间中
+  ///   用极为流畅的动画作为过渡」。
+  /// - **二级及以下** = 在一级页面上再操作一步才能看到的页面，以此类推。
+  ///   二级及以下的过渡「不需要在太短的时间内完成」，时长取一级的
+  ///   **1.5~2.5 倍**。
+  ///
+  /// 取值：[primaryPage] = 150ms（短、干脆）；[nestedPage] = 300ms
+  /// （= primaryPage × 2.0，落在 1.5~2.5 倍区间内）。改这两个值前先确认
+  /// 倍数关系仍成立，否则就违反了用户定的层级节奏。
+  static const Duration primaryPage = Duration(milliseconds: 150);
+  static const Duration nestedPage = Duration(milliseconds: 300);
+
+  /// 轻提示（SnackBar）的停留时长。
+  ///
+  /// 2026-10-09 用户要求：「圈出的提示需要在 2s 内消散」——框架默认 4 秒太长，
+  /// 一条「先勾选要刷的题库」挡住视线又不解决问题。
+  ///
+  /// 取 1.5s 而不是 2s：`duration` 只是**停留**时间，从出现到彻底移出画面还要
+  /// 加入场与退场动画（各约 250ms）。实测 duration=2s 时总存活 2650ms，超出
+  /// 用户要求；1.5s 时约 2.0s 正好落在「2 秒内消散」。
+  /// 另外切页面时会主动清掉（见 MainShell._select 与开始页的导航辅助）。
+  static const Duration toast = Duration(milliseconds: 1500);
+
+  /// 兼容别名（迁移期保留，新代码请用上面的语义名）
+  static const Duration fast = stateChange;
+  static const Duration normal = contentSwap;
+  static const Duration slow = overlay;
+
+  /// 按页面层级取转场时长：1 = 一级（Tab 之间），≥2 = 二级及以下。
+  ///
+  /// 三级及以下刻意**不再递增**：每深一层就更慢会让人越点越拖，
+  /// 用户只约束了「二级及以下 = 一级的 1.5~2.5 倍」，这里统一取 nestedPage。
+  static Duration pageForDepth(int depth) =>
+      depth <= 1 ? primaryPage : nestedPage;
+
+  /// 列表/卡片进场的错落节拍（配 [staggerMax] 限量使用）
+  static const Duration stagger = Duration(milliseconds: 30);
+
+  /// 错落进场的条目上限：超过直接显示，防长列表变开幕典礼
+  static const int staggerMax = 8;
+
+  // ════════════════════════════════════════════════════════════
+  // 曲线：只有三条 + 一条出场，选曲线仍然先问「这是哪一层」
+  // ════════════════════════════════════════════════════════════
+
+  /// 标准曲线：进入/落定（L0~L2 默认）
   static const Curve standard = Curves.easeOutCubic;
 
-  /// 弹性曲线（仅用于按压缩放反馈）
-  static const Curve emphasized = Curves.easeOutBack;
+  /// 强调曲线：M3 同款三拐点、零过冲（L3 浮层与页面转场）
+  static const Curve emphasized = Curves.easeInOutCubicEmphasized;
+
+  /// 按压缩放反馈曲线（仅配 ≤3% 的缩放微反馈）
+  static const Curve press = Curves.easeOutCubic;
+
+  /// 出场曲线：加速离场。
+  /// 与 [standard] 的「快速起步、缓慢落定」相反——退出应该越走越快，
+  /// 否则观感上像是"舍不得走"。
+  static const Curve exitCurve = Curves.easeInCubic;
+
+  /// 系统是否开启了「减弱动态效果」
+  static bool reduced(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  /// 尊重系统「减弱动态效果」：开启时返回零时长（照常 setState，只是不演）
+  static Duration effective(BuildContext context, Duration duration) =>
+      reduced(context) ? Duration.zero : duration;
 }

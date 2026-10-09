@@ -99,8 +99,23 @@ if (-not $SkipTests) {
     Write-Host ("    0 error / 0 warning / {0} info（既有风格噪音）" -f $info)
 
     Step '2/8' 'flutter test'
-    & flutter test
-    if ($LASTEXITCODE -ne 0) { Fail 'flutter test failed' }
+    # 测试库落在 %LOCALAPPDATA%\flashcard_app 下：目录里若留着跨 schema 代际的旧库，
+    # onCreate 不再触发 → 建索引时报 no such table: main.question_images，并发的
+    # 测试还会互相 database is locked，整轮大面积假红（实测 392 项挂 190 项）。
+    # 这一步用一次性隔离目录跑，跑完即删，也不碰本机 App 的真实数据目录。
+    $testEnvDir = Join-Path ([System.IO.Path]::GetTempPath()) ('mj_test_env_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
+    New-Item -ItemType Directory -Path $testEnvDir -Force | Out-Null
+    $savedLocalAppData = $env:LOCALAPPDATA
+    $env:LOCALAPPDATA = $testEnvDir
+    try {
+        & flutter test
+        $testExit = $LASTEXITCODE
+    } finally {
+        if ($savedLocalAppData) { $env:LOCALAPPDATA = $savedLocalAppData }
+        else { Remove-Item Env:\LOCALAPPDATA -ErrorAction SilentlyContinue }
+        Remove-Item $testEnvDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($testExit -ne 0) { Fail 'flutter test failed' }
 } else {
     Write-Host 'skipping analyze/test (-SkipTests)'
 }

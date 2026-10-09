@@ -56,3 +56,21 @@ String relativeDayLabel(DateTime due, {DateTime? now}) {
   if (diff == 1) return '明天';
   return '$diff天后';
 }
+
+/// 刷题页未作答时的引导文案：必须与真实交互一致——
+/// 单选/判断点选项即提交；多选要选完点「确认提交」；填空/简答要点「提交答案」。
+/// 此前所有题型共用同一句「点击选项提交答案，答对自动进入下一题」，
+/// 而多选/填空/简答都不会自动跳题，会误导用户（回归：answer_hint_test.dart）。
+String answerHintText(String questionType) {
+  switch (questionType) {
+    case 'multi_choice':
+      return '可多选，选好后点「确认提交」';
+    case 'fill_blank':
+    case 'ming_jie':
+    case 'jian_da':
+    case 'jie_da':
+      return '填写答案后点「提交答案」';
+    default:
+      return '点击选项提交答案，答对自动进入下一题';
+  }
+}

@@ -1,4 +1,4 @@
-# 向猫卷窗口投递键盘 Tab/方向键（Flutter 桌面支持键盘导航）
+﻿# 向猫卷窗口投递键盘 Tab/方向键（Flutter 桌面支持键盘导航）
 # 用法: powershell -File post_key.ps1 <虚拟键码> [次数]
 param([int]$vk = 9, [int]$times = 1)
 

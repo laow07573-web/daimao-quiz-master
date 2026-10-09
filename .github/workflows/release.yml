@@ -90,6 +90,13 @@ jobs:
             android/gradle/wrapper/gradle-wrapper.properties
           grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties
 
+      # pdfrx 的 Android 侧编译 PDFium FFI 胶水，build.gradle 钉了 NDK 26.1 + CMake 3.18+
+      # （缺任一都会让 Gradle 在配置/编译阶段直接失败）
+      - name: 安装 NDK 26.1 与 CMake（pdfrx 原生编译需要）
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "ndk;26.1.10909125" "cmake;3.22.1"
+
       - name: 注入签名配置（从 Secrets 还原 keystore）
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

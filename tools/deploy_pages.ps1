@@ -35,6 +35,17 @@ function Step($n, $m) { Write-Host ''; Write-Host ("=== [{0}] {1}" -f $n, $m) -F
 function Utf8NoBom($p, $text) {
     [System.IO.File]::WriteAllText($p, $text, (New-Object System.Text.UTF8Encoding($false)))
 }
+# 失效代理自动改直连（04 踩坑手册第 10 条）：git 配置里的
+# http.https://github.com.proxy 指向已退出的本地代理时，push 会直接失败。
+# 先按现有配置执行一次，失败再清空代理重试——不改用户全局配置。
+function Invoke-GitProxyAware {
+    param([string[]]$GitArgs)
+    & git @GitArgs
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host '    git 失败：配置的代理可能不可用，改用直连重试…' -ForegroundColor Yellow
+    & git -c 'http.https://github.com.proxy=' -c 'https.proxy=' @GitArgs
+    if ($LASTEXITCODE -ne 0) { throw ('git failed: git ' + ($GitArgs -join ' ')) }
+}
 
 Set-Location $root
 $idx = Join-Path $promo 'index.html'
@@ -59,7 +70,8 @@ Copy-Item (Join-Path $promo 'index.html') $stage -Force
 # promo/demo.html 是本地录屏专用文件（file:// 直开），不上架网站
 Copy-Item (Join-Path $promo '404.html')   $stage -Force
 Copy-Item (Join-Path $promo '.nojekyll')  $stage -Force
-Copy-Item (Join-Path $promo 'assets\logo.png') (Join-Path $stage 'assets') -Force
+# Copy the complete asset directory so redesigned website resources ship together.
+Copy-Item (Join-Path $promo 'assets\*') (Join-Path $stage 'assets') -Recurse -Force
 # favicon.png：index.html 与 404.html 都引用它，必须一并部署（曾漏掉导致线上 404）
 Copy-Item (Join-Path $promo 'favicon.png') $stage -Force
 
@@ -78,6 +90,31 @@ $null = Copy-Artifact ('MaoJuan-v{0}-android-arm64.apk'     -f $version) ('MaoJu
 $null = Copy-Artifact ('MaoJuan-v{0}-android-universal.apk' -f $version) ('MaoJuan-v{0}-android-universal.apk' -f $version)
 $null = Copy-Artifact ('MaoJuan-v{0}-windows-setup.exe'     -f $version) ('MaoJuan-v{0}-windows-setup.exe'     -f $version)
 $null = Copy-Artifact ('MaoJuan-v{0}-windows-portable.zip'  -f $version) ('MaoJuan-v{0}-windows-portable.zip'  -f $version)
+
+# Generate checksums from the staged bytes; downloadable checksum files must ship too.
+Get-ChildItem (Join-Path $stage 'download') -File | Where-Object { $_.Extension -in '.apk', '.exe', '.zip' } | ForEach-Object {
+    $checksum = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    Utf8NoBom ($_.FullName + '.sha256') ($checksum + '  ' + $_.Name + "`n")
+}
+
+# index.html 里有「文件大小与 SHA-256 校验」这个链接，指向 download/manifest.json。
+# 2026-10-09 换用 studio 版首页时才发现它没被部署（线上 404）：这里按 staged 字节
+# 现算现生成，而不是复制 promo/download/manifest.json —— 后者会随包更新而变陈旧，
+# 让「页面上给的校验值」和「实际下载到的文件」对不上，比 404 更坏。
+$manifest = @(
+    Get-ChildItem (Join-Path $stage 'download') -File |
+        Where-Object { $_.Extension -in '.apk', '.exe', '.zip' } |
+        Sort-Object Name |
+        ForEach-Object {
+            [ordered]@{
+                file   = $_.Name
+                bytes  = $_.Length
+                sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        }
+)
+Utf8NoBom (Join-Path $stage 'download\manifest.json') (($manifest | ConvertTo-Json -Depth 3) + "`n")
+Write-Host ("    manifest.json: {0} entries" -f $manifest.Count)
 
 # ---- 2. verify config points at files that were actually staged ---------------
 Step '2/4' 'checking the window.MAOJUAN download paths'
@@ -155,12 +192,10 @@ Step '4/4' 'pushing gh-pages'
 if ($env:GH_TOKEN) {
     $basic = [Convert]::ToBase64String(
         [Text.Encoding]::ASCII.GetBytes(('laow07573-web:{0}' -f $env:GH_TOKEN)))
-    & git -c "http.extraheader=Authorization: Basic $basic" `
-        push $Repo gh-pages --force-with-lease --progress
-    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+    Invoke-GitProxyAware @('-c', "http.extraheader=Authorization: Basic $basic",
+        'push', $Repo, 'gh-pages', '--force-with-lease', '--progress')
 } else {
-    & git push $Repo gh-pages --force-with-lease --progress
-    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+    Invoke-GitProxyAware @('push', $Repo, 'gh-pages', '--force-with-lease', '--progress')
 }
 
 Write-Host ''

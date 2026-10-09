@@ -11,10 +11,21 @@ import '../device_service.dart';
 /// - `GET  /sync/info`     → 本机设备信息（连通性探测）
 /// - `POST /sync/exchange` → 接收对端快照并合并入库，响应体返回本机快照，
 ///   对端收到后同样合并——一次请求完成双向同步
+///
+/// 识别码门禁（2026-10-08 用户要求「以免将数据同步到不想同步的设备里面」）：
+/// 两个接口都要求请求头携带 `X-Sync-Code`，由注入的 [verifyCode] 校验
+/// （设备长码或未过期的 6 位临时码，见 SyncCode）。不匹配一律 403。
+/// **未注入校验器时默认拒绝**——避免调用方忘了接线就变成不设防。
 class SyncServer {
   /// 同步服务端口（被占用时依次尝试备用端口）
   static const List<int> candidatePorts = [51630, 51631, 51632];
   static const int maxBodyBytes = 64 * 1024 * 1024; // 64MB 上限（局域网全量快照）
+
+  /// 识别码请求头
+  static const String codeHeader = 'x-sync-code';
+
+  /// 同步范围请求头：`full`（默认，整库）/ `banks`（仅题库，分享场景）
+  static const String scopeHeader = 'x-sync-scope';
 
   HttpServer? _server;
 
@@ -22,14 +33,20 @@ class SyncServer {
   Future<void> Function(Map<String, dynamic> snapshot)? onSnapshotReceived;
 
   /// 响应给对端的本机快照回调（引擎注入：SyncRepository.exportSnapshot）
-  Future<Map<String, dynamic>> Function()? buildSnapshot;
+  Future<Map<String, dynamic>> Function({required bool banksOnly})?
+      buildSnapshot;
+
+  /// 识别码校验器（引擎注入：presented 能否通过本机校验）。
+  /// 为 null 时**拒绝所有请求**（默认安全，杜绝漏接线）。
+  bool Function(String presented)? verifyCode;
 
   bool get running => _server != null;
   int get port => _server?.port ?? 0;
 
   Future<void> start({
     required Future<void> Function(Map<String, dynamic>) onReceived,
-    required Future<Map<String, dynamic>> Function() snapshot,
+    required Future<Map<String, dynamic>> Function({required bool banksOnly})
+        snapshot,
   }) async {
     if (running) return;
     onSnapshotReceived = onReceived;
@@ -52,6 +69,17 @@ class SyncServer {
 
   Future<void> _handle(HttpRequest request) async {
     try {
+      // 识别码门禁：两个接口都要过（探测接口也不该对陌生设备开口）
+      final presented = request.headers.value(codeHeader) ?? '';
+      final verifier = verifyCode;
+      if (verifier == null || !verifier(presented)) {
+        await _respondJson(request, 403, {
+          'error': 'sync code required',
+          'hint': '请求需要携带 X-Sync-Code（本机设备码或未过期的 6 位临时码）',
+        });
+        return;
+      }
+
       final path = request.uri.path;
       if (path == '/sync/info' && request.method == 'GET') {
         await _respondJson(request, 200, {
@@ -96,8 +124,10 @@ class SyncServer {
     if (receiver != null) {
       await receiver(peerSnapshot);
     }
+    // 同步范围：请求方声明 banks 时只回题库（用户之间分享题库的场景）
+    final banksOnly = request.headers.value(scopeHeader) == 'banks';
     final snapshot = buildSnapshot != null
-        ? await buildSnapshot!()
+        ? await buildSnapshot!(banksOnly: banksOnly)
         : <String, dynamic>{};
     await _respondJson(request, 200, snapshot);
   }

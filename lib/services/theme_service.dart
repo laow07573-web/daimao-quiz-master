@@ -130,6 +130,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFCF222E),
             dangerSoft: Color(0xFFFFEBE9),
             warning: Color(0xFF9A6700),
+            warningSoft: Color(0xFFFFF8C5),
           ),
         // 松绿-浅：白底 + 精密青绿
         AppTheme.sage => const AppThemeColors(
@@ -150,6 +151,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFCF222E),
             dangerSoft: Color(0xFFFFEBE9),
             warning: Color(0xFF9A6700),
+            warningSoft: Color(0xFFFFF8C5),
           ),
         // 墨黑-浅：Vercel 亮色（黑按钮 + 中性灰阶）
         AppTheme.ink => const AppThemeColors(
@@ -170,6 +172,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFCF222E),
             dangerSoft: Color(0xFFFFEBE9),
             warning: Color(0xFF9A6700),
+            warningSoft: Color(0xFFFFF8C5),
           ),
       };
 
@@ -193,6 +196,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFF85149),
             dangerSoft: Color(0xFF2D1214),
             warning: Color(0xFFD29922),
+            warningSoft: Color(0xFF272115),
           ),
         // 松绿-深：近黑画布 + 精密青绿
         AppTheme.sage => const AppThemeColors(
@@ -213,6 +217,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFF85149),
             dangerSoft: Color(0xFF2D1214),
             warning: Color(0xFFD29922),
+            warningSoft: Color(0xFF272115),
           ),
         // 墨黑-深：中性石墨 + 单色强调（最 Vercel：白按钮 + 灰阶）
         AppTheme.ink => const AppThemeColors(
@@ -233,6 +238,7 @@ class ThemeService extends ChangeNotifier {
             danger: Color(0xFFF85149),
             dangerSoft: Color(0xFF2D1214),
             warning: Color(0xFFD29922),
+            warningSoft: Color(0xFF272115),
           ),
       };
 
@@ -301,7 +307,8 @@ class ThemeService extends ChangeNotifier {
           color: c.navForeground,
         ),
         iconTheme: IconThemeData(color: c.navForeground, size: 20),
-        shape: Border(bottom: BorderSide(color: c.border, width: MaoLine.width)),
+        shape:
+            Border(bottom: BorderSide(color: c.border, width: MaoLine.width)),
       ),
 
       // ---- 卡片：10 圆角 + 实色 hairline，无阴影（层级靠描边与明度差） ----
@@ -360,8 +367,8 @@ class ThemeService extends ChangeNotifier {
           foregroundColor: c.accent,
           padding: const EdgeInsets.symmetric(
               horizontal: MaoSpace.sm, vertical: MaoSpace.xs),
-          shape: const RoundedRectangleBorder(
-              borderRadius: MaoRadius.smallBorder),
+          shape:
+              const RoundedRectangleBorder(borderRadius: MaoRadius.smallBorder),
           textStyle: MaoType.h3Style.copyWith(color: c.accent),
         ),
       ),
@@ -403,8 +410,8 @@ class ThemeService extends ChangeNotifier {
           borderRadius: MaoRadius.largeBorder,
           side: BorderSide(color: c.border, width: MaoLine.width),
         ),
-        titleTextStyle:
-            MaoType.h2Style.copyWith(fontFamily: 'MiSans', color: c.textPrimary),
+        titleTextStyle: MaoType.h2Style
+            .copyWith(fontFamily: 'MiSans', color: c.textPrimary),
         contentTextStyle:
             MaoType.bodyStyle.copyWith(color: c.textSecondary, fontSize: 14),
       ),
@@ -415,8 +422,8 @@ class ThemeService extends ChangeNotifier {
         elevation: 0,
         modalElevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(MaoRadius.large)),
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(MaoRadius.large)),
           side: BorderSide(color: c.border, width: MaoLine.width),
         ),
         showDragHandle: true,
@@ -427,8 +434,8 @@ class ThemeService extends ChangeNotifier {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: dark ? c.surfaceAlt : c.textPrimary,
-        contentTextStyle: MaoType.bodyStyle.copyWith(
-            color: dark ? c.textPrimary : c.surface, fontSize: 13),
+        contentTextStyle: MaoType.bodyStyle
+            .copyWith(color: dark ? c.textPrimary : c.surface, fontSize: 13),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: MaoRadius.controlBorder,
@@ -447,11 +454,11 @@ class ThemeService extends ChangeNotifier {
           borderRadius: BorderRadius.circular(MaoRadius.small),
         ),
         surfaceTintColor: Colors.transparent,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => states
-                .contains(WidgetState.selected)
-            ? MaoType.microStyle.copyWith(
-                color: c.accent, fontWeight: FontWeight.w600)
-            : MaoType.microStyle.copyWith(color: c.textTertiary)),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? MaoType.microStyle
+                    .copyWith(color: c.accent, fontWeight: FontWeight.w600)
+                : MaoType.microStyle.copyWith(color: c.textTertiary)),
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
               size: 24,
               color: states.contains(WidgetState.selected)
@@ -466,8 +473,8 @@ class ThemeService extends ChangeNotifier {
         indicatorColor: c.accentSoft,
         selectedIconTheme: IconThemeData(color: c.accent, size: 24),
         unselectedIconTheme: IconThemeData(color: c.textTertiary, size: 24),
-        selectedLabelTextStyle: MaoType.microStyle.copyWith(
-            color: c.accent, fontWeight: FontWeight.w600),
+        selectedLabelTextStyle: MaoType.microStyle
+            .copyWith(color: c.accent, fontWeight: FontWeight.w600),
         unselectedLabelTextStyle:
             MaoType.microStyle.copyWith(color: c.textTertiary),
       ),
@@ -478,8 +485,8 @@ class ThemeService extends ChangeNotifier {
         selectedColor: c.accentSoft,
         side: BorderSide(color: c.border, width: 1),
         labelStyle: MaoType.captionStyle.copyWith(color: c.textSecondary),
-        secondaryLabelStyle:
-            MaoType.captionStyle.copyWith(color: c.accent, fontWeight: FontWeight.w600),
+        secondaryLabelStyle: MaoType.captionStyle
+            .copyWith(color: c.accent, fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(MaoRadius.chip)),
         padding: const EdgeInsets.symmetric(
@@ -490,8 +497,7 @@ class ThemeService extends ChangeNotifier {
 
       // ---- 列表 / 分隔线 / 进度条 / 图标 ----
       listTileTheme: ListTileThemeData(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: MaoSpace.md),
+        contentPadding: const EdgeInsets.symmetric(horizontal: MaoSpace.md),
         iconColor: c.textSecondary,
         titleTextStyle: MaoType.h3Style.copyWith(color: c.textPrimary),
         subtitleTextStyle:
@@ -510,19 +516,21 @@ class ThemeService extends ChangeNotifier {
       ),
       iconTheme: IconThemeData(color: c.textSecondary, size: 20),
 
-      // ---- 页面转场：淡入 + 轻微上移（替代默认硬切） ----
+      // ---- 页面转场：淡入 + 极轻上移（自定义 builder，见 [_MaoPageTransitionsBuilder]） ----
       pageTransitionsTheme: const PageTransitionsTheme(builders: {
-        TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.android: _MaoPageTransitionsBuilder(),
         TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-        TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
-        TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.windows: _MaoPageTransitionsBuilder(),
+        TargetPlatform.macOS: _MaoPageTransitionsBuilder(),
+        TargetPlatform.linux: _MaoPageTransitionsBuilder(),
       }),
 
       // ---- 水波反馈颜色 ----
       splashColor: c.accent.withOpacity(0.10),
       highlightColor: c.accent.withOpacity(0.06),
-      splashFactory: InkSparkle.splashFactory,
+      // InkSparkle 的粒子水波与「发丝线 + 明度分层」的精密语言冲突，
+      // 归一到 InkSplash：一层安静的圆形水波即可。
+      splashFactory: InkSplash.splashFactory,
     );
   }
 
@@ -544,6 +552,90 @@ class ThemeService extends ChangeNotifier {
         labelMedium: MaoType.captionStyle.copyWith(color: secondary),
         labelSmall: MaoType.microStyle.copyWith(color: secondary),
       ).apply(fontFamily: 'MiSans');
+}
+
+/// 出场压缩曲线：把运动压进路由窗口的前一段走完，随后保持落定值。
+///
+/// 为什么需要：页面/弹窗路由的进出场窗口写死在 Flutter 路由里（Material
+/// 页面固定 300ms，弹窗 = 进场时长），而 [CurvedAnimation.reverseCurve]
+/// 作用在**递减**的 t 上——直接用 [Interval] 会把「提前落定」翻成
+/// 「延迟开始」。本映射把出场运动压缩到 motion/window 段内走完，
+/// 是「时长对齐 MaoMotion 令牌」在固定路由窗口下的等价手段。
+class MaoExitCurve extends Curve {
+  MaoExitCurve({
+    required Duration window,
+    required Duration motion,
+    this.curve = MaoMotion.standard,
+  })  : assert(window > Duration.zero),
+        assert(motion > Duration.zero && motion <= window),
+        share = motion.inMicroseconds / window.inMicroseconds;
+
+  /// 运动占路由窗口的比例
+  final double share;
+
+  /// 运动段内使用的曲线
+  final Curve curve;
+
+  @override
+  double transformInternal(double t) {
+    if (t <= 1 - share) return 0;
+    return 1 - curve.transform((1 - t) / share);
+  }
+}
+
+/// 页面转场：淡入 + 极轻上移（Mao Des 精密版 FadeUpwards）。
+///
+/// 为什么自定义：M2 [FadeUpwardsPageTransitionsBuilder] 一次推进 0.25 屏，
+/// 在发丝线 + 明度分层的精密界面里显得"飘"。这里把进入位移收到 0.06 屏，
+/// 进/出时长对齐层级令牌——层是「落定」不是「飘入」。
+/// iOS 保留系统侧滑手势语感（Cupertino 转场），其余平台用本转场。
+///
+/// 2026-10-09 修正：此前进场走的是 [MaoMotion.slow]（260ms），与刚按用户定义
+/// 定下的层级令牌（一级 150ms / 二级 300ms）**脱节**——规范写着 300ms，代码跑
+/// 260ms。现在进场窗口直接等于 [MaoMotion.nestedPage]，倍数关系
+/// （二级 = 一级 × 2.0）在代码里真正成立，而不是只在注释里成立。
+class _MaoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _MaoPageTransitionsBuilder();
+
+  /// Flutter 页面路由（MaterialRouteTransitionMixin）固定的转场窗口。
+  /// SDK 未导出该常量；[MaoMotion.nestedPage] 与它取同值（300ms），
+  /// 所以整窗即运动窗，不需要再拿 Interval 去截。
+  static const Duration _routeWindow = MaoMotion.nestedPage;
+
+  /// 进入位移：0.06 屏（FadeUpwards 原为 0.25，太"飘"）
+  static const Offset _enterOffset = Offset(0, 0.06);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // 尊重系统「减弱动态效果」：直接落位，不演转场
+    if (MaoMotion.reduced(context)) return child;
+
+    // 进场：整窗走强调曲线（二级页面属于「大块运动」，用零过冲的 M3 曲线）
+    final enter = CurvedAnimation(
+      parent: animation,
+      curve: MaoMotion.emphasized,
+      // 出场：压缩进 MaoMotion.exit 段内落定（一启动就走，不延迟）
+      reverseCurve: MaoExitCurve(
+        window: _routeWindow,
+        motion: MaoMotion.exit,
+        curve: MaoMotion.exitCurve,
+      ),
+    );
+    return FadeTransition(
+      opacity: enter,
+      child: SlideTransition(
+        position:
+            Tween<Offset>(begin: _enterOffset, end: Offset.zero).animate(enter),
+        child: child,
+      ),
+    );
+  }
 }
 
 /// 主题语义色扩展「Mao Des」
@@ -605,6 +697,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
   /// 警告
   final Color warning;
 
+  /// 警告浅底（与 dangerSoft 同一用法：浅底承载警告标签/提示块）
+  final Color warningSoft;
+
   const AppThemeColors({
     required this.background,
     required this.surface,
@@ -624,6 +719,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     this.danger = const Color(0xFFB91C1C),
     this.dangerSoft = const Color(0xFFFEE2E2),
     this.warning = const Color(0xFFD97706),
+    this.warningSoft = const Color(0xFFFFF8C5),
   });
 
   // ---- 兼容旧字段名（页面仍在用 navBar/card/cardBorder/successContainer…） ----
@@ -662,6 +758,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     Color? danger,
     Color? dangerSoft,
     Color? warning,
+    Color? warningSoft,
   }) =>
       AppThemeColors(
         background: background ?? this.background,
@@ -681,6 +778,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
         danger: danger ?? this.danger,
         dangerSoft: dangerSoft ?? this.dangerSoft,
         warning: warning ?? this.warning,
+        warningSoft: warningSoft ?? this.warningSoft,
       );
 
   @override
@@ -704,6 +802,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       danger: Color.lerp(danger, other.danger, t)!,
       dangerSoft: Color.lerp(dangerSoft, other.dangerSoft, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
+      warningSoft: Color.lerp(warningSoft, other.warningSoft, t)!,
     );
   }
 
@@ -734,6 +833,7 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       danger: dark ? const Color(0xFFF87171) : const Color(0xFFB91C1C),
       dangerSoft: dark ? const Color(0xFF3B1D1D) : const Color(0xFFFEE2E2),
       warning: dark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+      warningSoft: dark ? const Color(0xFF272115) : const Color(0xFFFFF8C5),
     );
   }
 }

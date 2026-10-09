@@ -70,15 +70,18 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                       style: MaoType.captionStyle
                           .copyWith(color: ac.textSecondary)),
                   const SizedBox(height: MaoSpace.xs),
-                  MaoNumber(accuracy.toStringAsFixed(1),
+                  // 成绩读数滚动落位（等宽数字，滚动期间宽度不跳）
+                  MaoAnimatedNumber(accuracy,
                       size: 44,
                       weight: FontWeight.w700,
                       suffix: '%',
+                      decimals: 1,
                       color: ac.accent),
                   const SizedBox(height: MaoSpace.xxs),
+                  // 标签是实义说明 → textSecondary（tertiary 只留占位/装饰）
                   Text('正确率',
                       style: MaoType.captionStyle
-                          .copyWith(color: ac.textTertiary)),
+                          .copyWith(color: ac.textSecondary)),
                 ],
               ),
             ),
@@ -143,18 +146,29 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (_loading)
-                    Center(
-                        child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: CircularProgressIndicator(color: ac.accent),
-                    ))
-                  else
-                    AiResponseWidget(
-                      text: _summaryText ?? '生成小结失败',
-                      fontSize: MaoType.body,
-                      color: ac.textPrimary,
-                    ),
+                  // 生成中用呼吸骨架占位，生成完 120ms 淡切入场（减弱动态时直接落位）
+                  AnimatedSwitcher(
+                    duration: MaoMotion.effective(context, MaoMotion.fast),
+                    switchInCurve: MaoMotion.standard,
+                    child: _loading
+                        ? const Column(
+                            key: ValueKey('summary-loading'),
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              MJSkeleton(width: double.infinity),
+                              SizedBox(height: MaoSpace.xs),
+                              MJSkeleton(width: double.infinity),
+                              SizedBox(height: MaoSpace.xs),
+                              MJSkeleton(width: 160),
+                            ],
+                          )
+                        : AiResponseWidget(
+                            key: const ValueKey('summary-text'),
+                            text: _summaryText ?? '生成小结失败',
+                            fontSize: MaoType.body,
+                            color: ac.textPrimary,
+                          ),
+                  ),
                 ],
               ),
             ),
@@ -216,10 +230,11 @@ class _StatChip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 标签是实义说明 → textSecondary（tertiary 只留占位/装饰）
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
+              style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
           const SizedBox(height: MaoSpace.xxs + 2),
           Text(value,
               maxLines: 1,

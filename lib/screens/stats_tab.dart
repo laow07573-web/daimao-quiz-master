@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/quiz_session.dart';
 import '../services/app_state.dart';
 import '../services/theme_service.dart';
+import '../widgets/guide/guide_anchor.dart';
+import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../utils/format_utils.dart';
 import '../utils/responsive.dart';
@@ -23,7 +25,8 @@ class StatsTab extends StatefulWidget {
   State<StatsTab> createState() => StatsTabState();
 }
 
-class StatsTabState extends State<StatsTab> {
+class StatsTabState extends State<StatsTab>
+    with SingleTickerProviderStateMixin {
   /// 上次已加载的统计数据版本号（见 AppState.statsRevision）：
   /// 变更时自动重载，保证从「开始」页操作后切回统计能看到新数据。
   int _loadedStatsRevision = -1;
@@ -46,12 +49,36 @@ class StatsTabState extends State<StatsTab> {
   Map<int, List<String>> _sessionBankNames = {};
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _error;
+
+  /// 统计概览数字的滚动进度（0→1）。
+  ///
+  /// 为什么由页面持有进度而不是让数字组件自己演入场动画：
+  /// 概览卡在 ListView 里，滚出屏幕会被回收、滚回来重新挂载；如果动画写在
+  /// 子组件里，每次重新挂载都会从 0 再演一遍（真机反馈：上下滑动时数字会
+  /// 重新播放动画）。进度放在页面 State 上，初始为 1（终态），只有点击
+  /// 本周/本月/全部时才 forward(from: 0)，重挂载拿到的始终是当前进度。
+  late final AnimationController _overviewCtrl;
 
   @override
   void initState() {
     super.initState();
+    _overviewCtrl = AnimationController(
+      vsync: this,
+      duration: MaoMotion.slow,
+      value: 1,
+    );
+    // 注意：排行/错题统计/历史记录的数据由 _AccuracyRanking 自己在首次
+    // 构建时按需触发（见其 didChangeDependencies → onLoaded），不要再在这里
+    // 额外调用 _loadRankings，否则进页面会重复查两遍库。
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _overviewCtrl.dispose();
+    super.dispose();
   }
 
   /// 供 MainShell 切 Tab 时调用
@@ -62,10 +89,15 @@ class StatsTabState extends State<StatsTab> {
   }
 
   Future<void> _loadAll() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    // 首次进入显示骨架；已有数据刷新时保留旧内容，避免整页闪屏。
+    if (!_hasLoadedOnce) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() => _error = null);
+    }
     try {
       final appState = context.read<AppState>();
       final yearly = await appState.getYearlyTotals();
@@ -85,6 +117,7 @@ class StatsTabState extends State<StatsTab> {
         _periodDuration = periodStats.totalDurationSeconds;
         _longestStreak = longestStreak;
         _loading = false;
+        _hasLoadedOnce = true;
       });
     } catch (e) {
       if (!mounted) return;
@@ -97,6 +130,9 @@ class StatsTabState extends State<StatsTab> {
 
   Future<void> _switchPeriod(String period) async {
     if (_period == period) return;
+    // 只有周期切换这一条路径触发概览数字滚动；其余刷新/滚动重挂载都不演。
+    _overviewCtrl.duration = MaoMotion.effective(context, MaoMotion.slow);
+    _overviewCtrl.forward(from: 0);
     setState(() => _period = period);
     try {
       final appState = context.read<AppState>();
@@ -141,20 +177,18 @@ class StatsTabState extends State<StatsTab> {
             .toList();
         // v1.0.2 修复：按知识点排行键名归一（UI 读 name/accuracy），
         // 缺失知识点兜底「未打标签」，total=0 不除零
-        _kpAccuracy = kps
-            .map((k) {
-              final total = (k['total'] as num?) ?? 0;
-              final correct = (k['correct'] as num?) ?? 0;
-              return {
-                'name': (k['name'] as String?)?.trim().isNotEmpty ?? false
-                    ? k['name'] as String
-                    : '未打标签',
-                'total': total,
-                'correct': correct,
-                'accuracy': total > 0 ? correct / total * 100 : 0.0,
-              };
-            })
-            .toList();
+        _kpAccuracy = kps.map((k) {
+          final total = (k['total'] as num?) ?? 0;
+          final correct = (k['correct'] as num?) ?? 0;
+          return {
+            'name': (k['name'] as String?)?.trim().isNotEmpty ?? false
+                ? k['name'] as String
+                : '未打标签',
+            'total': total,
+            'correct': correct,
+            'accuracy': total > 0 ? correct / total * 100 : 0.0,
+          };
+        }).toList();
         _errorStats = errors;
         _recentSessions = sessions;
         _sessionBankNames = bankNames;
@@ -193,59 +227,92 @@ class StatsTabState extends State<StatsTab> {
       // 平板适配：内容限宽居中（手机无影响）；
       // v1.0.3 宽屏重设计：宽屏限宽自动提升至 1080 + 区块双列并排
       body: ResponsivePage(
-        child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _ErrorView(error: _error!, onRetry: _loadAll)
-              : RefreshIndicator(
-                  onRefresh: _loadAll,
-                  child: ListView(
-                    padding: const EdgeInsets.all(14),
-                    children: isWideLayout(context)
-                        ? _buildWideSections(ac)
-                        : [
-                      // 统计口径包含模拟数据时明确提示，避免把模拟数字当成真实成绩
-                      ..._simulatedNotice(ac),
-                      _buildOverview(context),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: '年度坚持',
-                        child: _buildYearHeatmap(ac),
+        child: AnimatedSwitcher(
+          // 统计页包含热力图和图表，避免重内容与淡入动画叠加造成闪屏。
+          duration: Duration.zero,
+          switchInCurve: MaoMotion.standard,
+          child: _loading
+              ? const _StatsSkeleton(key: ValueKey('stats-loading'))
+              : _error != null
+                  ? _ErrorView(
+                      key: const ValueKey('stats-error'),
+                      error: _error!,
+                      onRetry: _loadAll)
+                  : RefreshIndicator(
+                      key: const ValueKey('stats-body'),
+                      onRefresh: _loadAll,
+                      child: ListView(
+                        padding: const EdgeInsets.all(14),
+                        children: isWideLayout(context)
+                            ? _buildWideSections(ac)
+                            : [
+                                // 统计口径包含模拟数据时明确提示，避免把模拟数字当成真实成绩
+                                ..._simulatedNotice(ac),
+                                // 区块进场：fade + 6px 上移错落（仅前几个演，见 _StaggerEnter）
+                                _StaggerEnter(
+                                  index: 0,
+                                  child: GuideAnchor(
+                                    id: GuideAnchorIds.statsOverview,
+                                    child: _buildOverview(context),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                // 2026-10-08 性能：热力图与趋势图是全页最重的两块，
+                                // ① 不做进场错落动画（对整块做大范围 Opacity 正是进页面
+                                //    那一下卡顿的来源）② 各自加 RepaintBoundary，滚动时
+                                //    不会带着它们一起重绘。
+                                _SectionCard(
+                                  title: '年度坚持',
+                                  child: RepaintBoundary(
+                                      child: _buildYearHeatmap(ac)),
+                                ),
+                                const SizedBox(height: 14),
+                                _SectionCard(
+                                  title: '近一年趋势',
+                                  child: RepaintBoundary(
+                                      child: TrendChart(
+                                          days: _trendData,
+                                          onDaySelected: _showTrendDayDetail)),
+                                ),
+                                const SizedBox(height: 14),
+                                _StaggerEnter(
+                                  index: 3,
+                                  child: _SectionCard(
+                                    title: '正确率排行',
+                                    child: _AccuracyRanking(
+                                      banks: _bankAccuracy,
+                                      kps: _kpAccuracy,
+                                      onLoaded: _loadRankings,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                _StaggerEnter(
+                                  index: 4,
+                                  child: _SectionCard(
+                                    title: '错题统计',
+                                    child: _ErrorStatsSection(
+                                      stats: _errorStats,
+                                      onLoaded: _loadRankings,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                // v1.0.2 七项改进：隐藏/恢复今日记录入口已移入开发者模式
+                                _StaggerEnter(
+                                  index: 5,
+                                  child: _SectionCard(
+                                    title: '历史记录',
+                                    child: _HistorySection(
+                                        sessions: _recentSessions,
+                                        bankNames: _sessionBankNames),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                              ],
                       ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: '近一年趋势',
-                        child: TrendChart(days: _trendData),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: '正确率排行',
-                        child: _AccuracyRanking(
-                          banks: _bankAccuracy,
-                          kps: _kpAccuracy,
-                          onLoaded: _loadRankings,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: '错题统计',
-                        child: _ErrorStatsSection(
-                          stats: _errorStats,
-                          onLoaded: _loadRankings,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      // v1.0.2 七项改进：隐藏/恢复今日记录入口已移入开发者模式
-                      _SectionCard(
-                        title: '历史记录',
-                        child: _HistorySection(
-                            sessions: _recentSessions,
-                            bankNames: _sessionBankNames),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
+                    ),
+        ),
       ),
     );
   }
@@ -262,7 +329,14 @@ class StatsTabState extends State<StatsTab> {
     return [
       // 提示条在宽屏同样置顶
       ..._simulatedNotice(ac),
-      _buildOverview(context),
+      // 区块进场：fade + 6px 上移错落（仅前几个演，见 _StaggerEnter）
+      _StaggerEnter(
+        index: 0,
+        child: GuideAnchor(
+          id: GuideAnchorIds.statsOverview,
+          child: _buildOverview(context),
+        ),
+      ),
       const SizedBox(height: 14),
       // v1.28：并排时两卡片等高（用户反馈要求与趋势卡持平）。
       // 趋势图内容高度固定（图表 200 + 翻页条/图例），据此给年度坚持卡
@@ -273,37 +347,48 @@ class StatsTabState extends State<StatsTab> {
         first: _SectionCard(
           title: '年度坚持',
           fillHeight: true,
-          child: _buildYearHeatmap(ac),
+          child: RepaintBoundary(child: _buildYearHeatmap(ac)),
         ),
         second: _SectionCard(
           title: '近一年趋势',
           fillHeight: true,
-          child: TrendChart(days: _trendData),
+          child: RepaintBoundary(
+              child: TrendChart(
+                  days: _trendData, onDaySelected: _showTrendDayDetail)),
         ),
       ),
       const SizedBox(height: 14),
       AdaptivePair(
-        first: _SectionCard(
-          title: '正确率排行',
-          child: _AccuracyRanking(
-            banks: _bankAccuracy,
-            kps: _kpAccuracy,
-            onLoaded: _loadRankings,
+        first: _StaggerEnter(
+          index: 3,
+          child: _SectionCard(
+            title: '正确率排行',
+            child: _AccuracyRanking(
+              banks: _bankAccuracy,
+              kps: _kpAccuracy,
+              onLoaded: _loadRankings,
+            ),
           ),
         ),
-        second: _SectionCard(
-          title: '错题统计',
-          child: _ErrorStatsSection(
-            stats: _errorStats,
-            onLoaded: _loadRankings,
+        second: _StaggerEnter(
+          index: 4,
+          child: _SectionCard(
+            title: '错题统计',
+            child: _ErrorStatsSection(
+              stats: _errorStats,
+              onLoaded: _loadRankings,
+            ),
           ),
         ),
       ),
       const SizedBox(height: 14),
-      _SectionCard(
-        title: '历史记录',
-        child: _HistorySection(
-            sessions: _recentSessions, bankNames: _sessionBankNames),
+      _StaggerEnter(
+        index: 5,
+        child: _SectionCard(
+          title: '历史记录',
+          child: _HistorySection(
+              sessions: _recentSessions, bankNames: _sessionBankNames),
+        ),
       ),
       const SizedBox(height: 20),
     ];
@@ -350,17 +435,18 @@ class StatsTabState extends State<StatsTab> {
             _LegendItem(color: _heatColor(80, ac), label: '达标'),
             _LegendItem(color: _heatColor(250, ac), label: '多'),
             Row(mainAxisSize: MainAxisSize.min, children: [
+              // 「今天」保持 accent 强调环，不参与热力色阶
               Container(
                 width: 13,
                 height: 13,
                 decoration: BoxDecoration(
-                  border: Border.all(color: ac.accent, width: 1.5),
-                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: ac.accent, width: MaoLine.width),
+                  borderRadius: MaoRadius.chipBorder,
                 ),
               ),
               const SizedBox(width: MaoSpace.xxs),
               Text('今天',
-                  style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
+                  style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
             ]),
           ],
         ),
@@ -368,19 +454,93 @@ class StatsTabState extends State<StatsTab> {
         // 年度摘要：单独一行，右对齐；窄屏也不会挤掉
         Align(
           alignment: Alignment.centerRight,
-          child: Text('$activeDays 天有记录 · 共 $yearTotal 题',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
+          child: Text.rich(
+            // 数字等宽 + 「数字+空格+汉字」间距；年度摘要是实义数据 → textSecondary
+            TextSpan(
+              style: MaoType.microStyle.copyWith(color: ac.textSecondary),
+              children: [
+                TextSpan(
+                    text: '$activeDays',
+                    style:
+                        MaoType.number(MaoType.micro, weight: FontWeight.w500)),
+                const TextSpan(text: ' 天有记录 · 共 '),
+                TextSpan(
+                    text: '$yearTotal',
+                    style:
+                        MaoType.number(MaoType.micro, weight: FontWeight.w500)),
+                const TextSpan(text: ' 题'),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
+    );
+  }
+
+  /// 点击趋势图某天：弹出当日详情。
+  ///
+  /// 用户原话：「要做到点击显示详细数据（今日刷题量与正确率）」。
+  /// 此前 TrendChart 根本没接 onDaySelected，点了没有任何反应。
+  void _showTrendDayDetail(Map<String, dynamic> day) {
+    final ac = AppThemeColors.of(context);
+    final date = day['date'] as DateTime;
+    final total = (day['total'] as num?)?.toInt() ?? 0;
+    final accuracy = (day['accuracy'] as num?)?.toDouble() ?? 0;
+    final prev = previousDayTotal([..._trendData], date);
+    final delta = prev == null ? null : total - prev.round();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+            MaoSpace.lg, MaoSpace.xs, MaoSpace.lg, MaoSpace.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${date.year} 年 ${date.month} 月 ${date.day} 日',
+                style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+            const SizedBox(height: MaoSpace.sm),
+            Row(
+              children: [
+                _TrendDetailItem(
+                    label: '刷题量',
+                    value: '$total',
+                    suffix: '题',
+                    color: TrendPalette.up),
+                const SizedBox(width: MaoSpace.lg),
+                _TrendDetailItem(
+                    label: '正确率',
+                    value: accuracy.toStringAsFixed(1),
+                    suffix: '%',
+                    color: TrendPalette.accuracy),
+              ],
+            ),
+            if (delta != null) ...[
+              const SizedBox(height: MaoSpace.sm),
+              Text(
+                delta == 0
+                    ? '与前一天持平'
+                    : delta > 0
+                        ? '比前一天多 $delta 题'
+                        : '比前一天少 ${delta.abs()} 题',
+                style: MaoType.captionStyle.copyWith(
+                    color: delta >= 0 ? TrendPalette.up : TrendPalette.down),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
   /// 点击热力图某天：弹出当日详情（保持轻量，不跳页）
   void _showDayDetail(String dateKey, int total, AppThemeColors ac) {
     final parts = dateKey.split('-');
-    final label = '${parts[0]} 年 ${int.parse(parts[1])} 月 ${int.parse(parts[2])} 日';
+    final label =
+        '${parts[0]} 年 ${int.parse(parts[1])} 月 ${int.parse(parts[2])} 日';
     final isVacation = _vacationDays.contains(dateKey);
     showModalBottomSheet<void>(
       context: context,
@@ -392,8 +552,7 @@ class StatsTabState extends State<StatsTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+            Text(label, style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
             const SizedBox(height: MaoSpace.sm),
             Row(
               children: [
@@ -410,12 +569,24 @@ class StatsTabState extends State<StatsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        isVacation
-                            ? '假期模式（不计入统计）'
-                            : (total > 0 ? '刷题 $total 道' : '当天没有刷题记录'),
-                        style: MaoType.h3Style
-                            .copyWith(color: ac.textPrimary, fontSize: 15),
+                      Text.rich(
+                        TextSpan(
+                          style: MaoType.h3Style
+                              .copyWith(color: ac.textPrimary, fontSize: 15),
+                          children: [
+                            if (isVacation)
+                              const TextSpan(text: '假期模式（不计入统计）')
+                            else if (total > 0) ...[
+                              const TextSpan(text: '刷题 '),
+                              TextSpan(
+                                  text: '$total',
+                                  style: MaoType.number(15,
+                                      weight: FontWeight.w600)),
+                              const TextSpan(text: ' 道'),
+                            ] else
+                              const TextSpan(text: '当天没有刷题记录'),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -440,71 +611,107 @@ class StatsTabState extends State<StatsTab> {
     );
   }
 
+  /// 热力三档（少/达标/多）：从 accent 派生的实色档位（见 [levelShade]）。
+  /// 墨黑主题 accent 是中性灰，透明度分档会退化成灰阶，故提饱和派生。
   Color _heatColor(int total, AppThemeColors ac) {
-    if (total <= 0) return ac.cardBorder;
-    if (total < 50) return ac.accent.withOpacity(0.30);
-    if (total < 200) return ac.accent.withOpacity(0.58);
-    return ac.accent;
+    if (total <= 0) return ac.border;
+    if (total < 50) return levelShade(ac.accent, ac.surface, 0.30);
+    if (total < 200) return levelShade(ac.accent, ac.surface, 0.58);
+    return levelShade(ac.accent, ac.surface, 1.0);
   }
+
   Widget _buildOverview(BuildContext context) {
     final ac = AppThemeColors.of(context);
-    // v1.0.2 UI 设计稿：统计概览（标签栏切换 本周/本月/全部 + 四指标）
-    return _SectionCard(
-      title: '统计概览',
-      trailing: _PeriodChips(
-        current: _period,
-        onChanged: _switchPeriod,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _OverviewStat(
-              label: '刷题量',
-              value: '$_periodQuestions',
-              color: ac.accent,
-            ),
+    // 2026-10-08 真机反馈：四项指标挤在一行时，「学习时长」这类复合读数
+    // （如 2天11时）会被 FittedBox 压小、并与相邻读数几乎贴在一起。
+    // 窄屏改为 2×2：每格可用宽度翻倍，读数不再被压缩；宽屏空间充足仍走一行四格。
+    //
+    // 数字滚动进度来自 _overviewCtrl（见字段注释）：只有周期切换会从 0 演一次，
+    // 滚动导致的重挂载只会读到当前进度，不会重新播放。
+    return AnimatedBuilder(
+      animation: _overviewCtrl,
+      builder: (context, _) {
+        final progress = _overviewCtrl.value;
+        final stats = <Widget>[
+          _OverviewStat(
+            label: '刷题量',
+            value: _periodQuestions,
+            color: ac.accent,
+            progress: progress,
           ),
-          Expanded(
-            child: _OverviewStat(
-              label: '正确率',
-              value: _periodAccuracy.toStringAsFixed(1),
-              suffix: '%',
-              color: ac.accent,
-            ),
+          _OverviewStat(
+            label: '正确率',
+            value: _periodAccuracy,
+            decimals: 1,
+            suffix: '%',
+            color: ac.accent,
+            progress: progress,
           ),
-          Expanded(
-            child: _OverviewStat(
-              label: '学习时长',
-              value: _formatDuration(_periodDuration),
-              color: ac.textSecondary,
-            ),
+          _OverviewStat(
+            label: '学习时长',
+            value: _periodDuration,
+            // 复合读数（'4天23时'）没有裸数值形态，按数值滚动再交给 format
+            format: (v) => _formatDuration(v.round()),
+            color: ac.textSecondary,
+            progress: progress,
           ),
-          Expanded(
-            child: _OverviewStat(
-              label: '最长连击',
-              value: '$_longestStreak',
-              suffix: ' 天',
-              color: ac.danger,
-            ),
+          _OverviewStat(
+            label: '最长连击',
+            value: _longestStreak,
+            suffix: ' 天',
+            color: ac.danger,
+            progress: progress,
           ),
-        ],
-      ),
+        ];
+        final perRow = isWideLayout(context) ? 4 : 2;
+        final rows = <Widget>[];
+        for (var i = 0; i < stats.length; i += perRow) {
+          if (rows.isNotEmpty) rows.add(const SizedBox(height: MaoSpace.lg));
+          rows.add(Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var j = 0; j < perRow; j++) ...[
+                if (j > 0) const SizedBox(width: MaoSpace.md),
+                Expanded(child: stats[i + j]),
+              ],
+            ],
+          ));
+        }
+        return _SectionCard(
+          title: '统计概览',
+          trailing: _PeriodChips(
+            current: _period,
+            onChanged: _switchPeriod,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: rows,
+          ),
+        );
+      },
     );
   }
 
-  /// 统计包含模拟数据时的提示条（开发者模式生成模拟数据后自动启用）。
-  /// 有提示才不会把模拟出来的成绩误当成真实学习数据。
+  /// 模拟数据相关的提示条。
+  ///
+  /// 两种情况都要说清楚，否则模拟数据会「凭空消失」：
+  /// · 已纳入统计 → 提醒这些不是真实学习记录；
+  /// · 库里有模拟数据但未纳入（开关被关掉）→ 明确告知 + 一键纳入。
+  ///   此前这种情况一个字都不提示，用户看到的是「模拟数据没法显示出来」。
   List<Widget> _simulatedNotice(AppThemeColors ac) {
-    if (!context.watch<AppState>().includeSimulatedStats) return const [];
+    final appState = context.watch<AppState>();
+    final included = appState.includeSimulatedStats;
+    if (!included && !appState.hasSimulatedData) return const [];
     return [
       Container(
         padding: const EdgeInsets.symmetric(
             horizontal: MaoSpace.sm, vertical: MaoSpace.xs),
         decoration: BoxDecoration(
-          color: ac.warning.withOpacity(0.10),
+          // 提示条是轻量横幅（非卡片）：底色用次级面、描边用 warning 语义色，
+          // 不再手调透明度（组件库暂无 warning 软底，属最小令牌化实现）
+          color: ac.surfaceAlt,
           borderRadius: MaoRadius.controlBorder,
-          border: Border.all(
-              color: ac.warning.withOpacity(0.45), width: MaoLine.width),
+          border: Border.all(color: ac.warning, width: MaoLine.width),
         ),
         child: Row(
           children: [
@@ -512,10 +719,27 @@ class StatsTabState extends State<StatsTab> {
             const SizedBox(width: MaoSpace.xs),
             Expanded(
               child: Text(
-                '当前统计包含模拟数据（开发者模式生成），并非真实学习记录',
+                included
+                    ? '当前统计包含模拟数据（开发者模式生成），并非真实学习记录'
+                    : '检测到模拟数据（开发者模式生成），当前未纳入统计，所以统计页看不到它们',
                 style: MaoType.captionStyle.copyWith(color: ac.textSecondary),
               ),
             ),
+            if (!included) ...[
+              const SizedBox(width: MaoSpace.xs),
+              TextButton(
+                onPressed: () =>
+                    context.read<AppState>().setIncludeSimulatedStats(true),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: MaoSpace.xs, vertical: 0),
+                  minimumSize: const Size(0, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text('纳入统计',
+                    style: MaoType.captionStyle.copyWith(color: ac.accent)),
+              ),
+            ],
           ],
         ),
       ),
@@ -527,6 +751,44 @@ class StatsTabState extends State<StatsTab> {
   /// 用紧凑写法：四格并排时 '119h25m' 这类长值会被截断，
   /// 紧凑格式（'4天23时'）能放下且不丢信息。
   String _formatDuration(int seconds) => fmtDurationCompact(seconds);
+}
+
+/// 趋势图当日详情里的一项读数（刷题量 / 正确率）。
+class _TrendDetailItem extends StatelessWidget {
+  const _TrendDetailItem(
+      {required this.label,
+      required this.value,
+      required this.suffix,
+      required this.color});
+
+  final String label;
+  final String value;
+  final String suffix;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(value,
+                style: MaoType.h1Style
+                    .copyWith(color: color, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 2),
+            Text(suffix,
+                style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
+          ],
+        ),
+        Text(label,
+            style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
+      ],
+    );
+  }
 }
 
 class _PeriodChips extends StatelessWidget {
@@ -543,58 +805,60 @@ class _PeriodChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
+    // 周期筛选收敛到组件库 MJChip（手搓 chips 的选中态/水波/圆角不再各画各的）
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final (value, label) in _options)
-          Padding(
-            padding: const EdgeInsets.only(left: 6),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(MaoRadius.control),
-              onTap: () => onChanged(value),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(MaoRadius.control),
-                  color: current == value
-                      ? ac.accent.withOpacity(0.15)
-                      : Colors.transparent,
-                ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: MaoType.body,
-                    color: current == value ? ac.accent : ac.textSecondary,
-                    fontWeight:
-                        current == value ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
+        for (final (value, label) in _options) ...[
+          if (value != _options.first.$1) const SizedBox(width: MaoSpace.xxs),
+          MJChip(
+            label: label,
+            selected: current == value,
+            onTap: () => onChanged(value),
+            dense: true,
           ),
+        ],
       ],
     );
   }
 }
 
+/// 统计概览读数的显示值。
+///
+/// [progress] 为 1（默认）时直接返回终值——这是「滚动重挂载后立刻显示真实数字」
+/// 的保证；只有点「本周/本月/全部」时页面才会把进度从 0 推上来，读数随之滚动。
+double overviewReadoutValue(num value, double progress) =>
+    value * progress.clamp(0.0, 1.0);
+
 class _OverviewStat extends StatelessWidget {
   const _OverviewStat({
     required this.label,
     required this.value,
+    this.decimals = 0,
     this.suffix = '',
+    this.format,
     required this.color,
+    this.progress = 1,
   });
 
   final String label;
-  final String value;
+  final num value;
+  final int decimals;
   final String suffix;
+
+  /// 自定义格式化（学习时长这类复合读数用）：按滚动中的数值再交给 format。
+  final String Function(num value)? format;
   final Color color;
+
+  /// 数字滚动进度（0→1）。默认 1 = 直接显示终值；
+  /// 只有「本周/本月/全部」切换时由页面把进度从 0 推上来。
+  final double progress;
 
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
+    // 进度只缩放数值本身，不动布局；到达终态后渲染结果与静态数字完全一致。
+    final shown = overviewReadoutValue(value, progress);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -602,17 +866,91 @@ class _OverviewStat extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child: MaoNumber(value,
-              size: MaoType.h1,
-              weight: FontWeight.w700,
-              color: color,
-              suffix: suffix),
+          child: format != null
+              ? MaoNumber(format!(shown),
+                  size: MaoType.h1, weight: FontWeight.w700, color: color)
+              : MaoNumber(
+                  decimals > 0
+                      ? shown.toStringAsFixed(decimals)
+                      : '${shown.round()}',
+                  size: MaoType.h1,
+                  weight: FontWeight.w700,
+                  color: color,
+                  suffix: suffix.isEmpty ? null : suffix),
         ),
         const SizedBox(height: MaoSpace.xxs + 1),
+        // 指标标签是实义说明 → textSecondary（tertiary 只留占位/装饰）
         Text(label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: MaoType.microStyle.copyWith(color: ac.textTertiary)),
+            style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
+      ],
+    );
+  }
+}
+
+/// 区块进场：fade + 6px 上移，按 [MaoMotion.stagger] 节拍错落。
+/// 只演前 [MaoMotion.staggerMax] 个，超出直接显示——长列表不做开幕典礼。
+/// 本页私有：错落是统计页的编排需求，不做成全站组件。
+class _StaggerEnter extends StatelessWidget {
+  const _StaggerEnter({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (index >= MaoMotion.staggerMax) return child;
+    final delay = MaoMotion.stagger * index;
+    final total = MaoMotion.normal + delay;
+    // 错拍段先保持 t=0（不可见），到点后在剩余时长内落位
+    final delayFrac = delay.inMilliseconds / total.inMilliseconds;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MaoMotion.effective(context, total),
+      curve: Interval(delayFrac, 1.0, curve: MaoMotion.standard),
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child:
+            Transform.translate(offset: Offset(0, 6 * (1 - t)), child: child),
+      ),
+    );
+  }
+}
+
+/// 加载骨架：按「区块卡」形态占位（标题条 + 一行读数 + 一行说明），
+/// 比转圈更接近真实布局，淡切到真内容时不跳版。
+class _StatsSkeleton extends StatelessWidget {
+  const _StatsSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(14),
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        for (var i = 0; i < 3; i++) ...[
+          const MJSurface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    MJSkeleton(width: MaoLine.accentBarWidth, height: 14),
+                    SizedBox(width: MaoSpace.xs),
+                    MJSkeleton(width: 72, height: 14),
+                  ],
+                ),
+                SizedBox(height: MaoSpace.sm),
+                MJSkeleton(height: 32, radius: MaoRadius.small),
+                SizedBox(height: MaoSpace.xs),
+                MJSkeleton(width: 120, height: 10),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
       ],
     );
   }
@@ -640,7 +978,9 @@ class _LegendItem extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
+        Text(label,
+            style:
+                TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
         const SizedBox(width: 8),
       ],
     );
@@ -720,102 +1060,70 @@ class _AccuracyRankingState extends State<_AccuracyRanking> {
     final data = _byBank ? widget.banks : widget.kps;
     return Column(
       children: [
-        Row(
-          children: [
-            _SegBtn(
-              label: '按题库',
-              active: _byBank,
-              onTap: () => setState(() => _byBank = true),
-            ),
-            const SizedBox(width: 8),
-            _SegBtn(
-              label: '按知识点',
-              active: !_byBank,
-              onTap: () => setState(() => _byBank = false),
-            ),
-          ],
+        // 维度切换收敛到组件库 MJSegmentedControl（凹槽+滑块，取代手搓按钮对）
+        MJSegmentedControl<bool>(
+          segments: const [(true, '按题库'), (false, '按知识点')],
+          value: _byBank,
+          onChanged: (v) => setState(() => _byBank = v),
+          dense: true,
         ),
         const SizedBox(height: 10),
-        if (data.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            // v1.0.2 UI 设计稿：空状态提示
-            child: Text('暂无数据，刷几道题后再来看看',
-                style: TextStyle(color: ac.textSecondary, fontSize: MaoType.caption)),
-          )
-        else
-          for (final item in data.take(8))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${item['name']}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: accuracyTierColor(
-                          (item['accuracy'] as num?)?.toDouble() ?? 0,
-                          AppThemeColors.of(context)),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${(item['accuracy'] as num?)?.toStringAsFixed(1) ?? '0.0'}%',
-                    style: TextStyle(
-                        fontSize: MaoType.body,
-                        fontWeight: FontWeight.w600,
-                        color: ac.textPrimary),
-                  ),
-                ],
-              ),
-            ),
+        // 切换过渡收敛到组件库 MJSwitchFade：旧内容立即移除、新内容淡入上移。
+        // 之前用 AnimatedSwitcher 交叉淡入——新旧两份列表同时存在，真机反馈
+        // 「切换存在重叠画面」，且高度不同的两份还会互相挤压。
+        MJSwitchFade(
+          switchKey: 'ranking-$_byBank-${data.length}',
+          child: data.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text('暂无数据，刷几道题后再来看看',
+                      style: TextStyle(
+                          color: ac.textSecondary, fontSize: MaoType.caption)),
+                )
+              : Column(
+                  children: [
+                    for (final item in data.take(8))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${item['name']}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: MaoType.body,
+                                    color: ac.textPrimary),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: accuracyTierColor(
+                                    (item['accuracy'] as num?)?.toDouble() ?? 0,
+                                    ac),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            MaoNumber(
+                              (item['accuracy'] as num?)?.toStringAsFixed(1) ??
+                                  '0.0',
+                              size: MaoType.body,
+                              weight: FontWeight.w600,
+                              color: ac.textPrimary,
+                              suffix: '%',
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
       ],
-    );
-  }
-}
-
-class _SegBtn extends StatelessWidget {
-  const _SegBtn({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return InkWell(
-      borderRadius: BorderRadius.circular(MaoRadius.control),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(MaoRadius.control),
-          color: active ? ac.accent.withOpacity(0.15) : Colors.transparent,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: MaoType.body,
-            color: active ? ac.accent : ac.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -862,7 +1170,8 @@ class _ErrorStatsSection extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ErrorBookScreen(initialFilter: 'wrong'),
+                    builder: (_) =>
+                        const ErrorBookScreen(initialFilter: 'wrong'),
                   ),
                 ),
               ),
@@ -870,7 +1179,8 @@ class _ErrorStatsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text('按题库分布', style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
+        Text('按题库分布',
+            style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         const SizedBox(height: 6),
         if (stats.isEmpty)
           // 空状态：还没有错题记录（措辞修正，原文"0题错题总数"难以理解）
@@ -887,15 +1197,34 @@ class _ErrorStatsSection extends StatelessWidget {
                       '${s['bank_name']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: MaoType.body, color: ac.textPrimary),
+                      style: TextStyle(
+                          fontSize: MaoType.body, color: ac.textPrimary),
                     ),
                   ),
-                  Text(
-                    '到期 ${s['due_count'] ?? 0} · 收藏 ${s['bookmark_count'] ?? 0}'
-                    // v1.0.2 FSRS 可见化：该题库最早到期的卡（SQL 只取 <= now 的卡，
-                    // 只可能是「已到期/今天」，写「下次到期」语义自相矛盾）
-                    '${s['next_due_at'] != null ? ' · 最早到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}' : ''}',
-                    style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary),
+                  // 数字等宽 + 「数字+空格+汉字」间距（到期/收藏是实义数据）
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                          fontSize: MaoType.caption, color: ac.textSecondary),
+                      children: [
+                        const TextSpan(text: '到期 '),
+                        TextSpan(
+                            text: '${s['due_count'] ?? 0}',
+                            style: MaoType.number(MaoType.caption,
+                                weight: FontWeight.w400)),
+                        const TextSpan(text: ' · 收藏 '),
+                        TextSpan(
+                            text: '${s['bookmark_count'] ?? 0}',
+                            style: MaoType.number(MaoType.caption,
+                                weight: FontWeight.w400)),
+                        // v1.0.2 FSRS 可见化：该题库最早到期的卡（SQL 只取 <= now 的卡，
+                        // 只可能是「已到期/今天」，写「下次到期」语义自相矛盾）
+                        if (s['next_due_at'] != null)
+                          TextSpan(
+                              text:
+                                  ' · 最早到期：${relativeDayLabel(DateTime.parse(s['next_due_at'] as String))}'),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -921,28 +1250,25 @@ class _ErrorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
-    return InkWell(
-      borderRadius: BorderRadius.circular(MaoRadius.small),
+    // 可点指标卡走组件库次级面板（不再自拼淡底+圆角）
+    return MJSurface(
+      tone: MJTone.alt,
+      radius: MaoRadius.small,
+      padding: const EdgeInsets.symmetric(vertical: 12),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(MaoRadius.small),
-          color: color.withOpacity(0.1),
-        ),
-        child: Column(
-          children: [
-            // v1.0.2 UI 设计稿：数值带单位（0题错题总数 / 0题待复习）
-            Text('$value 题',
-                style: TextStyle(
-                    fontSize: MaoType.h2,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
-            Text(label,
-                style:
-                    TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
-          ],
-        ),
+      child: Column(
+        children: [
+          // v1.0.2 UI 设计稿：数值带单位（0题错题总数 / 0题待复习）；
+          // 等宽数字 + 「数字+空格+汉字」间距（单位走 MaoNumber 后缀机制）
+          MaoNumber(value,
+              size: MaoType.h2,
+              weight: FontWeight.w700,
+              color: color,
+              suffix: ' 题'),
+          Text(label,
+              style: TextStyle(
+                  fontSize: MaoType.caption, color: ac.textSecondary)),
+        ],
       ),
     );
   }
@@ -994,7 +1320,8 @@ class _HistorySection extends StatelessWidget {
         child: Center(
           // v1.0.2 UI 设计稿：空状态提示
           child: Text('暂无练习记录',
-              style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
+              style:
+                  TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
         ),
       );
     }
@@ -1022,9 +1349,10 @@ class _HistorySection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: MaoType.body,
                               fontWeight: FontWeight.w600,
-                              // 模拟数据用弱化色，和真实记录一眼可分
+                              // 模拟数据降一级文字色，和真实记录一眼可分
+                              //（实义标签仍用 secondary；tertiary 只留占位/装饰）
                               color: s.source == 'simulation'
-                                  ? ac.textTertiary
+                                  ? ac.textSecondary
                                   : ac.textPrimary),
                         ),
                         // v1.0.2 七项改进：会话关联题库名副标题
@@ -1033,30 +1361,57 @@ class _HistorySection extends StatelessWidget {
                           Text(
                             (() {
                               final names = bankNames[s.id]!;
+                              // 「数字+空格+汉字」间距与全站一致
                               return names.take(2).join('、') +
-                                  (names.length > 2 ? ' 等${names.length}个' : '');
+                                  (names.length > 2
+                                      ? ' 等 ${names.length} 个'
+                                      : '');
                             })(),
                             style: TextStyle(
-                                fontSize: MaoType.caption, color: ac.textSecondary),
+                                fontSize: MaoType.caption,
+                                color: ac.textSecondary),
                           ),
-                        Text(
-                          // v1.0.2 修复：未完成会话（异常退出遗留）加标识
-                          s.endTime == null || s.endTime!.isEmpty
-                              ? '${_formatTime(s.startTime)} · 未完成'
-                              : _formatTime(s.startTime),
-                          style: TextStyle(
-                              fontSize: MaoType.caption, color: ac.textSecondary),
+                        Text.rich(
+                          TextSpan(
+                            style: TextStyle(
+                                fontSize: MaoType.caption,
+                                color: ac.textSecondary),
+                            children: [
+                              // 时间是数字读数：等宽，行内多条历史对齐不跳
+                              TextSpan(
+                                  text: _formatTime(s.startTime),
+                                  style: MaoType.number(MaoType.caption,
+                                      weight: FontWeight.w400)),
+                              // v1.0.2 修复：未完成会话（异常退出遗留）加标识
+                              if (s.endTime == null || s.endTime!.isEmpty)
+                                const TextSpan(text: ' · 未完成'),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    '${s.totalQuestions} 题 · ${s.accuracy.toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
+                  // 数字等宽 + 「数字+空格+汉字」间距（'X 题 · Y%' 混排规整）
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                          fontSize: MaoType.body, color: ac.textSecondary),
+                      children: [
+                        TextSpan(
+                            text: '${s.totalQuestions}',
+                            style: MaoType.number(MaoType.body,
+                                weight: FontWeight.w400)),
+                        const TextSpan(text: ' 题 · '),
+                        TextSpan(
+                            text: s.accuracy.toStringAsFixed(0),
+                            style: MaoType.number(MaoType.body,
+                                weight: FontWeight.w400)),
+                        const TextSpan(text: '%'),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.chevron_right,
-                      size: 16, color: ac.textSecondary),
+                  Icon(Icons.chevron_right, size: 16, color: ac.textSecondary),
                 ],
               ),
             ),
@@ -1074,31 +1429,24 @@ class _HistorySection extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error, required this.onRetry});
+  const _ErrorView({super.key, required this.error, required this.onRetry});
 
   final String error;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error_outline, color: ac.danger, size: 40),
-          const SizedBox(height: 10),
-          Text('加载失败', style: TextStyle(color: ac.textPrimary)),
-          const SizedBox(height: 4),
-          Text(error,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: MaoType.caption, color: ac.textSecondary)),
-          const SizedBox(height: 10),
-          FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
-        ],
+    // 错误态走组件库空态 + 统一按钮（图标/字阶/间距不再自拼）
+    return MJEmptyState(
+      icon: Icons.error_outline,
+      title: '加载失败',
+      description: error,
+      action: MJButton(
+        label: '重试',
+        kind: MJButtonKind.secondary,
+        dense: true,
+        onPressed: onRetry,
       ),
     );
   }
 }
-

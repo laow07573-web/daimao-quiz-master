@@ -77,3 +77,6 @@ tools/planbook_gen/
 
 # 开发期截图：不入库（用户要求仓库只保留源码；成品图只放 README 引用的那几张）
 docs/ui_new/
+
+# 宣传视频成片是发布产物（同安装包），生成器入库、成片不入库
+site/assets/promo.mp4

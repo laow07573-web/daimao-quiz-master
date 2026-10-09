@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猫卷 · 题库文档，导入即刷</title>
+<meta name="description" content="猫卷 —— 本地优先的 AI 备考刷题工具。题库自己建、数据自己管、AI 讲透、算法记住。完全免费，无账号无广告，Android / Windows 双端可用。">
+<link rel="icon" type="image/png" href="assets/mascot-pawprint-0.png">
+<script>document.documentElement.classList.add('js');</script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<a class="skip" href="#main">跳到主要内容</a>
+
+<!-- ═══ 手绘元素 & 图标（内联 SVG sprite，无外部依赖） ═══ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- 爪印（装饰印章） -->
+    <symbol id="ic-paw" viewBox="0 0 64 64">
+      <g fill="currentColor">
+        <ellipse cx="32" cy="43.5" rx="13.5" ry="11"/>
+        <ellipse cx="13.5" cy="27" rx="5.5" ry="7"/>
+        <ellipse cx="25" cy="15.5" rx="5.8" ry="7.5"/>
+        <ellipse cx="39" cy="15.5" rx="5.8" ry="7.5"/>
+        <ellipse cx="50.5" cy="27" rx="5.5" ry="7"/>
+      </g>
+    </symbol>
+    <!-- 波浪下划线 -->
+    <symbol id="ic-wavy" viewBox="0 0 240 12">
+      <path d="M3 7 Q 11 3 19 7 Q 27 10 35 6 Q 44 3 52 7 Q 61 10 69 6 Q 78 3 86 7 Q 95 10 103 6 Q 112 3 120 7 Q 129 10 137 6 Q 146 3 154 7 Q 163 10 171 6 Q 180 3 188 7 Q 197 10 205 6 Q 213 3 221 7 Q 228 9 237 6"/>
+    </symbol>
+    <!-- 墨线圈注（起笔过头一点，手绘感） -->
+    <symbol id="ic-circ" viewBox="0 0 220 80" preserveAspectRatio="none">
+      <path d="M20 42 C 16 18 62 8 108 8 C 158 8 204 16 202 40 C 200 64 154 74 106 72 C 56 70 14 62 20 36"/>
+    </symbol>
+    <!-- 手绘箭头 -->
+    <symbol id="ic-arrow" viewBox="0 0 140 70">
+      <path d="M8 22 C 44 6 88 12 116 44"/>
+      <path d="M100 40 L 118 49 L 107 63"/>
+    </symbol>
+    <!-- 荧光涂抹（吉祥物旁的重点线） -->
+    <symbol id="ic-hlstroke" viewBox="0 0 160 24">
+      <path d="M8 15 C 44 10 92 8 152 12"/>
+    </symbol>
+    <!-- 特性小图标（墨线描边） -->
+    <symbol id="ic-home" viewBox="0 0 32 32">
+      <path d="M4 15.5 L16 4.5 L28 15.5"/><path d="M7 13.5 V27.5 H25 V13.5"/><path d="M13 27.5 V20 H19 V27.5"/>
+    </symbol>
+    <symbol id="ic-doc" viewBox="0 0 32 32">
+      <path d="M8 3.5 H20 L25 8.5 V28.5 H8 Z"/><path d="M20 3.5 V8.5 H25"/><path d="M12 15 H21 M12 20 H21"/>
+    </symbol>
+    <symbol id="ic-ai" viewBox="0 0 32 32">
+      <path d="M5 6.5 H27 V21.5 H16.5 L11 27 V21.5 H5 Z"/>
+      <path d="M16 10.5 l1.4 2.8 2.8 1.4 -2.8 1.4 -1.4 2.8 -1.4 -2.8 -2.8 -1.4 2.8 -1.4 z"/>
+    </symbol>
+    <symbol id="ic-shuffle" viewBox="0 0 32 32">
+      <path d="M4 10 H11 C17 10 18 22 25 22"/><path d="M22 19 L25.5 22 L22 25"/>
+      <path d="M4 22 H11 C17 22 18 10 25 10"/><path d="M22 7 L25.5 10 L22 13"/>
+    </symbol>
+    <symbol id="ic-cal" viewBox="0 0 32 32">
+      <path d="M6 8.5 H26 V27.5 H6 Z"/><path d="M6 14.5 H26"/><path d="M11 5 V10 M21 5 V10"/><path d="M12 20.5 L15 23.5 L21 18"/>
+    </symbol>
+    <symbol id="ic-chart" viewBox="0 0 32 32">
+      <path d="M5 27.5 H28"/><path d="M9 27.5 V18"/><path d="M16 27.5 V8"/><path d="M23 27.5 V14"/>
+    </symbol>
+    <symbol id="ic-pen" viewBox="0 0 32 32">
+      <path d="M21 4.5 L27.5 11 L13 25.5 L5 27 L6.5 19 Z"/><path d="M18.5 7 L25 13.5"/>
+    </symbol>
+    <symbol id="ic-wifi" viewBox="0 0 32 32">
+      <path d="M5 13 C 11.5 7.5 20.5 7.5 27 13"/><path d="M9.5 18 C 13.5 14.5 18.5 14.5 22.5 18"/><circle cx="16" cy="23.5" r="1.6"/>
+    </symbol>
+    <symbol id="ic-lock" viewBox="0 0 32 32">
+      <path d="M11 14.5 V11.5 a5 5 0 0 1 10 0 v3"/><path d="M8 14.5 H24 V27.5 H8 Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ═══ 导航 ═══ -->
+<header class="site-head">
+  <nav class="nav-in" aria-label="页面内导航">
+    <a class="brand" href="#hero">
+      <svg class="paw" aria-hidden="true"><use href="#ic-paw"/></svg>猫卷
+    </a>
+    <ul class="nav-links">
+      <li><a href="#video">视频</a></li>
+      <li><a href="#features">特性</a></li>
+      <li><a href="#start">上手</a></li>
+      <li><a href="#shots">截图</a></li>
+      <li><a href="#apikey">API&nbsp;Key</a></li>
+      <li><a href="#faq">问答</a></li>
+    </ul>
+    <a class="btn btn-mini btn-y nav-dl" href="#download">↓ 免费下载</a>
+  </nav>
+</header>
+
+<main id="main">
+
+  <!-- ═══ 1. Hero ═══ -->
+  <section id="hero" class="wrap">
+    <div>
+      <p class="hero-tag">2026 年 6 月动工 · 开源免费 · 无广告 · 无会员 · 无账号</p>
+      <h1><span class="hl hl-y">猫卷</span></h1>
+      <p class="sub hero-sub">题库文档<span class="hl hl-g">导入即刷</span><svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg></p>
+      <p class="pitch">
+        <b>本地优先的 AI 备考刷题工具</b> —— 题库自己建 · 数据自己管 · AI 讲透 · 算法记住。<br>
+        别的软件收<s class="tapeover">会员费</s> <span class="redo">这里 免费</span>
+      </p>
+
+      <div id="download" class="dl-grid">
+        <a class="btn btn-y reveal no-rot" style="--d:0ms" href="download/MaoJuan-v1.28.1-android-arm64.apk" download>
+          <span class="btn-t">↓ Android arm64<small>20.4 MB · v1.28.1</small></span>
+        </a>
+        <a class="btn reveal no-rot" style="--d:60ms" href="download/MaoJuan-v1.28.1-android-universal.apk" download>
+          <span class="btn-t">↓ Android 通用<small>34.7 MB · v1.28.1</small></span>
+        </a>
+        <a class="btn btn-g reveal no-rot" style="--d:120ms" href="download/MaoJuan-v1.28.1-windows-setup.exe" download>
+          <span class="btn-t">↓ Windows 安装版<small>Win 10 / 11 · 64 位</small></span>
+        </a>
+        <a class="btn btn-p reveal no-rot" style="--d:180ms" href="download/MaoJuan-v1.28.1-windows-portable.zip" download>
+          <span class="btn-t">↓ Windows 绿色版<small>解压即用 · v1.28.1</small></span>
+        </a>
+      </div>
+
+      <p class="dl-note">
+        <span class="circled">完全免费<svg class="circ" viewBox="0 0 220 80" aria-hidden="true"><use href="#ic-circ"/></svg></span>
+        · 免账号 · v1.28.1。arm64 版 20.4 MB，2017 年后的手机基本都装它；机型不确定就下通用版（34.7 MB）。
+        刷题、统计完全离线可用；DOCX / PDF 导入和 AI 讲解需要配你自己的 API Key。
+      </p>
+      <p class="dl-alt">
+        下不动？走 <a class="hl-link" href="https://github.com/laow07573-web/daimao-quiz-master/releases/latest" target="_blank" rel="noopener">GitHub Releases</a> 兜底
+        · <a class="hl-link" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">查看源码</a>
+      </p>
+    </div>
+
+    <div class="hero-mascot" aria-hidden="false">
+      <svg class="paw p1" aria-hidden="true"><use href="#ic-paw"/></svg>
+      <svg class="paw p2" aria-hidden="true"><use href="#ic-paw"/></svg>
+      <svg class="paw p3" aria-hidden="true"><use href="#ic-paw"/></svg>
+      <div class="boil rt3" role="img" aria-label="墨墨，猫卷的吉祥物，一只简笔黑猫，正在挥手">
+        <img src="assets/mascot-wave-0.png" alt="">
+        <img src="assets/mascot-wave-1.png" alt="">
+        <img src="assets/mascot-wave-2.png" alt="">
+      </div>
+      <p class="mascot-name">吉祥物 · <b>墨墨</b>（它一直在抖）</p>
+    </div>
+  </section>
+
+  <!-- ═══ 2. 宣传视频 ═══ -->
+  <section id="video" class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">宣传视频</span>
+      <h2>先看一遍，<span class="hl hl-p">上手更快</span></h2>
+      <p class="lead">导入题库 → 自动切题入库 → 开刷看解析，全流程走一遭。</p>
+      <svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg>
+    </div>
+    <div class="player paper reveal" style="--d:80ms">
+      <video controls preload="metadata" poster="assets/promo-poster.jpg">
+        <source src="assets/promo.mp4" type="video/mp4">
+        <img src="assets/promo-poster.jpg" alt="浏览器暂不支持时显示海报图：猫卷宣传视频">
+      </video>
+      <p class="player-cap">
+        <svg class="paw paw-solid" aria-hidden="true"><use href="#ic-paw"/></svg>
+        演示录屏 · 从一份题库文档到开刷的全过程
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 3. 特性便签墙 ═══ -->
+  <section id="features" class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">特性</span>
+      <h2>你需要的，都<span class="hl hl-y">贴在这儿</span>了</h2>
+      <p class="lead">9 张便签，说清楚猫卷能干什么。</p>
+      <svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg>
+    </div>
+
+    <div class="notes">
+      <article class="note paper tape-y rt1 reveal" style="--d:0ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-home"/></svg></span>
+        <h3>本地优先 · 无账号无广告</h3>
+        <p>装好就刷，不注册、不看广告、没会员。题库、错题、进度全在你自己设备里。</p>
+        <svg class="paw" aria-hidden="true"><use href="#ic-paw"/></svg>
+      </article>
+
+      <article class="note paper tape-g rt2 reveal" style="--d:60ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-doc"/></svg></span>
+        <h3>DOCX · PDF · JSON 一键建库</h3>
+        <p>题库文档丢进去，自动切题入库；PDF 插图随题保留，JSON 直接入库。</p>
+      </article>
+
+      <article class="note paper tape-p rt3 reveal" style="--d:120ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-ai"/></svg></span>
+        <h3>AI 讲解与追问</h3>
+        <p>按「题眼破题法」拆题，哪句没懂接着问 —— 用你自己的 API Key 直连。</p>
+      </article>
+
+      <article class="note paper tape-g rt4 reveal" style="--d:0ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-shuffle"/></svg></span>
+        <h3>四种刷题模式</h3>
+        <p>定向爆破 / 顺序 / 随机 / 错题，想快刷还是专攻薄弱点，随你挑。</p>
+        <svg class="paw" aria-hidden="true"><use href="#ic-paw"/></svg>
+      </article>
+
+      <article class="note paper tape-p rt5 reveal" style="--d:60ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-cal"/></svg></span>
+        <h3>错题本 + FSRS-5 复习</h3>
+        <p>答错自动进错题本，按遗忘曲线排下次复习，到点只刷该刷的。</p>
+      </article>
+
+      <article class="note paper tape-y rt6 reveal" style="--d:120ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-chart"/></svg></span>
+        <h3>数据统计与年度热力图</h3>
+        <p>刷题量、正确率、连续打卡一屏看全，年度坚持热力图把努力画出来。</p>
+      </article>
+
+      <article class="note paper tape-p rt7 reveal" style="--d:0ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-pen"/></svg></span>
+        <h3>手写批注</h3>
+        <p>细笔 / 普通笔 / 荧光笔直接在题上圈重点、写推导，按题保存不丢。</p>
+      </article>
+
+      <article class="note paper tape-y rt8 reveal" style="--d:60ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-wifi"/></svg></span>
+        <h3>局域网同步</h3>
+        <p>同一 Wi-Fi 下手机平板自动对上，题库和进度互相同步，不走云端。</p>
+        <svg class="paw" aria-hidden="true"><use href="#ic-paw"/></svg>
+      </article>
+
+      <article class="note paper tape-g rt9 reveal" style="--d:120ms">
+        <span class="ic"><svg aria-hidden="true"><use href="#ic-lock"/></svg></span>
+        <h3>口令加密备份</h3>
+        <p>一键导出备份；设个口令，整个文件 AES-256-GCM 加密，换机也安心。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══ 4. 三步上手 ═══ -->
+  <section id="start" class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">上手</span>
+      <h2>三步，<span class="hl hl-g">开刷</span></h2>
+      <p class="lead">从装好到做第一道题，就这三步。</p>
+      <svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg>
+    </div>
+
+    <div class="steps">
+      <article class="step-card paper rt2 reveal" style="--d:0ms">
+        <span class="step-no num">1</span>
+        <h3>下载安装</h3>
+        <p>Windows 双击安装包（绿色版解压即用）；Android 装个 APK，装好就能开。</p>
+      </article>
+
+      <svg class="step-arrow" viewBox="0 0 140 70" aria-hidden="true"><use href="#ic-arrow"/></svg>
+
+      <article class="step-card paper rt11 reveal" style="--d:80ms">
+        <span class="step-no num">2</span>
+        <h3>导入题库</h3>
+        <p>DOCX / PDF / JSON 直接丢进去；想先试试，就一键导入示例题库。</p>
+      </article>
+
+      <svg class="step-arrow" viewBox="0 0 140 70" aria-hidden="true"><use href="#ic-arrow"/></svg>
+
+      <article class="step-card paper rt5 reveal" style="--d:160ms">
+        <span class="step-no num">3</span>
+        <h3>开刷</h3>
+        <p>选题库、选模式，开刷。答错的自动进错题本，FSRS 替你把复习排好。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══ 5. 真机截图 ═══ -->
+  <section id="shots" class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">真机截图</span>
+      <h2>真机长<span class="hl hl-p">这样</span></h2>
+      <p class="lead">真机实拍，非示意图。</p>
+      <svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg>
+    </div>
+
+    <div class="shots">
+      <figure class="shot rt2 reveal" style="--d:0ms">
+        <div class="phone">
+          <div class="speaker" aria-hidden="true"></div>
+          <div class="screen"><img src="assets/shots/home.png" alt="猫卷首页截图：问候卡（含累计数据）与本周战绩一屏展示"></div>
+        </div>
+        <figcaption><b>首页</b><span>问候卡与本周战绩，一屏不滚动</span></figcaption>
+      </figure>
+
+      <figure class="shot rt12 reveal" style="--d:60ms">
+        <div class="phone">
+          <div class="speaker" aria-hidden="true"></div>
+          <div class="screen"><img src="assets/shots/start.png" alt="猫卷开始页截图：定向爆破、题库管理、错题本、导入四大入口"></div>
+        </div>
+        <figcaption><b>开始页</b><span>定向爆破 / 题库管理 / 错题本 / 导入</span></figcaption>
+      </figure>
+
+      <figure class="shot rt7 reveal" style="--d:120ms">
+        <div class="phone">
+          <div class="speaker" aria-hidden="true"></div>
+          <div class="screen"><img src="assets/shots/stats.png" alt="猫卷统计页截图：年度坚持热力图与近一年趋势"></div>
+        </div>
+        <figcaption><b>统计页</b><span>年度坚持热力图与近一年趋势</span></figcaption>
+      </figure>
+
+      <figure class="shot rt9 reveal" style="--d:180ms">
+        <div class="phone">
+          <div class="speaker" aria-hidden="true"></div>
+          <div class="screen"><img src="assets/shots/errorbook.png" alt="猫卷错题本截图：薄弱知识点分组与到期提示"></div>
+        </div>
+        <figcaption><b>错题本</b><span>薄弱知识点分组与到期提示</span></figcaption>
+      </figure>
+    </div>
+
+    <p class="shots-note reveal">
+      <svg class="paw paw-solid" aria-hidden="true" style="display:inline-block;vertical-align:-5px;width:20px;height:20px"><use href="#ic-paw"/></svg>
+      以上四张都是真机实拍 —— 你装上看到的，就是这些页面。
+    </p>
+  </section>
+
+  <!-- ═══ 6. API Key 说明 ═══ -->
+  <section id="apikey" class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">API Key</span>
+      <h2>哪些要 Key，<span class="hl hl-y">哪些不要</span></h2>
+      <p class="lead">猫卷用你自己的 Key（BYOK）直连模型服务商 —— 先看这两张对照便签。</p>
+      <svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg>
+    </div>
+
+    <div class="key-cols">
+      <div class="key-mascot boil" role="img" aria-label="墨墨举着荧光笔，正在划重点">
+        <img src="assets/mascot-highlight-0.png" alt="">
+        <img src="assets/mascot-highlight-1.png" alt="">
+        <img src="assets/mascot-highlight-2.png" alt="">
+        <svg class="hl-stroke" viewBox="0 0 160 24" aria-hidden="true"><use href="#ic-hlstroke"/></svg>
+      </div>
+
+      <article class="key-card need paper tape-p rt1 reveal" style="--d:0ms">
+        <h3>要 Key</h3>
+        <ul>
+          <li><b>DOCX / PDF 导入</b><span>题目靠 AI 解析切块，没 Key 导不了（导入页会直接提示去配置）</span></li>
+          <li><b>AI 讲解与追问</b><span>逐题「题眼破题法」讲解 + 对话式追问</span></li>
+          <li><b>错题本「生成建议」</b><span>AI 深度诊断，给你的复习出主意</span></li>
+        </ul>
+      </article>
+
+      <article class="key-card no paper tape-g rt3 reveal" style="--d:100ms">
+        <h3>不用 Key</h3>
+        <ul>
+          <li><b>JSON 导入</b><span>结构化题库直接入库，不走 AI</span></li>
+          <li><b>示例题库</b><span>内置 10 道医学题，一键导入就能体验</span></li>
+          <li><b>刷题与判分</b><span>七种题型，各有对应判定逻辑</span></li>
+          <li><b>错题本 + FSRS-5</b><span>复习排期、薄弱诊断都是本地算的</span></li>
+          <li><b>数据统计</b><span>题量、正确率、年度热力图全在本地</span></li>
+        </ul>
+      </article>
+    </div>
+
+    <p class="key-foot paper reveal">
+      <svg class="paw" aria-hidden="true"><use href="#ic-paw"/></svg>
+      <span class="circled">Key 存在你自己设备里<svg class="circ" viewBox="0 0 220 80" aria-hidden="true"><use href="#ic-circ"/></svg></span>
+      —— AES-256-GCM 加密存储（Android 优先放系统 Keystore），AI 请求用它直连模型服务商，不经过我们的服务器。<br>
+      兼容任意 OpenAI 兼容接口：默认适配 DeepSeek，通义 / 智谱 / Kimi / OpenAI / OpenRouter 都行。
+    </p>
+  </section>
+
+  <!-- ═══ 7. FAQ ═══ -->
+  <section id="faq" class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2>常见的<span class="hl hl-g">几个问题</span></h2>
+      <svg class="wavy" viewBox="0 0 240 12" aria-hidden="true"><use href="#ic-wavy"/></svg>
+      <div class="mascot-stamp boil" aria-hidden="true">
+        <img src="assets/mascot-pawprint-0.png" alt="">
+        <img src="assets/mascot-pawprint-1.png" alt="">
+        <img src="assets/mascot-pawprint-2.png" alt="">
+      </div>
+    </div>
+
+    <div class="faq-list">
+      <details class="faq-item paper rt1 reveal" style="--d:0ms">
+        <summary><span class="q">问</span>猫卷收费吗？</summary>
+        <div class="faq-body">
+          <p><b>完全免费。</b>无账号、无会员、无广告、无内购 —— 下载下来就是你的，随便用。</p>
+        </div>
+      </details>
+
+      <details class="faq-item paper rt2 reveal" style="--d:40ms">
+        <summary><span class="q">问</span>我的数据存在哪里？会被上传吗？</summary>
+        <div class="faq-body">
+          <p><b>全在本地。</b>题库、错题、批注、复习进度都存在设备的本地数据库里，离线可用，卸载即彻底删除。</p>
+          <p>备份是你自己导出的文件，不存在别人服务器上；AI 请求也是用你的 Key 直连模型服务商，不经过我们。</p>
+        </div>
+      </details>
+
+      <details class="faq-item paper rt3 reveal" style="--d:80ms">
+        <summary><span class="q">问</span>Windows 提示「已保护你的电脑」，怎么点？</summary>
+        <div class="faq-body">
+          <p>蓝屏上先点<b>「更多信息」</b>，再点<b>「仍要运行」</b>。</p>
+          <p>这是安装包暂未购买代码签名证书的<b>未签名</b>提示，不是「有问题」。不放心就先核对 SHA-256 再装（见下一条），并只从本页或 GitHub Releases 下载。</p>
+        </div>
+      </details>
+
+      <details class="faq-item paper rt4 reveal" style="--d:120ms">
+        <summary><span class="q">问</span>怎么校验下载的文件？</summary>
+        <div class="faq-body">
+          <p>每个 Release 都附 <span class="num">SHA256SUMS.txt</span>。Windows 开 PowerShell，把文件名换成你实际下载的那个：</p>
+          <pre class="code"><span class="cm"># 把文件名换成你实际下载的那个</span>
+Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256</pre>
+          <p>把输出的 <span class="num">Hash</span> 与 <span class="num">SHA256SUMS.txt</span> 里对应行对比，一致就说明文件完整、没被动手脚。Android 用任意哈希校验工具算 APK 的 SHA-256，同样跟 <span class="num">-android-arm64.apk</span> 那一行对比。</p>
+        </div>
+      </details>
+
+      <details class="faq-item paper rt5 reveal" style="--d:160ms">
+        <summary><span class="q">问</span>手机上能用吗？</summary>
+        <div class="faq-body">
+          <p>能。<b>Android 6.0 及以上（minSdk 23）</b>装 APK 就行。2017 年后的手机基本都装 arm64 版（20.4 MB）；不确定机型就下通用版（34.7 MB）。</p>
+        </div>
+      </details>
+
+      <details class="faq-item paper rt6 reveal" style="--d:200ms">
+        <summary><span class="q">问</span>开源吗？什么协议？</summary>
+        <div class="faq-body">
+          <p>开源，协议是 <b>AGPL-3.0</b>：自由使用、修改、分发（含商用），但衍生作品必须同样以 AGPL-3.0 开源。</p>
+          <p>代码在 <a class="hl-link" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">github.com/laow07573-web/daimao-quiz-master</a>。</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══ 8. 页脚 ═══ -->
+<footer>
+  <div class="foot-in">
+    <a class="star-cta" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">
+      <svg class="paw" aria-hidden="true"><use href="#ic-paw"/></svg>觉得好用，就点个 Star ★
+    </a>
+    <p class="foot-note">给个 Star 是最实在的支持 —— 它能让更多正在备考的同学搜到猫卷。</p>
+    <p class="foot-note">
+      GitHub 仓库：<a class="hl-link" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">github.com/laow07573-web/daimao-quiz-master</a>
+    </p>
+    <p class="foot-note">
+      许可：<span class="num">AGPL-3.0</span>（自由使用 / 修改 / 分发，衍生作品须同样开源） · 作者：B 站 笨蛋鱼坏蛋猫
+    </p>
+    <p class="foot-note">Copyright © 2026 笨蛋鱼坏蛋猫</p>
+    <div class="foot-paws" aria-hidden="true">
+      <svg class="paw"><use href="#ic-paw"/></svg>
+      <svg class="paw"><use href="#ic-paw"/></svg>
+      <svg class="paw"><use href="#ic-paw"/></svg>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/app.js" defer></script>
+</body>
+</html>

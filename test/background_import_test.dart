@@ -103,7 +103,7 @@ void main() {
       await appState.init();
       final tmp = Directory.systemTemp.createTempSync('bg_import_docx');
       final docx = File('${tmp.path}/无API测试.docx')..writeAsBytesSync([1, 2]);
-      await appState.startBackgroundImport(docxFiles: [docx.path]);
+      await appState.startBackgroundImport(aiFiles: [docx.path]);
       final result = appState.pendingImportResult;
       expect(result, isNotNull);
       expect(result!.success, isFalse);

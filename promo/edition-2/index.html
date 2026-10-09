@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="猫卷：把自己的题库，变成自己的学习工作台。">
+  <title>猫卷 / 学习工作台</title>
+  <link rel="icon" href="../assets/brand.svg">
+  <style>
+
+:root{--ink:#111411;--acid:#d6ff3f;--paper:#f2f0e8;--white:#fffefa;--muted:#777a70;--red:#ff5544;--line:#c5c7bb;--serif:Georgia,'Songti SC','SimSun',serif;--sans:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;--mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5}a{color:inherit;text-decoration:none}.grain{position:fixed;inset:0;pointer-events:none;z-index:20;opacity:.35;background-image:radial-gradient(#111411 0.6px,transparent 0.6px);background-size:4px 4px}.site-header{height:78px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 clamp(22px,5vw,76px);position:relative;z-index:10}.wordmark{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.04em;font-size:20px}.mark{display:grid;place-items:center;width:34px;height:34px;background:var(--acid);color:var(--ink);font-size:19px;font-weight:700;transform:rotate(-6deg)}.header-meta,.header-link{font:11px var(--mono);letter-spacing:.08em;color:#aeb3a5}.header-link{color:var(--acid);border-bottom:1px solid var(--acid);padding-bottom:4px}.header-link span{font-size:15px;margin-left:7px}.hero{background:var(--ink);color:var(--paper);min-height:650px;padding:clamp(72px,11vw,150px) clamp(22px,10vw,150px) 55px;position:relative;display:flex;flex-direction:column;justify-content:space-between}.hero-kicker,.overline,.section-label,.hero-index{font:11px var(--mono);letter-spacing:.1em;text-transform:uppercase}.hero-kicker{color:var(--acid);margin-bottom:26px}.hero h1{font-size:clamp(64px,12vw,170px);line-height:.94;letter-spacing:-.085em;margin:0;font-weight:600;max-width:950px}.hero h1 em,.evidence-copy em,.principle-big em{font-family:var(--serif);font-weight:400;color:var(--acid)}.hero-bottom{display:flex;justify-content:space-between;align-items:end;gap:40px;margin-top:75px}.hero-bottom p{max-width:390px;color:#b9bdb2;font-size:15px;margin:0}.circle-cta{width:74px;height:74px;border:1px solid var(--acid);border-radius:50%;display:grid;place-items:center;color:var(--acid);font-size:32px;transition:.25s}.circle-cta:hover{background:var(--acid);color:var(--ink);transform:rotate(-45deg)}.hero-index{position:absolute;right:clamp(22px,5vw,76px);top:50%;color:#7d8475}.hero-index span{color:var(--red);margin:0 5px}.ticker{min-height:58px;background:var(--acid);display:flex;align-items:center;justify-content:center;gap:28px;padding:15px 20px;font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap}.ticker i{font-style:normal;font-size:18px}.desk-section,.evidence-section,.principles-section{padding:clamp(80px,11vw,150px) clamp(22px,8vw,120px)}.section-label{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px;margin-bottom:75px;color:var(--muted)}.section-label span:first-child{color:var(--red)}.desk-grid{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(45px,10vw,150px)}.overline{color:var(--red);margin:0 0 22px}.desk-intro h2,.evidence-copy h2,.download-section h2{font-size:clamp(45px,7vw,100px);letter-spacing:-.075em;line-height:.95;margin:0 0 30px;font-weight:500}.body-copy{max-width:430px;color:var(--muted);font-size:16px}.feature-list{border-top:2px solid var(--ink)}.feature-row{display:grid;grid-template-columns:48px 1fr 28px;gap:18px;padding:27px 0;border-bottom:1px solid var(--line);align-items:start;transition:.25s}.feature-row:hover{padding-left:13px;background:var(--acid)}.feature-no{font:12px var(--mono);color:var(--red)}.feature-row h3{font-size:23px;letter-spacing:-.04em;margin:0 0 7px}.feature-row p{color:var(--muted);font-size:14px;margin:0;max-width:450px}.arrow{font-size:20px}.evidence-section{background:#dedfd3}.evidence-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(40px,9vw,130px);align-items:center}.evidence-copy h2{font-size:clamp(50px,7vw,105px)}.proof-list{display:flex;flex-direction:column;gap:12px;margin-top:38px;font:12px var(--mono);color:#4e5549}.screen-stack{height:560px;position:relative}.screen-card{position:absolute;margin:0;width:240px;background:var(--white);padding:11px 11px 28px;box-shadow:18px 18px 0 rgba(17,20,17,.1)}.screen-card img{display:block;width:100%;height:480px;object-fit:cover;object-position:top}.screen-card figcaption{font:11px var(--mono);margin-top:10px}.screen-back{right:22%;top:5%;transform:rotate(7deg)}.screen-front{left:14%;top:12%;transform:rotate(-5deg);z-index:2}.principles-section{background:var(--red);color:var(--white)}.principles-section .section-label{border-color:rgba(255,255,255,.4);color:#ffd0ca}.principles-section .section-label span:first-child{color:var(--acid)}.principles-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:12%;align-items:start}.principle-big{font-size:clamp(55px,9vw,130px);line-height:.9;letter-spacing:-.08em}.principle-big em{color:var(--acid)}.principle-notes{border-top:1px solid rgba(255,255,255,.4)}.principle-notes p{border-bottom:1px solid rgba(255,255,255,.4);padding:20px 0;margin:0;color:#ffe8e3;font-size:15px}.principle-notes b{color:var(--acid);font-size:18px}.download-section{background:var(--acid);padding:clamp(75px,11vw,140px) clamp(22px,8vw,120px);display:grid;grid-template-columns:170px 1fr;gap:clamp(35px,10vw,150px);align-items:center}.download-section h2{color:var(--ink)}.download-section .body-copy{color:#414b29}.download-stamp{width:144px;height:144px;border:2px solid var(--ink);border-radius:50%;display:grid;place-items:center;text-align:center;font:12px var(--mono);line-height:1.2;transform:rotate(-12deg)}.download-stamp span{font-family:var(--serif);font-size:22px}.download-actions{display:flex;align-items:center;gap:25px;margin-top:35px}.download-button{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:var(--acid);padding:17px 21px;width:245px;font-weight:600}.download-button b{font-size:23px}.text-link{font:12px var(--mono);border-bottom:1px solid var(--ink);padding-bottom:4px}.footer{background:var(--ink);color:#899080;display:flex;justify-content:space-between;padding:22px clamp(22px,8vw,120px);font:10px var(--mono);letter-spacing:.06em}@media(max-width:750px){.header-meta{display:none}.hero{min-height:600px;padding-top:75px}.hero h1{font-size:clamp(62px,18vw,110px)}.hero-bottom{align-items:start;flex-direction:column;margin-top:90px}.hero-index{top:auto;bottom:58px}.ticker{justify-content:start;overflow:hidden;gap:18px}.desk-grid,.evidence-grid,.principles-grid{grid-template-columns:1fr}.section-label{margin-bottom:45px}.feature-row h3{font-size:20px}.screen-stack{height:530px;margin-top:20px}.screen-front{left:7%}.screen-back{right:5%}.download-section{grid-template-columns:1fr}.download-stamp{display:none}.footer{flex-direction:column;gap:10px}.download-actions{align-items:start;flex-direction:column}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="wordmark" href="#top" aria-label="猫卷首页">
+      <span class="mark">猫</span><span>猫卷</span>
+    </a>
+    <div class="header-meta"><span class="status-dot"></span>LOCAL-FIRST / 01</div>
+    <a class="header-link" href="#download">开始使用 <span>↗</span></a>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-kicker">自己的资料 · 自己的节奏 · 自己的记录</div>
+      <h1>把题库，<br><em>做成自己的。</em></h1>
+      <div class="hero-bottom">
+        <p>猫卷是一个本地优先的开源备考工具。导入资料、开始练习、留下错题——不注册，也不被催着学习。</p>
+        <a class="circle-cta" href="#download" aria-label="跳到下载"><span>↓</span></a>
+      </div>
+      <div class="hero-index">01 <span>/</span> 04</div>
+    </section>
+
+    <section class="ticker" aria-label="产品特点">
+      <div>题库自己建</div><i>✦</i><div>核心数据本地保存</div><i>✦</i><div>AI 可选，不绑服务商</div><i>✦</i><div>开源 · 无广告 · 无会员</div><i>✦</i>
+    </section>
+
+    <section class="desk-section" id="features">
+      <div class="section-label"><span>02</span><span>工作台</span></div>
+      <div class="desk-grid">
+        <div class="desk-intro">
+          <p class="overline">A QUIET TOOL FOR SERIOUS STUDY</p>
+          <h2>从资料<br>到理解。</h2>
+          <p class="body-copy">不再把题目散落在文档、聊天记录和截图里。猫卷把它们收进一个安静的工作台，留给你真正需要的东西。</p>
+        </div>
+        <div class="feature-list">
+          <article class="feature-row"><span class="feature-no">01</span><div><h3>导入与校对</h3><p>JSON 直接导入，DOCX 交给 AI 解析。先预览，再确认，不让错误资料混进复习。</p></div><span class="arrow">↗</span></article>
+          <article class="feature-row"><span class="feature-no">02</span><div><h3>三种练习节奏</h3><p>刷题即时核对，练习统一批改，背题快速浏览。今天想怎么学，由你决定。</p></div><span class="arrow">↗</span></article>
+          <article class="feature-row"><span class="feature-no">03</span><div><h3>错题有自己的去处</h3><p>按间隔复习回看真正需要的题，知识点和批注留在本机，不用账号替你保管。</p></div><span class="arrow">↗</span></article>
+          <article class="feature-row"><span class="feature-no">04</span><div><h3>AI 放在题目旁边</h3><p>用自己的 Key 追问题眼、逻辑和易错点。需要时打开，不需要时安静待着。</p></div><span class="arrow">↗</span></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="evidence-section">
+      <div class="section-label"><span>03</span><span>真实界面</span></div>
+      <div class="evidence-grid">
+        <div class="evidence-copy"><p class="overline">A GLIMPSE INSIDE</p><h2>看得见的<br><em>学习进度。</em></h2><p class="body-copy">不做虚假的仪表盘。每一个数字都来自你的真实作答，每一块记录都可以带走。</p><div class="proof-list"><span>✓ 离线可刷题</span><span>✓ 支持 Android / Windows</span><span>✓ AGPL-3.0 开源</span></div></div>
+        <div class="screen-stack">
+          <figure class="screen-card screen-back"><img src="../assets/shots/home.png" alt="猫卷首页界面"></figure>
+          <figure class="screen-card screen-front"><img src="../assets/shots/stats.png" alt="猫卷统计界面"><figcaption>统计 · 把变化看清楚</figcaption></figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="principles-section">
+      <div class="section-label"><span>04</span><span>原则</span></div>
+      <div class="principles-grid"><div class="principle-big">学习不该<br><em>变成竞赛。</em></div><div class="principle-notes"><p><b>本地优先</b><br>你的题库、错题和批注先属于你的设备。</p><p><b>不夸大 AI</b><br>需要自备 Key，回答需要核对，工具不承诺提分。</p><p><b>慢一点也可以</b><br>没有连胜压力，没有会员墙，只保留下一道题。</p></div></div>
+    </section>
+
+    <section class="download-section" id="download"><div class="download-stamp">OPEN<br>SOURCE<br><span>猫卷</span></div><div><p class="overline">TAKE YOUR WORKBENCH WITH YOU</p><h2>从第一道题<br>开始。</h2><p class="body-copy">Android 与 Windows。免费下载，开源维护。下载后可离线使用核心刷题功能。</p><div class="download-actions"><a class="download-button" href="../download/MaoJuan-v1.28.1-android-arm64.apk" download><span>Android ARM64</span><b>↓</b></a><a class="text-link" href="https://github.com/laow07573-web/daimao-quiz-master">查看源码 ↗</a></div></div></section>
+  </main>
+
+  <footer class="footer"><span>猫卷 / 做题有数，学习有度。</span><span>LOCAL-FIRST · OPEN SOURCE · 2026</span></footer>
+  <script>
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const links = document.querySelectorAll('a[href^="#"]');
+links.forEach(link => link.addEventListener('click', event => {
+  const target = document.querySelector(link.getAttribute('href'));
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth'});
+}));
+
+const rows = document.querySelectorAll('.feature-row');
+rows.forEach((row, index) => {
+  row.addEventListener('mouseenter', () => row.style.setProperty('--row-index', index));
+});
+
+// Download links stay intentionally relative to this standalone edition.
+// No dependency on the previous page's navigation or scripts.
+
+</script>
+</body>
+</html>

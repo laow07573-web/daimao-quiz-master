@@ -184,7 +184,8 @@ void main() {
           .toList();
       expect(cols, contains('device_id'));
       final version = await db.rawQuery('PRAGMA user_version');
-      expect(version.first.values.first, 11);
+      // 版本号随 schema 抬头（v12 题目配图）；本用例钉的是「新装库即当前版本」
+      expect(version.first.values.first, 12);
     });
   });
 }

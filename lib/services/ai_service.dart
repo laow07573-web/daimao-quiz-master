@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
@@ -86,7 +87,7 @@ class AIService {
       allQuestions.addAll(r.$1);
       if (r.$2 != null) {
         // 内部降级标记不展示给用户。
-        errors.add('第 ${i + 1} 块：${r.$2!.replaceAll(_tokenLimitMarker, '')}');
+        errors.add('第 ${i + 1} 块：${r.$2!.replaceAll(_tokenLimitMarker, '').replaceAll(_permanentMarker, '')}');
       }
     }
   
@@ -96,12 +97,13 @@ class AIService {
 
   /// 题目起始行判定（与 DocParserService._isQuestionLine 同口径，
   /// 另兼容【第N题】等括号变体）：边界切块的唯一依据。
-  /// 提升为静态公开：便于单测直接验证切块正确性。
-  static final RegExp _questionStartPattern = RegExp(
+  /// 提升为静态公开：便于单测直接验证切块正确性；
+  /// PDF 图归属（前置图挂下一题）也复用同一口径。
+  static final RegExp questionStartPattern = RegExp(
       r'^\s*(?:\d+[\.、．\)）]|第\s*\d+\s*题|[（\(]\s*\d+\s*[）\)]|【\s*第?\s*\d+\s*题\s*】)');
-  
-  static bool _isQuestionStart(String line) =>
-      _questionStartPattern.hasMatch(line);
+
+  static bool isQuestionStart(String line) =>
+      questionStartPattern.hasMatch(line);
   
   /// 题目边界感知切块（v1.27 提速 + 防切断）：
   /// 1. 按题目起始行把文本分成完整题目块（题干+选项+答案+解析永不拆散）；
@@ -119,7 +121,7 @@ class AIService {
     final header = StringBuffer();
     final cur = StringBuffer();
     for (final line in lines) {
-      if (_isQuestionStart(line)) {
+      if (isQuestionStart(line)) {
         final s = cur.toString().trim();
         if (s.isNotEmpty) blocks.add(s);
         cur.clear();
@@ -189,6 +191,9 @@ class AIService {
   
   /// 内部标记：错误属于「超过模型输出上限」（可自动降级重试，不展示给用户）。
   static const String _tokenLimitMarker = '|TOKEN_LIMIT';
+
+  /// 内部标记：终态错误（Key 无效 401 / 余额不足 402），重试无益
+  static const String _permanentMarker = '|PERMANENT';
   
   /// 用 AI 解析一个文本块中的题目（失败自动重试 1 次；
   /// 输出上限错误按 [​_maxTokensFallbacks] 逐级降级重试）。
@@ -197,17 +202,28 @@ class AIService {
       String chunk, int bankId, String now) async {
     for (var i = 0; i < _maxTokensFallbacks.length; i++) {
       final mt = _maxTokensFallbacks[i];
-      var result = await _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
-      if (result.$2 == null) return result;
-      if (result.$2!.contains(_tokenLimitMarker) &&
-          i < _maxTokensFallbacks.length - 1) {
+      // 每档最多试 3 次：空响应/限流/瞬时错误都值得再试（0s / 2s / 4s 退避）。
+      // 终态错误（401/402）与「撞输出上限」不重试——前者重试无益，后者换档位
+      (List<Question>, String?) result = (<Question>[], '未尝试');
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+        result = await _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
+        if (result.$2 == null) return result;
+        if (result.$2!.contains(_tokenLimitMarker) ||
+            result.$2!.contains(_permanentMarker)) {
+          break;
+        }
+      }
+      final err = result.$2!;
+      if (err.contains(_permanentMarker) || !err.contains(_tokenLimitMarker)) {
+        return result; // 终态错误或已重试耗尽；上限错误才继续降档
+      }
+      if (i < _maxTokensFallbacks.length - 1) {
         // v1.27：超过模型输出上限——自动降级重试（用户换模型/中转站也兼容）。
         await Future.delayed(const Duration(seconds: 1));
-        continue;
       }
-      // 其余失败：沿用既有的一次重试（退避 1s）。
-      await Future.delayed(const Duration(seconds: 1));
-      return _parseChunkOnce(chunk, bankId, now, maxTokens: mt);
     }
     return (<Question>[], 'AI请求失败: 输出上限降级重试全部失败');
   }
@@ -260,6 +276,7 @@ $chunk
 9. 原文中的解析内容请保留到 analysis 字段。
 10. 只返回 JSON，不要任何其他文字。
 11. 控制输出长度：题干/选项/答案如实提取即可，不要添加原文没有的冗余描述
+12. 文中形如 {{img:N}} 的图片占位符必须原样保留在对应题目的对应字段（题干/选项/解析）的对应位置，不得删改、翻译、重排或补全
 
 请直接返回 JSON：''';
 
@@ -290,8 +307,14 @@ $chunk
         final decoded = utf8.decode(rawBytes);
         logger.logUtf8Decode(rawBytes.length, decoded.length, decoded);
         final data = jsonDecode(decoded);
-        final content = data['choices']?[0]?['message']?['content'] as String?;
-        if (content == null) return (<Question>[], 'AI 响应缺少内容');
+        final content =
+            (data['choices']?[0]?['message']?['content'] as String?) ?? '';
+        // 空内容（null/空串/只剩 ``` 围栏）：多为服务端瞬时空响应（限流、
+        // 余额临界、内容过滤）。此前空串会一路走到 jsonDecode('') 炸出
+        // "Unexpected end of input"——用户看到的是一堆异常堆栈，完全看不懂
+        if (_isBlankContent(content)) {
+          return (<Question>[], 'AI 返回了空响应（可能是限流或账户余额不足）');
+        }
         logger.log('PIPE:DECODE', 'contentLen=${content.length}  parsing questions...');
         _trackUsage(data);
 
@@ -304,7 +327,9 @@ $chunk
         } catch (e) {
           final repaired = repairTruncatedJson(content);
           if (repaired == null) {
-            return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON（$e）');
+            // 不把原始异常串（带 ^ 定位符）抛给用户——它看起来像程序崩溃
+            return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON'
+                '（可能被截断或返回了异常内容，已尝试抢修仍失败）');
           }
           parsed = repaired;
           logger.log('PIPE:DECODE',
@@ -315,32 +340,198 @@ $chunk
           return (<Question>[], 'AI 解析生成失败：响应缺少 questions 字段');
         }
 
-        final questions = questionsList.map((q) {
-          final opts = (q['options'] as List?)
-                  ?.map((o) => o.toString().trim())
-                  .where((o) => o.isNotEmpty)
-                  .toList() ??
-              [];
-          return Question(
-            bankId: bankId,
-            title: (q['title'] ?? '').toString().trim(),
-            options: opts,
-            correctAnswer: (q['correct_answer'] ?? '').toString().trim().toUpperCase(),
-            analysis: _nullIfEmpty(q['analysis']?.toString().trim()),
-            questionType: _detectType(q),
-            knowledgePoint: _nullIfEmpty(q['knowledge_point']?.toString().trim()),
-            createdAt: now,
-          );
-        }).toList();
-        return (questions, null);
+        return (_questionsFromJson(parsed, bankId, now), null);
       } else {
         // v1.27：识别「输出上限」类错误（用户换模型/中转站上限低时出现），
         // 加内部标记供降级重试；其余错误如实上报。
         final bodyText = utf8.decode(response.bodyBytes, allowMalformed: true);
-        final limitSuffix =
-            isTokenLimitError(bodyText) ? _tokenLimitMarker : '';
-        return (<Question>[], 'AI服务返回错误 (${response.statusCode})$limitSuffix');
+        if (isTokenLimitError(bodyText)) {
+          return (<Question>[], 'AI服务返回错误 (${response.statusCode})$_tokenLimitMarker');
+        }
+        // 401/402 是终态错误（Key 无效/余额不足），重试无益——
+        // 打标记让重试层直接放行报错；其余状态码在统一前缀后给人话
+        final code = response.statusCode;
+        final permanent = (code == 401 || code == 402) ? _permanentMarker : '';
+        final friendly = switch (code) {
+          401 => 'API Key 无效或无权限，请在设置里核对',
+          402 => '账户余额不足，请充值或更换 API Key',
+          429 => '请求过于频繁，稍后再试',
+          >= 500 => 'AI 服务暂时不可用，稍后再试',
+          _ => '未知错误',
+        };
+        return (<Question>[], 'AI服务返回错误 ($code)：$friendly$permanent');
       }
+    } catch (e) {
+      return (<Question>[], 'AI请求失败: $e');
+    }
+  }
+
+  /// 空内容判定：null / 空白 / 只剩 ``` 围栏，都算「服务端没给东西」
+  static bool _isBlankContent(String? s) =>
+      s == null || _stripFence(s).trim().isEmpty;
+
+  /// 装配题目（文本切题与视觉切题共用同一套字段清洗与题型判定）
+  List<Question> _questionsFromJson(
+      Map<String, dynamic> parsed, int bankId, String now) {
+    final questionsList = parsed['questions'] as List? ?? const [];
+    return questionsList.map((q) {
+      final opts = (q['options'] as List?)
+              ?.map((o) => o.toString().trim())
+              .where((o) => o.isNotEmpty)
+              .toList() ??
+          [];
+      return Question(
+        bankId: bankId,
+        title: (q['title'] ?? '').toString().trim(),
+        options: opts,
+        correctAnswer: (q['correct_answer'] ?? '').toString().trim().toUpperCase(),
+        analysis: _nullIfEmpty(q['analysis']?.toString().trim()),
+        questionType: _detectType(q),
+        knowledgePoint: _nullIfEmpty(q['knowledge_point']?.toString().trim()),
+        createdAt: now,
+      );
+    }).toList();
+  }
+
+
+  // ════════════════════════════════════════════════════════════
+  // 视觉切题（扫描版/图片字 PDF）
+  //
+  // 动机：真实题库里有大量扫描版 PDF——字是"画在图片里的"（每页就是一张
+  // 整页位图，PDFium 抽字为 0），文字切题无从下手。这类页面直接把页图
+  // 交给视觉模型切题，识别+切题一步到位；失败口径与文本切题完全一致。
+  // 换图不换信任模型：仍是用户自己的 Key（BYOK）直连模型服务商。
+  // ════════════════════════════════════════════════════════════
+
+  /// 视觉切题提示词：把一页「题库文档」扫描图切题入库——只提取，不出题
+  static const String _visionPrompt = '''
+你是一个专业的题目解析器。下面是一张题库文档（扫描件）的页面图片，请把页面上的所有题目切出来，返回严格的 JSON，只返回 JSON，不要任何其他文字。
+要求：
+1. 逐字提取题干、选项、答案、解析，不要改写、补写或翻译；题号可省略
+2. 结构 {"questions":[{"title","options","correct_answer","question_type","analysis","knowledge_point"}]}；question_type 取值 single_choice/multi_choice/true_false/fill_blank/ming_jie/jian_da/jie_da
+3. options 只存选项内容（不含 "A." 等前缀）；多选答案用逗号分隔如 "A,C"
+4. 页面边缘若有答案速查表（如 "00001 B"、"1. C"），按题号对应回填到 correct_answer
+5. 文中形如 {{img:N}} 的占位符原样保留（若有）
+6. 页面上没有题目时返回 {"questions": []}
+''';
+
+  /// 扫描页逐页视觉切题。错误聚合形如「第 N 页：…」，与文本切题的
+  /// 「第 N 块」同口径；进度按页回调。
+  Future<AIParseResult> parseQuestionsFromPageImages(
+    List<Uint8List> pages,
+    int bankId,
+    void Function(int done, int total)? onProgress,
+  ) async {
+    final allQuestions = <Question>[];
+    final errors = <String>[];
+    final now = DateTime.now().toIso8601String();
+    for (var i = 0; i < pages.length; i++) {
+      final result = await _parsePageImageWithRetry(pages[i], bankId, now);
+      allQuestions.addAll(result.$1);
+      final err = result.$2;
+      if (err != null) {
+        errors.add('第 ${i + 1} 页：'
+            '${err.replaceAll(_tokenLimitMarker, '').replaceAll(_permanentMarker, '')}');
+      }
+      onProgress?.call(i + 1, pages.length);
+    }
+    return AIParseResult(allQuestions, errors.length, errors);
+  }
+
+  /// 与文本切题同款重试骨架：空响应/限流退避重试 3 次；终态错误（401/402/
+  /// 模型不支持看图）立即作罢
+  Future<(List<Question>, String?)> _parsePageImageWithRetry(
+      Uint8List jpeg, int bankId, String now) async {
+    (List<Question>, String?) result = (<Question>[], '未尝试');
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future.delayed(Duration(seconds: attempt * 2));
+      }
+      result = await _parsePageImageOnce(jpeg, bankId, now);
+      if (result.$2 == null) return result;
+      if (result.$2!.contains(_permanentMarker)) break;
+    }
+    return result;
+  }
+
+  Future<(List<Question>, String?)> _parsePageImageOnce(
+      Uint8List jpeg, int bankId, String now) async {
+    try {
+      final b64 = base64Encode(jpeg);
+      final response = await _client.post(
+        ApiEndpoint.resolve(_settings.apiEndpoint),
+        headers: await _headers(),
+        body: jsonEncode({
+          'model': _settings.model,
+          'messages': [
+            {
+              'role': 'user',
+              'content': [
+                {'type': 'text', 'text': _visionPrompt},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': 'data:image/jpeg;base64,$b64'}
+                },
+              ],
+            },
+          ],
+          'temperature': 0.1,
+          // 视觉模型逐图慢（整页扫描信息量大），超时与输出上限都放宽
+          'max_tokens': 8192,
+        }),
+      ).timeout(const Duration(seconds: 120));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final content =
+            (data['choices']?[0]?['message']?['content'] as String?) ?? '';
+        if (_isBlankContent(content)) {
+          return (<Question>[], 'AI 返回了空响应（可能是限流或账户余额不足）');
+        }
+        _trackUsage(data);
+        Map<String, dynamic> parsed;
+        try {
+          parsed = _extractJson(content);
+        } catch (e) {
+          final repaired = repairTruncatedJson(content);
+          if (repaired == null) {
+            return (<Question>[], 'AI 解析生成失败：响应不是合法 JSON'
+                '（可能被截断或返回了异常内容，已尝试抢修仍失败）');
+          }
+          parsed = repaired;
+        }
+        if (parsed['questions'] is! List) {
+          return (<Question>[], 'AI 解析生成失败：响应缺少 questions 字段');
+        }
+        return (_questionsFromJson(parsed, bankId, now), null);
+      }
+
+      final bodyText = utf8.decode(response.bodyBytes, allowMalformed: true);
+      // 模型不支持看图是终态：换模型/先转 DOCX 才有意义，重试无益
+      final code = response.statusCode;
+      final lower = bodyText.toLowerCase();
+      final looksVisionUnsupported = (code == 400 || code == 415 || code == 422) &&
+          (lower.contains('image') ||
+              lower.contains('vision') ||
+              lower.contains('multimodal') ||
+              bodyText.contains('图片'));
+      if (looksVisionUnsupported) {
+        return (<Question>[], '当前模型不支持识别图片：请换支持看图的模型'
+            '（如通义 qwen-vl、智谱 glm-4v、GPT-4o 等 OpenAI 兼容视觉模型），'
+            '或先用 OCR 工具把扫描件转成 DOCX 再导入$_permanentMarker');
+      }
+      if (isTokenLimitError(bodyText)) {
+        return (<Question>[], 'AI服务返回错误 ($code)$_tokenLimitMarker');
+      }
+      final permanent = (code == 401 || code == 402) ? _permanentMarker : '';
+      final friendly = switch (code) {
+        401 => 'API Key 无效或无权限，请在设置里核对',
+        402 => '账户余额不足，请充值或更换 API Key',
+        429 => '请求过于频繁，稍后再试',
+        >= 500 => 'AI 服务暂时不可用，稍后再试',
+        _ => '未知错误',
+      };
+      return (<Question>[], 'AI服务返回错误 ($code)：$friendly$permanent');
     } catch (e) {
       return (<Question>[], 'AI请求失败: $e');
     }
@@ -671,10 +862,14 @@ $chunk
 
   /// 判断是否为 AI 失败/错误串（非真实解析内容）
   static bool isAiError(String s) {
-    return s.startsWith('AI请求失败') ||
-        s.startsWith('AI服务返回错误') ||
-        s.startsWith('AI解析生成失败') ||
-        s.startsWith('解析生成失败');
+    // 去空格后判前缀：曾因文案「AI 解析生成失败」带空格而这里查的是
+    // 「AI解析生成失败」，错误文本被当成解析内容缓存
+    final t = s.trim().replaceAll(' ', '');
+    return t.startsWith('AI请求失败') ||
+        t.startsWith('AI服务返回错误') ||
+        t.startsWith('AI解析生成失败') ||
+        t.startsWith('AI返回了空响应') ||
+        t.startsWith('解析生成失败');
   }
 
   /// 追问功能：基于原题和解析进行追问（聊天式）

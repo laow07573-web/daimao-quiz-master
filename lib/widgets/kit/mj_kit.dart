@@ -8,6 +8,7 @@
 ///   2. 圆角一律取自 [MaoRadius]，控件方正
 ///   3. 一切统计数值用等宽数字（[MaoNumber]），保证数位对齐
 ///   4. 交互反馈短促（[MaoMotion.fast]），不用弹跳
+library;
 
 import 'package:flutter/material.dart';
 
@@ -67,7 +68,8 @@ class MJSurface extends StatelessWidget {
 
     Widget panel = DecoratedBox(
       decoration: BoxDecoration(
-        color: bg,
+        // Interactive surfaces paint their fill on Material so ink stays visible.
+        color: onTap == null ? bg : Colors.transparent,
         borderRadius: BorderRadius.circular(r),
         border: Border.all(color: ac.border, width: MaoLine.width),
       ),
@@ -91,8 +93,8 @@ class MJSurface extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: padding.add(
-                      const EdgeInsets.only(left: MaoSpace.sm)),
+                  padding:
+                      padding.add(const EdgeInsets.only(left: MaoSpace.sm)),
                   child: child,
                 ),
               ],
@@ -102,12 +104,18 @@ class MJSurface extends StatelessWidget {
 
     if (onTap != null) {
       panel = Material(
-        color: Colors.transparent,
+        color: bg,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(r),
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(r),
           splashColor: ac.accent.withOpacity(0.06),
           highlightColor: ac.accent.withOpacity(0.04),
+          hoverColor: ac.accent.withOpacity(hoverable ? 0.08 : 0.04),
+          focusColor: ac.accent.withOpacity(0.12),
           child: panel,
         ),
       );
@@ -168,8 +176,11 @@ class MJSectionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+              Semantics(
+                header: true,
+                child: Text(title,
+                    style: MaoType.h2Style.copyWith(color: ac.textPrimary)),
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: MaoSpace.xxs),
                 Text(subtitle!,
@@ -212,18 +223,60 @@ class MaoNumber extends StatelessWidget {
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     final c = color ?? ac.textPrimary;
+    // 后缀下限 micro=11：小字号 CJK 发虚是排版毛刺的来源
+    final suffixSize = size * 0.5 < MaoType.micro ? MaoType.micro : size * 0.5;
     return Text.rich(
       TextSpan(children: [
         TextSpan(text: text, style: MaoType.number(size, weight: weight)),
         if (suffix != null)
           TextSpan(
             text: suffix,
-            style: MaoType.number(size * 0.5,
-                weight: FontWeight.w500)
+            style: MaoType.number(suffixSize, weight: FontWeight.w500)
                 .copyWith(letterSpacing: 0),
           ),
       ]),
       style: TextStyle(color: c),
+    );
+  }
+}
+
+/// 滚动落位的等宽数字——仪表读数变化时短滚一次落定（无过冲、宽度不跳）。
+/// 进场从 0 数上来（仪表上电语感），数值更新从当前值落位；
+/// 系统「减弱动态效果」时直接落位不演。
+class MaoAnimatedNumber extends StatelessWidget {
+  const MaoAnimatedNumber(
+    this.value, {
+    super.key,
+    this.size = MaoType.h1,
+    this.weight = FontWeight.w600,
+    this.color,
+    this.suffix,
+    this.decimals = 0,
+  });
+
+  final num value;
+  final double size;
+  final FontWeight weight;
+  final Color? color;
+  final String? suffix;
+
+  /// 小数位（百分比一类带小数的读数用）
+  final int decimals;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value.toDouble()),
+      // 首页/概览读数稍慢一点，避免数字刚出现就瞬间跳完。
+      duration: MaoMotion.effective(context, const Duration(milliseconds: 420)),
+      curve: MaoMotion.standard,
+      builder: (context, v, _) => MaoNumber(
+        decimals > 0 ? v.toStringAsFixed(decimals) : '${v.round()}',
+        size: size,
+        weight: weight,
+        color: color,
+        suffix: suffix,
+      ),
     );
   }
 }
@@ -311,7 +364,8 @@ class MJButton extends StatelessWidget {
         fg = ac.textPrimary;
       case MJButtonKind.danger:
         bg = ac.danger;
-        fg = Colors.white;
+        // 实底（强调/危险）上的前景一律取 onAccent，不写死白色
+        fg = ac.onAccent;
     }
 
     final disabled = onPressed == null;
@@ -320,7 +374,8 @@ class MJButton extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
-          Icon(icon, size: dense ? 15 : 17, color: disabled ? ac.textTertiary : fg),
+          Icon(icon,
+              size: dense ? 15 : 17, color: disabled ? ac.textTertiary : fg),
           const SizedBox(width: MaoSpace.xs),
         ],
         Flexible(
@@ -345,12 +400,14 @@ class MJButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: MaoRadius.controlBorder,
-          splashColor: Colors.white.withOpacity(0.06),
-          highlightColor: Colors.white.withOpacity(0.04),
+          // 按压水波取前景色的透明层：实底按钮上是提亮，描边/幽灵按钮上不再隐形
+          splashColor: fg.withOpacity(0.06),
+          highlightColor: fg.withOpacity(0.04),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: MaoRadius.controlBorder,
-              border: side == BorderSide.none ? null : Border.fromBorderSide(side),
+              border:
+                  side == BorderSide.none ? null : Border.fromBorderSide(side),
             ),
             padding: EdgeInsets.symmetric(
                 horizontal: dense ? MaoSpace.sm : MaoSpace.md),
@@ -418,7 +475,8 @@ enum MJTagTone { neutral, accent, success, danger, warning }
 
 /// 小标签：4 圆角、极小字号、描边或浅底。
 class MJTag extends StatelessWidget {
-  const MJTag(this.text, {super.key, this.tone = MJTagTone.neutral, this.filled = true});
+  const MJTag(this.text,
+      {super.key, this.tone = MJTagTone.neutral, this.filled = true});
 
   final String text;
   final MJTagTone tone;
@@ -443,17 +501,15 @@ class MJTag extends StatelessWidget {
         bg = ac.dangerSoft;
       case MJTagTone.warning:
         fg = ac.warning;
-        bg = ac.warning.withOpacity(0.12);
+        bg = ac.warningSoft;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: MaoSpace.xs, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: MaoSpace.xs, vertical: 3),
       decoration: BoxDecoration(
         color: filled ? bg : Colors.transparent,
         borderRadius: MaoRadius.chipBorder,
-        border: filled
-            ? null
-            : Border.all(color: ac.border, width: MaoLine.width),
+        border:
+            filled ? null : Border.all(color: ac.border, width: MaoLine.width),
       ),
       child: Text(text,
           style: MaoType.microStyle.copyWith(color: fg, height: 1.1)),
@@ -530,6 +586,89 @@ class MJSegmentedControl<T> extends StatelessWidget {
 // 列表行
 // ════════════════════════════════════════════════════════════
 
+/// 内容切换过渡：旧内容立即移除，新内容淡入并轻微上移。
+///
+/// 与 `AnimatedSwitcher` 的关键区别：**不做交叉淡入**——AnimatedSwitcher 会让
+/// 新旧两份 child 同时存在一段时间，内容（尤其高度不同的列表）会叠在一起，
+/// 真机反馈「切换存在重叠画面」就是这么来的。这里用随 [switchKey] 变化的
+/// TweenAnimationBuilder：切换即整块换新，只演一次入场，不存在重叠帧。
+///
+/// 2026-10-09 重新设计时补强了两点：
+/// - **高度变化也平滑**（[animateSize]）：此前大家宁可用会重叠的
+///   AnimatedSwitcher，图的就是它的高度过渡；现在这里用 AnimatedSize
+///   补上，不必再为了高度去牺牲"不重叠"。
+/// - **时长走层级令牌**（[duration]，默认 [MaoMotion.contentSwap] = L2 内容替换），
+///   并且尊重系统「减弱动态效果」。
+class MJSwitchFade extends StatelessWidget {
+  const MJSwitchFade({
+    super.key,
+    required this.switchKey,
+    required this.child,
+    this.slideDistance = 8,
+    this.axis = Axis.vertical,
+    this.scaleFrom,
+    this.duration = MaoMotion.contentSwap,
+    this.animateSize = true,
+  });
+
+  /// 变化即触发重演（例如当前维度 / 数据条数）。
+  final Object switchKey;
+  final Widget child;
+
+  /// 入场位移距离（px）。语义是「从哪里落位过来」：
+  /// 垂直 = 从下方落定；水平 = 从侧边推入（切题那种方向感）。
+  final double slideDistance;
+
+  /// 位移方向：内容替换默认垂直；有前后顺序的切换（切题/翻页）用水平。
+  final Axis axis;
+
+  /// 可选的缩放入场起点（如 0.98）：用于「判定结果块」这类需要一点重量感的切换。
+  /// 为 null 时不缩放。
+  final double? scaleFrom;
+
+  /// 过渡时长：默认 L2 内容替换层；整块浮层级的切换传 [MaoMotion.overlay]。
+  final Duration duration;
+
+  /// 是否平滑高度变化（切换前后内容高度不同时用得上）。
+  final bool animateSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = MaoMotion.effective(context, duration);
+    final scale = scaleFrom;
+    Widget faded = TweenAnimationBuilder<double>(
+      key: ValueKey(switchKey),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: motion,
+      curve: MaoMotion.standard,
+      builder: (context, t, child) {
+        final offset = axis == Axis.vertical
+            ? Offset(0, (1 - t) * slideDistance)
+            : Offset((1 - t) * slideDistance, 0);
+        Widget out = Transform.translate(offset: offset, child: child);
+        if (scale != null) {
+          out = Transform.scale(
+            scale: scale + (1 - scale) * t.clamp(0.0, 1.0),
+            child: out,
+          );
+        }
+        return Opacity(opacity: t.clamp(0.0, 1.0), child: out);
+      },
+      child: child,
+    );
+    if (!animateSize) return faded;
+    // ClipRect 裁住高度动画过程中的溢出（旧内容比新内容高时）
+    return ClipRect(
+      child: AnimatedSize(
+        duration: motion,
+        curve: MaoMotion.standard,
+        alignment: Alignment.topCenter,
+        child: faded,
+      ),
+    );
+  }
+}
+
 /// 设置/导航类列表行：左图标 + 标题/副标题 + 右箭头或自定义尾部。
 class MJListRow extends StatelessWidget {
   const MJListRow({
@@ -570,8 +709,8 @@ class MJListRow extends StatelessWidget {
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(subtitle!,
-                    style: MaoType.captionStyle
-                        .copyWith(color: ac.textSecondary)),
+                    style:
+                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
               ],
             ],
           ),
@@ -700,7 +839,18 @@ class _MJSkeletonState extends State<MJSkeleton>
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _c.stop();
+      _c.value = 1;
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -712,15 +862,14 @@ class _MJSkeletonState extends State<MJSkeleton>
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
     return FadeTransition(
-      opacity: Tween(begin: 0.45, end: 0.9).animate(
-          CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+      opacity: Tween(begin: 0.45, end: 0.9)
+          .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
       child: Container(
         height: widget.height,
         width: widget.width,
         decoration: BoxDecoration(
           color: ac.surfaceAlt,
-          borderRadius:
-              BorderRadius.circular(widget.radius ?? MaoRadius.chip),
+          borderRadius: BorderRadius.circular(widget.radius ?? MaoRadius.chip),
         ),
       ),
     );
@@ -838,11 +987,44 @@ class MJSheet extends StatelessWidget {
     Widget? trailing,
     double maxWidth = 480,
   }) {
+    // 弹层进出场统一：默认 250/200ms 不走 MaoMotion——自带 controller
+    // 压到「进 MaoMotion.slow / 出 MaoMotion.exit」，与全站节奏一致。
+    final enter = MaoMotion.effective(context, MaoMotion.slow);
+    final exit = MaoMotion.effective(context, MaoMotion.exit);
+    final controller = AnimationController(
+      // 静态入口没有 State 提供 vsync：借 Navigator（SDK 自建弹层 controller
+      // 同款做法，见 BottomSheet.createAnimationController）
+      vsync: Navigator.of(context, rootNavigator: true),
+      duration: enter,
+      reverseDuration: exit,
+    );
+    // 外部传入的 controller 路由不代管回收，且 popped Future 早于出场动画
+    // 结束就返回——因此等出场落定（dismissed）后再 dispose。
+    var disposed = false;
+    void disposeOnce() {
+      if (disposed) return;
+      disposed = true;
+      controller.dispose();
+    }
+
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed) {
+        // 状态回调正遍历监听表，dispose 挪到微任务执行
+        Future<void>.microtask(disposeOnce);
+      }
+    });
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       constraints: BoxConstraints(maxWidth: maxWidth),
+      transitionAnimationController: controller,
+      // 2026-10-08 真机 BUG 修复：主题里 bottomSheetTheme.showDragHandle = true，
+      // 而这里把弹层背景设成了透明（真正的底色由 MJSheet 自己的 Container 画）。
+      // Flutter 的拖拽手柄是渲染在「我们的 Container 之上」的，于是手柄那一横条
+      // 处在一片透明区域里 —— 真机表现为弹层顶部有一条能看见下层页面的透明带。
+      // MJSheet 自带标题栏，不需要框架手柄；显式关掉，让 Container 铺满整层。
+      showDragHandle: false,
       builder: (_) => MJSheet(title: title, trailing: trailing, child: child),
     );
   }
@@ -853,8 +1035,8 @@ class MJSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: ac.surface,
-        borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(MaoRadius.large)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(MaoRadius.large)),
         border: Border.all(color: ac.border, width: MaoLine.width),
       ),
       child: SafeArea(
@@ -870,8 +1052,8 @@ class MJSheet extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(title!,
-                          style: MaoType.h2Style
-                              .copyWith(color: ac.textPrimary)),
+                          style:
+                              MaoType.h2Style.copyWith(color: ac.textPrimary)),
                     ),
                     if (trailing != null) trailing!,
                   ],
@@ -906,9 +1088,34 @@ class MJDialog extends StatelessWidget {
     required Widget content,
     List<Widget> actions = const [],
   }) {
-    return showDialog<T>(
+    // 弹窗进出场统一：默认 200ms zoom 不走 MaoMotion——改「淡入 + 0.98→1
+    // 微放大」落定，进 MaoMotion.normal / 出 MaoMotion.exit。
+    final window = MaoMotion.effective(context, MaoMotion.normal);
+    final exit = MaoMotion.effective(context, MaoMotion.exit);
+    return showGeneralDialog<T>(
       context: context,
-      builder: (_) =>
+      barrierDismissible: true,
+      barrierLabel: title,
+      transitionDuration: window,
+      transitionBuilder: (context, animation, secondary, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: MaoMotion.standard,
+          // showGeneralDialog 没有独立出场时长参数（窗口 = 进场时长），
+          // 用 MaoExitCurve 把出场压缩进 MaoMotion.exit 段内落定
+          reverseCurve: window == Duration.zero
+              ? MaoMotion.standard
+              : MaoExitCurve(window: window, motion: exit),
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
+            child: child,
+          ),
+        );
+      },
+      pageBuilder: (dialogCtx, animation, secondary) =>
           MJDialog(title: title, content: content, actions: actions),
     );
   }
@@ -1000,7 +1207,8 @@ class MJToolbar extends StatelessWidget {
 /// 「开始」页则是主动去做题时才进。两处必须长得一样，所以收进组件库，
 /// 而不是各页自己拼一份（此前首页漏掉这个入口就是因为只写在了开始页）。
 class MJResumeCard extends StatelessWidget {
-  const MJResumeCard({super.key, required this.session, required this.answered, this.onTap});
+  const MJResumeCard(
+      {super.key, required this.session, required this.answered, this.onTap});
 
   /// 未完成会话。
   final QuizSession session;
@@ -1021,7 +1229,7 @@ class MJResumeCard extends StatelessWidget {
     return MJSurface(
       accentEdge: true,
       onTap: onTap,
-      padding: const EdgeInsets.all(MaoSpace.sm + 2),
+      padding: const EdgeInsets.all(MaoSpace.sm),
       child: Row(
         children: [
           Icon(Icons.play_circle_outline, color: ac.accent, size: 22),
@@ -1032,8 +1240,7 @@ class MJResumeCard extends StatelessWidget {
               children: [
                 Text('继续上次刷题',
                     style: MaoType.h3Style.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: ac.textPrimary)),
+                        fontWeight: FontWeight.w600, color: ac.textPrimary)),
                 const SizedBox(height: 2),
                 Text(
                   '已答 $answered/${session.totalQuestions} 题 · $modeLabel',
@@ -1048,5 +1255,161 @@ class MJResumeCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 后台导入任务
+// ════════════════════════════════════════════════════════════
+
+/// 后台导入任务的 UI 层控制位。
+///
+/// 为什么在 UI 层：导入任务运行在 AppState（不归本次改动），无法真正中止；
+/// 「取消」的语义是「不再展示进度、结果直接丢弃」——任务自身会很快结束并
+/// 释放导入互斥，取消后短时间内再导入仍会提示「已有导入任务进行中」，
+/// 这是真话（互斥确实还在）。首页/开始页/导入页/主壳共读写这一位，
+/// 新任务开始时必须复位。
+class MJImportTask {
+  const MJImportTask._();
+
+  /// 用户已放弃当前导入任务：进度卡隐藏、完成提示与解析结果直接丢弃。
+  static bool discarded = false;
+}
+
+/// 后台导入任务卡：首页/开始页/导入页共用同一张脸
+/// （进度 + 阶段文案 + 取消），不再各画一套。
+class MJTaskCard extends StatelessWidget {
+  const MJTaskCard({
+    super.key,
+    required this.progress,
+    required this.status,
+    this.onCancel,
+  });
+
+  /// 任务进度 0..1
+  final double progress;
+
+  /// `AppState.importStatus` 原文（阶段文案由它映射，不依赖应用层改动）
+  final String status;
+
+  /// 取消（放弃本次导入结果）；null 表示此入口不可取消
+  final VoidCallback? onCancel;
+
+  /// 文档解析的三阶段管线：PDF 先抽图文，再 AI 解析，最后待预览确认。
+  /// 阶段文案直接呈现这条管线，用户能预判「进行到哪、下一步是什么」。
+  static const List<String> _stages = [
+    '1/3 提取图文',
+    '2/3 AI 解析',
+    '3/3 待预览',
+  ];
+
+  /// 从状态原文映射当前阶段；-1 = 非文档解析流程（JSON/示例直导入），
+  /// 只显状态原文。
+  static int _stageOf(String status) {
+    if (status.contains('解析完成') || status.contains('预览')) return 2;
+    if (status.contains('解析失败')) return -1;
+    if (status.contains('提取')) return 0;
+    if (status.contains('解析') || status.contains('AI')) return 1;
+    return -1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
+    final pct = progress.clamp(0.0, 1.0);
+    final stage = _stageOf(status);
+    return MJSurface(
+      accentEdge: true,
+      padding: const EdgeInsets.all(MaoSpace.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child:
+                    CircularProgressIndicator(strokeWidth: 2, color: ac.accent),
+              ),
+              const SizedBox(width: MaoSpace.xs),
+              Expanded(
+                child: Text('正在导入题库，可先去做别的',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: MaoType.h3Style.copyWith(
+                        fontWeight: FontWeight.w600, color: ac.textPrimary)),
+              ),
+              MaoNumber('${(pct * 100).toInt()}',
+                  size: MaoType.h3, weight: FontWeight.w600),
+              Text('%',
+                  style: MaoType.microStyle.copyWith(color: ac.textSecondary)),
+            ],
+          ),
+          const SizedBox(height: MaoSpace.xs),
+          MJProgress(value: pct),
+          const SizedBox(height: MaoSpace.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (stage >= 0) ...[
+                      _TaskStageLine(current: stage),
+                      const SizedBox(height: MaoSpace.xxs),
+                    ],
+                    Text(status,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: MaoType.captionStyle
+                            .copyWith(color: ac.textSecondary)),
+                  ],
+                ),
+              ),
+              if (onCancel != null) ...[
+                const SizedBox(width: MaoSpace.xs),
+                MJButton(
+                  label: '取消',
+                  kind: MJButtonKind.ghost,
+                  dense: true,
+                  onPressed: onCancel,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 三阶段管线指示：当前阶段用强调色，其余弱化（只报进度，不报装饰）。
+class _TaskStageLine extends StatelessWidget {
+  const _TaskStageLine({required this.current});
+
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = AppThemeColors.of(context);
+    final spans = <TextSpan>[];
+    for (var i = 0; i < MJTaskCard._stages.length; i++) {
+      if (i > 0) {
+        spans.add(TextSpan(
+            text: ' → ',
+            style: MaoType.microStyle.copyWith(color: ac.textTertiary)));
+      }
+      spans.add(TextSpan(
+        text: MJTaskCard._stages[i],
+        style: MaoType.microStyle.copyWith(
+          color: i == current ? ac.accent : ac.textTertiary,
+          fontWeight: i == current ? FontWeight.w600 : FontWeight.w500,
+        ),
+      ));
+    }
+    return Text.rich(TextSpan(children: spans),
+        maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 }
