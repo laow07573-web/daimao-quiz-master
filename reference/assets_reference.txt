@@ -2,5 +2,8 @@
 app_logo.png
 blank_submit.jpg
 burst_icon.png
+burst_icon_ui.png
 correct.wav
+laowu_01.mp3
+laowu_02.mp3
 wrong.wav

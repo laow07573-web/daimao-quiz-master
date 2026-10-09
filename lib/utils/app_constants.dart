@@ -12,7 +12,7 @@ library;
 /// 把关——改了 pubspec 却忘了同步这里，测试会红。这正是「APK versionName 误标」
 /// 那类事故的根因，所以用测试锁住，而不是靠记性。
 const String kAppVersion =
-    String.fromEnvironment('APP_VERSION', defaultValue: 'v1.28.1.20');
+    String.fromEnvironment('APP_VERSION', defaultValue: 'v1.29.0.21');
 
 /// 刷题数量「全部」哨兵值（9999）
 const int kQuestionCountAll = 9999;
