@@ -3,23 +3,23 @@
 /* 部署脚本（tools/deploy_promo.ps1 / deploy_pages.ps1）从这里读版本号
    与资源名；即便当前页面不消费它，也不要删除，否则发布链路会直接报错。 */
 window.MAOJUAN = {
-   version:         "1.28.1",
-   buildDate:       "20260915",
+   version:         "1.29.0",
+   buildDate:       "20261009",
    /* Android：arm64 版 20.4MB，通用版 34.7MB —— 直接随页面同源分发。
       GitHub Pages 单文件上限 100MB，两者都放得下，因此不需要网盘。
       （若将来改用 Cloudflare Pages（单文件 25MB 上限），把 android 换成
       国内网盘分享链接，并把本文件里的 download/ 路径保留给 Windows 包。） */
-   android:          "download/MaoJuan-v1.28.1-android-arm64.apk",
-   androidUniversal: "download/MaoJuan-v1.28.1-android-universal.apk",
-   windowsSetup:     "download/MaoJuan-v1.28.1-windows-setup.exe",
-   windowsPortable:  "download/MaoJuan-v1.28.1-windows-portable.zip",
+   android:          "download/MaoJuan-v1.29.0-android-arm64.apk",
+   androidUniversal: "download/MaoJuan-v1.29.0-android-universal.apk",
+   windowsSetup:     "download/MaoJuan-v1.29.0-windows-setup.exe",
+   windowsPortable:  "download/MaoJuan-v1.29.0-windows-portable.zip",
    githubRelease:    "https://github.com/laow07573-web/daimao-quiz-master/releases/latest",
    repo:             "https://github.com/laow07573-web/daimao-quiz-master",
    sha256: {
-     apk:      "32cec0e2903584eb8a54b9d388cb2763c2dc99e0c42d8ef66035c329bc780bba",
-     apkUniv:  "e3359c3725f2bf041ba1d1b05fb4ce179222f380155030fee98ff8e7c8c0a743",
-     setup:    "b6ee24f7e5fe179e29540e7710f2393b6a937a36a5ed8f4aa9ab59423b35f9ee",
-     portable: "d5abc0ddeb78b3da675ad1037db331ffbbc187220c5f94ab4e6d9a1cec854229"
+     apk:      "55b7669470df5c73adc0f4df673c72f2dfc0c43d5b15ecdb5ddd4c3ae3df9ad5",
+     apkUniv:  "1dd5cdcebc6f5181ba4e23512c7ca4ce3eb36c4cb1899ef92df9b6911c3198ea",
+     setup:    "dea171c5ceea7d84249b776ac371b623ad76932ac4d64f42621ecd327c094e13",
+     portable: "0f46946f49daf565288f9dacb9f079efffb51a6add8bd2fe165826ae209c455e"
    }
  };
 </script>
@@ -32,5 +32,5 @@ window.MAOJUAN = {
 <section id="about" class="about section"><span class="eyebrow">03 / 为什么做猫卷</span><h2>学习资产，<br>应该在<span>你自己手里。</span></h2><div class="about-grid"><p class="big-copy">资料已经有了，<br>不该再被会员和账号拦住。</p><div><p>猫卷希望把建题库、刷题和复习的主动权还给学习的人。无账号、无广告、无会员；题库与记录优先保存在本地，支持备份迁移与局域网同步。</p><p>AI 是可选的工具，不是进入学习的门票。你选择模型与服务商，用自己的 Key；基础刷题、错题复习和统计无需 AI。</p><a class="text-link" href="https://github.com/laow07573-web/daimao-quiz-master">看看开源代码 ↗</a></div></div></section>
 <section class="section history"><div class="section-head"><div><span class="eyebrow">04 / 一点点长成现在的样子</span><h2>小步改进，认真做题。</h2></div><p>依据更新日志与提交记录整理。<br>开发进展与已发布版本分开看。</p></div><ol><li><time>2026.06</time><h3>先让自己的资料刷起来</h3><p>从「呆猫刷题宝」开始，打通文档导入、AI 解析和错题重刷。</p></li><li><time>2026.08</time><h3>成为猫卷</h3><p>完善数据管理，加入手写批注、宽屏布局与多端同步。</p></li><li><time>2026.09</time><h3>讲解和记录，更清楚</h3><p>v1.28 系列完善回答风格、追问对话与年度学习统计。</p></li><li><time>2026.10 · 开发中</time><h3>让第一次使用更简单</h3><p>完善跨页引导、PDF 配图与扫描识别。具体发布状态见版本说明。</p></li></ol></section>
 <section class="section faq"><div><span class="eyebrow">05 / 先把话说清楚</span><h2>你可能想问。</h2></div><div><details><summary>没有 API Key，可以用吗？</summary><p>可以。JSON 和内置示例题库无需 Key。刷题、错题复习、手写批注与本地统计也无需 Key。DOCX 解析及 AI 讲解、追问需联网并配置 Key。</p></details><details><summary>免费使用，包括 AI 费用吗？</summary><p>App 免费，不收会员费。AI 服务由你选择的服务商提供，可能按其定价产生费用，猫卷不承担模型调用费用。</p></details><details><summary>学习数据会发送出去吗？</summary><p>核心记录默认保存在设备本地。使用 AI 时，相关题目和认证信息会发给你配置的服务商。局域网同步不经过云端。</p></details><details><summary>PDF 和间隔复习有哪些边界？</summary><p>PDF 能力已存在于源码，更新日志仍列为待发布，请核对安装版本。错题排期采用 FSRS-5 简化实现，不承诺记忆率或考试结果。</p></details></div></section>
-<section id="download" class="download section"><div class="section-head"><div><span class="eyebrow">06 / 留一点时间，给理解</span><h2>下一道题，<br>按你的节奏来。</h2></div><p>本地分发包 v1.28.1，随站点提供下载。<br>不等同于最新开发源码，更新前建议备份。</p></div><div class="downloads"><a href="download/MaoJuan-v1.28.1-android-arm64.apk" download><span>ANDROID</span><h3>ARM64 版 ↗</h3><small>33.0 MiB · ARM64 设备</small></a><a href="download/MaoJuan-v1.28.1-android-universal.apk" download><span>ANDROID</span><h3>通用版 ↗</h3><small>47.3 MiB · 不确定架构时选择</small></a><a href="download/MaoJuan-v1.28.1-windows-setup.exe" download><span>WINDOWS</span><h3>安装版 ↗</h3><small>22.8 MiB · Win 10 / 11 · 64 位</small></a><a href="download/MaoJuan-v1.28.1-windows-portable.zip" download><span>WINDOWS</span><h3>便携版 ↗</h3><small>26.7 MiB · 完整包，解压即用</small></a></div><p class="download-extra"><a href="download/manifest.json">文件大小与 SHA-256 校验</a><span> / </span><a href="https://github.com/laow07573-web/daimao-quiz-master/releases/latest">更多版本与发布说明 ↗</a></p></section></main>
+<section id="download" class="download section"><div class="section-head"><div><span class="eyebrow">06 / 留一点时间，给理解</span><h2>下一道题，<br>按你的节奏来。</h2></div><p>本地分发包 v1.28.1，随站点提供下载。<br>不等同于最新开发源码，更新前建议备份。</p></div><div class="downloads"><a href="download/MaoJuan-v1.29.0-android-arm64.apk" download><span>ANDROID</span><h3>ARM64 版 ↗</h3><small>33.0 MiB · ARM64 设备</small></a><a href="download/MaoJuan-v1.29.0-android-universal.apk" download><span>ANDROID</span><h3>通用版 ↗</h3><small>63.9 MiB · 不确定架构时选择</small></a><a href="download/MaoJuan-v1.29.0-windows-setup.exe" download><span>WINDOWS</span><h3>安装版 ↗</h3><small>22.8 MiB · Win 10 / 11 · 64 位</small></a><a href="download/MaoJuan-v1.29.0-windows-portable.zip" download><span>WINDOWS</span><h3>便携版 ↗</h3><small>26.7 MiB · 完整包，解压即用</small></a></div><p class="download-extra"><a href="download/manifest.json">文件大小与 SHA-256 校验</a><span> / </span><a href="https://github.com/laow07573-web/daimao-quiz-master/releases/latest">更多版本与发布说明 ↗</a></p></section></main>
 <footer><div class="footer-brand">猫卷<span>做题有数，学习有度。</span></div><div><a href="https://github.com/laow07573-web/daimao-quiz-master">GitHub ↗</a><a href="https://space.bilibili.com/432211049?spm_id_from=333.1387.0.0">B 站 ↗</a><small>开发者：笨蛋鱼坏蛋猫 · AGPL-3.0 开源</small></div></footer><script src="assets/studio.js"></script></body></html>
