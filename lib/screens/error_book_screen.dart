@@ -952,6 +952,11 @@ class _ErrorBookScreenState extends State<ErrorBookScreen> {
                         // Tab 切到「开始」。切 Tab 复用引导已有的那条通道
                         // （GuideController.requestTab → 主壳注册的 _select），
                         // 不再新增第二条跨页切 Tab 的通路。
+                        //
+                        // 前提（跨文件隐式契约）：**主壳就是首路由**——splash
+                        // 是用 pushReplacement 进 MainShell 的。若哪天改成往闪屏
+                        // 上 push，这里的 popUntil 会落回闪屏、Tab 也不会切，
+                        // 表现成「点了没反应」。改启动流程时记得一起看这里。
                         final guide = GuideScope.maybeOf(context);
                         Navigator.of(context).popUntil((r) => r.isFirst);
                         guide?.requestTab(kQuickStartTabIndex);

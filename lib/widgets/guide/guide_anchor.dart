@@ -27,8 +27,9 @@ class GuideScope extends InheritedWidget {
 /// 给真实控件打引导锚点：把目标控件包一层即可，不改变布局
 ///
 /// 用 StatefulWidget 而不是无状态包 KeyedSubtree：**每个实例自己一把
-/// GlobalKey**。同一 id 可能有多个实例（错题本空态的「去刷题」
-/// `pushReplacement` 出第二个开始页），一 id 一 key 会撞 GlobalKey。
+/// GlobalKey**。同一 id 可能有多个实例（错题本空态的「去刷题」历史上会
+/// `pushReplacement` 出第二个开始页，已于 2026-10-09 修掉；二级页压住
+/// 一级页时同一 id 仍可能共存），一 id 一 key 会撞 GlobalKey。
 /// 注册表按「最上层路由」挑可见的那个（见 [GuideAnchorRegistry]）。
 ///
 /// 作用域不存在时（普通页面构建、单页测试）直接返回 [child]，

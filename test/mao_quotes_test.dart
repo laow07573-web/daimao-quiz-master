@@ -178,4 +178,35 @@ void main() {
 
     expect(visibleQuotes(tester), isEmpty, reason: '老吴模式下不该出现随机语录');
   });
+
+  // 上面那条只断言了「没有语录」。2026-10-09 代码审查指出：测试环境里音频必然
+  // 播不出来（没有平台通道），实际跑的是 catch→降级 那条分支，所以它证明不了
+  // 「播放成功时屏幕上干干净净」。下面两条把正反两个分支都钉住。
+  testWidgets('老吴模式：播放成功时不弹任何气泡（只有声音）', (tester) async {
+    LaoWuMode.debugPlayOverride = () async => true; // 模拟真机上播放成功
+    addTearDown(() => LaoWuMode.debugPlayOverride = null);
+
+    await pumpHost(tester, laoWu: true);
+    await tester.tap(find.byType(MaoQuoteTappable));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(visibleQuotes(tester), isEmpty);
+    expect(MaoQuoteBubble.visible, isFalse,
+        reason: '播放成功就该只有声音——屏幕上不该出现语录气泡，也不该出现降级提示');
+  });
+
+  testWidgets('老吴模式：播放失败降级为一句提示，而不是静默', (tester) async {
+    LaoWuMode.debugPlayOverride = () async => false; // 模拟音频缺失/播放失败
+    addTearDown(() => LaoWuMode.debugPlayOverride = null);
+
+    await pumpHost(tester, laoWu: true);
+    await tester.tap(find.byType(MaoQuoteTappable));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('老吴的音频还在路上'), findsOneWidget,
+        reason: '播不出来时要有可见反馈，否则用户以为点了没反应');
+    expect(visibleQuotes(tester), isEmpty, reason: '降级提示不是语录');
+  });
 }

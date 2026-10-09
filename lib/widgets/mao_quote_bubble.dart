@@ -26,7 +26,21 @@ class MaoQuoteBubble {
 
   static OverlayEntry? _entry;
 
-  static bool get visible => _entry != null;
+  /// 是否有一条正在显示。
+  ///
+  /// 用 `mounted` 而不是 `!= null`：如果承载气泡的 Overlay 被整棵拆掉
+  /// （换 MaterialApp / 测试里 `runApp` 顶替整棵树），气泡 State 随树 dispose、
+  /// 它的定时器被取消，`onFinished` 就再也不会来——只判 null 会让这里一直
+  /// 谎报 true。`mounted` 为 false 时顺带把失效引用清掉。
+  static bool get visible {
+    final entry = _entry;
+    if (entry == null) return false;
+    if (!entry.mounted) {
+      _entry = null;
+      return false;
+    }
+    return true;
+  }
 
   /// 弹一条语录；[text] 为空时从 [MaoQuotes] 随机取。
   static void show(BuildContext context, {String? text}) {

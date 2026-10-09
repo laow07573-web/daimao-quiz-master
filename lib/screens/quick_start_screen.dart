@@ -64,6 +64,11 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
   /// （accessibility_enabled=1），此时 Flutter 会让 SnackBar 常驻、忽略 duration
   /// （实测点击后 3.8 秒仍在，只有切页才消失）。所以这里再挂一个定时器兜底，
   /// 保证「2 秒内消散」与系统无障碍设置无关。
+  ///
+  /// 兜底只收**当前这一条**（`hideCurrentSnackBar`，它自带 isEmpty/isDismissed
+  /// 守卫，对已自动消失的条目是空操作），不要用 `clearSnackBars`——那是全局清空，
+  /// 会把别处（或用户已经切过去的下一个页面）刚弹出的提示一起清掉。
+  /// 离开本页时定时器会被 [_navigateAndRefresh] / dispose 取消，提示不跟着走。
   void _toast(String message, {SnackBarAction? action}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger
@@ -75,7 +80,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
       ));
     _toastTimer?.cancel();
     _toastTimer = Timer(MaoMotion.toast, () {
-      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
     });
   }
 
@@ -116,6 +121,9 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
       BuildContext context, AppState appState, Widget page) async {
     // 2026-10-09 用户要求：「切入其他页面的时候就不要显示这个提示了」。
     // 点提示里的「去选择 / 去导入」会进二级页，提示不该跟着过去。
+    // 同时要把兜底定时器一起取消：否则它会在 1.5s 时触发，去清掉**新页面**上
+    // 刚弹出的提示（提示没跟过去，但清提示的定时器跟过去了）。
+    _toastTimer?.cancel();
     ScaffoldMessenger.of(context).clearSnackBars();
     await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }

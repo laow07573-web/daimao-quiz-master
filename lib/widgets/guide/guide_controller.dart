@@ -10,9 +10,11 @@ import 'guide_steps.dart';
 /// 互动式引导要在**真实控件**上打洞高亮，就得拿到控件的屏幕矩形。
 /// 两个刻意设计：
 /// 1. **每个锚点实例自己一把 GlobalKey**（而不是一 id 一把全局 key）：
-///    同一 id 可能同时存在两个实例——错题本空态的「去刷题」会
-///    `pushReplacement` 出第二个开始页，一 id 一 key 会直接撞出
-///    「Multiple widgets used the same GlobalKey」。
+///    同一 id 可能同时存在两个实例（历史上错题本空态的「去刷题」会
+///    `pushReplacement` 出第二个开始页，该行为已于 2026-10-09 修掉），
+///    一 id 一 key 会直接撞出「Multiple widgets used the same GlobalKey」。
+///    保留「一实例一 key」是因为二级页压住一级页、引导层插在 Navigator 之上时，
+///    同一 id 仍可能短暂共存两份。
 /// 2. **按路由挑可见的那一个**：被二级页/弹窗压住的页面仍在渲染树里、
 ///    矩形照样量得到，不判路由就会把洞打到用户看不见的页面上。
 class GuideAnchorRegistry {
@@ -117,7 +119,8 @@ class GuideController extends ChangeNotifier {
   bool get isLast => _index >= steps.length - 1;
 
   /// 主壳注册的切 Tab 回调：引导只表达「要切到哪个 Tab」，不直接改别人的状态
-  void attachTabSwitcher(ValueChanged<int>? switcher) => _tabSwitcher = switcher;
+  void attachTabSwitcher(ValueChanged<int>? switcher) =>
+      _tabSwitcher = switcher;
 
   /// 主壳上报当前 Tab（用户自己点到了这一步等着的那一页就顺势前进）
   void setCurrentTab(int tab) {

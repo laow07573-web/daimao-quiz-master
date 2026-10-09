@@ -27,8 +27,6 @@ class LaoWuMode {
     'laowu_02.mp3',
   ];
 
-  static const String assetPrefix = 'assets/';
-
   static AudioPlayer? _player;
 
   static AudioPlayer get _instance => _player ??= AudioPlayer();
@@ -37,6 +35,14 @@ class LaoWuMode {
   static int _lastIndex = -1;
 
   static bool get hasAudio => audioAssets.isNotEmpty;
+
+  /// 仅供测试：替换真正的播放动作。
+  ///
+  /// 真机上音频走平台通道，widget 测试里必然失败、只能测到降级分支；
+  /// 有了这个钩子才能验证「播成功时**不弹气泡**」这条正向路径。
+  /// 生产代码里始终为 null。
+  @visibleForTesting
+  static Future<bool> Function()? debugPlayOverride;
 
   /// 挑一段音频，两条以上时避开上一条。
   /// [random] 可注入以便测试；[reset] 供测试清空去重状态。
@@ -47,6 +53,8 @@ class LaoWuMode {
     final r = random ?? Random();
     var index = r.nextInt(audioAssets.length);
     if (index == _lastIndex) {
+      // 撞上上一条时顺移一格：这是**近似**均匀（被顺移到的下一项概率略高，
+      // 34 条语录时偏差约 1/34，可忽略），换来的是"连点必不重复"这个体验保证。
       index = (index + 1) % audioAssets.length;
     }
     _lastIndex = index;
@@ -54,9 +62,11 @@ class LaoWuMode {
   }
 
   /// 播放老吴模式音频。返回是否真的播了（false = 资源缺失/播放失败）。
-  static Future<bool> play({Random? random}) async {
+  static Future<bool> play() async {
+    final override = debugPlayOverride;
+    if (override != null) return override();
     if (!hasAudio) return false;
-    final asset = pickAudio(random: random);
+    final asset = pickAudio();
     try {
       await _instance.play(AssetSource(asset));
       return true;
@@ -65,11 +75,10 @@ class LaoWuMode {
       return false;
     }
   }
-
-  static Future<void> dispose() async {
-    await _player?.dispose();
-    _player = null;
-  }
+  // 说明：播放器是**进程内单例**，与 App 同生命周期（一段几秒的语音，常驻一个
+  // 平台播放器不构成按次泄漏），因此这里没有 dispose —— 2026-10-09 代码审查指出
+  // 原先那个无人调用的 dispose() 是死代码，已删掉，避免留下「释放意图没落地」
+  // 的假象。若将来真的需要释放，记得把 _lastIndex 与 debugPlayOverride 一并重置。
 }
 
 /// 点 Logo 的统一入口：按「老吴模式」分流。
