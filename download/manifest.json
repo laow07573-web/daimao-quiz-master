@@ -1,0 +1,22 @@
+[
+    {
+        "file":  "MaoJuan-v1.29.0-android-arm64.apk",
+        "bytes":  34625757,
+        "sha256":  "e2eb1e8c62ed39b87a6f808205eac3af7580b396407e6d5a1c221eccf51ddf4f"
+    },
+    {
+        "file":  "MaoJuan-v1.29.0-android-universal.apk",
+        "bytes":  49580995,
+        "sha256":  "baf5c6d59e7766ce7d23c828c597238c54582f5264fb668b90a2204c7fea918b"
+    },
+    {
+        "file":  "MaoJuan-v1.29.0-windows-portable.zip",
+        "bytes":  27949383,
+        "sha256":  "5b79bf9c8364c7597d68510ab71ea0b89fdc9a0d3198bd34421773a8fe7e51d2"
+    },
+    {
+        "file":  "MaoJuan-v1.29.0-windows-setup.exe",
+        "bytes":  23953043,
+        "sha256":  "f84e24ad2aca0a9e0ff871c6bb1d2c349f167e91cd3270e3614c41bcfb144adf"
+    }
+]
