@@ -125,7 +125,7 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     // 端上 OCR 的中文模型。google_mlkit_text_recognition 只把各语种包声明为
     // compileOnly，必须由 App 自己引入用到的语种——漏了它有两个后果：
     // ① 运行时 NoClassDefFoundError，被 OcrService 的 catch 吞掉 → OCR 静默失效；
