@@ -1,4 +1,4 @@
-# 通过 PostMessage 向猫卷窗口投递鼠标点击（无需前台）
+﻿# 通过 PostMessage 向猫卷窗口投递鼠标点击（无需前台）
 # 用法: powershell -File post_click.ps1 <客户区X比例> <客户区Y比例>
 param([double]$rx = 0.5, [double]$ry = 0.94)
 

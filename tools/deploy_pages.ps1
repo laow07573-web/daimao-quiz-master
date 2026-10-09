@@ -1,4 +1,4 @@
-# MaoJuan - publish the promo site to GitHub Pages (branch: gh-pages)
+﻿# MaoJuan - publish the promo site to GitHub Pages (branch: gh-pages)
 #
 # GitHub Pages is the zero-signup host: it only needs the GitHub account we
 # already push to. Its weakness is mainland reachability, so
@@ -96,6 +96,25 @@ Get-ChildItem (Join-Path $stage 'download') -File | Where-Object { $_.Extension 
     $checksum = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     Utf8NoBom ($_.FullName + '.sha256') ($checksum + '  ' + $_.Name + "`n")
 }
+
+# index.html 里有「文件大小与 SHA-256 校验」这个链接，指向 download/manifest.json。
+# 2026-10-09 换用 studio 版首页时才发现它没被部署（线上 404）：这里按 staged 字节
+# 现算现生成，而不是复制 promo/download/manifest.json —— 后者会随包更新而变陈旧，
+# 让「页面上给的校验值」和「实际下载到的文件」对不上，比 404 更坏。
+$manifest = @(
+    Get-ChildItem (Join-Path $stage 'download') -File |
+        Where-Object { $_.Extension -in '.apk', '.exe', '.zip' } |
+        Sort-Object Name |
+        ForEach-Object {
+            [ordered]@{
+                file   = $_.Name
+                bytes  = $_.Length
+                sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        }
+)
+Utf8NoBom (Join-Path $stage 'download\manifest.json') (($manifest | ConvertTo-Json -Depth 3) + "`n")
+Write-Host ("    manifest.json: {0} entries" -f $manifest.Count)
 
 # ---- 2. verify config points at files that were actually staged ---------------
 Step '2/4' 'checking the window.MAOJUAN download paths'

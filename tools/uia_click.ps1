@@ -1,4 +1,4 @@
-# 用 UI Automation 直接调用猫卷窗口元素的 Invoke/SelectionItem 动作（无需前台）
+﻿# 用 UI Automation 直接调用猫卷窗口元素的 Invoke/SelectionItem 动作（无需前台）
 # 用法: powershell -File uia_click.ps1 <元素名匹配文本> [截图输出路径]
 param(
     [string]$match = '统计',
