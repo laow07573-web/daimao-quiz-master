@@ -225,6 +225,10 @@ $promoText = [regex]::Replace($promoText, '(download/MaoJuan-)v[\d.]+(-android-)
     ('${1}v' + $Version + '${2}'))
 $promoText = [regex]::Replace($promoText, '(download/MaoJuan-)v[\d.]+(-windows-)',
     ('${1}v' + $Version + '${2}'))
+# 正文里那句「本地分发包 v<版本>」也是硬编码，必须一并替换——曾漏掉这一处：
+# 配置块与下载链接都已是新版本，页面上却还写着旧版本号（肉眼最不容易发现的）。
+$promoText = [regex]::Replace($promoText, '(本地分发包\s*)v[\d.]+',
+    ('${1}v' + $Version))
 [System.IO.File]::WriteAllText($promo, $promoText, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ("    promo/index.html synced to v{0} (sha256 + version + download names)" -f $Version)
 

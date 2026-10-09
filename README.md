@@ -127,7 +127,7 @@
 | Windows | `MaoJuan-v<版本>-windows-setup.exe` | Windows 10/11 64 位安装包 |
 | Windows | `MaoJuan-v<版本>-windows-portable.zip` | 绿色免安装版，解压即用 |
 
-> 文件名中的 `<版本>` 随版本变化（例如 `MaoJuan-v1.28.1-android-arm64.apk`），
+> 文件名中的 `<版本>` 随版本变化（例如 `MaoJuan-v1.29.0-android-arm64.apk`），
 > 所以这里不写死版本号——请以 Releases 页面上的实际文件名为准。
 > 每个 Release 都附 `SHA256SUMS.txt` 校验值，下载后可自行核对完整性
 > （校验方法见下方[安装与校验](#安装与校验)）。
@@ -172,7 +172,7 @@
 
 ```powershell
 # 把文件名换成你实际下载的那个
-Get-FileHash .\MaoJuan-v1.28.1-windows-setup.exe -Algorithm SHA256
+Get-FileHash .\MaoJuan-v1.29.0-windows-setup.exe -Algorithm SHA256
 ```
 
 把输出的 `Hash` 与 `SHA256SUMS.txt` 里对应行对比，一致即说明文件完整、未被篡改。
@@ -245,7 +245,7 @@ flutter build windows --release
 > 的测试库，会因 `onCreate` 不再触发而出现 `no such table: main.question_images`
 > 之类的大面积假红（清掉该目录即可恢复）。
 
-> 版本号的唯一来源是 `pubspec.yaml` 的 `version:` 字段（形如 `1.28.1+20`）。
+> 版本号的唯一来源是 `pubspec.yaml` 的 `version:` 字段（形如 `1.29.0+21`）。
 > 发布构建会通过 `--dart-define=APP_VERSION=v<版本名>.<构建号>` 把它注入应用
 > 内展示，不需要在任何 Dart 文件里手工改版本号。
 > `test/version_single_source_test.dart` 会校验两者一致，防止版本号漂移。
