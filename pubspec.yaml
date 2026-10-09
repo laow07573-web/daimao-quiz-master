@@ -49,6 +49,10 @@ dependencies:
   # 密钥加密（v1.0.2 新增：AES-256-GCM）
   pointycastle: ^3.9.1
 
+  # 同步配对：二维码生成（纯 Dart，无平台代码）+ 扫码（ML Kit 条码识别）
+  qr: ^3.0.1
+  mobile_scanner: ^5.2.3
+
   # 哈希（v1.0.2 设计审查：开发者选项密码哈希比对）
   crypto: ^3.0.0
 

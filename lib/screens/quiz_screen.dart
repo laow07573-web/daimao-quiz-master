@@ -30,6 +30,15 @@ import 'practice_screen.dart';
 
 enum QuizMode { normal, memorize, practice }
 
+/// 答题页底部栏是否显示。
+///
+/// 底栏承载各模式的收尾动作：练习模式是「提交练习 (已答 X/N)」、背题模式是
+/// 「回到首页」、刷题模式是「完成刷题，查看小结」。
+/// 练习模式必须**无条件**显示：提交入口若依赖"当前题是否已作答"，一题不答就
+/// 没有按钮，交白卷这条路径（以及白卷彩蛋）根本走不到——真机反馈正是这个问题。
+bool shouldShowBottomBar({required QuizMode mode, required bool isAnswered}) =>
+    mode == QuizMode.practice || mode == QuizMode.memorize || isAnswered;
+
 /// 统一答题页（v1.0.2 重构：三模式共用一套结构）
 /// - normal：答完即判 + 自动跳题 + 解析/收藏/重新作答；末题左滑结束会话进小结
 ///   （与「完成刷题」按钮同路径同结局）
@@ -424,8 +433,17 @@ class _QuizScreenState extends State<QuizScreen> {
                   // 滚动区域
                   Expanded(
                     child: Stack(
+                      // 手势层铺满整个中间区域：上方 AppBar/进度条与下方
+                      // 错题本/下一题栏都不属于这里，其余画面范围都应能左右滑动切题
+                      fit: StackFit.expand,
                       children: [
                         GestureDetector(
+                          // 2026-10-08 真机反馈：左右滑动切题的区域应覆盖「除上方 UI 与
+                          // 下方错题本/下一题以外的整个画面」。此前用默认的
+                          // deferToChild，而 SingleChildScrollView 只在**内容**范围内
+                          // 命中——内容没铺满时（如「查看 AI 解析」下方的空白）就拖不动。
+                          // opaque 让手势层在自身范围内始终参与命中；子级按钮仍优先响应。
+                          behavior: HitTestBehavior.opaque,
                           onHorizontalDragEnd: (details) {
                             // v1.27 需求纠偏：批注模式下禁止左右滑动切题（画布接管全部指针）；
                             // 非批注态整个答题区域（本手势包裹全部滚动内容）均可左右拖动切题。
@@ -603,8 +621,13 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
 
-                  // 底部按钮：已答或背题模式均显示
-                  if (isAnswered || widget.quizMode == QuizMode.memorize)
+                  // 底部按钮：练习模式**始终**显示——它的底栏里就是「提交练习」，
+                  // 提交入口不能依赖"当前题是否已作答"，否则一题不答就没有按钮，
+                  // 交白卷这一整条路径（含白卷彩蛋）根本走不到。真机反馈「练习模式
+                  // 交白卷的彩蛋去哪了」，根因就是这里。
+                  // 刷题模式仍是答后才显示（答前显示的是选项区），背题模式始终显示。
+                  if (shouldShowBottomBar(
+                      mode: widget.quizMode, isAnswered: isAnswered))
                     _buildBottomBar(appState, ac),
                 ],
               ),
@@ -1205,6 +1228,7 @@ class _QuizScreenState extends State<QuizScreen> {
       onFalse: () => answer('错'),
     );
   }
+
   void _submitFillBlank(AppState appState) {
     // v1.0.2: 填空提交要求所有空填满（与逐空判定一致）
     final texts = _fillBlankControllers.map((c) => c.text.trim()).toList();
@@ -1299,19 +1323,35 @@ class _QuizScreenState extends State<QuizScreen> {
   void _showAnswerSheet(
       BuildContext context, AppState appState, AppThemeColors ac) {
     _modalOpen = true;
+    // 用户反馈两件事，一起处理：
+    //   ① 「答题卡页面应该折叠，只有用户点开才展示完整答题卡」——默认只占屏幕
+    //      下半部分（折叠态），可上拖展开；
+    //   ② 「无法上下滑动来选择题目」——此前弹层里直接放 AnswerSheetWidget
+    //      （内部是 Wrap，不滚动），50 题超出默认高度后被裁掉且滑不动。
+    // 改用 DraggableScrollableSheet + 可滚动内容：折叠展开都顺，题目全可见。
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       // 平板适配：弹窗限宽居中
       constraints: const BoxConstraints(maxWidth: kSheetMaxWidth),
-      builder: (_) => AnswerSheetWidget(
-        answers: _practiceAnswers,
-        currentIndex: appState.currentQuestionIndex,
-        onJumpTo: (i) {
-          Navigator.pop(context);
-          // v1.0.2 设计审查修复：单次跳转替代 while 逐题循环
-          appState.jumpToQuestion(i);
-          _scrollToTop();
-        },
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: 0.42,
+        minChildSize: 0.28,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          child: AnswerSheetWidget(
+            answers: _practiceAnswers,
+            currentIndex: appState.currentQuestionIndex,
+            onJumpTo: (i) {
+              Navigator.pop(sheetContext);
+              // v1.0.2 设计审查修复：单次跳转替代 while 逐题循环
+              appState.jumpToQuestion(i);
+              _scrollToTop();
+            },
+          ),
+        ),
       ),
     ).then((_) => _modalOpen = false);
   }
@@ -1608,8 +1648,8 @@ class _QuizScreenState extends State<QuizScreen> {
                 SnackBar(
                     content: const Text('请先在设置中配置 API Key 后再查看解析。'),
                     backgroundColor: AppThemeColors.of(context).warning,
-                    action: SnackBarAction(
-                        label: '去设置', onPressed: _openSettings)),
+                    action:
+                        SnackBarAction(label: '去设置', onPressed: _openSettings)),
               );
               return;
             }
@@ -1881,15 +1921,13 @@ class _QuizScreenState extends State<QuizScreen> {
       decoration: BoxDecoration(
         color: ac.background,
         // 精密暗色：底栏与内容的分隔用一条发丝线，不用投影
-        border: Border(
-            top: BorderSide(color: ac.border, width: MaoLine.width)),
+        border: Border(top: BorderSide(color: ac.border, width: MaoLine.width)),
       ),
       child: appState.isLastQuestion
           ? MJButton(
               expand: true,
-              label: widget.quizMode == QuizMode.memorize
-                  ? '回到首页'
-                  : '完成刷题，查看小结',
+              label:
+                  widget.quizMode == QuizMode.memorize ? '回到首页' : '完成刷题，查看小结',
               onPressed: () {
                 if (widget.quizMode == QuizMode.memorize) {
                   _handleExit(appState);

@@ -1,21 +1,18 @@
 import '../utils/design_tokens.dart';
 import '../services/theme_service.dart';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../services/app_state.dart';
-import '../services/database_service.dart';
 import '../services/debug_log_service.dart';
 import '../services/keepalive_service.dart';
 import '../utils/responsive.dart';
 
 /// 开发者选项（v1.0.2）：密码进入，调试专用
-/// 日志 / 模拟长期使用 / 保活状态 / DB 备份导入导出
+/// 日志 / 模拟长期使用 / 保活状态
+/// （数据库备份导入导出已迁至 设置 → 同步与提醒 → 数据库备份）
 class DeveloperOptionsScreen extends StatefulWidget {
   const DeveloperOptionsScreen({super.key});
 
@@ -52,7 +49,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
 
   Future<void> _checkKeepalive() async {
     // v1.0.2 设计审查修复（简化保活）：不再查询无障碍状态
-    final bat = await KeepAliveService.instance.isIgnoringBatteryOptimizations();
+    final bat =
+        await KeepAliveService.instance.isIgnoringBatteryOptimizations();
     if (!mounted) return;
     setState(() {
       _batteryIgnored = bat;
@@ -66,7 +64,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('清除模拟数据'),
-        content: const Text('将删除全部模拟生成的刷题记录、复习卡与错题条目，且不可恢复。\n\n你的真实刷题数据不受影响。确定清除？'),
+        content:
+            const Text('将删除全部模拟生成的刷题记录、复习卡与错题条目，且不可恢复。\n\n你的真实刷题数据不受影响。确定清除？'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -112,7 +111,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                         fontSize: MaoType.body,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 12),
-                Text('生成天数：$days 天', style: const TextStyle(fontSize: MaoType.body)),
+                Text('生成天数：$days 天',
+                    style: const TextStyle(fontSize: MaoType.body)),
                 Slider(
                   value: days.toDouble(),
                   min: 30,
@@ -152,7 +152,8 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
                 if (dueToday)
                   Text('· 错题本的「待复习」数量会全部增加。',
                       style: TextStyle(
-                          fontSize: MaoType.body, color: Theme.of(ctx).colorScheme.error)),
+                          fontSize: MaoType.body,
+                          color: Theme.of(ctx).colorScheme.error)),
               ],
             ),
           ),
@@ -160,32 +161,33 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消')),
-                FilledButton(
-                    onPressed: () async {
-                      // 对齐里程碑：设为今天到期前二次确认
-                      // 先取 Navigator（同步），避免 await 之后再用 ctx 触发跨异步告警
-                      final rootNav = Navigator.of(ctx);
-                      if (dueToday) {
-                        final sure = await showDialog<bool>(
-                          context: ctx,
-                          builder: (c2) => AlertDialog(
-                            title: const Text('确认操作'),
-                            content: const Text('确定把所有复习卡设为今天到期吗？\n错题本的「待复习」数量会全部增加。'),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(c2, false),
-                                  child: const Text('取消')),
-                              FilledButton(
-                                  onPressed: () => Navigator.pop(c2, true),
-                                  child: const Text('确定')),
-                            ],
-                          ),
-                        );
-                        if (sure != true) return;
-                      }
-                      rootNav.pop(true);
-                    },
-                    child: const Text('开始模拟')),
+            FilledButton(
+                onPressed: () async {
+                  // 对齐里程碑：设为今天到期前二次确认
+                  // 先取 Navigator（同步），避免 await 之后再用 ctx 触发跨异步告警
+                  final rootNav = Navigator.of(ctx);
+                  if (dueToday) {
+                    final sure = await showDialog<bool>(
+                      context: ctx,
+                      builder: (c2) => AlertDialog(
+                        title: const Text('确认操作'),
+                        content:
+                            const Text('确定把所有复习卡设为今天到期吗？\n错题本的「待复习」数量会全部增加。'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(c2, false),
+                              child: const Text('取消')),
+                          FilledButton(
+                              onPressed: () => Navigator.pop(c2, true),
+                              child: const Text('确定')),
+                        ],
+                      ),
+                    );
+                    if (sure != true) return;
+                  }
+                  rootNav.pop(true);
+                },
+                child: const Text('开始模拟')),
           ],
         ),
       ),
@@ -203,230 +205,6 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
               ? '已将 ${result.cards} 张复习卡设为到期'
               : '已生成 ${result.records} 条记录，复习卡 ${result.cards} 张');
     });
-  }
-
-  /// 导出备份。
-  ///
-  /// 备份是整库拷贝，默认会把 API Key 一起带出去，而那条密文的密钥写死在
-  /// App 里——拿到备份就能解出 Key。所以这里先让用户选：
-  ///   · 不含 API Key（默认，推荐）：换机后重新填一次 Key 即可；
-  ///   · 含 API Key：必须设置备份口令，整个备份文件会被加密。
-  Future<void> _exportBackup() async {
-    final choice = await _askExportMode();
-    if (choice == null || !mounted) return;
-
-    String? password;
-    if (choice == _ExportMode.withApiKey) {
-      final pwd = await _askBackupPassword();
-      if (pwd == null) return; // 用户取消
-      password = pwd;
-    }
-
-    // v1.0.2 设计审查修复：复用系统临时目录单文件（此前每次 createTemp('backup')
-    // 目录且从不清理，累积垃圾）
-    final dir = Directory.systemTemp;
-    final suffix = choice == _ExportMode.withApiKey ? 'encrypted' : '';
-    final name = 'flashcard_backup_${DateTime.now().millisecondsSinceEpoch}'
-        '${suffix.isEmpty ? '' : '_$suffix'}.db';
-    final path = '${dir.path}/$name';
-
-    if (mounted) setState(() => _status = '正在导出…');
-    final err = await DatabaseService.instance.exportBackup(
-      path,
-      includeApiKey: choice == _ExportMode.withApiKey,
-      password: password,
-    );
-    if (err != null) {
-      if (!mounted) return;
-      setState(() => _status = '导出失败: $err');
-      return;
-    }
-    if (!mounted) return;
-    setState(() => _status = choice == _ExportMode.withApiKey
-        ? '已导出（含 API Key，口令加密）。请牢记口令，丢失无法恢复。'
-        : '已导出（不含 API Key）。');
-    try {
-      await Share.shareXFiles([XFile(path)], subject: '猫卷数据库备份');
-    } catch (e) {
-      // v1.0.2 设计审查修复：分享失败不再静默
-      if (!mounted) return;
-      setState(() => _status = '分享失败: $e');
-    }
-  }
-
-  /// 选择导出模式；返回 null 表示用户取消。
-  Future<_ExportMode?> _askExportMode() {
-    return showDialog<_ExportMode>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('导出数据库备份'),
-        content: const Text(
-          '备份包含题库、刷题记录、错题与批注。\n\n'
-          '是否包含 API Key？\n'
-          '· 不含（推荐）：备份是明文文件，换机后重新填一次 Key。\n'
-          '· 包含：会要求设置备份口令，整个文件加密后才可分享。',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, _ExportMode.withApiKey),
-              child: const Text('含 API Key')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, _ExportMode.withoutApiKey),
-              child: const Text('不含（推荐）')),
-        ],
-      ),
-    );
-  }
-
-  /// 要求设置备份口令（至少 6 位，需二次确认一致）。返回 null 表示取消。
-  Future<String?> _askBackupPassword() async {
-    final c1 = TextEditingController();
-    final c2 = TextEditingController();
-    String? error;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setInner) => AlertDialog(
-          title: const Text('设置备份口令'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '导入这个备份时需要输入同一口令。口令丢失则备份无法恢复，请自行记牢。',
-                style: TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: c1,
-                obscureText: true,
-                decoration: InputDecoration(
-                    labelText: '备份口令', errorText: error),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: c2,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: '再输入一次'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消')),
-            FilledButton(
-              onPressed: () {
-                final a = c1.text;
-                if (a.length < 6) {
-                  setInner(() => error = '口令至少 6 位');
-                  return;
-                }
-                if (a != c2.text) {
-                  setInner(() => error = '两次输入不一致');
-                  return;
-                }
-                Navigator.pop(ctx, true);
-              },
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-      ),
-    );
-    final pwd = c1.text;
-    c1.dispose();
-    c2.dispose();
-    return ok == true ? pwd : null;
-  }
-
-  Future<void> _importBackup() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['db'],
-    );
-    if (result == null || result.files.isEmpty) return;
-    final path = result.files.first.path;
-    if (path == null) return;
-    if (!mounted) return;
-
-    // 口令加密的备份先要口令——在确认覆盖之前问，避免用户确认完才发现没口令
-    String? password;
-    if (await DatabaseService.instance.isEncryptedBackup(path)) {
-      if (!mounted) return;
-      password = await _askImportPassword();
-      if (password == null) return; // 取消
-    }
-    if (!mounted) return;
-
-    // v1.0.2 对齐里程碑：导入前确认（覆盖当前所有数据）
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('导入数据库备份'),
-        content: Text(password == null
-            ? '导入将覆盖当前所有数据，且需要重启App才能生效。'
-            : '这是一个口令加密的备份。导入将覆盖当前所有数据，且需要重启App才能生效。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('导入')),
-        ],
-      ),
-    );
-    if (sure != true || !mounted) return;
-
-    if (mounted) setState(() => _status = '正在导入…');
-    final err = await DatabaseService.instance
-        .importBackup(path, password: password);
-    if (!mounted) return;
-    setState(() {
-      // v1.0.2 对齐里程碑：数据库已替换，请重启App使数据生效。
-      _status = err == null
-          ? '数据库已替换，请重启App使数据生效。'
-          : '导入失败: $err';
-    });
-  }
-
-  /// 输入备份口令。返回 null 表示用户取消。
-  Future<String?> _askImportPassword() async {
-    final c = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('备份已加密'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('这个备份导出时设置了口令，请输入以继续。',
-                style: TextStyle(fontSize: 13)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: c,
-              obscureText: true,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: '备份口令'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('确定')),
-        ],
-      ),
-    );
-    final pwd = c.text;
-    c.dispose();
-    return ok == true ? pwd : null;
   }
 
   @override
@@ -571,8 +349,7 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
           title: '隐藏当日刷题记录',
           subtitle: '将今日答题记录暂时隐藏（可恢复），今日将显示为未刷题',
           onTap: () async {
-            final hidden =
-                await context.read<AppState>().hideTodayRecords();
+            final hidden = await context.read<AppState>().hideTodayRecords();
             if (!mounted) return;
             setState(() {
               _status = hidden > 0 ? '已隐藏 $hidden 条今日记录' : '今日暂无答题记录';
@@ -605,20 +382,9 @@ class _DeveloperOptionsScreenState extends State<DeveloperOptionsScreen> {
             await _checkKeepalive();
           },
         ),
-        const SizedBox(height: 8),
-        _DevCard(
-          icon: Icons.backup_outlined,
-          title: '导出数据库备份',
-          subtitle: '默认不含 API Key；含 Key 时整包口令加密',
-          onTap: _exportBackup,
-        ),
-        const SizedBox(height: 8),
-        _DevCard(
-          icon: Icons.restore,
-          title: '导入数据库备份',
-          subtitle: '校验 SQLite 魔数与核心表；加密备份需输入口令',
-          onTap: _importBackup,
-        ),
+        // 数据库导入/导出已迁至 设置 → 同步与提醒 → 数据库备份
+        // （2026-10-08 用户要求：整库备份是常规数据管理能力，不该藏在开发者模式里）。
+        // 这里不再保留任何入口，避免两处重复。
         if (_status != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -671,7 +437,8 @@ class _DevCard extends StatelessWidget {
                   if (subtitle != null)
                     Text(subtitle!,
                         style: TextStyle(
-                            fontSize: MaoType.caption, color: ac.textSecondary)),
+                            fontSize: MaoType.caption,
+                            color: ac.textSecondary)),
                 ],
               ),
             ),
@@ -682,7 +449,6 @@ class _DevCard extends StatelessWidget {
     );
   }
 }
-
 
 /// 开发者选项里的开关卡片（与 _DevCard 同视觉语言，右侧为开关）。
 class _DevSwitchCard extends StatelessWidget {
@@ -720,12 +486,11 @@ class _DevSwitchCard extends StatelessWidget {
               children: [
                 Text(title,
                     style: MaoType.h3Style.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: ac.textPrimary)),
+                        fontWeight: FontWeight.w600, color: ac.textPrimary)),
                 const SizedBox(height: 2),
                 Text(subtitle,
-                    style: MaoType.captionStyle
-                        .copyWith(color: ac.textSecondary)),
+                    style:
+                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
               ],
             ),
           ),
@@ -735,13 +500,4 @@ class _DevSwitchCard extends StatelessWidget {
       ),
     );
   }
-}
-
-/// 导出备份时对 API Key 的处理方式。
-enum _ExportMode {
-  /// 不含 API Key（默认）：备份是明文文件，换机后重新填 Key。
-  withoutApiKey,
-
-  /// 含 API Key：必须设置备份口令，整个备份文件加密。
-  withApiKey,
 }

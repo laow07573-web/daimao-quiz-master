@@ -119,8 +119,11 @@ void main() {
         )
       ''');
       // 旧数据：1 题库 + 1 题 + 1 会话 + 1 作答 + 1 错题 + 1 批注
-      final bankId = await old.insert('question_banks',
-          {'name': '旧库', 'question_count': 1, 'created_at': '2025-01-01T00:00:00'});
+      final bankId = await old.insert('question_banks', {
+        'name': '旧库',
+        'question_count': 1,
+        'created_at': '2025-01-01T00:00:00'
+      });
       final qid = await old.insert('questions', {
         'bank_id': bankId,
         'title': '旧题',
@@ -145,8 +148,11 @@ void main() {
       });
       await old.insert('error_book',
           {'question_id': qid, 'added_at': '2025-01-02T00:06:00'});
-      await old.insert('question_annotations',
-          {'question_id': qid, 'data': '[[]]', 'updated_at': '2025-01-02T00:07:00'});
+      await old.insert('question_annotations', {
+        'question_id': qid,
+        'data': '[[]]',
+        'updated_at': '2025-01-02T00:07:00'
+      });
       await old.execute('PRAGMA user_version = 10');
       await old.close();
       return path;
@@ -169,30 +175,33 @@ void main() {
       expect(version.first.values.first, 12);
 
       // uid 全部回填且非空
-      final banks = await migrated.rawQuery('SELECT uid, updated_at FROM question_banks');
+      final banks =
+          await migrated.rawQuery('SELECT uid, updated_at FROM question_banks');
       expect(banks.first['uid'], isNotNull);
       expect(banks.first['updated_at'], '2025-01-01T00:00:00'); // 回填 created_at
       final questions = await migrated.rawQuery('SELECT uid FROM questions');
       expect(questions.first['uid'], isNotNull);
       final sessions = await migrated.rawQuery('SELECT uid FROM quiz_sessions');
       expect(sessions.first['uid'], isNotNull);
-      final records = await migrated.rawQuery(
-          'SELECT uid, origin_device FROM answer_records');
+      final records = await migrated
+          .rawQuery('SELECT uid, origin_device FROM answer_records');
       expect(records.first['uid'], isNotNull);
       expect(records.first['origin_device'], 'local-device');
 
       // session_questions.question_uid 按题目关联回填
-      final sq = await migrated.rawQuery('SELECT question_uid FROM session_questions');
+      final sq =
+          await migrated.rawQuery('SELECT question_uid FROM session_questions');
       expect(sq.first['question_uid'], questions.first['uid']);
 
       // 错题：回填 uid + 归属本机
-      final errors = await migrated.rawQuery(
-          'SELECT uid, origin_device FROM error_book');
+      final errors =
+          await migrated.rawQuery('SELECT uid, origin_device FROM error_book');
       expect(errors.first['uid'], isNotNull);
       expect(errors.first['origin_device'], 'local-device');
 
       // 新唯一约束：同一题另一设备的错题可共存（旧表 UNIQUE 会冲突）
-      final qid = (await migrated.rawQuery('SELECT id FROM questions')).first['id'];
+      final qid =
+          (await migrated.rawQuery('SELECT id FROM questions')).first['id'];
       await migrated.insert('error_book', {
         'question_id': qid,
         'uid': 'remote-uid',
@@ -203,8 +212,8 @@ void main() {
       expect(both.length, 2);
 
       // 批注：复合主键迁移，既有批注归属本机
-      final annos = await migrated.rawQuery(
-          'SELECT device_id, data FROM question_annotations');
+      final annos = await migrated
+          .rawQuery('SELECT device_id, data FROM question_annotations');
       expect(annos.first['device_id'], 'local-device');
       // 他端同一题批注可共存
       await migrated.insert('question_annotations', {
@@ -213,7 +222,8 @@ void main() {
         'data': '[[]]',
         'updated_at': '2025-01-03T00:00:00',
       });
-      final annoBoth = await migrated.rawQuery('SELECT * FROM question_annotations');
+      final annoBoth =
+          await migrated.rawQuery('SELECT * FROM question_annotations');
       expect(annoBoth.length, 2);
     });
   });
@@ -228,13 +238,18 @@ void main() {
       final bankId = await db.insertBank(
           QuestionBank(name: '共享库', createdAt: '2025-02-01T00:00:00'));
       await db.insertQuestions([
-        Question(bankId: bankId, title: '原题', correctAnswer: 'A',
+        Question(
+            bankId: bankId,
+            title: '原题',
+            correctAnswer: 'A',
             createdAt: '2025-02-01T00:00:00'),
       ]);
       final bankUid = (await (await db.database).rawQuery(
-          'SELECT uid FROM question_banks WHERE id = ?', [bankId])).first['uid'] as String;
-      final questionUid = (await (await db.database).rawQuery(
-          'SELECT uid FROM questions')).first['uid'] as String;
+              'SELECT uid FROM question_banks WHERE id = ?', [bankId]))
+          .first['uid'] as String;
+      final questionUid =
+          (await (await db.database).rawQuery('SELECT uid FROM questions'))
+              .first['uid'] as String;
 
       // 对端推送同一题库：名字更新（updated_at 更新）→ 采纳
       final snapshot = {
@@ -322,12 +337,16 @@ void main() {
       final bankId = await db.insertBank(
           QuestionBank(name: '批注库', createdAt: '2025-02-01T00:00:00'));
       await db.insertQuestions([
-        Question(bankId: bankId, title: 'q', correctAnswer: 'A',
+        Question(
+            bankId: bankId,
+            title: 'q',
+            correctAnswer: 'A',
             createdAt: '2025-02-01T00:00:00'),
       ]);
       final qid = (await db.getQuestionsByBank(bankId)).first.id!;
-      final questionUid = (await (await db.database).rawQuery(
-          'SELECT uid FROM questions WHERE id = ?', [qid])).first['uid'] as String;
+      final questionUid = (await (await db.database)
+              .rawQuery('SELECT uid FROM questions WHERE id = ?', [qid]))
+          .first['uid'] as String;
 
       // 本机批注
       await AnnotationService.instance.save(qid, [
@@ -400,12 +419,16 @@ void main() {
       final bankId = await db.insertBank(
           QuestionBank(name: '错题库', createdAt: '2025-02-01T00:00:00'));
       await db.insertQuestions([
-        Question(bankId: bankId, title: 'q', correctAnswer: 'A',
+        Question(
+            bankId: bankId,
+            title: 'q',
+            correctAnswer: 'A',
             createdAt: '2025-02-01T00:00:00'),
       ]);
       final qid = (await db.getQuestionsByBank(bankId)).first.id!;
-      final questionUid = (await (await db.database).rawQuery(
-          'SELECT uid FROM questions WHERE id = ?', [qid])).first['uid'] as String;
+      final questionUid = (await (await db.database)
+              .rawQuery('SELECT uid FROM questions WHERE id = ?', [qid]))
+          .first['uid'] as String;
 
       await db.addToErrorBook(qid); // 本机收藏
 
@@ -463,8 +486,8 @@ void main() {
 
       // 本机移出错题本不误删他端记录
       await db.removeFromErrorBook(qid);
-      final afterRemove = await (await db.database).rawQuery(
-          'SELECT origin_device FROM error_book');
+      final afterRemove = await (await db.database)
+          .rawQuery('SELECT origin_device FROM error_book');
       expect(afterRemove.length, 1);
       expect(afterRemove.first['origin_device'], remoteDevice);
       expect(await db.isInErrorBook(qid), isFalse); // 本机状态已取消
@@ -521,28 +544,40 @@ void main() {
         ],
         'annotations': <Map<String, dynamic>>[],
       });
-      expect((await (await db.database).rawQuery(
-          'SELECT COUNT(*) AS c FROM answer_records')).first['c'], 1);
-      expect((await (await db.database).rawQuery(
-          'SELECT COUNT(*) AS c FROM error_book')).first['c'], 1);
-      expect((await (await db.database).rawQuery(
-          'SELECT COUNT(*) AS c FROM quiz_sessions')).first['c'], 1);
+      expect(
+          (await (await db.database)
+                  .rawQuery('SELECT COUNT(*) AS c FROM answer_records'))
+              .first['c'],
+          1);
+      expect(
+          (await (await db.database)
+                  .rawQuery('SELECT COUNT(*) AS c FROM error_book'))
+              .first['c'],
+          1);
+      expect(
+          (await (await db.database)
+                  .rawQuery('SELECT COUNT(*) AS c FROM quiz_sessions'))
+              .first['c'],
+          1);
     });
 
-    test('导出快照：uid/bank_uid 关联、bank_ids 按 uid 对应、模拟数据不同步',
-        () async {
+    test('导出快照：uid/bank_uid 关联、bank_ids 按 uid 对应、模拟数据不同步', () async {
       DeviceService.instance.overrideDeviceId('device-a');
       final db = DatabaseService.instance;
       final repo = SyncRepository();
       final bankId = await db.insertBank(
           QuestionBank(name: '导出库', createdAt: '2025-02-01T00:00:00'));
       await db.insertQuestions([
-        Question(bankId: bankId, title: 'q', correctAnswer: 'A',
+        Question(
+            bankId: bankId,
+            title: 'q',
+            correctAnswer: 'A',
             createdAt: '2025-02-01T00:00:00'),
       ]);
       final q = (await db.getQuestionsByBank(bankId)).first;
       final bankUid = (await (await db.database).rawQuery(
-          'SELECT uid FROM question_banks WHERE id = ?', [bankId])).first['uid'] as String;
+              'SELECT uid FROM question_banks WHERE id = ?', [bankId]))
+          .first['uid'] as String;
 
       // 完成的真实会话（bank_ids 本地 id）+ 模拟会话（不应导出）
       await db.insertSession(QuizSession(
@@ -559,9 +594,9 @@ void main() {
         startTime: '2025-02-03T10:00:00',
         endTime: '2025-02-03T10:05:00',
       ));
-      await (await db.database)
-          .update('quiz_sessions', {'source': 'simulation'},
-              where: 'id = ?', whereArgs: [simId]);
+      await (await db.database).update(
+          'quiz_sessions', {'source': 'simulation'},
+          where: 'id = ?', whereArgs: [simId]);
       await db.insertAnswerRecord(AnswerRecord(
         questionId: q.id!,
         isCorrect: true,
@@ -582,17 +617,19 @@ void main() {
       expect(sessions.first['bank_ids'], bankUid);
       // 作答记录带 question_uid + origin_device
       final records = snap['answer_records'] as List;
-      expect(records.first['question_uid'],
-          (await (await db.database).rawQuery(
-              'SELECT uid FROM questions WHERE id = ?', [q.id])).first['uid']);
+      expect(
+          records.first['question_uid'],
+          (await (await db.database)
+                  .rawQuery('SELECT uid FROM questions WHERE id = ?', [q.id]))
+              .first['uid']);
       expect(records.first['origin_device'], 'device-a');
     });
   });
 
   group('设备发现（信标）', () {
     test('信标编解码往返 + 他应用/垃圾数据拒绝', () {
-      final beacon = SyncBeacon(
-          deviceId: 'dev-1', deviceName: '猫卷-Android', port: 51630);
+      final beacon =
+          SyncBeacon(deviceId: 'dev-1', deviceName: '猫卷-Android', port: 51630);
       final decoded = SyncBeacon.decode(beacon.encode());
       expect(decoded, isNotNull);
       expect(decoded!.deviceId, 'dev-1');
@@ -618,8 +655,8 @@ void main() {
       discovery.onPeerDiscovered = (_) => discovered++;
       discovery.onPeersChanged = () => changed++;
 
-      final peerBeacon = const SyncBeacon(
-          deviceId: 'peer-1', deviceName: '平板', port: 51630);
+      final peerBeacon =
+          const SyncBeacon(deviceId: 'peer-1', deviceName: '平板', port: 51630);
       discovery.handleDatagram(
           Uint8List.fromList(utf8.encode(peerBeacon.encode())),
           InternetAddress('192.168.1.2'));
@@ -655,13 +692,22 @@ void main() {
   });
 
   group('同步服务端（SyncServer）', () {
+    /// 2026-10-08：接口新增识别码门禁（用户要求「以免将数据同步到不想同步
+    /// 的设备里面」），测试统一注入校验器并携带请求头。
+    const code = 'TESTCODE1234';
+
     test('exchange 接口：收对端快照合并、响应返回本机快照', () async {
       final server = SyncServer();
       Map<String, dynamic>? received;
+      var lastBanksOnly = false;
       await server.start(
         onReceived: (snap) async => received = snap,
-        snapshot: () async => {'device_id': 'self', 'banks': <dynamic>[]},
+        snapshot: ({required bool banksOnly}) async {
+          lastBanksOnly = banksOnly;
+          return {'device_id': 'self', 'banks': <dynamic>[]};
+        },
       );
+      server.verifyCode = (presented) => presented == code;
       expect(server.port, greaterThan(0));
 
       final client = http.Client();
@@ -674,7 +720,10 @@ void main() {
         };
         final resp = await client.post(
           Uri.parse('http://127.0.0.1:${server.port}/sync/exchange'),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            SyncServer.codeHeader: code,
+          },
           body: utf8.encode(jsonEncode(peerSnap)),
         );
         expect(resp.statusCode, 200);
@@ -682,23 +731,128 @@ void main() {
         expect(received, isNotNull);
         expect(received!['device_id'], 'peer-x');
         // 响应体是本机快照（对端据此合并，一次请求双向同步）
-        final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+        final body =
+            jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
         expect(body['device_id'], 'self');
+        expect(lastBanksOnly, isFalse, reason: '默认是整库同步');
 
         // info 接口返回设备信息
-        final info = await client
-            .get(Uri.parse('http://127.0.0.1:${server.port}/sync/info'));
+        final info = await client.get(
+            Uri.parse('http://127.0.0.1:${server.port}/sync/info'),
+            headers: {SyncServer.codeHeader: code});
         expect(info.statusCode, 200);
-        expect(
-            (jsonDecode(utf8.decode(info.bodyBytes)) as Map)['device_name'],
+        expect((jsonDecode(utf8.decode(info.bodyBytes)) as Map)['device_name'],
             isNotNull);
 
         // 非法 body 拒绝
         final bad = await client.post(
           Uri.parse('http://127.0.0.1:${server.port}/sync/exchange'),
+          headers: {SyncServer.codeHeader: code},
           body: 'not json',
         );
         expect(bad.statusCode, 400);
+      } finally {
+        client.close();
+        await server.stop();
+      }
+    });
+
+    test('识别码门禁：没带码 / 带错码一律 403，且不触发合并', () async {
+      final server = SyncServer();
+      var mergeCalls = 0;
+      await server.start(
+        onReceived: (snap) async => mergeCalls++,
+        snapshot: ({required bool banksOnly}) async => {'device_id': 'self'},
+      );
+      server.verifyCode = (presented) => presented == code;
+
+      final client = http.Client();
+      try {
+        final uri = Uri.parse('http://127.0.0.1:${server.port}/sync/exchange');
+
+        // ① 完全不带识别码
+        final none = await client.post(uri, body: jsonEncode({'a': 1}));
+        expect(none.statusCode, 403);
+
+        // ② 带错的识别码
+        final wrong = await client.post(uri,
+            headers: {SyncServer.codeHeader: 'WRONG-CODE'},
+            body: jsonEncode({'a': 1}));
+        expect(wrong.statusCode, 403);
+
+        // ③ 探测接口同样要码（不对陌生设备开口）
+        final info = await client
+            .get(Uri.parse('http://127.0.0.1:${server.port}/sync/info'));
+        expect(info.statusCode, 403);
+
+        // 被拒的请求不该落任何数据
+        expect(mergeCalls, 0);
+      } finally {
+        client.close();
+        await server.stop();
+      }
+    });
+
+    test('未注入校验器时默认拒绝（漏接线不能变成不设防）', () async {
+      final server = SyncServer();
+      await server.start(
+        onReceived: (snap) async {},
+        snapshot: ({required bool banksOnly}) async => {'device_id': 'self'},
+      );
+      final client = http.Client();
+      try {
+        final resp = await client.post(
+          Uri.parse('http://127.0.0.1:${server.port}/sync/exchange'),
+          headers: {SyncServer.codeHeader: code},
+          body: jsonEncode({'a': 1}),
+        );
+        expect(resp.statusCode, 403);
+      } finally {
+        client.close();
+        await server.stop();
+      }
+    });
+
+    test('仅题库范围：请求头声明 banks 时只回题库快照', () async {
+      final server = SyncServer();
+      Map<String, dynamic>? received;
+      var banksOnlySeen = false;
+      await server.start(
+        onReceived: (snap) async => received = snap,
+        snapshot: ({required bool banksOnly}) async {
+          banksOnlySeen = banksOnly;
+          return {
+            'device_id': 'self',
+            'scope': banksOnly ? 'banks' : 'full',
+            'banks': <dynamic>[],
+            'sessions': banksOnly
+                ? <dynamic>[]
+                : [
+                    {'uid': 's1'}
+                  ],
+          };
+        },
+      );
+      server.verifyCode = (presented) => presented == code;
+
+      final client = http.Client();
+      try {
+        final resp = await client.post(
+          Uri.parse('http://127.0.0.1:${server.port}/sync/exchange'),
+          headers: {
+            'Content-Type': 'application/json',
+            SyncServer.codeHeader: code,
+            SyncServer.scopeHeader: 'banks',
+          },
+          body: utf8.encode(jsonEncode({'device_id': 'peer-x'})),
+        );
+        expect(resp.statusCode, 200);
+        expect(banksOnlySeen, isTrue, reason: '请求方声明 banks 时不应回整库');
+        final body =
+            jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+        expect(body['scope'], 'banks');
+        expect(body['sessions'], isEmpty, reason: '仅题库时不能带刷题记录');
+        expect(received, isNotNull);
       } finally {
         client.close();
         await server.stop();

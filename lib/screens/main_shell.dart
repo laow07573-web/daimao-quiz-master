@@ -37,7 +37,8 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell>
+    with SingleTickerProviderStateMixin {
   /// 取证/诊断入口：--dart-define=MAOJUAN_GOTO=stats 启动直达统计页。
   /// 仅在显式构建参数下生效，正常包不受影响。
   static const String _goto = String.fromEnvironment('MAOJUAN_GOTO');
@@ -54,9 +55,23 @@ class _MainShellState extends State<MainShell> {
   /// 引导控制器（挂在根节点；首帧后拿到并接线）
   GuideController? _guide;
 
+  /// 切 Tab 的内容层过渡进度（0→1）。
+  ///
+  /// 为什么用控制器而不是「TweenAnimationBuilder + ValueKey(_index)」：
+  /// 换血式 key 会让 IndexedStack 整棵子树重建——四个 Tab 里含热力图（371 格）
+  /// 与趋势图，等于每次切页都重建全部页面，实测就是切页卡顿的来源。
+  /// 现在孩子（IndexedStack）作为 AnimatedBuilder 的 child 缓存，动画 tick
+  /// 只改透明度/位移，不触发页面重建。
+  late final AnimationController _pageAnim;
+
   @override
   void initState() {
     super.initState();
+    _pageAnim = AnimationController(
+      vsync: this,
+      duration: MaoMotion.normal,
+      value: 1,
+    );
     // 帧后再接线：引导要等主壳首帧布局落定才能量锚点矩形，
     // 也顺带避开在 initState 里访问 InheritedWidget
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -77,6 +92,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     _guide?.attachTabSwitcher(null);
+    _pageAnim.dispose();
     super.dispose();
   }
 
@@ -143,7 +159,19 @@ class _MainShellState extends State<MainShell> {
 
   void _select(int i) {
     if (i == _index) return;
+    // 2026-10-09 用户要求：「切入其他页面的时候就不要显示这个提示了」。
+    // SnackBar 挂在 root ScaffoldMessenger 上，切 Tab 不会自己消失——而它讲的
+    // 往往是上一个页面的上下文（例如开始页的「先勾选要刷的题库」），跟到别的
+    // 页面只会让人莫名其妙。这里连同排队中的一起清掉。
+    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _index = i);
+    // 内容层过渡：每次切 Tab 从头演一次（不动时长则应立刻落位）
+    _pageAnim.duration = MaoMotion.effective(context, MaoMotion.primaryPage);
+    if (_pageAnim.duration == Duration.zero) {
+      _pageAnim.value = 1;
+    } else {
+      _pageAnim.forward(from: 0);
+    }
     // 上报给引导：某一步正等着用户自己点到这个 Tab
     _guide?.setCurrentTab(i);
     // 切 Tab 回调刷新（两形态共用）
@@ -154,26 +182,40 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  /// 内容层：IndexedStack 保活 + 切 Tab 轻淡入（克制版）。
+  /// 内容层：IndexedStack 保活 + 切 Tab 淡入并轻微横向落位。
   ///
-  /// TweenAnimationBuilder 的 key 随 _index 换血触发 0→1 淡入（MaoMotion.fast）；
-  /// 四个 Tab 都挂 GlobalKey，换血重建时状态随 GlobalKey 迁移，保活不丢。
-  /// NavigationBar 的指示器不做任何动画。
-  Widget _buildPages(BuildContext context) => TweenAnimationBuilder<double>(
-        key: ValueKey(_index),
-        tween: Tween<double>(begin: 0, end: 1),
-        duration: MaoMotion.effective(context, MaoMotion.fast),
-        curve: MaoMotion.standard,
-        builder: (context, t, child) => Opacity(opacity: t, child: child),
-        child: IndexedStack(
-          index: _index,
-          children: [
-            HomeScreen(key: _homeKey),
-            QuickStartScreen(key: _quickStartKey),
-            StatsTab(key: _statsKey),
-            ProfileTab(key: _profileKey),
-          ],
-        ),
+  /// 关键：IndexedStack 作为 [AnimatedBuilder] 的 child 传入——动画 tick 只重建
+  /// 外层 Opacity/FractionalTranslation，四个页面（含热力图与趋势图）不会被重建；
+  /// 之前用 ValueKey 换血触发重建，切页会卡。
+  /// 四个一级页面的**实例缓存**。
+  ///
+  /// 2026-10-09 真机反馈「一级页面切换明显卡顿」的真根因：切 Tab 会 setState，
+  /// 而此前 children 是在 `_buildPages` 里**现场构造**的——每次 setState 都生成
+  /// 四个新的页面 widget，Element 只能逐个 update，于是**四个页面（含统计页的
+  /// 热力图 371 格与趋势图）全部 rebuild**。动画 tick 本身很轻，卡的是切换那一帧。
+  ///
+  /// 把列表缓存成同一个 List 实例后，children 的元素是 identical 的，
+  /// Flutter 走「widget 未变」的快速路径，切页只换 IndexedStack 的 index。
+  late final List<Widget> _pages = [
+    HomeScreen(key: _homeKey),
+    QuickStartScreen(key: _quickStartKey),
+    StatsTab(key: _statsKey),
+    ProfileTab(key: _profileKey),
+  ];
+
+  Widget _buildPages(BuildContext context) => AnimatedBuilder(
+        animation: _pageAnim,
+        child: IndexedStack(index: _index, children: _pages),
+        builder: (context, child) {
+          final t = _pageAnim.value;
+          return Opacity(
+            opacity: t,
+            child: FractionalTranslation(
+              translation: Offset((1 - t) * 0.04, 0),
+              child: child,
+            ),
+          );
+        },
       );
 
   @override

@@ -12,6 +12,7 @@ class AnswerSheetWidget extends StatelessWidget {
   final List<PracticeAnswerState> answers;
   final int currentIndex;
   final void Function(int index) onJumpTo;
+
   /// v1.0.2 七项改进：是否显示对错（结果页复盘 = true；练习作答中 = false）
   final bool showResult;
 
@@ -85,24 +86,36 @@ class AnswerSheetWidget extends StatelessWidget {
                 fg = ac.onAccent;
                 bd = ac.accent;
               }
-              return InkWell(
-                borderRadius: MaoRadius.smallBorder,
-                onTap: () => onJumpTo(i),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: bg,
+              return Semantics(
+                button: true,
+                selected: isCurrent,
+                label:
+                    '第 ${i + 1} 题${a.answered ? (showResult ? (a.correct ? '，答对' : '，答错') : '，已作答') : '，未作答'}',
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: InkWell(
                     borderRadius: MaoRadius.smallBorder,
-                    // 描边恒 1px：粗细随当前项变化会让格子在跳题瞬间缩放
-                    // 0.6px（视觉#5）；当前项权重由 accent 实底 + onAccent 数字承担
-                    border: Border.all(color: bd, width: MaoLine.width),
+                    onTap: () => onJumpTo(i),
+                    child: Center(
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: MaoRadius.smallBorder,
+                          border: Border.all(color: bd, width: MaoLine.width),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${i + 1}',
+                          style: MaoType.number(MaoType.caption,
+                                  weight: FontWeight.w600)
+                              .copyWith(color: fg),
+                        ),
+                      ),
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: Text('${i + 1}',
-                      style: MaoType.number(MaoType.caption,
-                              weight: FontWeight.w600)
-                          .copyWith(color: fg)),
                 ),
               );
             }),

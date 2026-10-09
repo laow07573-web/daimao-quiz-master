@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +12,8 @@ import '../utils/responsive.dart';
 import '../widgets/guide/guide_anchor.dart';
 import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
+import '../widgets/sync_conflict_banner.dart';
+import '../widgets/mao_quote_tappable.dart';
 import '../widgets/kit/mj_logo.dart';
 import '../widgets/weekly_stats_board.dart';
 import 'import_preview_screen.dart';
@@ -47,10 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 不能只在「开始」页（那里是主动去做题时才会进）。
   (QuizSession, int)? _unfinished;
 
-    // v1.0.2 扩展：今日一言（开页面显示）。
-    // v1.27 PC 加载修复：首帧直接显示缓存/本地一言，不再显示「正在加载一言...」，
-    // 网络结果到达后静默替换；失败也不回退占位文案。
-    String _hitokoto = HitokotoService.immediateText();
+  // v1.0.2 扩展：今日一言（开页面显示）。
+  // v1.27 PC 加载修复：首帧直接显示缓存/本地一言，不再显示「正在加载一言...」，
+  // 网络结果到达后静默替换；失败也不回退占位文案。
+  String _hitokoto = HitokotoService.immediateText();
 
   @override
   void initState() {
@@ -161,12 +163,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 固定块：问候卡（含累计数据）+ 续刷入口 + 待办提示。
-                        // 续刷放在待办之前：它是"接着上次继续做"的第一顺位动作。
+                        // 同名题库冲突提示（2026-10-09 用户要求「挂在首页就好了」）：
+                        // 同步时遇到同名但内容不同的题库会挂起，等用户在这里决定
+                        // 覆盖还是增添。没有冲突时这块完全不占位。
+                        const SyncConflictBanner(),
+                        // 固定块：首页先回答「我现在到哪了、接下来做什么」。
+                        // 统计保留在同一张状态卡内，续刷单独置于状态之后，避免多张并列主卡。
                         Column(
                           key: _fixedBlockKey,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // 用户要求去掉首页这栏标题（此前加回的「学习状态」标题+副标题
+                            // 属于回归，已移除）；卡片本身保留。
                             _buildHeroCard(appState, ac),
                             if (_unfinished != null) ...[
                               const SizedBox(height: MaoSpace.sm),
@@ -235,7 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
       list.add(_buildBalanceWarning(ac));
     }
     if (appState.importTaskActive) {
-      if (!MJImportTask.discarded) list.add(_buildImportProgressCard(appState, ac));
+      if (!MJImportTask.discarded) {
+        list.add(_buildImportProgressCard(appState, ac));
+      }
     } else if (appState.previewQuestions.isNotEmpty) {
       list.add(_buildPreviewConfirmCard(appState, ac));
     }
@@ -275,8 +285,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: MaoSpace.sm),
-              // 品牌位：矢量标记（34px 下位图字标完全糊掉，标记仍然清晰）
-              const MJLogoBadge(box: 34),
+              // 品牌位：矢量标记，直接绘制（原 34px 带框位图时代的尺寸已不适用）
+              // 2026-10-09 用户需求：点 Logo 出随机语录（与一言是两套，见 MaoQuotes）
+              const MaoQuoteTappable(
+                box: 42,
+                child: MJLogoBadge(box: 42),
+              ),
             ],
           ),
           const SizedBox(height: MaoSpace.sm),
@@ -326,18 +340,8 @@ class _HomeScreenState extends State<HomeScreen> {
         fmtDurationCompact(stats?.totalDurationSeconds ?? 0),
         5
       ),
-      (
-        Icons.quiz_outlined,
-        '总题量',
-        '${stats?.totalQuestions ?? 0}',
-        4
-      ),
-      (
-        Icons.trending_up,
-        '正确率',
-        stats?.formattedAccuracy ?? '0.0%',
-        4
-      ),
+      (Icons.quiz_outlined, '总题量', '${stats?.totalQuestions ?? 0}', 4),
+      (Icons.trending_up, '正确率', stats?.formattedAccuracy ?? '0.0%', 4),
     ];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,8 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(items[i].$3,
                       maxLines: 1,
-                      style: MaoType.number(MaoType.h3,
-                              weight: FontWeight.w700)
+                      style: MaoType.number(MaoType.h3, weight: FontWeight.w700)
                           .copyWith(color: ac.textPrimary)),
                 ),
               ],
@@ -447,8 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _accuracyText(
-      Map<String, dynamic> d, Map<String, dynamic> accByDay) {
+  String _accuracyText(Map<String, dynamic> d, Map<String, dynamic> accByDay) {
     final key = dateKeyOf(d['date'] as DateTime);
     final row = accByDay[key];
     final total = (row?['total'] as int?) ?? 0;
@@ -572,8 +574,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.w600, color: ac.accent)),
                 const SizedBox(height: 2),
                 Text('点击查看预览，确认后入库',
-                    style: MaoType.captionStyle
-                        .copyWith(color: ac.textSecondary)),
+                    style:
+                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
               ],
             ),
           ),
@@ -583,4 +585,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-

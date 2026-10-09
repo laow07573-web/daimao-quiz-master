@@ -334,54 +334,27 @@ void main() {
     });
   });
 
-  group('趋势图箭头翻页', () {
-    testWidgets('365 天数据多页：左箭头翻到过去，日期范围文本变化',
+  group('趋势图连续交互', () {
+    testWidgets('全年数据使用连续拖动/缩放容器，不再显示旧分页箭头',
         (tester) async {
-      final days = List.generate(70, (i) {
-        final date = DateTime(2026, 8, 27).subtract(Duration(days: 69 - i));
-        return {'date': date, 'total': i, 'accuracy': 50.0};
+      final days = List.generate(365, (i) {
+        final date = DateTime(2026, 1, 1).add(Duration(days: i));
+        return {'date': date, 'total': i % 80, 'accuracy': 50.0};
       });
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: TrendChart(days: days)),
       ));
       await tester.pump();
 
-      // 70 天 / 7 天每页 = 10 页 > 6：显示日期范围文本 + 左右箭头
-      expect(find.byIcon(Icons.chevron_left), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
-      final labelFinder = find.textContaining(' - ');
-      expect(labelFinder, findsOneWidget);
-      final before = tester.widget<Text>(labelFinder).data;
+      expect(find.byKey(const ValueKey('trend_interactive_viewer')),
+          findsOneWidget);
+      expect(find.byIcon(Icons.chevron_left), findsNothing);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
 
-      // 点左箭头翻到更早的一页
-      await tester.tap(find.byIcon(Icons.chevron_left));
-      await tester.pumpAndSettle();
-      final after = tester.widget<Text>(labelFinder).data;
-      expect(after, isNot(before), reason: '左箭头应翻到更早的页');
-
-      // 右箭头翻回
-      await tester.tap(find.byIcon(Icons.chevron_right));
-      await tester.pumpAndSettle();
-      expect(tester.widget<Text>(labelFinder).data, before);
-    });
-
-    testWidgets('少量页数：圆点可点击跳页', (tester) async {
-      final days = List.generate(21, (i) {
-        final date = DateTime(2026, 8, 27).subtract(Duration(days: 20 - i));
-        return {'date': date, 'total': i, 'accuracy': 50.0};
-      });
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: TrendChart(days: days)),
-      ));
+      final chart = tester.getRect(
+          find.byKey(const ValueKey('trend_interactive_viewer')));
+      await tester.dragFrom(chart.center, chart.center + const Offset(-160, 0));
       await tester.pump();
-
-      // 21 天 = 3 页 ≤ 6：圆点可点（带 ValueKey 精确定位）
-      expect(find.byKey(const ValueKey('trend_dot_0')), findsOneWidget);
-      expect(find.byKey(const ValueKey('trend_dot_2')), findsOneWidget);
-      // 点第一个圆点跳到第一页（当前在最后一页）
-      await tester.tap(find.byKey(const ValueKey('trend_dot_0')));
-      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
   });

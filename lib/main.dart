@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'services/app_state.dart';
+import 'services/perf_probe.dart';
 import 'services/database_service.dart';
 import 'services/debug_log_service.dart';
 import 'services/theme_service.dart';
@@ -68,8 +70,7 @@ class _FallbackScaffold extends StatelessWidget {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(icon, size: 68, color: iconColor),
               const SizedBox(height: MaoSpace.lg),
-              Text(title,
-                  style: MaoType.h1Style.copyWith(color: _Fallback.fg)),
+              Text(title, style: MaoType.h1Style.copyWith(color: _Fallback.fg)),
               const SizedBox(height: MaoSpace.sm),
               Text(message,
                   textAlign: TextAlign.center,
@@ -117,6 +118,10 @@ Future<bool> _acquireSingleInstanceLock() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 帧时间探针：只在 debug/profile 启用（release 不注册回调，零开销）。
+  // profile 构建下的数字才代表真实体验，用来区分卡在 build 还是 raster。
+  if (!kReleaseMode) PerfProbe.instance.start();
 
   // 签名校验（v1.0.2 里程碑一致：原版含防篡改）
   final ok = await TamperCheck.verify();
@@ -342,6 +347,9 @@ class _FlashcardAppState extends State<FlashcardApp> {
       theme: theme,
       darkTheme: darkTheme,
       themeMode: themeService.themeMode,
+      // 主题切换不瞬间替换整棵 Material 树，颜色/组件样式平滑过渡。
+      themeAnimationDuration: MaoMotion.normal,
+      themeAnimationCurve: MaoMotion.standard,
       navigatorObservers: _guideObservers,
       // 引导遮罩挂在 Navigator **之上**：用户点高亮处跳进二级页面
       // （导入页 / 开始刷题弹窗）时，引导能跟过去继续指，而不是被新路由盖住

@@ -22,9 +22,9 @@ void main() {
             child: YearHeatmap(
               year: y,
               dailyTotals: {
-                '$y-03-05': 10,   // 少
-                '$y-03-06': 80,   // 达标
-                '$y-03-07': 250,  // 多
+                '$y-03-05': 10, // 少
+                '$y-03-06': 80, // 达标
+                '$y-03-07': 250, // 多
               },
               todayKey: '$y-03-06',
               onDayTap: onTap,
@@ -53,10 +53,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull, reason: '窄容器不应布局溢出');
     expect(find.byType(YearHeatmap), findsOneWidget);
-    // 格子为正方形
-    final cell = tester.getSize(find.byType(AspectRatio).first);
-    expect(cell.width, greaterThan(0));
-    expect((cell.width - cell.height).abs(), lessThan(0.5));
+    // 格子为正方形：2026-10-09 起网格由 CustomPaint 绘制（原来 371 个格子
+    // widget 造成统计页首帧 build 103ms），正方形由 painter 内部保证——
+    // 断言画布尺寸的宽高比：宽 = 53 列 × 格宽，高 = 7 行 × 格宽。
+    final canvas = tester.getSize(find.byKey(YearHeatmap.gridCanvasKey));
+    expect(canvas.width, greaterThan(0));
+    final cellW = canvas.width / 53;
+    expect((canvas.height - cellW * 7).abs(), lessThan(1.0),
+        reason: '画布高度应正好是 7 行正方形格子的高度');
   });
 
   testWidgets('宽容器同样不溢出（宽屏双列卡片场景）', (tester) async {

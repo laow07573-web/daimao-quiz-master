@@ -2,6 +2,9 @@
     package="com.flashcard.app">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 扫码配对（同步识别码二维码）：仅在用户主动点「扫码配对」时使用 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <!-- 局域网同步（v11）：设备发现需读取网络状态与接收 UDP 广播 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>

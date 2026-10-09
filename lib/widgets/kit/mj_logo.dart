@@ -3,175 +3,161 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../services/theme_service.dart';
-import '../../utils/design_tokens.dart';
-import 'mj_kit.dart';
 
-/// 猫卷标记（MaoJuan mark）——「卡片/书卷轮廓 + 猫耳」。
-///
-/// 为什么是这个形状：猫卷的「卷」是书卷，卡片形轮廓（圆角矩形）既呼应
-/// 「卷」，又天然贴合 [MaoRadius] 的圆角语言；两只三角耳 + 耳间浅凹给出
-/// 「猫」。全图只有两个形状元素，缩到 21px 仍可辨认——这是原先那张
-/// 「MaoJuan 字标 + 猫剪影 + Study Smarter 副标」三重要素的位图做不到的。
-///
-/// 用矢量而非位图：应用内三处尺寸跨度大（26 / 68 / 88px），且标记要跟随
-/// 主题强调色。位图缩放在小尺寸会糊，也无法随主题变色。
-///
-/// 几何与 `tool/logo/generate_logo.py` 同源：都由 100×100 设计空间的同一组
-/// 常量推导（圆角矩形 ∪ 双耳 △ − 耳间浅凹 ▽）。改这里必须同步改那里，
-/// 否则应用内标记与启动图标会长得不一样。
+/// Approved cat-ear paper mark, fitted without distorting its 544×512 viewBox.
 class MJLogo extends StatelessWidget {
   const MJLogo({super.key, this.size = 24, this.color});
 
-  /// 外接正方形边长。标记本身约占其 84% 宽 / 92% 高（四周留白是设计的一部分）。
   final double size;
 
-  /// 标记颜色；null 时取当前主题强调色。
+  /// Null follows the current theme accent, including the ink theme.
   final Color? color;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
-      child: CustomPaint(
-        painter: _MJLogoPainter(color ?? AppThemeColors.of(context).accent),
-        isComplex: false,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size,
+        child: CustomPaint(
+          painter: _MJLogoPainter(color ?? AppThemeColors.of(context).accent),
+        ),
+      );
 }
 
-/// 100×100 设计空间的几何常量。
-///
-/// 公开而非私有，是为了让 `test/logo_geometry_test.dart` 能对着
-/// `tool/logo/geometry.json`（由生成脚本写出）逐个数校验——应用内标记与
-/// Android/Windows 启动图标必须永远是同一个形状。
+/// Exact approved SVG coordinates; generator exports the same commands to JSON.
 class MJLogoGeometry {
   const MJLogoGeometry._();
-
-  /// 设计空间边长。
-  static const double ds = 100;
-
-  /// 卡片/书卷轮廓（左、上、右、下、圆角）。
-  static const double headLeft = 11;
-  static const double headTop = 34;
-  static const double headRight = 89;
-  static const double headBottom = 92;
-  static const double headRadius = 14;
-
-  /// 左耳三角（三个顶点，顺时针）；右耳是它的水平镜像。
-  static const List<List<double>> earLeft = [
-    [17, 34],
-    [23, 5],
-    [47, 34],
-  ];
-
-  /// 耳间浅凹（从头顶挖掉的三角）。
-  static const List<List<double>> dip = [
-    [43, 32],
-    [57, 32],
-    [50, 43],
-  ];
-
-  /// 启动图标：方块圆角占比 / 标记占比。
+  static const double width = 544;
+  static const double height = 512;
   static const double tileRadiusRatio = 0.22;
-  static const double markRatio = 0.68;
+  static const double markRatio = 1.26;
+  static const Color accent = Color(0xFF5E6AD2);
+  static const Color fold = Color(0xFFCBCFF4);
+  static const Color ink = Color(0xFF0B0C0E);
+  static const double eyeWidth = 22;
+  static const double mouthWidth = 12;
+  static const double lineWidth = 14;
+  static const List<List<Object>> body = [
+    ['M', 124, 178],
+    ['L', 124, 84],
+    ['Q', 124, 66, 139, 77],
+    ['L', 236, 146],
+    ['L', 308, 146],
+    ['L', 405, 77],
+    ['Q', 420, 66, 420, 84],
+    ['L', 420, 342],
+    ['L', 326, 436],
+    ['L', 162, 436],
+    ['Q', 124, 436, 124, 398],
+    ['Z'],
+  ];
+  static const List<List<Object>> corner = [
+    ['M', 326, 436],
+    ['L', 326, 374],
+    ['Q', 326, 342, 358, 342],
+    ['L', 420, 342],
+    ['Z'],
+  ];
+  static const List<List<Object>> eyes = [
+    ['M', 190, 227],
+    ['L', 224, 227],
+    ['M', 320, 227],
+    ['L', 354, 227],
+  ];
+  static const List<List<Object>> mouth = [
+    ['M', 259, 264],
+    ['L', 272, 277],
+    ['L', 285, 264],
+  ];
+  static const List<List<Object>> lines = [
+    ['M', 190, 329],
+    ['L', 267, 329],
+    ['M', 190, 367],
+    ['L', 240, 367],
+  ];
+
+  /// Select whichever foreground has greater WCAG contrast against the fill.
+  static Color detailColor(Color fill) {
+    final luminance = fill.computeLuminance();
+    final whiteContrast = 1.05 / (luminance + 0.05);
+    final inkContrast = (luminance + 0.05) / (ink.computeLuminance() + 0.05);
+    return whiteContrast >= inkContrast ? Colors.white : ink;
+  }
+
+  static Color foldColor(Color fill) =>
+      fill == accent ? fold : Color.lerp(fill, detailColor(fill), 0.70)!;
+
+  static Path path(List<List<Object>> commands) {
+    final result = Path();
+    for (final command in commands) {
+      final p = command.skip(1).map((v) => (v as num).toDouble()).toList();
+      switch (command.first) {
+        case 'M':
+          result.moveTo(p[0], p[1]);
+          break;
+        case 'L':
+          result.lineTo(p[0], p[1]);
+          break;
+        case 'Q':
+          result.quadraticBezierTo(p[0], p[1], p[2], p[3]);
+          break;
+        case 'Z':
+          result.close();
+          break;
+      }
+    }
+    return result;
+  }
 }
 
 class _MJLogoPainter extends CustomPainter {
   _MJLogoPainter(this.color);
-
   final Color color;
-
-  static const double _ds = MJLogoGeometry.ds;
-  static const Rect _head = Rect.fromLTRB(
-      MJLogoGeometry.headLeft,
-      MJLogoGeometry.headTop,
-      MJLogoGeometry.headRight,
-      MJLogoGeometry.headBottom);
-  static const double _headRadius = MJLogoGeometry.headRadius;
-
-  // 从 MJLogoGeometry 派生（不重复字面量）：常量表是唯一来源，
-  // 测试校验的也就是绘制实际用的这份数。
-  static final List<Offset> _earLeft = [
-    for (final p in MJLogoGeometry.earLeft) Offset(p[0], p[1]),
-  ];
-  static final List<Offset> _dip = [
-    for (final p in MJLogoGeometry.dip) Offset(p[0], p[1]),
-  ];
-
-  /// 设计空间内的最终路径，只构建一次。
-  static final Path _design = _buildDesignPath();
-
-  static Path _buildDesignPath() {
-    final head = Path()
-      ..addRRect(RRect.fromRectAndRadius(_head, const Radius.circular(_headRadius)));
-    final ears = Path()
-      ..addPolygon(_earLeft, true)
-      ..addPolygon(
-          [for (final o in _earLeft) Offset(_ds - o.dx, o.dy)], true);
-    // 顺序不能反：先并耳再挖凹。反过来的话凹口会被紧接着的耳的填充盖回去，
-    // 于是头顶变成一条平边，猫就没了。
-    final solid = Path.combine(PathOperation.union, head, ears);
-    final dip = Path()..addPolygon(_dip, true);
-    return Path.combine(PathOperation.difference, solid, dip);
-  }
+  static final _body = MJLogoGeometry.path(MJLogoGeometry.body);
+  static final _corner = MJLogoGeometry.path(MJLogoGeometry.corner);
+  static final _eyes = MJLogoGeometry.path(MJLogoGeometry.eyes);
+  static final _mouth = MJLogoGeometry.path(MJLogoGeometry.mouth);
+  static final _lines = MJLogoGeometry.path(MJLogoGeometry.lines);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final s = math.min(size.width, size.height) / _ds;
-    if (s <= 0) return;
-    canvas.drawPath(
-      _design.transform(Matrix4.diagonal3Values(s, s, 1).storage),
-      Paint()
-        ..color = color
-        ..isAntiAlias = true
-        ..style = PaintingStyle.fill,
-    );
+    final scale = math.min(
+        size.width / MJLogoGeometry.width, size.height / MJLogoGeometry.height);
+    if (scale <= 0) return;
+    canvas.save();
+    canvas.translate((size.width - MJLogoGeometry.width * scale) / 2,
+        (size.height - MJLogoGeometry.height * scale) / 2);
+    canvas.scale(scale);
+    canvas.drawPath(_body, Paint()..color = color);
+    canvas.drawPath(_corner, Paint()..color = MJLogoGeometry.foldColor(color));
+    final stroke = Paint()
+      ..color = MJLogoGeometry.detailColor(color)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(_eyes, stroke..strokeWidth = MJLogoGeometry.eyeWidth);
+    canvas.drawPath(_mouth, stroke..strokeWidth = MJLogoGeometry.mouthWidth);
+    canvas.drawPath(_lines, stroke..strokeWidth = MJLogoGeometry.lineWidth);
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_MJLogoPainter old) => old.color != color;
+  bool shouldRepaint(_MJLogoPainter oldDelegate) => oldDelegate.color != color;
 }
 
-/// 标记配一个发丝描边方块底（启动页 / 问候卡里的「品牌位」）。
+/// 品牌标记（不垫底色、不加描边）。
 ///
-/// 三处使用（启动页 88 / 首页 34 / 我的页 38）尺寸不同但必须是同一处理，
-/// 所以收在这里，避免各页自己拼 Container 拼出三种样子。
+/// 2026-10-07 真机反馈：此前这里会给标记垫一层描边方块（surfaceAlt 底 +
+/// 1px 描边 + 内边距），于是启动页与首页问候卡上的标记被框住，实际绘制尺寸
+/// 还要再扣掉内边距，看起来又小又闷。现在直接绘制标记本身，[box] 就是标记
+/// 的实际边长，不再有承载它的那一层。
+///
+/// 若某处确实需要「有底色的方块」（例如背景与标记对比不足），请在该处自己
+/// 包一层 [MJSurface]，而不是让品牌标记固定带框。
 class MJLogoBadge extends StatelessWidget {
-  const MJLogoBadge({
-    super.key,
-    this.box = 34,
-    this.padding = MaoSpace.xxs,
-    this.radius,
-    this.tone = MJTone.alt,
-  });
+  const MJLogoBadge({super.key, this.box = 34});
 
-  /// 方块边长。
+  /// 标记边长（不再是「外框边长」）。
   final double box;
 
-  /// 方块内边距（标记尺寸 = box - 2 × padding）。
-  final double padding;
-
-  /// 圆角，默认按尺寸在 control / large 之间取合适值。
-  final double? radius;
-
-  /// 底色层级：alt（次级面板）或 base。
-  final MJTone tone;
-
   @override
-  Widget build(BuildContext context) {
-    final ac = AppThemeColors.of(context);
-    final r = radius ?? (box >= 60 ? MaoRadius.large : MaoRadius.control);
-    return Container(
-      width: box,
-      height: box,
-      padding: EdgeInsets.all(padding),
-      decoration: BoxDecoration(
-        color: tone == MJTone.base ? ac.surface : ac.surfaceAlt,
-        borderRadius: BorderRadius.circular(r),
-        border: Border.all(color: ac.border, width: MaoLine.width),
-      ),
-      child: MJLogo(size: box - padding * 2),
-    );
-  }
+  Widget build(BuildContext context) => MJLogo(size: box);
 }

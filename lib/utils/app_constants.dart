@@ -23,3 +23,9 @@ const int kYearPageSpan = 200;
 
 /// AI 单题解析成本估算（余额提示文案用，元/题）
 const double kAiCostPerQuestionYuan = 0.002;
+
+/// 底部导航「开始」Tab 的下标。
+///
+/// 二级页面里要做「回到开始页」时引这个常量，别写死字面量——主壳
+/// （lib/screens/main_shell.dart）里四个 Tab 的顺序才是唯一权威。
+const int kQuickStartTabIndex = 1;

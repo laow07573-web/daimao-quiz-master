@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flashcard_app/models/question.dart';
 import 'package:flashcard_app/models/question_bank.dart';
+import 'package:flashcard_app/services/app_state.dart';
 import 'package:flashcard_app/services/database_service.dart';
 
 /// 开发者选项相关逻辑测试（v1.0.2 对齐里程碑）：
@@ -65,7 +66,8 @@ void main() {
     await db.simulateLongTermUse();
     final dir = Directory(
         Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path);
-    final backupPath = '${dir.path}/backup_${DateTime.now().millisecondsSinceEpoch}.db';
+    final backupPath =
+        '${dir.path}/backup_${DateTime.now().millisecondsSinceEpoch}.db';
     final err = await db.exportBackup(backupPath);
     expect(err, isNull);
 
@@ -73,12 +75,14 @@ void main() {
     expect(await db.validateBackupFile(backupPath), isNull);
 
     // 篡改文件 → 魔数校验失败（文件不是有效的 SQLite 数据库备份）
-    final badPath = '${dir.path}/bad_${DateTime.now().millisecondsSinceEpoch}.db';
+    final badPath =
+        '${dir.path}/bad_${DateTime.now().millisecondsSinceEpoch}.db';
     await File(badPath).writeAsString('not a sqlite file at all');
     expect(await db.validateBackupFile(badPath), isNotNull);
 
     // 过小文件 → 文件不是有效的数据库备份（文件过小）
-    final tinyPath = '${dir.path}/tiny_${DateTime.now().millisecondsSinceEpoch}.db';
+    final tinyPath =
+        '${dir.path}/tiny_${DateTime.now().millisecondsSinceEpoch}.db';
     await File(tinyPath).writeAsString('tiny');
     expect(await db.validateBackupFile(tinyPath), isNotNull);
 
@@ -90,5 +94,43 @@ void main() {
     final rawAfterImport =
         await rawDb.rawQuery('SELECT COUNT(*) as c FROM answer_records');
     expect(rawAfterImport.first['c'], greaterThan(0));
+  });
+
+  test('模拟数据存在性探针：生成后为真，清除后为假', () async {
+    final db = DatabaseService.instance;
+    await seedBank();
+    expect(await db.hasSimulatedData(), isFalse);
+
+    await db.simulateLongTermUse(days: 7);
+    expect(await db.hasSimulatedData(), isTrue,
+        reason: '模拟生成后应能探测到模拟数据，否则统计页无法提示「未纳入统计」');
+
+    await db.clearSimulatedData();
+    expect(await db.hasSimulatedData(), isFalse);
+  });
+
+  test('冷启动口径：开关恢复必须早于首页取数，否则模拟数据在首页看不到', () async {
+    final db = DatabaseService.instance;
+    await seedBank();
+
+    // 走真实开发者流程：生成模拟数据（会自动写入并打开「统计包含模拟数据」）
+    final first = AppState();
+    await first.init();
+    final sim = await first.simulateLongTermUse(days: 7);
+    expect(sim.error, isNull);
+    expect(sim.records, greaterThan(0));
+    expect(await db.getSetting('stats_include_simulated'), '1');
+
+    // 模拟一次冷启动：静态开关回到新进程默认值 false
+    DatabaseService.includeSimulatedData = false;
+    final cold = AppState();
+    await cold.init();
+
+    expect(cold.includeSimulatedStats, isTrue, reason: '开关应从 settings 恢复');
+    expect(cold.hasSimulatedData, isTrue);
+    // 库里只有模拟记录（没有真实作答），所以首页累计必须等于模拟题量。
+    expect(cold.homeStats?.totalQuestions, sim.records,
+        reason: '首页累计要按恢复后的口径计算；此前 _loadHomeStats 排在开关恢复之前，'
+            '冷启动会算出 0 且之后不再重算');
   });
 }

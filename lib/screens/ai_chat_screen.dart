@@ -153,7 +153,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
               child: SizedBox(
                 width: 26,
                 height: 26,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: ac.accent),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: ac.accent),
               ),
             )
           : Column(
@@ -167,10 +168,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       if (q != null) _QuestionContextCard(question: q, ac: ac),
                       const SizedBox(height: MaoSpace.md),
                       if (history.isEmpty && !app.followUpLoading)
-                        _EmptyState(ac: ac, onPick: (t) {
-                          _input.text = t;
-                          _focus.requestFocus();
-                        })
+                        _EmptyState(
+                            ac: ac,
+                            onPick: (t) {
+                              _input.text = t;
+                              _focus.requestFocus();
+                            })
                       else
                         for (final m in history)
                           _ChatBubble(message: m, ac: ac),
@@ -240,7 +243,8 @@ class _QuestionContextCardState extends State<_QuestionContextCard> {
                 borderRadius: BorderRadius.circular(MaoRadius.chip),
                 onTap: () => setState(() => _expanded = !_expanded),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   child: Icon(
                     _expanded
                         ? Icons.keyboard_arrow_up_rounded
@@ -257,8 +261,8 @@ class _QuestionContextCardState extends State<_QuestionContextCard> {
             q.title,
             maxLines: _expanded ? 12 : 2,
             overflow: TextOverflow.ellipsis,
-            style: MaoType.captionStyle.copyWith(
-                color: ac.textPrimary, height: 1.55),
+            style: MaoType.captionStyle
+                .copyWith(color: ac.textPrimary, height: 1.55),
           ),
           if (_expanded && q.options.isNotEmpty) ...[
             const SizedBox(height: MaoSpace.xs - 2),
@@ -316,7 +320,8 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: MaoSpace.sm),
         Text('有什么不懂的，直接问',
-            style: MaoType.h3Style.copyWith(color: ac.textPrimary, fontSize: 15)),
+            style:
+                MaoType.h3Style.copyWith(color: ac.textPrimary, fontSize: 15)),
         const SizedBox(height: MaoSpace.xxs),
         Text('AI 会结合上面的解析与题目上下文回答',
             textAlign: TextAlign.center,
@@ -337,11 +342,12 @@ class _EmptyState extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: ac.surface,
                     borderRadius: BorderRadius.circular(MaoRadius.control),
-                    border: Border.all(
-                        color: ac.border, width: MaoShadow.hairline),
+                    border:
+                        Border.all(color: ac.border, width: MaoShadow.hairline),
                   ),
                   child: Text(t,
-                      style: MaoType.captionStyle.copyWith(color: ac.textPrimary)),
+                      style:
+                          MaoType.captionStyle.copyWith(color: ac.textPrimary)),
                 ),
               ),
           ],
@@ -380,7 +386,8 @@ class _ChatBubble extends StatelessWidget {
       ),
       child: isUser
           ? Text(message.content,
-              style: MaoType.bodyStyle.copyWith(color: ac.onAccent, height: 1.5))
+              style:
+                  MaoType.bodyStyle.copyWith(color: ac.onAccent, height: 1.5))
           : AiResponseWidget(text: message.content, fontSize: MaoType.body - 1),
     );
 
@@ -431,8 +438,18 @@ class _TypingBubbleState extends State<_TypingBubble>
   void initState() {
     super.initState();
     _c = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1100))
-      ..repeat();
+        vsync: this, duration: const Duration(milliseconds: 1100));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _c.stop();
+      _c.value = 0;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
   }
 
   @override
@@ -469,8 +486,7 @@ class _TypingBubbleState extends State<_TypingBubble>
                 bottomLeft: Radius.circular(5),
                 bottomRight: Radius.circular(MaoRadius.control),
               ),
-              border:
-                  Border.all(color: ac.border, width: MaoShadow.hairline),
+              border: Border.all(color: ac.border, width: MaoShadow.hairline),
             ),
             child: AnimatedBuilder(
               animation: _c,
@@ -483,9 +499,7 @@ class _TypingBubbleState extends State<_TypingBubble>
                       child: Opacity(
                         opacity: 0.35 +
                             0.65 *
-                                ((1 -
-                                        ((_c.value - i * 0.18).abs() % 0.5) /
-                                            0.5)
+                                ((1 - ((_c.value - i * 0.18).abs() % 0.5) / 0.5)
                                     .clamp(0.0, 1.0)),
                         child: Container(
                           width: 6,

@@ -14,7 +14,6 @@ import 'device_service.dart';
 import 'fsrs_service.dart';
 
 class DatabaseService {
-
   // ======================== 数据来源过滤开关 ========================
   //
   // 默认只统计真实作答（source='real'）；模拟长期使用产生的数据带
@@ -40,6 +39,7 @@ class DatabaseService {
 
   static DatabaseService? _instance;
   static Database? _database;
+
   /// 测试用：覆盖数据库文件路径（多测试文件并行时按文件隔离，防互相清库）
   static String? overrideDbPath;
 
@@ -71,7 +71,9 @@ class DatabaseService {
       dbPath = join(await getDatabasesPath(), 'flashcard.db');
     } else {
       dbPath = join(
-        Platform.environment['LOCALAPPDATA'] ?? Platform.environment['HOME'] ?? '.',
+        Platform.environment['LOCALAPPDATA'] ??
+            Platform.environment['HOME'] ??
+            '.',
         'flashcard_app',
         'flashcard.db',
       );
@@ -176,8 +178,8 @@ class DatabaseService {
           FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
         )
       ''');
-      await db.execute(
-          'CREATE INDEX idx_questions_bank_id ON questions(bank_id)');
+      await db
+          .execute('CREATE INDEX idx_questions_bank_id ON questions(bank_id)');
       await db.execute(
           'CREATE INDEX idx_answer_records_question_id ON answer_records(question_id)');
       await db.execute(
@@ -207,8 +209,7 @@ class DatabaseService {
       ''');
     }
     if (oldVersion < 5) {
-      await db.execute(
-          'ALTER TABLE questions ADD COLUMN knowledge_point TEXT');
+      await db.execute('ALTER TABLE questions ADD COLUMN knowledge_point TEXT');
     }
     if (oldVersion < 6) {
       // v1.0.2 对齐里程碑：隐藏今日答题记录（统计查询统一排除 hidden=1）
@@ -255,8 +256,9 @@ class DatabaseService {
           FOREIGN KEY (bank_id) REFERENCES question_banks(id) ON DELETE CASCADE
         )
       ''');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_session_questions_session '
-          'ON session_questions(session_id)');
+      await db
+          .execute('CREATE INDEX IF NOT EXISTS idx_session_questions_session '
+              'ON session_questions(session_id)');
     }
     if (oldVersion < 9) {
       // v1.0.2 聊天气泡式追问：每道题的追问历史（用户/AI 消息持久化）
@@ -314,9 +316,9 @@ class DatabaseService {
     // 查询索引与 onCreate/升级两条路径共用（IF NOT EXISTS 幂等）
     await db.execute('CREATE INDEX IF NOT EXISTS idx_question_images_question '
         'ON question_images(question_id)');
-    await db.execute(
-        'CREATE UNIQUE INDEX IF NOT EXISTS idx_question_images_slot '
-        'ON question_images(question_id, position)');
+    await db
+        .execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_question_images_slot '
+            'ON question_images(question_id, position)');
   }
 
   /// v10→v11 迁移：同步实体补 uid，批注改复合主键，错题改 (题,设备) 唯一。
@@ -346,8 +348,7 @@ class DatabaseService {
 
     // uid 回填（批量）
     Future<void> backfillUid(String table) async {
-      final rows =
-          await db.rawQuery('SELECT id FROM $table WHERE uid IS NULL');
+      final rows = await db.rawQuery('SELECT id FROM $table WHERE uid IS NULL');
       if (rows.isEmpty) return;
       final batch = db.batch();
       for (final r in rows) {
@@ -614,27 +615,31 @@ class DatabaseService {
   /// 按 uid 查本地题库行（不存在返回 null）
   Future<Map<String, dynamic>?> bankRowByUid(
       DatabaseExecutor db, String uid) async {
-    final rows = await db.query('question_banks', where: 'uid = ?', whereArgs: [uid]);
+    final rows =
+        await db.query('question_banks', where: 'uid = ?', whereArgs: [uid]);
     return rows.isEmpty ? null : rows.first;
   }
 
   /// 按 uid 查本地题目行（不存在返回 null）
   Future<Map<String, dynamic>?> questionRowByUid(
       DatabaseExecutor db, String uid) async {
-    final rows = await db.query('questions', where: 'uid = ?', whereArgs: [uid]);
+    final rows =
+        await db.query('questions', where: 'uid = ?', whereArgs: [uid]);
     return rows.isEmpty ? null : rows.first;
   }
 
   /// 按 uid 查本地会话行（不存在返回 null）
   Future<Map<String, dynamic>?> sessionRowByUid(
       DatabaseExecutor db, String uid) async {
-    final rows = await db.query('quiz_sessions', where: 'uid = ?', whereArgs: [uid]);
+    final rows =
+        await db.query('quiz_sessions', where: 'uid = ?', whereArgs: [uid]);
     return rows.isEmpty ? null : rows.first;
   }
 
   /// 按 uid upsert 题库：新则插；已有且传入 updated_at 更新则更新名/题数。
   /// 返回本地 id
-  Future<int> upsertBankByUid(DatabaseExecutor db, Map<String, dynamic> row) async {
+  Future<int> upsertBankByUid(
+      DatabaseExecutor db, Map<String, dynamic> row) async {
     final existing = await bankRowByUid(db, row['uid'] as String);
     if (existing == null) {
       return await db.insert('question_banks', row);
@@ -643,12 +648,16 @@ class DatabaseService {
     final oldAt = (existing['updated_at'] as String?) ?? '';
     final newAt = (row['updated_at'] as String?) ?? '';
     if (newAt.compareTo(oldAt) > 0) {
-      await db.update('question_banks', {
-        'name': row['name'],
-        'file_source': row['file_source'],
-        'question_count': row['question_count'],
-        'updated_at': newAt.isEmpty ? null : newAt,
-      }, where: 'id = ?', whereArgs: [id]);
+      await db.update(
+          'question_banks',
+          {
+            'name': row['name'],
+            'file_source': row['file_source'],
+            'question_count': row['question_count'],
+            'updated_at': newAt.isEmpty ? null : newAt,
+          },
+          where: 'id = ?',
+          whereArgs: [id]);
     }
     return id;
   }
@@ -667,17 +676,21 @@ class DatabaseService {
     final oldAt = (existing['updated_at'] as String?) ?? '';
     final newAt = (row['updated_at'] as String?) ?? '';
     if (newAt.compareTo(oldAt) > 0) {
-      await db.update('questions', {
-        'bank_id': row['bank_id'],
-        'title': row['title'],
-        'options': row['options'],
-        'correct_answer': row['correct_answer'],
-        'analysis': row['analysis'],
-        'question_type': row['question_type'],
-        'source': row['source'],
-        'knowledge_point': row['knowledge_point'],
-        'updated_at': newAt.isEmpty ? null : newAt,
-      }, where: 'id = ?', whereArgs: [id]);
+      await db.update(
+          'questions',
+          {
+            'bank_id': row['bank_id'],
+            'title': row['title'],
+            'options': row['options'],
+            'correct_answer': row['correct_answer'],
+            'analysis': row['analysis'],
+            'question_type': row['question_type'],
+            'source': row['source'],
+            'knowledge_point': row['knowledge_point'],
+            'updated_at': newAt.isEmpty ? null : newAt,
+          },
+          where: 'id = ?',
+          whereArgs: [id]);
     }
     return id;
   }
@@ -694,17 +707,21 @@ class DatabaseService {
     String stamp(Map<String, dynamic> r) =>
         (r['end_time'] as String?) ?? (r['start_time'] as String? ?? '');
     if (stamp(row).compareTo(stamp(existing)) > 0) {
-      await db.update('quiz_sessions', {
-        'bank_ids': row['bank_ids'],
-        'mode': row['mode'],
-        'total_questions': row['total_questions'],
-        'correct_count': row['correct_count'],
-        'wrong_count': row['wrong_count'],
-        'start_time': row['start_time'],
-        'end_time': row['end_time'],
-        'duration_seconds': row['duration_seconds'],
-        'source': row['source'],
-      }, where: 'id = ?', whereArgs: [id]);
+      await db.update(
+          'quiz_sessions',
+          {
+            'bank_ids': row['bank_ids'],
+            'mode': row['mode'],
+            'total_questions': row['total_questions'],
+            'correct_count': row['correct_count'],
+            'wrong_count': row['wrong_count'],
+            'start_time': row['start_time'],
+            'end_time': row['end_time'],
+            'duration_seconds': row['duration_seconds'],
+            'source': row['source'],
+          },
+          where: 'id = ?',
+          whereArgs: [id]);
     }
     return id;
   }
@@ -724,14 +741,18 @@ class DatabaseService {
     final oldAt = (rows.first['answered_at'] as String?) ?? '';
     final newAt = (row['answered_at'] as String?) ?? '';
     if (newAt.compareTo(oldAt) > 0) {
-      await db.update('answer_records', {
-        'user_answer': row['user_answer'],
-        'is_correct': row['is_correct'],
-        'ai_analysis': row['ai_analysis'],
-        'answered_at': newAt,
-        'hidden': row['hidden'],
-        'session_id': row['session_id'],
-      }, where: 'id = ?', whereArgs: [rows.first['id']]);
+      await db.update(
+          'answer_records',
+          {
+            'user_answer': row['user_answer'],
+            'is_correct': row['is_correct'],
+            'ai_analysis': row['ai_analysis'],
+            'answered_at': newAt,
+            'hidden': row['hidden'],
+            'session_id': row['session_id'],
+          },
+          where: 'id = ?',
+          whereArgs: [rows.first['id']]);
     }
   }
 
@@ -769,10 +790,13 @@ class DatabaseService {
     final oldAt = (rows.first['updated_at'] as String?) ?? '';
     final newAt = (row['updated_at'] as String?) ?? '';
     if (newAt.compareTo(oldAt) > 0) {
-      await db.update('question_annotations', {
-        'data': row['data'],
-        'updated_at': newAt,
-      }, where: 'question_id = ? AND device_id = ?',
+      await db.update(
+          'question_annotations',
+          {
+            'data': row['data'],
+            'updated_at': newAt,
+          },
+          where: 'question_id = ? AND device_id = ?',
           whereArgs: [row['question_id'], row['device_id']]);
     }
   }
@@ -819,11 +843,15 @@ class DatabaseService {
 
   Future<void> updateBankQuestionCount(int bankId, int count) async {
     final db = await database;
-    await db.update('question_banks', {
-      'question_count': count,
-      // v11 同步：题数变化可被对端按 updated_at 取新合并
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [bankId]);
+    await db.update(
+        'question_banks',
+        {
+          'question_count': count,
+          // v11 同步：题数变化可被对端按 updated_at 取新合并
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [bankId]);
   }
 
   Future<void> deleteBank(int bankId) async {
@@ -838,10 +866,8 @@ class DatabaseService {
       await txn.delete('question_annotations',
           where: 'question_id IN (SELECT id FROM questions WHERE bank_id = ?)',
           whereArgs: [bankId]);
-      await txn.delete('questions',
-          where: 'bank_id = ?', whereArgs: [bankId]);
-      await txn.delete('question_banks',
-          where: 'id = ?', whereArgs: [bankId]);
+      await txn.delete('questions', where: 'bank_id = ?', whereArgs: [bankId]);
+      await txn.delete('question_banks', where: 'id = ?', whereArgs: [bankId]);
     });
   }
 
@@ -870,9 +896,11 @@ class DatabaseService {
       for (var i = 0; i < questions.length; i++) {
         for (final img in questions[i].images) {
           hasImages = true;
-          imgBatch.insert('question_images', img.toMap()
-            ..['question_id'] = ids[i]
-            ..remove('id'));
+          imgBatch.insert(
+              'question_images',
+              img.toMap()
+                ..['question_id'] = ids[i]
+                ..remove('id'));
         }
       }
       if (hasImages) await imgBatch.commit(noResult: true);
@@ -920,9 +948,11 @@ class DatabaseService {
       if (images.isEmpty) return;
       final batch = txn.batch();
       for (final img in images) {
-        batch.insert('question_images', img.toMap()
-          ..['question_id'] = questionId
-          ..remove('id'));
+        batch.insert(
+            'question_images',
+            img.toMap()
+              ..['question_id'] = questionId
+              ..remove('id'));
       }
       await batch.commit(noResult: true);
     });
@@ -953,21 +983,25 @@ class DatabaseService {
       int id, String title, String correctAnswer, String questionType,
       {List<String>? options, String? analysis}) async {
     final db = await database;
-    await db.update('questions', {
-      'title': title,
-      'correct_answer': correctAnswer,
-      'question_type': questionType,
-      if (options != null) 'options': jsonEncode(options),
-      if (analysis != null) 'analysis': analysis,
-      // v11 同步：编辑后对端可按 updated_at 取新合并，不被旧数据覆盖
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+        'questions',
+        {
+          'title': title,
+          'correct_answer': correctAnswer,
+          'question_type': questionType,
+          if (options != null) 'options': jsonEncode(options),
+          if (analysis != null) 'analysis': analysis,
+          // v11 同步：编辑后对端可按 updated_at 取新合并，不被旧数据覆盖
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [id]);
   }
 
   Future<List<Question>> getQuestionsByBank(int bankId) async {
     final db = await database;
-    final maps = await db.query('questions',
-        where: 'bank_id = ?', whereArgs: [bankId]);
+    final maps =
+        await db.query('questions', where: 'bank_id = ?', whereArgs: [bankId]);
     return maps.map((m) => Question.fromMap(m)).toList();
   }
 
@@ -1030,10 +1064,13 @@ class DatabaseService {
     final db = await database;
     final batch = db.batch();
     for (final id in bankIds) {
-      batch.insert('session_banks', {
-        'session_id': sessionId,
-        'bank_id': id,
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      batch.insert(
+          'session_banks',
+          {
+            'session_id': sessionId,
+            'bank_id': id,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }
@@ -1060,12 +1097,15 @@ class DatabaseService {
     for (var i = 0; i < questions.length; i++) {
       final q = questions[i];
       if (q.id == null) continue;
-      batch.insert('session_questions', {
-        'session_id': sessionId,
-        'position': i,
-        'question_id': q.id!,
-        'question_uid': uidMap[q.id],
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      batch.insert(
+          'session_questions',
+          {
+            'session_id': sessionId,
+            'position': i,
+            'question_id': q.id!,
+            'question_uid': uidMap[q.id],
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }
@@ -1097,8 +1137,7 @@ class DatabaseService {
   }
 
   /// 某题的追问历史（按时间正序，最多 50 条）
-  Future<List<Map<String, dynamic>>> getFollowUpMessages(
-      int questionId) async {
+  Future<List<Map<String, dynamic>>> getFollowUpMessages(int questionId) async {
     final db = await database;
     return await db.query(
       'follow_up_messages',
@@ -1161,7 +1200,8 @@ class DatabaseService {
     final db = await database;
     final rows = await db.query('quiz_sessions',
         columns: ['id'],
-        where: "source IN ${DatabaseService.sourceFilter} AND (end_time IS NULL OR end_time = '')");
+        where:
+            "source IN ${DatabaseService.sourceFilter} AND (end_time IS NULL OR end_time = '')");
     if (rows.isEmpty) return 0;
     final ids = rows.map((r) => r['id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(',');
@@ -1333,8 +1373,8 @@ class DatabaseService {
 
   Future<String?> getCachedAnalysis(int questionId) async {
     final db = await database;
-    final maps = await db.query('ai_cache',
-        where: 'question_id = ?', whereArgs: [questionId]);
+    final maps = await db
+        .query('ai_cache', where: 'question_id = ?', whereArgs: [questionId]);
     if (maps.isEmpty) return null;
     return maps.first['analysis'] as String;
   }
@@ -1399,8 +1439,8 @@ class DatabaseService {
   /// 整体平均正确率（排除隐藏记录与模拟数据）
   Future<double> getOverallAccuracy() async {
     final db = await database;
-    final total = await db
-        .rawQuery("SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}");
+    final total = await db.rawQuery(
+        "SELECT COUNT(*) as cnt FROM answer_records WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}");
     final correct = await db.rawQuery(
         "SELECT COUNT(*) as cnt FROM answer_records WHERE is_correct = 1 AND hidden = 0 AND source IN ${DatabaseService.sourceFilter}");
     final t = total.first['cnt'] as int;
@@ -1453,12 +1493,15 @@ class DatabaseService {
   /// 错题复习查询保持全设备并集（题库共享，哪台都能复习）
   Future<void> addToErrorBook(int questionId) async {
     final db = await database;
-    await db.insert('error_book', {
-      'question_id': questionId,
-      'uid': const Uuid().v4(),
-      'origin_device': await DeviceService.instance.deviceId,
-      'added_at': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert(
+        'error_book',
+        {
+          'question_id': questionId,
+          'uid': const Uuid().v4(),
+          'origin_device': await DeviceService.instance.deviceId,
+          'added_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   /// 移出错题本：只删本机收藏，不动其他设备的错题记录（各自保留）
@@ -1483,8 +1526,8 @@ class DatabaseService {
   /// 读取一道题的 FSRS 状态，不存在返回 null
   Future<FSRSCardState?> getFSRSCard(int questionId) async {
     final db = await database;
-    final maps = await db.query('fsrs_cards',
-        where: 'question_id = ?', whereArgs: [questionId]);
+    final maps = await db
+        .query('fsrs_cards', where: 'question_id = ?', whereArgs: [questionId]);
     if (maps.isEmpty) return null;
     return FSRSCardState.fromMap(maps.first);
   }
@@ -1525,7 +1568,8 @@ class DatabaseService {
   }
 
   /// 获取到期的 FSRS 错题（按题库分组）
-  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {    final db = await database;
+  Future<Map<int, List<Question>>> getDueReviewQuestionsByBank() async {
+    final db = await database;
     final results = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (
@@ -1627,7 +1671,8 @@ class DatabaseService {
     final bankWhere = (bankIds != null && bankIds.isNotEmpty)
         ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
         : '';
-    final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
+    final args =
+        bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     final rows = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
@@ -1642,7 +1687,8 @@ class DatabaseService {
     final bankWhere = (bankIds != null && bankIds.isNotEmpty)
         ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
         : '';
-    final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
+    final args =
+        bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     final rows = await db.rawQuery('''
       SELECT COUNT(DISTINCT q.id) as cnt FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
@@ -1660,7 +1706,8 @@ class DatabaseService {
     final bankWhere = (bankIds != null && bankIds.isNotEmpty)
         ? 'AND q.bank_id IN (${List.filled(bankIds.length, '?').join(',')})'
         : '';
-    final args = bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
+    final args =
+        bankIds != null && bankIds.isNotEmpty ? bankIds.toList() : <Object>[];
     return await db.rawQuery('''
       SELECT
         CASE
@@ -1694,13 +1741,15 @@ class DatabaseService {
     final untagged = kp == '未打标签';
     // 占位符顺序：bankWhere（bankIds）在前，knowledge_point 在后
     final args = bankIds != null && bankIds.isNotEmpty
-        ? <Object>[...bankIds, ...(untagged ? <Object>[] : [kp])]
+        ? <Object>[
+            ...bankIds,
+            ...(untagged ? <Object>[] : [kp])
+          ]
         : (untagged ? <Object>[] : [kp]);
     final rows = await db.rawQuery('''
       SELECT DISTINCT q.* FROM questions q
       WHERE q.id IN (${_errorIdSubquery(mode)}) $bankWhere
-        ${untagged ? "AND (q.knowledge_point IS NULL OR q.knowledge_point = '')"
-                   : 'AND q.knowledge_point = ?'}
+        ${untagged ? "AND (q.knowledge_point IS NULL OR q.knowledge_point = '')" : 'AND q.knowledge_point = ?'}
       ORDER BY RANDOM()
     ''', args);
     return rows.map((m) => Question.fromMap(m)).toList();
@@ -1735,10 +1784,14 @@ class DatabaseService {
   /// 更新题目知识点标签（v11 同步：同步刷新 updated_at）
   Future<void> updateQuestionKnowledgePoint(int questionId, String kp) async {
     final db = await database;
-    await db.update('questions', {
-      'knowledge_point': kp,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [questionId]);
+    await db.update(
+        'questions',
+        {
+          'knowledge_point': kp,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [questionId]);
   }
 
   // ======================== v1.0.2 对齐里程碑：改判 / 隐藏今日记录 ========================
@@ -1749,8 +1802,8 @@ class DatabaseService {
   Future<void> rejudgeAnswerRecord(int recordId, bool isCorrect) async {
     final db = await database;
     await db.transaction((txn) async {
-      final rows = await txn.query('answer_records',
-          where: 'id = ?', whereArgs: [recordId]);
+      final rows = await txn
+          .query('answer_records', where: 'id = ?', whereArgs: [recordId]);
       if (rows.isEmpty) return;
       final record = rows.first;
       final oldCorrect = (record['is_correct'] as int) == 1;
@@ -1762,16 +1815,21 @@ class DatabaseService {
       // 会话统计修正
       final sessionId = record['session_id'];
       if (sessionId != null) {
-        final sessions = await txn.query('quiz_sessions',
-            where: 'id = ?', whereArgs: [sessionId]);
+        final sessions = await txn
+            .query('quiz_sessions', where: 'id = ?', whereArgs: [sessionId]);
         if (sessions.isNotEmpty) {
           final s = sessions.first;
-          final correct = (s['correct_count'] as int? ?? 0) + (isCorrect ? 1 : -1);
+          final correct =
+              (s['correct_count'] as int? ?? 0) + (isCorrect ? 1 : -1);
           final wrong = (s['wrong_count'] as int? ?? 0) + (isCorrect ? -1 : 1);
-          await txn.update('quiz_sessions',
-              {'correct_count': correct < 0 ? 0 : correct,
-               'wrong_count': wrong < 0 ? 0 : wrong},
-              where: 'id = ?', whereArgs: [sessionId]);
+          await txn.update(
+              'quiz_sessions',
+              {
+                'correct_count': correct < 0 ? 0 : correct,
+                'wrong_count': wrong < 0 ? 0 : wrong
+              },
+              where: 'id = ?',
+              whereArgs: [sessionId]);
         }
       }
 
@@ -1782,13 +1840,12 @@ class DatabaseService {
           where: 'question_id = ?', whereArgs: [questionId]);
       if (existingRows.isNotEmpty) {
         final existing = FSRSCardState.fromMap(existingRows.first);
-        await txn.insert(
-            'fsrs_cards',
+        await txn.insert('fsrs_cards',
             FSRSService.schedule(existing, isCorrect ? 3 : 1, now).toMap(),
             conflictAlgorithm: ConflictAlgorithm.replace);
       } else {
-        await txn.insert('fsrs_cards',
-            FSRSService.initCard(questionId, now).toMap());
+        await txn.insert(
+            'fsrs_cards', FSRSService.initCard(questionId, now).toMap());
       }
     });
   }
@@ -1889,8 +1946,9 @@ class DatabaseService {
       return false;
     }
 
-    final end = upTo ?? DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 1));
+    final end = upTo ??
+        DateTime(now.year, now.month, now.day)
+            .subtract(const Duration(days: 1));
     var streak = 0;
     var cursor = DateTime(end.year, end.month, end.day);
     while (true) {
@@ -1983,7 +2041,8 @@ class DatabaseService {
       default:
         start = null;
     }
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+        '''
       SELECT
         COUNT(*) as questions,
         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
@@ -1996,7 +2055,10 @@ class DatabaseService {
       FROM answer_records
       WHERE hidden = 0 AND source IN ${DatabaseService.sourceFilter}
         ${start != null ? 'AND answered_at >= ?' : ''}
-    ''', start != null ? [start.toIso8601String(), start.toIso8601String()] : []);
+    ''',
+        start != null
+            ? [start.toIso8601String(), start.toIso8601String()]
+            : []);
     final r = rows.first;
     return {
       'questions': (r['questions'] as int?) ?? 0,
@@ -2034,8 +2096,8 @@ class DatabaseService {
     final db = await database;
 
     // 基于当前题库：空题库拦截
-    final allQuestions = await db.rawQuery(
-        'SELECT * FROM questions ORDER BY id LIMIT 500');
+    final allQuestions =
+        await db.rawQuery('SELECT * FROM questions ORDER BY id LIMIT 500');
     final pool = allQuestions.map((m) => Question.fromMap(m)).toList();
     if (pool.isEmpty) {
       return (error: '题库为空，请先导入题库再模拟', records: 0, cards: 0);
@@ -2044,11 +2106,11 @@ class DatabaseService {
     // 重复执行会先清理上次模拟的数据（模拟会话 id + 模拟产生的复习卡/错题条目）
     final simSessionsRaw = await getSetting('sim_sessions');
     if (simSessionsRaw != null) {
-      final ids = (jsonDecode(simSessionsRaw) as List)
-          .map((e) => e as int)
-          .toList();
+      final ids =
+          (jsonDecode(simSessionsRaw) as List).map((e) => e as int).toList();
       for (final id in ids) {
-        await db.delete('answer_records', where: 'session_id = ?', whereArgs: [id]);
+        await db
+            .delete('answer_records', where: 'session_id = ?', whereArgs: [id]);
         await db.delete('quiz_sessions', where: 'id = ?', whereArgs: [id]);
       }
     }
@@ -2061,16 +2123,19 @@ class DatabaseService {
       final bookmarkIds = (simQ['bookmarks'] as List? ?? []).cast<int>();
       if (cardIds.isNotEmpty) {
         await db.delete('fsrs_cards',
-            where: 'question_id IN (${List.filled(cardIds.length, '?').join(',')})',
+            where:
+                'question_id IN (${List.filled(cardIds.length, '?').join(',')})',
             whereArgs: cardIds);
       }
       if (bookmarkIds.isNotEmpty) {
         await db.delete('error_book',
-            where: 'question_id IN (${List.filled(bookmarkIds.length, '?').join(',')})',
+            where:
+                'question_id IN (${List.filled(bookmarkIds.length, '?').join(',')})',
             whereArgs: bookmarkIds);
       }
     }
-    await db.delete('settings', where: "key = 'sim_sessions' OR key = 'sim_questions'");
+    await db.delete('settings',
+        where: "key = 'sim_sessions' OR key = 'sim_questions'");
     final simIds = <int>[];
     final simCardIds = <int>{};
     final simBookmarkIds = <int>{};
@@ -2100,8 +2165,8 @@ class DatabaseService {
     if (weakKps.isNotEmpty) {
       for (var i = 0; i < pool.length; i++) {
         if (i % 5 < 3) {
-          await db.update('questions',
-              {'knowledge_point': weakKps[i % weakKps.length]},
+          await db.update(
+              'questions', {'knowledge_point': weakKps[i % weakKps.length]},
               where: 'id = ?', whereArgs: [pool[i].id]);
         }
       }
@@ -2119,16 +2184,20 @@ class DatabaseService {
         // 最后一天（今天）不生成数据，避免影响实时打卡/连击
         final count = day == days - 1 ? 0 : rng.nextInt(80) + 10;
         if (count == 0) continue;
-        final sessionId = await txn.insert('quiz_sessions', QuizSession(
-          bankIds: 'simulation',
-          mode: 'single',
-          totalQuestions: count,
-          correctCount: (count * 0.75).round(),
-          wrongCount: count - (count * 0.75).round(),
-          startTime: DateTime(d.year, d.month, d.day, 9).toIso8601String(),
-          endTime: DateTime(d.year, d.month, d.day, 9, 40).toIso8601String(),
-          durationSeconds: 2400,
-        ).toMap()..['source'] = 'simulation');
+        final sessionId = await txn.insert(
+            'quiz_sessions',
+            QuizSession(
+              bankIds: 'simulation',
+              mode: 'single',
+              totalQuestions: count,
+              correctCount: (count * 0.75).round(),
+              wrongCount: count - (count * 0.75).round(),
+              startTime: DateTime(d.year, d.month, d.day, 9).toIso8601String(),
+              endTime:
+                  DateTime(d.year, d.month, d.day, 9, 40).toIso8601String(),
+              durationSeconds: 2400,
+            ).toMap()
+              ..['source'] = 'simulation');
         simIds.add(sessionId);
         for (var i = 0; i < count; i++) {
           final q = pool[rng.nextInt(pool.length)];
@@ -2190,11 +2259,28 @@ class DatabaseService {
     }
 
     await setSetting('sim_sessions', jsonEncode(simIds));
-    await setSetting('sim_questions', jsonEncode({
-      'cards': simCardIds.toList(),
-      'bookmarks': simBookmarkIds.toList(),
-    }));
+    await setSetting(
+        'sim_questions',
+        jsonEncode({
+          'cards': simCardIds.toList(),
+          'bookmarks': simBookmarkIds.toList(),
+        }));
     return (error: null, records: recordCount, cards: cardCount);
+  }
+
+  /// 当前是否存有模拟长期使用产生的数据（开发者模式）。
+  ///
+  /// 用途：模拟数据默认不计入统计口径，用户关掉「统计包含模拟数据」后，
+  /// 这些数据会在所有统计里静默消失。统计页据此给出「检测到模拟数据但未
+  /// 纳入统计」的提示 + 一键纳入，避免用户以为数据丢了。
+  Future<bool> hasSimulatedData() async {
+    try {
+      final raw = await getSetting('sim_sessions');
+      if (raw == null) return false;
+      return (jsonDecode(raw) as List).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// 清除模拟长期使用产生的全部数据（v1.0.2）：
@@ -2206,12 +2292,11 @@ class DatabaseService {
     var removedSessions = 0;
     final simSessionsRaw = await getSetting('sim_sessions');
     if (simSessionsRaw != null) {
-      final ids = (jsonDecode(simSessionsRaw) as List)
-          .map((e) => e as int)
-          .toList();
+      final ids =
+          (jsonDecode(simSessionsRaw) as List).map((e) => e as int).toList();
       for (final id in ids) {
-        await db.delete('answer_records',
-            where: 'session_id = ?', whereArgs: [id]);
+        await db
+            .delete('answer_records', where: 'session_id = ?', whereArgs: [id]);
         await db.delete('quiz_sessions', where: 'id = ?', whereArgs: [id]);
         removedSessions++;
       }
@@ -2223,17 +2308,19 @@ class DatabaseService {
       final bookmarkIds = (simQ['bookmarks'] as List? ?? []).cast<int>();
       if (cardIds.isNotEmpty) {
         await db.delete('fsrs_cards',
-            where: 'question_id IN (${List.filled(cardIds.length, '?').join(',')})',
+            where:
+                'question_id IN (${List.filled(cardIds.length, '?').join(',')})',
             whereArgs: cardIds);
       }
       if (bookmarkIds.isNotEmpty) {
         await db.delete('error_book',
-            where: 'question_id IN (${List.filled(bookmarkIds.length, '?').join(',')})',
+            where:
+                'question_id IN (${List.filled(bookmarkIds.length, '?').join(',')})',
             whereArgs: bookmarkIds);
       }
     }
-    await db.delete(
-        'settings', where: "key = 'sim_sessions' OR key = 'sim_questions'");
+    await db.delete('settings',
+        where: "key = 'sim_sessions' OR key = 'sim_questions'");
     return removedSessions;
   }
 
@@ -2262,7 +2349,8 @@ class DatabaseService {
     try {
       tmpDb = await databaseFactory.openDatabase(filePath);
       final versionRows = await tmpDb.rawQuery('PRAGMA user_version');
-      final version = versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
+      final version =
+          versionRows.isNotEmpty ? versionRows.first.values.first as int : 0;
       if (version < 1 || version > 12) {
         // user_version 0/非法：非本 App 生成或版本被外部重置，导入后会触发
         // onUpgrade(0→8) 破坏性重建清空题目，拒绝导入。
@@ -2273,7 +2361,12 @@ class DatabaseService {
           "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
           "('question_banks','questions','answer_records','settings')");
       final names = tables.map((r) => r['name']).toSet();
-      for (final t in ['question_banks', 'questions', 'answer_records', 'settings']) {
+      for (final t in [
+        'question_banks',
+        'questions',
+        'answer_records',
+        'settings'
+      ]) {
         if (!names.contains(t)) return '备份缺少核心表: $t';
       }
       // v8 新增表存在性（旧版本备份导入后由 onUpgrade 建表，故只校验 v8 备份）
@@ -2289,8 +2382,13 @@ class DatabaseService {
       // v1.0.2 设计审查修复：关键列存在性校验（防 user_version 伪造但缺列的库）。
       // 旧版本备份导入后由 onUpgrade 补列，故只校验该版本应当已存在的列
       final colChecks = <int, Map<String, List<String>>>{
-        6: {'answer_records': ['hidden']},
-        7: {'answer_records': ['hidden', 'source'], 'quiz_sessions': ['source']},
+        6: {
+          'answer_records': ['hidden']
+        },
+        7: {
+          'answer_records': ['hidden', 'source'],
+          'quiz_sessions': ['source']
+        },
         // v11 同步字段：缺列的库导入后由 onUpgrade 补，故只作完整性提示校验
         11: {
           'question_banks': ['uid'],

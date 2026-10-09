@@ -63,8 +63,7 @@ class AppState extends ChangeNotifier {
   Question? get currentQuestion => _currentQuestionIndex < _quizQuestions.length
       ? _quizQuestions[_currentQuestionIndex]
       : null;
-  bool get isLastQuestion =>
-      _currentQuestionIndex >= _quizQuestions.length - 1;
+  bool get isLastQuestion => _currentQuestionIndex >= _quizQuestions.length - 1;
 
   // 当前题目的AI解析
   String? _currentAnalysis;
@@ -93,9 +92,9 @@ class AppState extends ChangeNotifier {
 
   // 答题历史（按题目索引存储，支持前后翻题）
   final List<AnswerRecord?> _answerHistory = [];
-bool _skipFSRS = false;
-bool get skipFSRS => _skipFSRS;
-void set skipFSRS(bool v) => _skipFSRS = v;
+  bool _skipFSRS = false;
+  bool get skipFSRS => _skipFSRS;
+  void set skipFSRS(bool v) => _skipFSRS = v;
   bool _noShuffle = false;
   void set noShuffle(bool v) => _noShuffle = v;
   bool get hasPrevious => _currentQuestionIndex > 0;
@@ -140,6 +139,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 统计是否包含模拟数据（开发者选项）。默认 false：只统计真实作答。
   bool get includeSimulatedStats => DatabaseService.includeSimulatedData;
 
+  bool _hasSimulatedData = false;
+
+  /// 库里是否存有模拟数据（用于「检测到模拟数据但未纳入统计」提示）。
+  bool get hasSimulatedData => _hasSimulatedData;
+
   /// 切换「统计包含模拟数据」。持久化，并立即刷新统计口径。
   Future<void> setIncludeSimulatedStats(bool v) async {
     DatabaseService.includeSimulatedData = v;
@@ -153,6 +157,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     _statsRevision++;
     notifyListeners();
   }
+
   String? _weaknessAnalysis;
   String? get weaknessAnalysis => _weaknessAnalysis;
 
@@ -259,7 +264,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       // 检测格式：不允许旧版二进制 .doc
       final format = DocParserService.detectFormat(file.path);
       if (format == 'doc') {
-        _importStatus = '「$fileName」是旧版 .doc 格式，不兼容。\n请用 Word 打开 → 文件 → 另存为 → .docx';
+        _importStatus =
+            '「$fileName」是旧版 .doc 格式，不兼容。\n请用 Word 打开 → 文件 → 另存为 → .docx';
         notifyListeners();
         return;
       }
@@ -303,7 +309,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
 
       if (ocrText.trim().length >= 100) {
         // OCR 认出了可用文字层：与文字版 PDF 同路，文本模型即可切题
-        result = await _aiService!.parseQuestionsFromRawText(ocrText, 0, (d, t) {
+        result =
+            await _aiService!.parseQuestionsFromRawText(ocrText, 0, (d, t) {
           _importStatus = '扫描版 PDF：AI 切题 ($d/$t 块)';
           _importProgress =
               (_bgProgressBase + _bgProgressSpan * (t > 0 ? d / t : 0))
@@ -335,8 +342,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     }
     // 配图物化：全局槽位重编为题内槽位；丢 token 的图按期望题序补挂，
     // 挂不上的显性进「待指派」，绝不静默丢图
-    final materialized = materializeQuestionImages(
-        questions: result.questions, pool: imagePool);
+    final materialized =
+        materializeQuestionImages(questions: result.questions, pool: imagePool);
     _previewQuestions = materialized.questions;
     _previewOrphans = materialized.orphans;
     _previewParseErrors = result.errors;
@@ -383,8 +390,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }
 
   /// 确认导入：将预览题目保存到数据库
-  Future<void> confirmImport() async {
-    if (_previewQuestions.isEmpty) return;
+  Future<void> confirmImport({Set<int> excludedIndices = const {}}) async {
+    // 只筛选本次写入的快照，不修改预览；失败时编辑和删除墓碑仍可重试。
+    final selected = [
+      for (var i = 0; i < _previewQuestions.length; i++)
+        if (!excludedIndices.contains(i)) _previewQuestions[i],
+    ];
+    if (selected.isEmpty) throw StateError('请至少保留一道题目');
 
     final now = DateTime.now().toIso8601String();
     // v1.0.2 七项改进：重名自动加后缀，杜绝同一文档重复导入产生重复题库
@@ -394,28 +406,36 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       createdAt: now,
     ));
 
-    final questions = _previewQuestions.map((q) => Question(
-          bankId: bankId,
-          title: q.title,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          analysis: q.analysis,
-          questionType: q.questionType,
-          // v1.0.2 修复：预览阶段 AI 整理出的知识点不丢失
-          knowledgePoint: q.knowledgePoint,
-          createdAt: now,
-          // v12：配图随题入库（题目的一部分，随题删除）
-          images: q.images,
-        )).toList();
+    final questions = selected
+        .map((q) => Question(
+              bankId: bankId,
+              title: q.title,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+              analysis: q.analysis,
+              questionType: q.questionType,
+              // v1.0.2 修复：预览阶段 AI 整理出的知识点不丢失
+              knowledgePoint: q.knowledgePoint,
+              createdAt: now,
+              // v12：配图随题入库（题目的一部分，随题删除）
+              images: q.images,
+            ))
+        .toList();
 
-    await _db.insertQuestions(questions);
-    await _db.updateBankQuestionCount(bankId, questions.length);
+    try {
+      await _db.insertQuestions(questions);
+      await _db.updateBankQuestionCount(bankId, questions.length);
+      await _loadBanks();
+    } catch (_) {
+      // 清理本次未完成的题库，避免用户重试产生重复/半成品题库。
+      await _db.deleteBank(bankId);
+      rethrow;
+    }
 
     _importStatus = '导入完成！共 ${questions.length} 道题目'
         '${renamed ? '（检测到同名题库，已自动命名为「$uniqueName」）' : ''}';
     _previewQuestions = [];
     _previewOrphans = {};
-    await _loadBanks();
     notifyListeners();
   }
 
@@ -447,10 +467,11 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       notifyListeners();
     }
   }
-  
+
   /// 测试注入：直接填充预览题目（预览页交互测试用，跳过 AI 解析）。
   @visibleForTesting
-  void setPreviewQuestionsForTest(List<Question> qs, {String bankName = '测试题库'}) {
+  void setPreviewQuestionsForTest(List<Question> qs,
+      {String bankName = '测试题库'}) {
     _previewQuestions = List.of(qs);
     _previewBankName = bankName;
     notifyListeners();
@@ -476,23 +497,32 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   // 刷题模式
   int _selectedQuestionCount = 50;
   int get selectedQuestionCount => _selectedQuestionCount;
-  void setQuestionCount(int count) { _selectedQuestionCount = count; notifyListeners(); }
+  void setQuestionCount(int count) {
+    _selectedQuestionCount = count;
+    notifyListeners();
+  }
 
   // 初始化
   Future<void> init() async {
     await _loadSettings();
     await _loadBanks();
-    await _loadHomeStats();
-    _initAIService();
 
-    // 恢复「统计包含模拟数据」开关（开发者选项；默认关闭）
+    // 恢复「统计包含模拟数据」开关（开发者选项；默认关闭）。
+    //
+    // 必须在任何统计取数之前恢复：_loadHomeStats() 走的是同一套 sourceFilter，
+    // 之前它排在恢复之前，冷启动时首页累计数字会按「只算真实作答」算一遍，
+    // 之后就再没人重算——表现为模拟数据在首页看不到（实测 353 条模拟记录
+    // 会被算成 0，见 test/dev_mode_test.dart 的冷启动口径用例）。
     try {
       final v = await _db.getSetting('stats_include_simulated');
       DatabaseService.includeSimulatedData = v == '1';
     } catch (_) {
       DatabaseService.includeSimulatedData = false;
     }
+    _hasSimulatedData = await _db.hasSimulatedData();
 
+    await _loadHomeStats();
+    _initAIService();
   }
 
   void _initAIService() {
@@ -546,7 +576,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       deviceName: deviceName,
     );
     // v1.0.2 新增设置
-    _vacationModeEnabled = (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
+    _vacationModeEnabled =
+        (await _db.getSetting('vacation_mode_enabled') ?? '0') == '1';
     final vStart = await _db.getSetting('vacation_start_date');
     final vEnd = await _db.getSetting('vacation_end_date');
     _vacationStartDate = vStart != null ? DateTime.tryParse(vStart) : null;
@@ -624,10 +655,12 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     if (end != null) _vacationEndDate = end;
     await _db.setSetting('vacation_mode_enabled', enabled ? '1' : '0');
     if (_vacationStartDate != null) {
-      await _db.setSetting('vacation_start_date', _vacationStartDate!.toIso8601String());
+      await _db.setSetting(
+          'vacation_start_date', _vacationStartDate!.toIso8601String());
     }
     if (_vacationEndDate != null) {
-      await _db.setSetting('vacation_end_date', _vacationEndDate!.toIso8601String());
+      await _db.setSetting(
+          'vacation_end_date', _vacationEndDate!.toIso8601String());
     }
     notifyListeners();
   }
@@ -671,8 +704,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     return {
       for (final d in list)
         '${(d['date'] as DateTime).year}-'
-            '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
-            '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}':
+                '${(d['date'] as DateTime).month.toString().padLeft(2, '0')}-'
+                '${(d['date'] as DateTime).day.toString().padLeft(2, '0')}':
             d['total'] as int,
     };
   }
@@ -755,7 +788,9 @@ void set skipFSRS(bool v) => _skipFSRS = v;
     notifyListeners();
 
     final files = filePaths
-        .where((p) => p.toLowerCase().endsWith('.docx') || p.toLowerCase().endsWith('.doc'))
+        .where((p) =>
+            p.toLowerCase().endsWith('.docx') ||
+            p.toLowerCase().endsWith('.doc'))
         .map((p) => File(p))
         .toList();
 
@@ -819,7 +854,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
         // ===== 正则解析模式（原有逻辑）=====
         _importStatus = '正在解析: $fileName';
         notifyListeners();
-        questions = await DocParserService.parseFileInIsolate(file.path, bankId);
+        questions =
+            await DocParserService.parseFileInIsolate(file.path, bankId);
       }
 
       if (questions.isNotEmpty) {
@@ -846,13 +882,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// JSON 题库导入（v1.0.2：分组建库，无需预览）
   /// 返回 (题库数, 题目数, 错误信息, 改名组数)——错误随返回值传递；
   /// v1.0.2 七项改进：同名题库自动加后缀，杜绝重复题库
-  Future<(int, int, String?, int)> importJsonFiles(List<String> filePaths) async {
+  Future<(int, int, String?, int)> importJsonFiles(
+      List<String> filePaths) async {
     var banks = 0;
     var questions = 0;
     var renamed = 0;
     String? firstError;
-    final existingNames =
-        (await _db.getAllBanks()).map((b) => b.name).toSet();
+    final existingNames = (await _db.getAllBanks()).map((b) => b.name).toSet();
     for (final p in filePaths) {
       final (b, q, err, r) =
           await BankFileService.importJsonFile(p, existingNames: existingNames);
@@ -1021,6 +1057,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }) async {
     final r = await _db.simulateLongTermUse(
         days: days, randomWeakKp: randomWeakKp, dueToday: dueToday);
+    _hasSimulatedData = await _db.hasSimulatedData();
     // 生成成功即自动打开「统计包含模拟数据」——否则开发者生成完
     // 在首页/统计看不到任何东西，等于白生成。
     if (r.error == null && r.records > 0) {
@@ -1034,6 +1071,7 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 清除模拟长期使用产生的全部数据（会话/记录/复习卡/错题条目）
   Future<int> clearSimulatedData() async {
     final n = await _db.clearSimulatedData();
+    _hasSimulatedData = await _db.hasSimulatedData();
     await bumpStatsRevision();
     return n;
   }
@@ -1242,7 +1280,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 解析流的节流通知：60ms 内的多个 chunk 合并成一次 notifyListeners。
   void _notifyAnalysisThrottled() {
     final now = DateTime.now();
-    if (now.difference(_lastAnalysisNotify) < const Duration(milliseconds: 60)) {
+    if (now.difference(_lastAnalysisNotify) <
+        const Duration(milliseconds: 60)) {
       return;
     }
     _lastAnalysisNotify = now;
@@ -1537,8 +1576,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   /// 进入答题/复习前批量挂到题目对象上
   Future<List<Question>> _withImages(List<Question> questions) async {
     if (questions.isEmpty) return questions;
-    final byId =
-        await _db.getImagesForQuestions(questions.map((q) => q.id ?? -1).toList());
+    final byId = await _db
+        .getImagesForQuestions(questions.map((q) => q.id ?? -1).toList());
     return questions
         .map((q) => q.copyWith(images: byId[q.id] ?? const []))
         .toList();
@@ -1628,8 +1667,8 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   }) async {
     final List<Question> questions;
     if (kp != null && kp.isNotEmpty) {
-      questions =
-          await _db.getFullQuestionsByKnowledgePoint(kp, mode, bankIds: bankIds);
+      questions = await _db.getFullQuestionsByKnowledgePoint(kp, mode,
+          bankIds: bankIds);
     } else {
       questions = await _db.getFullErrorQuestions(mode, bankIds: bankIds);
     }
@@ -1886,8 +1925,14 @@ void set skipFSRS(bool v) => _skipFSRS = v;
   ///
   /// 两条批量查询（题目+统计一条、FSRS 一条），**避免 N+1**；
   /// 卡片上要显示的「做过几次 / 正确率 / 下次复习」都来自这里。
-  Future<List<({Question question, int answered, int correct, FSRSCardState? card})>>
-      getErrorQuestionCards(
+  Future<
+      List<
+          ({
+            Question question,
+            int answered,
+            int correct,
+            FSRSCardState? card
+          })>> getErrorQuestionCards(
     String mode, {
     Set<int>? bankIds,
     String? window,
@@ -1930,11 +1975,13 @@ void set skipFSRS(bool v) => _skipFSRS = v;
       _weaknessAnalysis = '暂无刷题数据，开始你的第一次刷题吧！';
     } else {
       _weaknessAnalysis = await _aiService!.generateWeaknessAnalysis(
-        bankAccuracies.map((b) => {
-          'bank_name': b.bankName,
-          'total': b.total,
-          'correct': b.correct,
-        }).toList(),
+        bankAccuracies
+            .map((b) => {
+                  'bank_name': b.bankName,
+                  'total': b.total,
+                  'correct': b.correct,
+                })
+            .toList(),
         overallAccuracy,
       );
     }

@@ -13,6 +13,19 @@ import 'package:flashcard_app/services/theme_service.dart';
 /// 1. 编辑卡支持超过 4 个选项（五选全显示/可改/可增删，保存不丢失）；
 /// 2. 五选答案（A,E）不再误报「答案格式异常」；
 /// 3. 顶部统计徽章（正常/需检查/有问题）点击筛选题目，再点取消。
+class _RetryImportState extends AppState {
+  int attempts = 0;
+  final selections = <Set<int>>[];
+
+  @override
+  Future<void> confirmImport({Set<int> excludedIndices = const {}}) async {
+    attempts++;
+    selections.add(Set.of(excludedIndices));
+    if (attempts == 1) throw StateError('模拟写入失败');
+    clearPreview();
+  }
+}
+
 void main() {
   setUp(() async {
     await DatabaseService.instance.close();
@@ -57,6 +70,93 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
   }
+
+  testWidgets('确认失败保留编辑与删除，留在预览页并可重试成功返回', (tester) async {
+    final state = _RetryImportState();
+    state.setPreviewQuestionsForTest([
+      mk('保留题', answer: 'A'),
+      mk('待删除题', answer: 'B'),
+    ]);
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppState>.value(value: state),
+        ChangeNotifierProvider<ThemeService>.value(value: ThemeService()),
+      ],
+      child: MaterialApp(
+        navigatorKey: navigator,
+        theme: ThemeService().themeData,
+        home: const Scaffold(body: Text('首页')),
+      ),
+    ));
+    navigator.currentState!.push(MaterialPageRoute<void>(
+        builder: (_) => const ImportPreviewScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.delete_outline).last);
+    await settle(tester);
+    await tester.tap(find.byIcon(Icons.edit_outlined).first);
+    await settle(tester);
+    await tester.enterText(find.byType(TextField).first, '已编辑题干');
+    await tester.ensureVisible(find.text('保存'));
+    await tester.tap(find.text('保存'));
+    await settle(tester);
+    await tester.tap(find.text('确认导入 1 道题目'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ImportPreviewScreen), findsOneWidget);
+    expect(find.textContaining('模拟写入失败'), findsOneWidget);
+    expect(find.text('已编辑题干'), findsOneWidget);
+    expect(find.text('待删除题'), findsNothing);
+    expect(state.previewQuestions.map((q) => q.title), ['已编辑题干', '待删除题']);
+    expect(state.selections.single, {1});
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('重试导入 1 道题目'));
+    await tester.pumpAndSettle();
+    expect(state.attempts, 2);
+    expect(state.selections.last, {1});
+    expect(find.byType(ImportPreviewScreen), findsNothing);
+    expect(find.text('首页'), findsOneWidget);
+  });
+
+  test('数据库写入失败保留全部预览，重试仅写入未删除题', () async {
+    final state = AppState();
+    await state.init();
+    state.setPreviewQuestionsForTest([
+      mk('已编辑题干', answer: 'A'),
+      mk('删除题', answer: 'B'),
+    ]);
+    final db = await DatabaseService.instance.database;
+    await db.execute('''
+      CREATE TRIGGER fail_preview_insert BEFORE INSERT ON questions
+      BEGIN SELECT RAISE(ABORT, 'test import failure'); END
+    ''');
+    await expectLater(
+        state.confirmImport(excludedIndices: {1}), throwsA(anything));
+    expect(state.previewQuestions.map((q) => q.title), ['已编辑题干', '删除题']);
+    expect(await DatabaseService.instance.getAllBanks(), isEmpty);
+    await db.execute('DROP TRIGGER fail_preview_insert');
+    await state.confirmImport(excludedIndices: {1});
+    expect(state.previewQuestions, isEmpty);
+    final rows = await db.query('questions');
+    expect(rows, hasLength(1));
+    expect(rows.single['title'], '已编辑题干');
+    expect(await DatabaseService.instance.getAllBanks(), hasLength(1));
+    state.dispose();
+  });
+
+  testWidgets('全删后禁止空导入，不永久删除预览数据', (tester) async {
+    final state = _RetryImportState();
+    state.setPreviewQuestionsForTest([mk('保留底稿', answer: 'A')]);
+    await tester.pumpWidget(host(state));
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await settle(tester);
+    final button = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, '确认导入 0 道题目'));
+    expect(button.onPressed, isNull);
+    expect(state.previewQuestions, hasLength(1));
+    expect(state.attempts, 0);
+  });
 
   testWidgets('编辑卡支持 5 选项：全显示、可修改、可添加，保存不丢失', (tester) async {
     final appState = AppState();

@@ -1,4 +1,4 @@
-﻿# MaoJuan - publish the promo site to GitHub Pages (branch: gh-pages)
+# MaoJuan - publish the promo site to GitHub Pages (branch: gh-pages)
 #
 # GitHub Pages is the zero-signup host: it only needs the GitHub account we
 # already push to. Its weakness is mainland reachability, so
@@ -70,7 +70,8 @@ Copy-Item (Join-Path $promo 'index.html') $stage -Force
 # promo/demo.html 是本地录屏专用文件（file:// 直开），不上架网站
 Copy-Item (Join-Path $promo '404.html')   $stage -Force
 Copy-Item (Join-Path $promo '.nojekyll')  $stage -Force
-Copy-Item (Join-Path $promo 'assets\logo.png') (Join-Path $stage 'assets') -Force
+# Copy the complete asset directory so redesigned website resources ship together.
+Copy-Item (Join-Path $promo 'assets\*') (Join-Path $stage 'assets') -Recurse -Force
 # favicon.png：index.html 与 404.html 都引用它，必须一并部署（曾漏掉导致线上 404）
 Copy-Item (Join-Path $promo 'favicon.png') $stage -Force
 
@@ -89,6 +90,12 @@ $null = Copy-Artifact ('MaoJuan-v{0}-android-arm64.apk'     -f $version) ('MaoJu
 $null = Copy-Artifact ('MaoJuan-v{0}-android-universal.apk' -f $version) ('MaoJuan-v{0}-android-universal.apk' -f $version)
 $null = Copy-Artifact ('MaoJuan-v{0}-windows-setup.exe'     -f $version) ('MaoJuan-v{0}-windows-setup.exe'     -f $version)
 $null = Copy-Artifact ('MaoJuan-v{0}-windows-portable.zip'  -f $version) ('MaoJuan-v{0}-windows-portable.zip'  -f $version)
+
+# Generate checksums from the staged bytes; downloadable checksum files must ship too.
+Get-ChildItem (Join-Path $stage 'download') -File | Where-Object { $_.Extension -in '.apk', '.exe', '.zip' } | ForEach-Object {
+    $checksum = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    Utf8NoBom ($_.FullName + '.sha256') ($checksum + '  ' + $_.Name + "`n")
+}
 
 # ---- 2. verify config points at files that were actually staged ---------------
 Step '2/4' 'checking the window.MAOJUAN download paths'

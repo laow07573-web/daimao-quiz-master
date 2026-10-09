@@ -40,77 +40,77 @@ class _BankManageScreenState extends State<BankManageScreen> {
       // 平板适配：内容限宽居中（手机无影响）
       body: ResponsivePage(
         child: Consumer<AppState>(
-        builder: (context, appState, _) {
-          if (appState.banks.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.library_books_outlined,
-                      size: 64, color: ac.border),
-                  const SizedBox(height: 16),
-                  Text('还没有题库',
-                      style: TextStyle(fontSize: MaoType.h3, color: ac.textSecondary)),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('导入题库'),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const ImportScreen()),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return Column(
-            children: [
-              _buildQuizSettings(appState, ac),
-              const Divider(height: 1),
-              Expanded(
-                // v1.0.3 宽屏重设计：宽屏题库卡 2 列网格，窄屏维持单列
-                child: Builder(builder: (context) {
-                  Widget buildCard(int index) {
-                    final bank = appState.banks[index];
-                    final isSelected =
-                        appState.selectedBankIds.contains(bank.id);
-                    return _BankCard(
-                      bank: bank,
-                      isSelected: isSelected,
-                      onTap: () => appState.toggleBankSelection(bank.id!),
-                      onDelete: () => _confirmDelete(context, appState, bank),
-                      onExport: () => _exportBank(bank),
-                    );
-                  }
-
-                  if (isWideLayout(context)) {
-                    return GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 0,
-                        childAspectRatio: 5.2,
+          builder: (context, appState, _) {
+            if (appState.banks.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.library_books_outlined,
+                        size: 64, color: ac.border),
+                    const SizedBox(height: 16),
+                    Text('还没有题库',
+                        style: TextStyle(
+                            fontSize: MaoType.h3, color: ac.textSecondary)),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('导入题库'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ImportScreen()),
                       ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                _buildQuizSettings(appState, ac),
+                const Divider(height: 1),
+                Expanded(
+                  // v1.0.3 宽屏重设计：宽屏题库卡 2 列网格，窄屏维持单列
+                  child: Builder(builder: (context) {
+                    Widget buildCard(int index) {
+                      final bank = appState.banks[index];
+                      final isSelected =
+                          appState.selectedBankIds.contains(bank.id);
+                      return _BankCard(
+                        bank: bank,
+                        isSelected: isSelected,
+                        onTap: () => appState.toggleBankSelection(bank.id!),
+                        onDelete: () => _confirmDelete(context, appState, bank),
+                        onExport: () => _exportBank(bank),
+                      );
+                    }
+
+                    if (isWideLayout(context)) {
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 0,
+                          childAspectRatio: 5.2,
+                        ),
+                        itemCount: appState.banks.length,
+                        itemBuilder: (context, index) => buildCard(index),
+                      );
+                    }
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
                       itemCount: appState.banks.length,
                       itemBuilder: (context, index) => buildCard(index),
                     );
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: appState.banks.length,
-                    itemBuilder: (context, index) => buildCard(index),
-                  );
-                }),
-              ),
-            ],
-          );
-        },
-      ),
+                  }),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -128,13 +128,17 @@ class _BankManageScreenState extends State<BankManageScreen> {
               Icon(Icons.tune, size: 18, color: ac.accent),
               const SizedBox(width: 6),
               Text('刷题设置',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: MaoType.h3, color: ac.textPrimary)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: MaoType.h3,
+                      color: ac.textPrimary)),
               const Spacer(),
               Text(
                 appState.selectedBankIds.isEmpty
                     ? '点击题目前方选择框'
                     : '已选 ${appState.selectedBankIds.length} 个题库',
-                style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
+                style:
+                    TextStyle(fontSize: MaoType.body, color: ac.textSecondary),
               ),
             ],
           ),
@@ -142,10 +146,10 @@ class _BankManageScreenState extends State<BankManageScreen> {
           Row(
             children: [
               Text('刷题模式: ',
-                  style: TextStyle(fontSize: MaoType.body, color: ac.textSecondary)),
+                  style: TextStyle(
+                      fontSize: MaoType.body, color: ac.textSecondary)),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: (appState.selectedBankIds.length > 1
                           ? ac.textSecondary
@@ -181,8 +185,7 @@ class _BankManageScreenState extends State<BankManageScreen> {
         content: Text('确定要删除题库"${bank.name}"吗？\n该题库下的所有题目也将被删除，此操作不可恢复。'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           TextButton(
             onPressed: () {
               appState.deleteBank(bank.id!);
@@ -246,66 +249,76 @@ class _BankCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = AppThemeColors.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-      padding: const EdgeInsets.only(bottom: MaoSpace.xs),
-      child: MJSurface(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label:
+          '${bank.name}，${bank.questionCount} 道题目${isSelected ? '，已选中' : '，未选中'}',
+      child: GestureDetector(
         onTap: onTap,
-        padding: const EdgeInsets.all(MaoSpace.sm),
-        child: Row(
-          children: [
-            // Linear 式小方块选择器（与答题页选项一致）
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: isSelected ? ac.accent : Colors.transparent,
-                border: Border.all(
-                  color: isSelected ? ac.accent : ac.border,
-                  width: 1.2,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: MaoSpace.xs),
+          child: MJSurface(
+            onTap: onTap,
+            padding: const EdgeInsets.all(MaoSpace.sm),
+            child: Row(
+              children: [
+                // Linear 式小方块选择器（与答题页选项一致）
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isSelected ? ac.accent : Colors.transparent,
+                    border: Border.all(
+                      color: isSelected ? ac.accent : ac.border,
+                      width: 1.2,
+                    ),
+                    borderRadius: MaoRadius.chipBorder,
+                  ),
+                  child: isSelected
+                      ? Icon(Icons.check, size: 12, color: ac.onAccent)
+                      : null,
                 ),
-                borderRadius: MaoRadius.chipBorder,
-              ),
-              child: isSelected
-                  ? Icon(Icons.check, size: 12, color: ac.onAccent)
-                  : null,
+                const SizedBox(width: MaoSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(bank.name,
+                          style: TextStyle(
+                              fontSize: MaoType.h3,
+                              fontWeight: FontWeight.w600,
+                              color: ac.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text('${bank.questionCount} 道题目',
+                          style: TextStyle(
+                              fontSize: MaoType.body, color: ac.textSecondary)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: '导出题库',
+                  icon: Icon(Icons.file_download_outlined,
+                      color: ac.textSecondary, size: 20),
+                  padding: EdgeInsets.zero,
+                  // 触达目标 ≥40×40（与预览页同一图标按钮口径）
+                  constraints:
+                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  onPressed: onExport,
+                ),
+                IconButton(
+                  tooltip: '删除题库',
+                  icon: Icon(Icons.delete_outline,
+                      color: ac.textSecondary, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  onPressed: onDelete,
+                ),
+              ],
             ),
-            const SizedBox(width: MaoSpace.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(bank.name,
-                      style: TextStyle(
-                          fontSize: MaoType.h3, fontWeight: FontWeight.w600, color: ac.textPrimary)),
-                  const SizedBox(height: 4),
-                  Text('${bank.questionCount} 道题目',
-                      style: TextStyle(
-                          fontSize: MaoType.body, color: ac.textSecondary)),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: '导出题库',
-              icon: Icon(Icons.file_download_outlined,
-                  color: ac.textSecondary, size: 20),
-              padding: EdgeInsets.zero,
-              // 触达目标 ≥40×40（与预览页同一图标按钮口径）
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              onPressed: onExport,
-            ),
-            IconButton(
-              tooltip: '删除题库',
-              icon: Icon(Icons.delete_outline,
-                  color: ac.textSecondary, size: 20),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              onPressed: onDelete,
-            ),
-          ],
+          ),
         ),
-      ),
       ),
     );
   }

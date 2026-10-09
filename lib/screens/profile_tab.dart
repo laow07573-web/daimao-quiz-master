@@ -11,6 +11,7 @@ import '../widgets/guide/guide_anchor.dart';
 import '../widgets/guide/guide_steps.dart';
 import '../widgets/kit/mj_kit.dart';
 import '../widgets/kit/mj_logo.dart';
+import '../widgets/mao_quote_tappable.dart';
 import 'developer_options_screen.dart';
 import 'settings_hub_screen.dart';
 
@@ -79,15 +80,19 @@ class _ProfileTabState extends State<ProfileTab> {
               child: Row(
                 children: [
                   // 品牌位：矢量标记（与首页/启动页同一组件，三处形状与描边一致）
-                  const MJLogoBadge(box: 38),
+                  // 2026-10-09 用户需求：点 Logo 出随机语录（首页那处行为一致）
+                  const MaoQuoteTappable(
+                    box: 42,
+                    child: MJLogoBadge(box: 42),
+                  ),
                   const SizedBox(width: MaoSpace.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(_greeting,
-                            style:
-                                MaoType.h1Style.copyWith(color: ac.textPrimary)),
+                            style: MaoType.h1Style
+                                .copyWith(color: ac.textPrimary)),
                         const SizedBox(height: MaoSpace.xxs),
                         Text(
                           // v1.0.2 对齐里程碑：昵称（设置后首页显示专属问候）
@@ -100,6 +105,11 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: MaoSpace.lg),
+            const MJSectionHeader(
+              title: '个人空间',
+              subtitle: '设置、数据与使用帮助',
             ),
             const SizedBox(height: MaoSpace.sm),
             // ── 入口列表：宽屏三列并排，窄屏纵列 ──
@@ -126,8 +136,7 @@ class _ProfileTabState extends State<ProfileTab> {
             // 重看引导 = 请求根节点的引导控制器再播一遍（遮罩盖在 Navigator 之上）
             _EntryTile(
               icon: Icons.school_outlined,
-              title: '重看使用引导',
-              subtitle: '导入 → 刷题 → 统计，一步步带你走一遍',
+              title: '使用引导',
               onTap: () => GuideScope.maybeOf(context)?.start(),
             ),
             const SizedBox(height: MaoSpace.lg),
@@ -140,11 +149,10 @@ class _ProfileTabState extends State<ProfileTab> {
                 children: [
                   Text('猫卷 · 医学备考刷题平台',
                       style: MaoType.h3Style.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: ac.textPrimary)),
+                          fontWeight: FontWeight.w600, color: ac.textPrimary)),
                   const SizedBox(height: MaoSpace.xs),
                   Text(
-                    '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解由你的 API Key 直连，隐私无忧\n许可：AGPL-3.0（可自由使用 / 修改 / 分发）',
+                    '开源免费，无广告无会员\n题库与记录本地存储，数据自有\nAI 讲解使用你的 API Key，请求发往所配置的服务商\n许可：AGPL-3.0（可自由使用 / 修改 / 分发）',
                     style: MaoType.captionStyle
                         .copyWith(height: 1.75, color: ac.textSecondary),
                   ),
@@ -170,7 +178,7 @@ class _ProfileTabState extends State<ProfileTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('猫卷'),
-        content: Text(
+        content: const Text(
           // v1.0.2 定位：医学生备考（未来拓展通用场景）
           '医学备考刷题工具\n支持本地题库、AI 解析、FSRS 间隔复习、数据统计。\n\n版本：$kAppVersion',
         ),
@@ -185,7 +193,12 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 }
 
-/// 入口行：单色描边小图标 + 标题（+ 尾部版本号）+ 细箭头。
+/// 入口行：单色描边小图标 + 标题（副标题另起一行）+ 细箭头。
+///
+/// 2026-10-08 修复：此前副标题与标题同处一个 Row 且副标题不参与伸缩，
+/// 长副标题会把标题的 Expanded 挤到接近 0 宽，中文于是逐字换行变成竖排
+/// （真机截图：我的页「重看使用引导」）。现在标题与副标题纵向排列在
+/// Expanded 内，任何长度的副标题都不会再挤压标题。
 class _EntryTile extends StatelessWidget {
   const _EntryTile({
     required this.icon,
@@ -220,16 +233,27 @@ class _EntryTile extends StatelessWidget {
           ),
           const SizedBox(width: MaoSpace.sm),
           Expanded(
-            child: Text(title,
-                style: MaoType.h3Style.copyWith(
-                    fontWeight: FontWeight.w600, color: ac.textPrimary)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: MaoType.h3Style.copyWith(
+                        fontWeight: FontWeight.w600, color: ac.textPrimary)),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: MaoType.captionStyle
+                          .copyWith(color: ac.textTertiary)),
+                ],
+              ],
+            ),
           ),
-          if (subtitle != null)
-            Text(subtitle!,
-                style: MaoType.captionStyle.copyWith(color: ac.textTertiary)),
           const SizedBox(width: MaoSpace.xxs),
-          Icon(Icons.chevron_right_rounded,
-              size: 16, color: ac.textTertiary),
+          Icon(Icons.chevron_right_rounded, size: 16, color: ac.textTertiary),
         ],
       ),
     );

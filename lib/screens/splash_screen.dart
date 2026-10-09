@@ -7,6 +7,7 @@ import '../services/theme_service.dart';
 import '../utils/design_tokens.dart';
 import '../widgets/kit/mj_logo.dart';
 import 'main_shell.dart';
+
 /// 启动闪屏页（v1.0.2 对齐原版设计：App Logo + 标题 + 今日一言 + 加载圈）
 ///
 /// 固定 1.4 秒自动进入下一步：首次启动进主界面并在其上插播互动式引导
@@ -67,7 +68,8 @@ class _SplashScreenState extends State<SplashScreen> {
     final firstRun = _firstRun ?? !(await GuideService.instance.hasSeen());
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => SplashScreen.nextScreen(firstRun: firstRun)),
+      MaterialPageRoute(
+          builder: (_) => SplashScreen.nextScreen(firstRun: firstRun)),
     );
   }
 
@@ -89,13 +91,13 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 品牌位：矢量标记 + 发丝描边方块（不再用白底位图，小尺寸不会糊）
-              const MJLogoBadge(box: 88, padding: 14),
+              // 品牌位：标记直接绘制（无底色方块、无描边），尺寸即标记大小
+              const MJLogoBadge(box: 104),
               const SizedBox(height: MaoSpace.lg),
               // 软件名字
               Text('猫卷',
-                  style: MaoType.h1Style.copyWith(
-                      fontSize: 28, color: ac.textPrimary)),
+                  style: MaoType.h1Style
+                      .copyWith(fontSize: 28, color: ac.textPrimary)),
               const SizedBox(height: MaoSpace.sm),
               // 发丝分隔
               Container(
@@ -106,8 +108,8 @@ class _SplashScreenState extends State<SplashScreen> {
               const SizedBox(height: MaoSpace.sm),
               // 今日一言
               Text('今日一言',
-                  style: MaoType.microStyle.copyWith(
-                      color: ac.textTertiary, letterSpacing: 1.2)),
+                  style: MaoType.microStyle
+                      .copyWith(color: ac.textTertiary, letterSpacing: 1.2)),
               const SizedBox(height: MaoSpace.xs),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 48),
@@ -124,8 +126,8 @@ class _SplashScreenState extends State<SplashScreen> {
               SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: ac.accent),
+                child:
+                    CircularProgressIndicator(strokeWidth: 2, color: ac.accent),
               ),
             ],
           ),

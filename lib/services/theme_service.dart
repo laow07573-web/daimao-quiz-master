@@ -307,7 +307,8 @@ class ThemeService extends ChangeNotifier {
           color: c.navForeground,
         ),
         iconTheme: IconThemeData(color: c.navForeground, size: 20),
-        shape: Border(bottom: BorderSide(color: c.border, width: MaoLine.width)),
+        shape:
+            Border(bottom: BorderSide(color: c.border, width: MaoLine.width)),
       ),
 
       // ---- 卡片：10 圆角 + 实色 hairline，无阴影（层级靠描边与明度差） ----
@@ -366,8 +367,8 @@ class ThemeService extends ChangeNotifier {
           foregroundColor: c.accent,
           padding: const EdgeInsets.symmetric(
               horizontal: MaoSpace.sm, vertical: MaoSpace.xs),
-          shape: const RoundedRectangleBorder(
-              borderRadius: MaoRadius.smallBorder),
+          shape:
+              const RoundedRectangleBorder(borderRadius: MaoRadius.smallBorder),
           textStyle: MaoType.h3Style.copyWith(color: c.accent),
         ),
       ),
@@ -409,8 +410,8 @@ class ThemeService extends ChangeNotifier {
           borderRadius: MaoRadius.largeBorder,
           side: BorderSide(color: c.border, width: MaoLine.width),
         ),
-        titleTextStyle:
-            MaoType.h2Style.copyWith(fontFamily: 'MiSans', color: c.textPrimary),
+        titleTextStyle: MaoType.h2Style
+            .copyWith(fontFamily: 'MiSans', color: c.textPrimary),
         contentTextStyle:
             MaoType.bodyStyle.copyWith(color: c.textSecondary, fontSize: 14),
       ),
@@ -421,8 +422,8 @@ class ThemeService extends ChangeNotifier {
         elevation: 0,
         modalElevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(MaoRadius.large)),
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(MaoRadius.large)),
           side: BorderSide(color: c.border, width: MaoLine.width),
         ),
         showDragHandle: true,
@@ -433,8 +434,8 @@ class ThemeService extends ChangeNotifier {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: dark ? c.surfaceAlt : c.textPrimary,
-        contentTextStyle: MaoType.bodyStyle.copyWith(
-            color: dark ? c.textPrimary : c.surface, fontSize: 13),
+        contentTextStyle: MaoType.bodyStyle
+            .copyWith(color: dark ? c.textPrimary : c.surface, fontSize: 13),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: MaoRadius.controlBorder,
@@ -453,11 +454,11 @@ class ThemeService extends ChangeNotifier {
           borderRadius: BorderRadius.circular(MaoRadius.small),
         ),
         surfaceTintColor: Colors.transparent,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => states
-                .contains(WidgetState.selected)
-            ? MaoType.microStyle.copyWith(
-                color: c.accent, fontWeight: FontWeight.w600)
-            : MaoType.microStyle.copyWith(color: c.textTertiary)),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? MaoType.microStyle
+                    .copyWith(color: c.accent, fontWeight: FontWeight.w600)
+                : MaoType.microStyle.copyWith(color: c.textTertiary)),
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
               size: 24,
               color: states.contains(WidgetState.selected)
@@ -472,8 +473,8 @@ class ThemeService extends ChangeNotifier {
         indicatorColor: c.accentSoft,
         selectedIconTheme: IconThemeData(color: c.accent, size: 24),
         unselectedIconTheme: IconThemeData(color: c.textTertiary, size: 24),
-        selectedLabelTextStyle: MaoType.microStyle.copyWith(
-            color: c.accent, fontWeight: FontWeight.w600),
+        selectedLabelTextStyle: MaoType.microStyle
+            .copyWith(color: c.accent, fontWeight: FontWeight.w600),
         unselectedLabelTextStyle:
             MaoType.microStyle.copyWith(color: c.textTertiary),
       ),
@@ -484,8 +485,8 @@ class ThemeService extends ChangeNotifier {
         selectedColor: c.accentSoft,
         side: BorderSide(color: c.border, width: 1),
         labelStyle: MaoType.captionStyle.copyWith(color: c.textSecondary),
-        secondaryLabelStyle:
-            MaoType.captionStyle.copyWith(color: c.accent, fontWeight: FontWeight.w600),
+        secondaryLabelStyle: MaoType.captionStyle
+            .copyWith(color: c.accent, fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(MaoRadius.chip)),
         padding: const EdgeInsets.symmetric(
@@ -496,8 +497,7 @@ class ThemeService extends ChangeNotifier {
 
       // ---- 列表 / 分隔线 / 进度条 / 图标 ----
       listTileTheme: ListTileThemeData(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: MaoSpace.md),
+        contentPadding: const EdgeInsets.symmetric(horizontal: MaoSpace.md),
         iconColor: c.textSecondary,
         titleTextStyle: MaoType.h3Style.copyWith(color: c.textPrimary),
         subtitleTextStyle:
@@ -587,14 +587,20 @@ class MaoExitCurve extends Curve {
 ///
 /// 为什么自定义：M2 [FadeUpwardsPageTransitionsBuilder] 一次推进 0.25 屏，
 /// 在发丝线 + 明度分层的精密界面里显得"飘"。这里把进入位移收到 0.06 屏，
-/// 进/出时长对齐 [MaoMotion.slow] / [MaoMotion.exit]——层是「落定」不是「飘入」。
+/// 进/出时长对齐层级令牌——层是「落定」不是「飘入」。
 /// iOS 保留系统侧滑手势语感（Cupertino 转场），其余平台用本转场。
+///
+/// 2026-10-09 修正：此前进场走的是 [MaoMotion.slow]（260ms），与刚按用户定义
+/// 定下的层级令牌（一级 150ms / 二级 300ms）**脱节**——规范写着 300ms，代码跑
+/// 260ms。现在进场窗口直接等于 [MaoMotion.nestedPage]，倍数关系
+/// （二级 = 一级 × 2.0）在代码里真正成立，而不是只在注释里成立。
 class _MaoPageTransitionsBuilder extends PageTransitionsBuilder {
   const _MaoPageTransitionsBuilder();
 
   /// Flutter 页面路由（MaterialRouteTransitionMixin）固定的转场窗口。
-  /// SDK 未导出该常量；曲线按此窗口把有效运动压进 MaoMotion 时长内落定。
-  static const Duration _routeWindow = Duration(milliseconds: 300);
+  /// SDK 未导出该常量；[MaoMotion.nestedPage] 与它取同值（300ms），
+  /// 所以整窗即运动窗，不需要再拿 Interval 去截。
+  static const Duration _routeWindow = MaoMotion.nestedPage;
 
   /// 进入位移：0.06 屏（FadeUpwards 原为 0.25，太"飘"）
   static const Offset _enterOffset = Offset(0, 0.06);
@@ -607,19 +613,25 @@ class _MaoPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    // 进场：窗口内前 MaoMotion.slow 段走完（曲线提前落定 = 观感时长对齐令牌）
+    // 尊重系统「减弱动态效果」：直接落位，不演转场
+    if (MaoMotion.reduced(context)) return child;
+
+    // 进场：整窗走强调曲线（二级页面属于「大块运动」，用零过冲的 M3 曲线）
     final enter = CurvedAnimation(
       parent: animation,
-      curve: Interval(0, MaoMotion.slow.inMicroseconds / _routeWindow.inMicroseconds,
-          curve: MaoMotion.standard),
+      curve: MaoMotion.emphasized,
       // 出场：压缩进 MaoMotion.exit 段内落定（一启动就走，不延迟）
-      reverseCurve: MaoExitCurve(window: _routeWindow, motion: MaoMotion.exit),
+      reverseCurve: MaoExitCurve(
+        window: _routeWindow,
+        motion: MaoMotion.exit,
+        curve: MaoMotion.exitCurve,
+      ),
     );
     return FadeTransition(
       opacity: enter,
       child: SlideTransition(
-        position: Tween<Offset>(begin: _enterOffset, end: Offset.zero)
-            .animate(enter),
+        position:
+            Tween<Offset>(begin: _enterOffset, end: Offset.zero).animate(enter),
         child: child,
       ),
     );

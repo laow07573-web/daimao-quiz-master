@@ -36,39 +36,71 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
   /// 断点续刷：最新未完成会话 + 已答题数（续刷是「做」的动作，故在开始页）
   (QuizSession, int)? _unfinished;
 
+  /// 「发起刷题」弹层是否已打开：连点入口时防止叠出多层弹层。
+  bool _sheetOpen = false;
+
+  /// 轻提示的兜底定时器：无障碍导航开启时框架会忽略 SnackBar 的 duration，
+  /// 必须自己按时清掉（见 [_toast]）。
+  Timer? _toastTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      final info =
-          await context.read<AppState>().getUnfinishedSessionInfo();
+      final info = await context.read<AppState>().getUnfinishedSessionInfo();
       if (mounted) setState(() => _unfinished = info);
+    });
+  }
+
+  /// 统一的轻提示：**先收起上一条再显示**。
+  ///
+  /// 2026-10-08 真机反馈：连点「定向爆破」会连弹多条提示叠在一起。
+  /// ScaffoldMessenger 默认把 SnackBar 排队逐条播，快速连点就会叠成一片；
+  /// 这里统一收敛入口，保证同一时刻只有一条提示。
+  ///
+  /// 2026-10-09 用户要求：「提示需要在 2s 内消散」。
+  /// 只传 `duration` **在这台真机上不够**——设备开着无障碍服务
+  /// （accessibility_enabled=1），此时 Flutter 会让 SnackBar 常驻、忽略 duration
+  /// （实测点击后 3.8 秒仍在，只有切页才消失）。所以这里再挂一个定时器兜底，
+  /// 保证「2 秒内消散」与系统无障碍设置无关。
+  void _toast(String message, {SnackBarAction? action}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        action: action,
+        duration: MaoMotion.toast,
+      ));
+    _toastTimer?.cancel();
+    _toastTimer = Timer(MaoMotion.toast, () {
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
     });
   }
 
   bool _vacationBlocked(AppState appState) {
     if (!appState.vacationModeEnabled) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('寒暑假模式中，答题功能已暂停')),
-    );
+    _toast('寒暑假模式中，答题功能已暂停');
     return true;
+  }
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    super.dispose();
   }
 
   /// 一键导入内置示例题库（免 Key、免文件，转后台执行）
   void _importSampleBank(AppState appState) {
     // 后台导入互斥在应用层是静默 return——UI 层提前明示，别让用户干等
     if (appState.importTaskActive) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已有导入任务进行中')),
-      );
+      _toast('已有导入任务进行中');
       return;
     }
     MJImportTask.discarded = false;
     unawaited(appState.startBackgroundSampleImport());
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已开始导入示例题库，进度见开始页顶部卡片')),
-    );
+    _toast('已开始导入示例题库，进度见开始页顶部卡片');
   }
 
   /// 取消导入：后台任务不可中止（边界见 [MJImportTask]），
@@ -77,13 +109,14 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
     MJImportTask.discarded = true;
     // 丢弃解析结果，并借 clearPreview 的通知让各页立即隐藏任务卡
     appState.clearPreview();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已取消导入，解析结果将丢弃')),
-    );
+    _toast('已取消导入，解析结果将丢弃');
   }
 
   Future<void> _navigateAndRefresh(
       BuildContext context, AppState appState, Widget page) async {
+    // 2026-10-09 用户要求：「切入其他页面的时候就不要显示这个提示了」。
+    // 点提示里的「去选择 / 去导入」会进二级页，提示不该跟着过去。
+    ScaffoldMessenger.of(context).clearSnackBars();
     await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
@@ -113,8 +146,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 后台导入：进行中进度卡
-                  if (appState.importTaskActive &&
-                      !MJImportTask.discarded) ...[
+                  if (appState.importTaskActive && !MJImportTask.discarded) ...[
                     MJTaskCard(
                       progress: appState.importProgress,
                       status: appState.importStatus,
@@ -164,8 +196,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                                 const SizedBox(height: 2),
                                 Text('导入示例题库（10 道医学题），无需任何配置立即体验',
                                     style: MaoType.captionStyle.copyWith(
-                                        color: ac.textSecondary,
-                                        height: 1.35)),
+                                        color: ac.textSecondary, height: 1.35)),
                               ],
                             ),
                           ),
@@ -173,8 +204,8 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                           FilledButton(
                             onPressed: () => _importSampleBank(appState),
                             style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 14),
                               minimumSize: const Size(0, 36),
                             ),
                             child: Text('导入',
@@ -199,20 +230,33 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                         final ok = await appState.resumeUnfinishedSession();
                         if (!ok || !mounted) return;
                         await nav.push(
-                          MaterialPageRoute(
-                              builder: (_) => const QuizScreen()),
+                          MaterialPageRoute(builder: (_) => const QuizScreen()),
                         );
                       },
                     ),
                     const SizedBox(height: MaoSpace.md),
                   ],
-                  const MJSectionHeader(title: '开始刷题'),
+                  const MJSectionHeader(
+                    title: '开始刷题',
+                    subtitle: '先选题库，再开始一轮练习；“定向爆破”就是按所选题库集中刷题',
+                  ),
                   const SizedBox(height: MaoSpace.sm),
                   GuideAnchor(
                     // 引导锚点：首启引导「开始刷题」那步
                     id: GuideAnchorIds.quickPrimary,
                     child: _QuickActionTile(
                       icon: Icons.rocket_launch_rounded,
+                      // 原版素材「爆」字（漫画风）：这个功能就叫定向爆破，
+                      // 用原图的辨识度比通用火箭图标强。用 burst_icon_ui.png
+                      // （裁边缩放的 UI 版）而不是 1MB 的原图；按主题色着色。
+                      iconWidget: Image.asset(
+                        'assets/burst_icon_ui.png',
+                        width: 20,
+                        height: 20,
+                        color: ac.accent,
+                        colorBlendMode: BlendMode.srcIn,
+                        filterQuality: FilterQuality.medium,
+                      ),
                       label: '定向爆破',
                       subtitle: appState.selectedBankIds.isEmpty
                           ? '请先选择题库'
@@ -221,18 +265,16 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                       onTap: appState.selectedBankIds.isEmpty
                           ? () {
                               final hasBanks = appState.banks.isNotEmpty;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(hasBanks ? '先勾选要刷的题库' : '还没有题库，先导入一份吧'),
-                                  action: SnackBarAction(
-                                    label: hasBanks ? '去选择' : '去导入',
-                                    onPressed: () => _navigateAndRefresh(
-                                      context,
-                                      appState,
-                                      hasBanks
-                                          ? const BankManageScreen()
-                                          : const ImportScreen(),
-                                    ),
+                              _toast(
+                                hasBanks ? '先勾选要刷的题库' : '还没有题库，先导入一份吧',
+                                action: SnackBarAction(
+                                  label: hasBanks ? '去选择' : '去导入',
+                                  onPressed: () => _navigateAndRefresh(
+                                    context,
+                                    appState,
+                                    hasBanks
+                                        ? const BankManageScreen()
+                                        : const ImportScreen(),
                                   ),
                                 ),
                               );
@@ -282,7 +324,8 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '本软件由b站：笨蛋鱼坏蛋猫 开发 | $kAppVersion',
-                      style: MaoType.microStyle.copyWith(color: ac.textTertiary),
+                      style:
+                          MaoType.microStyle.copyWith(color: ac.textTertiary),
                     ),
                   ),
                 ],
@@ -300,6 +343,10 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
   /// 又在两步之间丢失「我要干什么」的上下文；这里数量 chips + 模式单选 +
   /// 底部「开始」主按钮，一次确认发起。
   void _showStartQuizSheet(BuildContext context, AppState appState) {
+    // 连点防护：底部弹层是异步路由，第二次点击若在弹层出现前到达就会再压一层
+    // （真机表现为叠层 / 半透明穿插）。这里用状态位保证同一时刻只有一层。
+    if (_sheetOpen) return;
+    _sheetOpen = true;
     MJSheet.show<void>(
       context,
       title: '发起刷题',
@@ -318,7 +365,7 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
           }
         },
       ),
-    );
+    ).whenComplete(() => _sheetOpen = false);
   }
 
   Future<void> _startQuiz(AppState appState) async {
@@ -331,7 +378,8 @@ class _QuickStartScreenState extends State<QuickStartScreen> {
       );
       return;
     }
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const QuizScreen()));
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const QuizScreen()));
   }
 
   Future<void> _startPractice(AppState appState) async {
@@ -408,6 +456,7 @@ class _QuickActionTile extends StatelessWidget {
     required this.subtitle,
     required this.iconColor,
     required this.onTap,
+    this.iconWidget,
   });
 
   final IconData icon;
@@ -415,6 +464,10 @@ class _QuickActionTile extends StatelessWidget {
   final String subtitle;
   final Color iconColor;
   final VoidCallback onTap;
+
+  /// 自定义图标（覆盖 [icon]）。用于非 Material 图形的品牌/原版素材，
+  /// 例如「定向爆破」用原版「爆」字图（assets/burst_icon_ui.png）。
+  final Widget? iconWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +488,7 @@ class _QuickActionTile extends StatelessWidget {
                 borderRadius: MaoRadius.smallBorder,
                 border: Border.all(color: ac.border, width: MaoLine.width),
               ),
-              child: Icon(icon, color: iconColor, size: 16),
+              child: iconWidget ?? Icon(icon, color: iconColor, size: 16),
             ),
             const SizedBox(width: MaoSpace.sm),
             Expanded(
@@ -444,8 +497,7 @@ class _QuickActionTile extends StatelessWidget {
                 children: [
                   Text(label,
                       style: MaoType.h3Style.copyWith(
-                          color: ac.textPrimary,
-                          fontWeight: FontWeight.w600)),
+                          color: ac.textPrimary, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 1),
                   Text(subtitle,
                       maxLines: 1,
@@ -455,8 +507,7 @@ class _QuickActionTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: ac.textTertiary, size: 16),
+            Icon(Icons.chevron_right_rounded, color: ac.textTertiary, size: 16),
           ],
         ),
       ),
@@ -552,7 +603,8 @@ class _StartQuizSheetState extends State<_StartQuizSheet> {
         const SizedBox(height: MaoSpace.md),
         Text('刷题模式',
             style: MaoType.captionStyle.copyWith(color: ac.textSecondary)),
-        _modeRow(_StartMode.quiz, Icons.flash_on_rounded, '正常刷题', '答完即判，立刻校对解析'),
+        _modeRow(
+            _StartMode.quiz, Icons.flash_on_rounded, '正常刷题', '答完即判，立刻校对解析'),
         _modeRow(_StartMode.practice, Icons.edit_note_rounded, '练习',
             '答题卡模式，限时/不限时，统一批改'),
         _modeRow(_StartMode.memorize, Icons.visibility_rounded, '背题模式',
@@ -609,7 +661,8 @@ class _StartQuizSheetState extends State<_StartQuizSheet> {
                   : null,
             ),
             const SizedBox(width: MaoSpace.sm),
-            Icon(icon, size: 18, color: selected ? ac.accent : ac.textSecondary),
+            Icon(icon,
+                size: 18, color: selected ? ac.accent : ac.textSecondary),
             const SizedBox(width: MaoSpace.sm),
             Expanded(
               child: Column(
@@ -658,8 +711,8 @@ class _PreviewConfirmCard extends StatelessWidget {
                         fontWeight: FontWeight.w600, color: ac.accent)),
                 const SizedBox(height: 2),
                 Text('点击查看预览，确认后入库',
-                    style: MaoType.captionStyle
-                        .copyWith(color: ac.textSecondary)),
+                    style:
+                        MaoType.captionStyle.copyWith(color: ac.textSecondary)),
               ],
             ),
           ),
@@ -669,4 +722,3 @@ class _PreviewConfirmCard extends StatelessWidget {
     );
   }
 }
-

@@ -19,23 +19,21 @@ class ApiPreset {
 const List<ApiPreset> kApiPresets = [
   ApiPreset('DeepSeek 官方', 'https://api.deepseek.com/v1', 'deepseek-chat',
       '国内直连，性价比高'),
-  ApiPreset('阿里云百炼（通义）',
-      'https://dashscope.aliyuncs.com/compatible-mode/v1', 'qwen-plus',
-      '阿里云百炼，OpenAI 兼容模式'),
-  ApiPreset('硅基流动', 'https://api.siliconflow.cn/v1',
-      'deepseek-ai/DeepSeek-V3', '聚合多家开源模型'),
-  ApiPreset('智谱 GLM', 'https://open.bigmodel.cn/api/paas/v4',
-      'glm-4-flash', '清华智谱，有免费额度'),
-  ApiPreset('月之暗面 Kimi', 'https://api.moonshot.cn/v1',
-      'moonshot-v1-8k', '长文本见长'),
-  ApiPreset('OpenAI 官方', 'https://api.openai.com/v1', 'gpt-4o-mini',
-      '需自备网络环境'),
+  ApiPreset('阿里云百炼（通义）', 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      'qwen-plus', '阿里云百炼，OpenAI 兼容模式'),
+  ApiPreset('硅基流动', 'https://api.siliconflow.cn/v1', 'deepseek-ai/DeepSeek-V3',
+      '聚合多家开源模型'),
+  ApiPreset('智谱 GLM', 'https://open.bigmodel.cn/api/paas/v4', 'glm-4-flash',
+      '清华智谱，有免费额度'),
+  ApiPreset(
+      '月之暗面 Kimi', 'https://api.moonshot.cn/v1', 'moonshot-v1-8k', '长文本见长'),
+  ApiPreset('OpenAI 官方', 'https://api.openai.com/v1', 'gpt-4o-mini', '需自备网络环境'),
   ApiPreset('OpenRouter', 'https://openrouter.ai/api/v1',
       'deepseek/deepseek-chat', '聚合全球模型（含免费额度）'),
   ApiPreset('OpenCode Go', 'https://opencode.ai/zen/go/v1', 'glm-5.3-flash',
       'Go 订阅（\$10/月），点「选择模型」可列出全部'),
-  ApiPreset('本地 Ollama', 'http://localhost:11434/v1', 'llama3.1',
-      '本地部署，需自行启动服务'),
+  ApiPreset(
+      '本地 Ollama', 'http://localhost:11434/v1', 'llama3.1', '本地部署，需自行启动服务'),
   // 自定义：不自动填端点/模型，用户手填任意官方或第三方地址
   ApiPreset('自定义', '', '', '手动填写接口地址', isCustom: true),
 ];
@@ -65,7 +63,8 @@ enum AnalysisDetail {
 }
 
 class AppSettings {
-  static const String defaultApiEndpoint = 'https://api.deepseek.com/v1/chat/completions';
+  static const String defaultApiEndpoint =
+      'https://api.deepseek.com/v1/chat/completions';
   static const String defaultModel = 'deepseek-chat';
 
   String apiKey;
@@ -78,6 +77,9 @@ class AppSettings {
   AnalysisDetail analysisDetail; // AI 回答详细程度（默认简洁）
   bool keywordHighlight; // AI 回答关键词高亮（默认开启）
 
+  /// 老吴模式：点 Logo 不弹语录、改放一段音频（2026-10-09 用户需求）
+  bool laoWuMode;
+
   AppSettings({
     this.apiKey = '',
     this.apiEndpoint = defaultApiEndpoint,
@@ -88,6 +90,7 @@ class AppSettings {
     this.deviceName = '',
     this.analysisDetail = AnalysisDetail.brief,
     this.keywordHighlight = true,
+    this.laoWuMode = false,
   });
 
   bool get isConfigured => apiKey.isNotEmpty;
@@ -98,6 +101,7 @@ class AppSettings {
       'api_endpoint': apiEndpoint,
       'model': model,
       'sound_enabled': soundEnabled ? '1' : '0',
+      'lao_wu_mode': laoWuMode ? '1' : '0',
       'nickname': nickname,
       'auto_sync': autoSync ? '1' : '0',
       'device_name': deviceName,
@@ -134,6 +138,7 @@ class AppSettings {
     String? deviceName,
     AnalysisDetail? analysisDetail,
     bool? keywordHighlight,
+    bool? laoWuMode,
   }) {
     return AppSettings(
       apiKey: apiKey ?? this.apiKey,
@@ -145,6 +150,7 @@ class AppSettings {
       deviceName: deviceName ?? this.deviceName,
       analysisDetail: analysisDetail ?? this.analysisDetail,
       keywordHighlight: keywordHighlight ?? this.keywordHighlight,
+      laoWuMode: laoWuMode ?? this.laoWuMode,
     );
   }
 }

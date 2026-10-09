@@ -29,6 +29,27 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// ── ABI 过滤：把 Flutter 的 --target-platform 映射成 ndk.abiFilters ──────────
+// 为什么需要这一步：Flutter 的 --target-platform 只约束它自己的引擎库。
+// flutter.groovy 里仅在 --split-per-abi 时才设置 splits.abi，**从不设置
+// ndk.abiFilters**，于是插件 AAR 内自带的原生库会按全部 ABI 打进 APK。
+// 实测（2026-10-07）：`--target-platform android-arm64` 产出的包里，
+// libflutter.so / libapp.so 确实只有 arm64，但 pdfium 与 ML Kit OCR 仍带
+// x86 / x86_64 / armeabi-v7a 三份，白装约 19MB。
+//
+// 这里复用 Flutter 已经传入的同一个 target-platform 属性：构建哪些架构，
+// 就只装哪些架构。未传该属性时 requestedAbis 为空，行为与原来完全一致。
+def platformToAbi = [
+    'android-arm'  : 'armeabi-v7a',
+    'android-arm64': 'arm64-v8a',
+    'android-x86'  : 'x86',
+    'android-x64'  : 'x86_64',
+]
+def requestedPlatforms = project.findProperty('target-platform')
+def requestedAbis = requestedPlatforms == null
+    ? []
+    : requestedPlatforms.split(',').collect { platformToAbi[it.trim()] }.findAll { it != null }
+
 apply plugin: 'com.android.application'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
@@ -50,6 +71,13 @@ android {
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+
+        // 见文件顶部说明：只对本次真正要构建的架构打包原生库。
+        if (!requestedAbis.isEmpty()) {
+            ndk {
+                abiFilters.addAll(requestedAbis)
+            }
+        }
     }
 
     signingConfigs {
@@ -79,6 +107,15 @@ android {
             // R8 规则：ML Kit 未引入的语种包（见 proguard-rules.pro）。
             // 只追加一个文件，不覆盖 AGP 自带的默认规则集。
             proguardFile 'proguard-rules.pro'
+        }
+        profile {
+            // 2026-10-09 性能测量需要：profile 包默认用 debug 签名，而
+            // TamperCheck 只在 kDebugMode 跳过校验 —— 于是 profile 包一启动就
+            // 被判「安全警告」停在告警页，界面完全静止、拿不到任何帧数据
+            // （实测 40 秒只有 4 帧、全是启动帧）。
+            // 让 profile 也走正式签名，测量包才能真实跑起来；release 的保护
+            // 逻辑一点没动，只是多给开发者构建一种可用签名。
+            signingConfig signingConfigs.release
         }
     }
 }
