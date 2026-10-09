@@ -2,9 +2,8 @@
 # 猫卷 · 自动发版流水线
 # 放置位置：.github/workflows/release.yml
 #
-# 使用方式：本地打 tag 并推送，例如：
-#     git tag v1.28.1 && git push origin v1.28.1
-# 流程：tag 校验 → 构建 Android（arm64 + 通用）→ 构建 Windows（便携版 + 安装版）
+# 使用方式：在 Actions 页面手动运行本 workflow（workflow_dispatch）。
+# 流程：版本一致性校验 → 构建 Android（arm64 + 通用）→ 构建 Windows（便携版 + 安装版）
 #       → 汇总 SHA-256 → 创建 GitHub Release
 #
 # 需要配置的 Repository Secrets（Settings → Secrets and variables → Actions）：
@@ -25,9 +24,17 @@
 # ============================================================
 name: Release
 
+# 2026-10-10 改为手动触发（原来随 tag 自动跑）：
+#   这条通道目前还缺两个前提，未补齐时 tag 触发只会产出失败的红叉——
+#     ① Android 构建需要 4 个 Repository Secrets（ANDROID_KEYSTORE_BASE64 等），尚未配置；
+#     ② Windows 构建需要 runner 上有能被 CMake 识别的 Visual Studio
+#        （windows-latest 上实测报 "could not find any instance of Visual Studio"，回退到 VS 2019 名称）。
+#   另外 publish 用的是 gh release create：若本地已用 tools/publish_release.ps1 发过同名
+#   Release，这条通道再跑会因同名冲突而失败。
+#   结论：日常发版走 tools/publish_release.ps1（本地一条龙，含四维基线与签名核验）；
+#   需要无本地环境发版时，先补齐上面两项，再到 Actions 页面手动运行本 workflow。
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write   # 创建 Release 需要
