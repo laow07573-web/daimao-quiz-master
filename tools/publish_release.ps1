@@ -123,7 +123,10 @@ if (-not $SkipTests) {
 # ---- 3. build Windows + universal APK ------------------------------------------
 Step '3/8' 'building Windows + universal APK'
 $env:JAVA_HOME = 'D:\dev\jdk21'
-& flutter build apk --release --obfuscate --split-debug-info=build/symbols --dart-define=$appVersionDefine
+# 通用版只打 arm + arm64：x86 / x64 只有模拟器用得上，真实设备全是 arm。
+# 不传 --target-platform 会把它们一起打进来，实测 47 -> 64 MiB（还会触发
+# GitHub「单文件超过 50MB」的建议值警告）。
+& flutter build apk --release --obfuscate --split-debug-info=build/symbols --target-platform android-arm,android-arm64 --dart-define=$appVersionDefine
 if ($LASTEXITCODE -ne 0) { Fail 'universal APK build failed' }
 & flutter build windows --release --dart-define=$appVersionDefine
 if ($LASTEXITCODE -ne 0) { Fail 'Windows build failed' }
@@ -229,6 +232,20 @@ $promoText = [regex]::Replace($promoText, '(download/MaoJuan-)v[\d.]+(-windows-)
 # 配置块与下载链接都已是新版本，页面上却还写着旧版本号（肉眼最不容易发现的）。
 $promoText = [regex]::Replace($promoText, '(本地分发包\s*)v[\d.]+',
     ('${1}v' + $Version))
+# 四个下载卡片的体积文案同样会过期：按后面那句固定说明定位，只换前面的数字
+# （曾漏掉——脚本改了版本号却没改体积，页面上一边写 v1.29.0 一边写旧包的 MiB）。
+$sizeMap = [ordered]@{
+    'ARM64 设备'           = [math]::Round((Get-Item $apkArm64Dst).Length / 1MB, 1)
+    '不确定架构时选择'      = [math]::Round((Get-Item $apkUnivDst).Length / 1MB, 1)
+    'Win 10 / 11 · 64 位'  = [math]::Round((Get-Item $setupDst).Length / 1MB, 1)
+    '完整包，解压即用'      = [math]::Round((Get-Item $portableDst).Length / 1MB, 1)
+}
+foreach ($k in $sizeMap.Keys) {
+    $pattern = '[\d.]+( MiB · ' + [regex]::Escape($k) + ')'
+    # 必须显式格式化成一位小数：PowerShell 的 [math]::Round(33.0, 1) 会渲染成 "33"，
+    # 页面上就会出现「33 MiB」这种与其它三条不一致的写法。
+    $promoText = [regex]::Replace($promoText, $pattern, (([double]$sizeMap[$k]).ToString('0.0') + '${1}'))
+}
 [System.IO.File]::WriteAllText($promo, $promoText, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ("    promo/index.html synced to v{0} (sha256 + version + download names)" -f $Version)
 
@@ -267,7 +284,7 @@ $Note
 | 文件 | 大小 | 适用 |
 |---|---|---|
 | ``$apkArm64Name`` | 推荐 | 2017 年后绝大多数手机 |
-| ``$apkUnivName`` | 通用 | 含全部 CPU 架构，不确定机型时用 |
+| ``$apkUnivName`` | 通用 | 覆盖 32 位与 64 位 ARM 设备，不确定机型时用 |
 
 **Windows**
 
