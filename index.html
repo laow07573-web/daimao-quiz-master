@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>猫卷 — 把知识，学成自己的。</title>
+<meta name="description" content="猫卷，本地优先的开源学习工具。自建题库、AI 按题讲解、错题排期复习；无账号、无广告、无会员，Android 与 Windows 皆可用。">
+<link rel="icon" href="assets/brand.svg">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="canonical" href="https://laow07573-web.github.io/daimao-quiz-master/">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f4f1ea">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="猫卷">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:url" content="https://laow07573-web.github.io/daimao-quiz-master/">
+<meta property="og:title" content="猫卷 — 把知识，学成自己的。">
+<meta property="og:description" content="本地优先的开源学习工具。自建题库、按题讲解与错题复习。">
+<meta property="og:image" content="https://laow07573-web.github.io/daimao-quiz-master/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<script>
+/* 部署脚本（tools/deploy_promo.ps1 / deploy_pages.ps1）从这里读版本号
+   与资源名；即便当前页面不消费它，也不要删除，否则发布链路会直接报错。 */
+window.MAOJUAN = {
+   version:         "1.29.0",
+   buildDate:       "20261010",
+   /* Android：arm64 版 33.0MB，通用版 47.3MB —— 直接随页面同源分发。
+      GitHub Pages 单文件上限 100MB，两者都放得下，因此不需要网盘。
+      （若将来改用 Cloudflare Pages（单文件 25MB 上限），两个 Android 包都超过上限，
+        需要换网盘链接；Windows 两包在限内，可继续用 download/ 路径。） */
+   android:          "download/MaoJuan-v1.29.0-android-arm64.apk",
+   androidUniversal: "download/MaoJuan-v1.29.0-android-universal.apk",
+   windowsSetup:     "download/MaoJuan-v1.29.0-windows-setup.exe",
+   windowsPortable:  "download/MaoJuan-v1.29.0-windows-portable.zip",
+   githubRelease:    "https://github.com/laow07573-web/daimao-quiz-master/releases/latest",
+   repo:             "https://github.com/laow07573-web/daimao-quiz-master",
+   /* 页面展示用校验值快照；tools/publish_release.ps1 会在打包后按 dist 里的
+      真实产物就地改写这四个字段，因此平时不需要手改。 */
+   sha256: {
+     apk:      "e2eb1e8c62ed39b87a6f808205eac3af7580b396407e6d5a1c221eccf51ddf4f",
+     apkUniv:  "baf5c6d59e7766ce7d23c828c597238c54582f5264fb668b90a2204c7fea918b",
+     setup:    "f84e24ad2aca0a9e0ff871c6bb1d2c349f167e91cd3270e3614c41bcfb144adf",
+     portable: "5b79bf9c8364c7597d68510ab71ea0b89fdc9a0d3198bd34421773a8fe7e51d2"
+   }
+ };
+</script>
+<link rel="stylesheet" href="assets/swiss.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="mast">
+  <div class="wrap mast-in">
+    <a class="brand" href="#top" aria-label="猫卷 首页">
+      <svg viewBox="100 55 344 401" aria-hidden="true" focusable="false">
+        <path d="M124 178V84Q124 66 139 77L236 146H308L405 77Q420 66 420 84V342L326 436H162Q124 436 124 398Z" fill="currentColor"/>
+        <path d="M326 436V374Q326 342 358 342H420Z" fill="currentColor"/>
+        <path d="M190 227H224M320 227H354" fill="none" stroke="var(--paper)" stroke-width="22" stroke-linecap="round"/>
+        <path d="M259 264L272 277L285 264M190 329H267M190 367H240" fill="none" stroke="var(--paper)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <b>猫卷</b><span>MAOJUAN</span>
+    </a>
+
+    <nav class="mast-nav" aria-label="章节">
+      <a href="#intake"><i>01</i>三步</a>
+      <a href="#spec"><i>02</i>规格</a>
+      <a href="#screens"><i>03</i>界面</a>
+      <a href="#memo"><i>04</i>备忘</a>
+      <a href="#log"><i>05</i>记录</a>
+      <a href="#faq"><i>06</i>问题</a>
+    </nav>
+
+    <div class="mast-r">
+      <span class="ver">V <span data-ver="bare">1.29.0</span></span>
+      <a class="mast-cta" href="#download">获取安装包 <span class="arw" aria-hidden="true">↗</span></a>
+    </div>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+  <!-- ============ 封面 ============ -->
+  <section class="hero" id="top">
+    <div class="hero-lines" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+
+    <div class="wrap hero-in">
+      <div class="hero-top">
+        <span class="mono">本地优先的开源学习工具</span>
+        <span class="mono idx">MJ—1290 / 2026 / 第一册</span>
+      </div>
+
+      <h1 class="display hero-h" data-rise>
+        把知识，<span class="l2">学成自己的。</span>
+      </h1>
+
+      <div class="grid hero-bot">
+        <div class="c1-5">
+          <p class="lede" data-rise>资料是起点，理解才是目的。<br>把题库带进猫卷，一道一道理清。</p>
+          <div class="hero-act" data-rise>
+            <a class="btn" href="#download">获取安装包 <span class="arw" aria-hidden="true">↗</span></a>
+            <a class="link" href="#intake">阅读手册 <span class="arw" aria-hidden="true">↓</span></a>
+          </div>
+        </div>
+
+        <div class="c7-9">
+          <p class="small" data-rise>不需要账号，不插入广告，不收会员费。<br>题库与记录优先留在本机。</p>
+        </div>
+
+        <dl class="hero-meta c10-12" data-rise>
+          <div><dt>平台</dt><dd>Android · Windows</dd></div>
+          <div><dt>账号</dt><dd>无需注册</dd></div>
+          <div><dt>费用</dt><dd>无会员 · 无广告</dd></div>
+          <div><dt>授权</dt><dd>AGPL-3.0</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 01 三步 ============ -->
+  <section class="sec" id="intake">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>01</div>
+        <div class="c3-9">
+          <h2 class="sec-tit" data-rise>从自己的资料开始。</h2>
+        </div>
+        <p class="sec-lead c10-12" data-rise>不必在文档、笔记和错题本之间来回切换。每一次思考，都有地方留下来。</p>
+      </div>
+
+      <div class="grid sec-body steps">
+        <div class="c1-4" data-rise>
+          <div class="step-no">01</div>
+          <div class="step-en">Import</div>
+          <h3>带进来</h3>
+          <p class="body">JSON 直接导入；DOCX / PDF 交给你配置的 AI 解析，逐题校对后再入库。</p>
+          <div class="step-art">
+            <div class="files">
+              <b>.DOCX</b><b>.PDF</b><b>.JSON</b>
+              <span class="to" aria-hidden="true">→</span>
+              <em>题库</em>
+            </div>
+          </div>
+        </div>
+
+        <div class="c5-8" data-rise>
+          <div class="step-no">02</div>
+          <div class="step-en">Practice</div>
+          <h3>想明白</h3>
+          <p class="body">刷题、练习、背题三种模式；需要时逐题看 AI 讲解，结合上下文继续追问。</p>
+          <div class="step-art">
+            <div class="modes" role="group" aria-label="练习模式">
+              <button type="button" data-mode aria-pressed="true">刷题</button>
+              <button type="button" data-mode aria-pressed="false">练习</button>
+              <button type="button" data-mode aria-pressed="false">背题</button>
+            </div>
+            <p class="mode-copy" id="mode-copy" aria-live="polite">一题一屏，答完再看讲解。</p>
+          </div>
+        </div>
+
+        <div class="c9-12" data-rise>
+          <div class="step-no">03</div>
+          <div class="step-en">Recall</div>
+          <h3>再回看</h3>
+          <p class="body">按作答表现安排错题复习；按知识点看薄弱处，把批注留在题目旁边。</p>
+          <div class="step-art">
+            <div class="scale" aria-hidden="true">
+              <i><b>今天</b></i><i><b>3 天</b></i><i><b>7 天</b></i>
+            </div>
+            <p class="scale-note">按作答表现排期 · 复习不是盲目重刷</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 02 规格 ============ -->
+  <section class="sec" id="spec">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>02</div>
+        <div class="c3-9">
+          <h2 class="sec-tit" data-rise>不常提，但一直在。</h2>
+        </div>
+        <p class="sec-lead c10-12" data-rise>下面这些都已在当前版本里。不用装插件，也不用额外开会员。</p>
+      </div>
+
+      <div class="sec-body specs">
+        <div class="spec-row" data-rise>
+          <div class="no">02.1</div>
+          <div class="k">深色模式与三套主题</div>
+          <div class="v">清蓝、松绿、墨黑各含明暗两式，可跟随系统，也可以手动定住。</div>
+        </div>
+        <div class="spec-row" data-rise>
+          <div class="no">02.2</div>
+          <div class="k">错题导出打印稿</div>
+          <div class="v">错题可导出 JSON 继续整理，也可导出 Word 打印稿：答案印在题下，或统一放到末页。</div>
+        </div>
+        <div class="spec-row" data-rise>
+          <div class="no">02.3</div>
+          <div class="k">提醒与寒暑假</div>
+          <div class="v">本地排程的每日提醒；放假时一键暂停提醒与复习排期，连续记录不因此中断。</div>
+        </div>
+        <div class="spec-row" data-rise>
+          <div class="no">02.4</div>
+          <div class="k">键盘与命令面板</div>
+          <div class="v">答题与批注都有快捷键，另有命令面板（Ctrl / Cmd + K）直接跳到某个功能。</div>
+        </div>
+        <div class="spec-row" data-rise>
+          <div class="no">02.5</div>
+          <div class="k">年度坚持热力图</div>
+          <div class="v">按年回看每一天的投入，配合按题库与按知识点的正确率排行，找到该补的地方。</div>
+        </div>
+        <div class="spec-row" data-rise>
+          <div class="no">02.6</div>
+          <div class="k">内置示例题库</div>
+          <div class="v">不用准备资料也能先试：内置示例题库无需 Key、不用联网，装完就能刷。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 界面 ============ -->
+  <section class="sec" id="screens">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>03</div>
+        <div class="c3-9">
+          <h2 class="sec-tit" data-rise>打开以后，事情很清楚。</h2>
+        </div>
+        <p class="sec-lead c10-12" data-rise>从选题库到回看错题，把注意力留给真正要学的东西。</p>
+      </div>
+
+      <div class="grid sec-body plates">
+        <figure class="plate c1-4" data-rise>
+          <div class="plate-shot">
+            <img src="assets/shots/start.png" width="420" height="892" loading="lazy" decoding="async"
+                 alt="猫卷「快速开始」界面：定向爆破、管理题库、错题本、导入题库四个入口">
+          </div>
+          <figcaption>
+            <div class="plate-cap"><b>01 · 快速开始</b><span>START</span></div>
+            <p>定向爆破 · 管理题库 · 错题本 · 导入题库</p>
+          </figcaption>
+        </figure>
+
+        <figure class="plate c5-8" data-rise>
+          <div class="plate-shot">
+            <img src="assets/shots/errorbook.png" width="420" height="892" loading="lazy" decoding="async"
+                 alt="猫卷「错题本」界面：按知识点分组的薄弱清单与到期错题">
+          </div>
+          <figcaption>
+            <div class="plate-cap"><b>02 · 错题本</b><span>ERRORBOOK</span></div>
+            <p>智能排期 · 按知识点分组的薄弱清单</p>
+          </figcaption>
+        </figure>
+
+        <figure class="plate c9-12" data-rise>
+          <div class="plate-shot">
+            <img src="assets/shots/stats.png" width="420" height="892" loading="lazy" decoding="async"
+                 alt="猫卷「统计」界面：统计概览、年度坚持热力图、近一年趋势与正确率排行">
+          </div>
+          <figcaption>
+            <div class="plate-cap"><b>03 · 统计</b><span>STATS</span></div>
+            <p>年度热力图 · 趋势 · 正确率排行</p>
+          </figcaption>
+        </figure>
+      </div>
+
+      <p class="plates-note">界面截图按印刷规范去色，实际界面为浅色主题。数据仅作展示，具体以安装版本为准。</p>
+    </div>
+  </section>
+
+  <!-- ============ 04 备忘 ============ -->
+  <section class="sec" id="memo">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>04</div>
+        <div class="c3-11">
+          <h2 class="sec-tit" data-rise>学习资产，应该在你自己手里。</h2>
+        </div>
+      </div>
+
+      <div class="grid sec-body">
+        <div class="c1-7">
+          <p class="memo-big" data-rise>资料已经有了，<br>不该再被会员和账号拦住。</p>
+          <div class="memo-mark" data-rise><span class="sq" aria-hidden="true"></span><span>无账号 · 无广告 · 无会员</span></div>
+        </div>
+
+        <div class="c9-12 memo-side" data-rise>
+          <p class="body">猫卷希望把建题库、刷题和复习的主动权还给学习的人。无账号、无广告、无会员；题库与记录优先保存在本地，支持备份迁移与局域网同步。</p>
+          <p class="body">AI 是可选的工具，不是进入学习的门票。你选择模型与服务商，用自己的 Key；基础刷题、错题复习和统计无需 AI。</p>
+          <a class="link" href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">看看开源代码 <span class="arw" aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 05 记录 ============ -->
+  <section class="sec" id="log">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>05</div>
+        <div class="c3-9">
+          <h2 class="sec-tit" data-rise>小步改进，认真做题。</h2>
+        </div>
+        <p class="sec-lead c10-12" data-rise>依据更新日志与提交记录整理。开发进展与已发布版本分开看。</p>
+      </div>
+
+      <div class="sec-body log">
+        <div class="log-row" data-rise>
+          <div class="when"><i aria-hidden="true"></i>2026.06</div>
+          <div class="what">先让自己的资料刷起来</div>
+          <div class="note">从「呆猫刷题宝」开始，打通文档导入、AI 解析和错题重刷。</div>
+        </div>
+        <div class="log-row" data-rise>
+          <div class="when"><i aria-hidden="true"></i>2026.08</div>
+          <div class="what">成为猫卷</div>
+          <div class="note">完善数据管理，加入手写批注与宽屏布局。</div>
+        </div>
+        <div class="log-row" data-rise>
+          <div class="when"><i aria-hidden="true"></i>2026.09</div>
+          <div class="what">讲解和记录，更清楚</div>
+          <div class="note">v1.28 系列完善回答风格、追问对话与年度学习统计。</div>
+        </div>
+        <div class="log-row is-last" data-rise>
+          <div class="when"><i aria-hidden="true"></i>2026.10</div>
+          <div class="what">让第一次使用更简单</div>
+          <div class="note">新增互动式首次使用引导（13 步，会跟着你进二级页）；PDF 导入会保留原文配图；扫描件在 Android 上走端上离线 OCR 识别。</div>
+        </div>
+        <p class="log-foot">开发进展与已发布版本分开看：仓库可能比安装包更新。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 问题 ============ -->
+  <section class="sec" id="faq">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>06</div>
+        <div class="c3-9">
+          <h2 class="sec-tit" data-rise>先把话说清楚。</h2>
+        </div>
+        <p class="sec-lead c10-12" data-rise>安装包、Key 与数据边界，都在这里。</p>
+      </div>
+
+      <div class="sec-body faq">
+        <details data-rise>
+          <summary>
+            <span class="qno">Q-01</span>
+            <span class="q">没有 API Key，可以用吗？</span>
+            <span class="sign" aria-hidden="true">+</span>
+          </summary>
+          <p class="ans">可以。JSON 和内置示例题库无需 Key。刷题、错题复习、手写批注与本地统计也无需 Key。DOCX / PDF 解析及 AI 讲解、追问需联网并配置 Key。</p>
+        </details>
+
+        <details data-rise>
+          <summary>
+            <span class="qno">Q-02</span>
+            <span class="q">免费使用，包括 AI 费用吗？</span>
+            <span class="sign" aria-hidden="true">+</span>
+          </summary>
+          <p class="ans">App 免费，不收会员费。AI 服务由你选择的服务商提供，可能按其定价产生费用，猫卷不承担模型调用费用。</p>
+        </details>
+
+        <details data-rise>
+          <summary>
+            <span class="qno">Q-03</span>
+            <span class="q">学习数据会发送出去吗？</span>
+            <span class="sign" aria-hidden="true">+</span>
+          </summary>
+          <p class="ans">核心记录默认保存在设备本地。使用 AI 时，相关题目和认证信息会发给你配置的服务商。局域网同步不经过云端。</p>
+        </details>
+
+        <details data-rise>
+          <summary>
+            <span class="qno">Q-04</span>
+            <span class="q">PDF 和间隔复习有哪些边界？</span>
+            <span class="sign" aria-hidden="true">+</span>
+          </summary>
+          <p class="ans">PDF 与 DOCX 一样，需先配置 Key 才能解析（JSON 与内置示例题库不需要）；无文字层的扫描件在 Android 上走端上离线 OCR，不需要联网、也不占 API 额度；Windows 上改走在线多模态视觉切题，需要联网并消耗 API 额度。错题排期采用 FSRS-5 简化实现，不承诺记忆率或考试结果。</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 07 下载 ============ -->
+  <section class="sec" id="download">
+    <div class="wrap">
+      <div class="grid sec-head">
+        <div class="c1-2 sec-num" data-rise>07</div>
+        <div class="c3-9">
+          <h2 class="sec-tit" data-rise>下一道题，按你的节奏来。</h2>
+        </div>
+        <p class="sec-lead c10-12 dl-lede" data-rise>本地分发包 v1.29.0，随站点提供下载。<br>不等同于最新开发源码，更新前建议备份。</p>
+      </div>
+
+      <table class="cargo">
+        <caption>安装包 / PACKAGES</caption>
+        <thead>
+          <tr><th scope="col">平台</th><th scope="col">包</th><th scope="col">体积 · 说明</th><th scope="col">校验</th></tr>
+        </thead>
+        <tbody>
+          <tr class="is-pick">
+            <td class="plat">Android</td>
+            <td><a class="pkg" href="download/MaoJuan-v1.29.0-android-arm64.apk">ARM64 版</a><span class="badge">手机首选</span></td>
+            <td class="size">33.0 MiB · ARM64 设备</td>
+            <td class="chk"><a href="download/manifest.json">SHA-256</a></td>
+          </tr>
+          <tr>
+            <td class="plat">Android</td>
+            <td><a class="pkg" href="download/MaoJuan-v1.29.0-android-universal.apk">通用版</a></td>
+            <td class="size">47.3 MiB · 不确定架构时选择</td>
+            <td class="chk"><a href="download/manifest.json">SHA-256</a></td>
+          </tr>
+          <tr>
+            <td class="plat">Windows</td>
+            <td><a class="pkg" href="download/MaoJuan-v1.29.0-windows-setup.exe">安装版</a></td>
+            <td class="size">22.8 MiB · Win 10 / 11 · 64 位</td>
+            <td class="chk"><a href="download/manifest.json">SHA-256</a></td>
+          </tr>
+          <tr>
+            <td class="plat">Windows</td>
+            <td><a class="pkg" href="download/MaoJuan-v1.29.0-windows-portable.zip">便携版</a></td>
+            <td class="size">26.7 MiB · 完整包，解压即用</td>
+            <td class="chk"><a href="download/manifest.json">SHA-256</a></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="dl-foot">
+        <a href="download/manifest.json">文件大小与 SHA-256 校验</a>
+        <a href="https://github.com/laow07573-web/daimao-quiz-master/releases/latest" target="_blank" rel="noopener">更多版本与发布说明 ↗</a>
+        <span>当前版本 <span data-ver="bare">1.29.0</span> · 2026.10</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="grid foot-top">
+      <div class="c1-5 foot-brand">
+        <b>猫卷</b>
+        <p>把知识，学成自己的。</p>
+        <span class="mono">MJ—1290 · 学习器材 · REV <span data-ver="bare">1.29.0</span></span>
+      </div>
+
+      <div class="c6-7 foot-col">
+        <h3>手册</h3>
+        <a href="#intake">三步</a>
+        <a href="#spec">规格</a>
+        <a href="#screens">界面</a>
+        <a href="#memo">备忘</a>
+        <a href="#log">记录</a>
+        <a href="#faq">问题</a>
+      </div>
+
+      <div class="c8-9 foot-col">
+        <h3>项目</h3>
+        <a href="https://github.com/laow07573-web/daimao-quiz-master" target="_blank" rel="noopener">GitHub ↗</a>
+        <a href="https://github.com/laow07573-web/daimao-quiz-master/releases" target="_blank" rel="noopener">发布记录 ↗</a>
+        <a href="https://space.bilibili.com/432211049" target="_blank" rel="noopener">B 站 ↗</a>
+      </div>
+
+      <div class="c10-12 foot-col">
+        <h3>声明</h3>
+        <span>开发者：笨蛋鱼坏蛋猫</span>
+        <span>AGPL-3.0 开源</span>
+        <span>AI 服务与费用由所选服务商提供</span>
+      </div>
+    </div>
+
+    <div class="foot-bottom">
+      <span>© 2026 笨蛋鱼坏蛋猫 · AGPL-3.0</span>
+      <span>本页随版本更新 · 下载包体积以发布页为准</span>
+      <a href="#top">回到顶部 ↑</a>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/swiss.js" defer></script>
+</body>
+</html>

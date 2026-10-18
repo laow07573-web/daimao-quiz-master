@@ -1,0 +1,15 @@
+{
+  "name": "猫卷",
+  "short_name": "猫卷",
+  "description": "本地优先的开源学习工具。自建题库、按题讲解与错题复习。",
+  "lang": "zh-CN",
+  "start_url": "/daimao-quiz-master/",
+  "scope": "/daimao-quiz-master/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#f4f1ea",
+  "icons": [
+    { "src": "assets/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "assets/brand.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

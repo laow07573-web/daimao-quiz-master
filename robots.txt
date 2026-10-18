@@ -1,0 +1,5 @@
+﻿User-agent: *
+Allow: /
+Disallow: /download/
+
+Sitemap: https://laow07573-web.github.io/daimao-quiz-master/sitemap.xml

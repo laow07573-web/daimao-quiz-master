@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>页面不存在 · 猫卷</title>
+<meta name="description" content="这个地址没有对应的页面。回到猫卷首页，继续按自己的节奏来。">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f4f1ea">
+<!-- GitHub Pages 会把 404.html 挂在请求路径上渲染，因此这里所有 URL 必须是根绝对路径，
+     相对路径（assets/…、./）在 /daimao-quiz-master/foo/bar 这类地址下会解析到错误目录。 -->
+<link rel="icon" href="/daimao-quiz-master/assets/brand.svg" type="image/svg+xml">
+<link rel="icon" href="/daimao-quiz-master/favicon.png" sizes="any">
+<style>
+:root{
+  color-scheme:light;
+  --paper:#f4f1ea;--ink:#111;--ink-2:#2b2b2b;
+  --mute:rgba(17,17,17,.64);--rule:rgba(17,17,17,.2);--rule-2:rgba(17,17,17,.12);
+  --red:#c6200f;
+  --sans:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Source Han Sans SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Menlo,Consolas,monospace;
+  --pad:clamp(18px,4vw,72px);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;min-height:100dvh;background:var(--paper);color:var(--ink);
+  font:16px/1.75 var(--sans);-webkit-font-smoothing:antialiased;overflow-wrap:break-word;
+  display:flex;flex-direction:column
+}
+p,h1,dl,dd{margin:0}
+a{color:inherit}
+.mono{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+.bar{
+  border-bottom:1px solid var(--ink);padding:14px var(--pad);
+  display:flex;align-items:center;justify-content:space-between;gap:20px
+}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+.brand svg{width:20px;height:20px;display:block}
+.brand b{font-size:15px;letter-spacing:0}
+.brand .mono{font-size:9px;letter-spacing:.18em;color:var(--mute)}
+.bar .err{color:var(--red)}
+main{flex:1}
+.wrap{max-width:1440px;margin:0 auto;padding:clamp(40px,7vw,96px) var(--pad) clamp(40px,7vw,88px)}
+.kicker{display:flex;align-items:center;gap:9px;padding-top:14px;border-top:1px solid var(--ink)}
+.kicker i{width:7px;height:7px;background:var(--red);display:inline-block}
+.kicker span{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink)}
+.code{font-size:clamp(88px,17vw,190px);line-height:.94;letter-spacing:.01em;font-weight:700;margin:clamp(16px,3vw,30px) 0 0}
+h1{font-size:clamp(28px,4.4vw,54px);line-height:1.14;font-weight:700;letter-spacing:-.005em;margin:clamp(6px,1.2vw,14px) 0 0}
+.lead{margin-top:clamp(16px,2vw,24px);max-width:44ch;font-size:13.5px;line-height:1.8;color:var(--ink-2)}
+.actions{display:flex;align-items:center;gap:26px;flex-wrap:wrap;margin-top:clamp(24px,3.4vw,40px)}
+.btn{
+  display:inline-flex;align-items:center;gap:10px;padding:11px 18px;
+  background:var(--ink);color:var(--paper);text-decoration:none;
+  font-size:13px;font-weight:700;line-height:1.2;letter-spacing:.01em;transition:background .16s
+}
+.btn:hover{background:var(--red)}
+.btn:active{transform:translateY(1px)}
+.link{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-size:13px;padding-bottom:2px;border-bottom:1px solid var(--rule);transition:color .16s,border-color .16s}
+.link:hover{color:var(--red);border-bottom-color:var(--red)}
+.spec{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:clamp(40px,6vw,72px);border-top:1px solid var(--rule)}
+.spec div{padding:12px 18px 0 0;border-right:1px solid var(--rule-2)}
+.spec div:last-child{border-right:0}
+.spec dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--mute);text-transform:uppercase}
+.spec dd{margin-top:5px;font-size:13px;font-weight:700}
+footer{padding:16px var(--pad);border-top:1px solid var(--ink)}
+footer .row{max-width:1440px;margin:0 auto;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:baseline}
+footer a{text-decoration:none;border-bottom:1px solid var(--rule)}
+@media (max-width:620px){
+  .spec{grid-template-columns:1fr}
+  .spec div{border-right:0;border-bottom:1px solid var(--rule-2);padding:12px 0}
+  .spec div:last-child{border-bottom:0}
+  .actions{gap:18px}
+  .brand .mono{display:none}
+  footer .row{flex-direction:column;gap:6px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="/daimao-quiz-master/">
+    <svg viewBox="100 55 344 401" aria-hidden="true"><path fill="currentColor" d="M124 55h296a24 24 0 0 1 24 24v329a24 24 0 0 1-24 24H124a24 24 0 0 1-24-24V79a24 24 0 0 1 24-24Z"/><path fill="none" stroke="#f4f1ea" stroke-width="22" stroke-linecap="round" d="M190 227h34M320 227h34"/><path fill="none" stroke="#f4f1ea" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" d="M259 264l13 13 13-13M190 329h77M190 367h50"/></svg>
+    <b>猫卷</b><span class="mono">MAOJUAN · MJ—1290</span>
+  </a>
+  <span class="mono err">ERR / 404</span>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="kicker"><i aria-hidden="true"></i><span>页面缺失 · NOT FOUND</span></div>
+    <p class="code" aria-hidden="true">404</p>
+    <h1>这个页面不存在。</h1>
+    <p class="lead">链接可能已经失效，或者地址输错了。回到封面，从头看看猫卷能做什么——资料、讲解、复习，都还在原处。</p>
+    <div class="actions">
+      <a class="btn" href="/daimao-quiz-master/">回到封面 <span aria-hidden="true">↗</span></a>
+      <a class="link" href="/daimao-quiz-master/#download">获取安装包 <span aria-hidden="true">↓</span></a>
+    </div>
+    <dl class="spec">
+      <div><dt>请求</dt><dd>此地址无对应页面</dd></div>
+      <div><dt>建议</dt><dd>回到封面重选入口</dd></div>
+      <div><dt>手册</dt><dd>MJ—1290 · 学习器材</dd></div>
+    </dl>
+  </div>
+</main>
+
+<footer>
+  <div class="row">
+    <span class="mono">猫卷 · 做题有数，学习有度。</span>
+    <span class="mono">END OF PAGE · 404</span>
+    <a class="mono" href="/daimao-quiz-master/">返回封面 ↑</a>
+  </div>
+</footer>
+
+</body>
+</html>

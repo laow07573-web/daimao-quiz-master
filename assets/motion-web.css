@@ -1,0 +1,280 @@
+/* ============================================================================
+   猫卷官网 · motion-web 动效层
+   ----------------------------------------------------------------------------
+   在 assets/studio.css 之后加载，只做三件事：
+     1. 建立动效令牌（时长 / 缓动），让全站节奏可统一调
+     2. 修掉既有动效的三个缺陷（硬跳的 hover、同步摆动的纸张、切换缺过渡）
+     3. 把「全页同一个 fade-up」换成有编排的入场 —— 不同区块走不同到达方式
+   不改版式、不改色彩、不改文案、不覆盖既有的悬停配色；只碰
+   transform / opacity / clip-path 三个属性。
+   ========================================================================= */
+
+/* ── 1. 动效令牌 ─────────────────────────────────────────────────────────── */
+:root{
+  --dur-instant:   90ms;    /* 指针按下的即时反馈 */
+  --dur-fast:     170ms;    /* hover / 按钮 / 链接 */
+  --dur-standard: 320ms;    /* 卡片落位、界面切换 */
+  --dur-medium:   460ms;    /* 区块揭示（滚动触发） */
+  --dur-slow:     760ms;    /* 整段进入 */
+
+  --ease-out-expo:     cubic-bezier(.16, 1, .3, 1);       /* 揭示默认 */
+  --ease-out-quart:    cubic-bezier(.25, 1, .5, 1);
+  --ease-out-circ:     cubic-bezier(0, .55, .45, 1);      /* 干脆、机械感 */
+  --ease-out-back:     cubic-bezier(.34, 1.56, .64, 1);   /* 落位带一点回弹 */
+  --ease-in-out-quart: cubic-bezier(.76, 0, .24, 1);
+
+  --stagger: 80ms;          /* 列表依次入场的间隔 */
+}
+
+/* ── 2. 基础修整（只补细节，不动布局） ───────────────────────────────────── */
+:root{ color-scheme: light }          /* 承诺浅色：原生控件/滚动条不再按暗色渲染 */
+html{ scrollbar-gutter: stable }      /* 有无滚动条都不跳 */
+::selection{ background:#243d35; color:#f7f6f0 }
+a{ text-underline-offset:.18em }
+a,button{ -webkit-tap-highlight-color:transparent }
+
+/* ── 3. 缺陷修复 ─────────────────────────────────────────────────────────── */
+
+/* 3.1 主按钮原本只过渡 background，位移是硬跳的。
+       补齐 transform / box-shadow；按下给一个真实的即时反馈。 */
+.button{
+  transition:
+    background var(--dur-fast) var(--ease-out-circ),
+    transform  var(--dur-fast) var(--ease-out-back),
+    box-shadow var(--dur-fast) var(--ease-out-circ);
+}
+.button:hover{ transform:translateY(-2px); box-shadow:0 10px 22px #243d3521 }
+.button:active{
+  transform:translateY(0) scale(.985);
+  box-shadow:none;
+  transition-duration:var(--dur-instant);
+}
+
+/* 3.2 两张纸原本同为 8s ease-in-out，会像一整块在摆。
+       错开周期与相位之后才读成各自漂浮。 */
+.paper-back{  animation-duration:9.5s }
+.paper-front{ animation-duration:12.4s; animation-delay:-3.1s }
+
+/* 3.3 圆图章原本完全静止，和漂浮的纸并置会显得是"贴上去的"。
+       给一个比纸更慢、幅度更小的浮动。 */
+.round-stamp{ animation:mw-stamp-float 15.5s var(--ease-in-out-quart) infinite; animation-delay:-6s }
+@keyframes mw-stamp-float{
+  0%,100%{ transform:rotate(15deg)   translateY(0) }
+  50%    { transform:rotate(13.6deg) translateY(-4px) }
+}
+
+/* 3.4 界面切换：原来是新图套用通用 enter，起手太透明、像闪了一下。
+       换成"轻微推近 + 淡入"，更像换了一页而不是重绘了一张图。 */
+#screen.changing{ animation:mw-screen-in var(--dur-standard) var(--ease-out-expo) both }
+@keyframes mw-screen-in{
+  from{ opacity:.35; transform:translateY(6px) scale(.994) }
+  to  { opacity:1;   transform:none }
+}
+
+/* ── 4. 入场编排：不同区块不同到达方式 ─────────────────────────────────────
+   技能点名的失败模式是「用同一段 fade-up 铺满全页」——那等于没有层级。
+   所以：① 先撤掉 studio.css 的统一 enter；② 每个区块的到达方式各不相同；
+        ③ 留出完全不做动效的安静带。
+   ------------------------------------------------------------------------ */
+.reveal-on{ animation:none }        /* 撤掉旧的统一入场 */
+
+/* 4.1 区块标题：幕帘揭开（自上而下裁切 + 轻微位移），像被展开而不是被淡入 */
+.section-head.reveal-on{ animation:mw-curtain var(--dur-medium) var(--ease-out-expo) both }
+@keyframes mw-curtain{
+  from{ clip-path:inset(0 0 100% 0); transform:translateY(14px) }
+  to  { clip-path:inset(0 0 0 0);    transform:none }
+}
+
+/* 4.2 三张流程卡：依次升起（stagger），不是一起冒出来 */
+.flow article.reveal-on{ animation:mw-rise var(--dur-medium) var(--ease-out-expo) both }
+.flow article:nth-child(1){ animation-delay:0ms }
+.flow article:nth-child(2){ animation-delay:var(--stagger) }
+.flow article:nth-child(3){ animation-delay:calc(var(--stagger) * 2) }
+@keyframes mw-rise{
+  from{ opacity:0; transform:translateY(18px) }
+  to  { opacity:1; transform:none }
+}
+
+/* 4.3 时间线：从左向右侧推入，呼应「一点点长成」的推进感 */
+.history li.reveal-on{ animation:mw-push var(--dur-medium) var(--ease-out-quart) both }
+.history li:nth-child(1){ animation-delay:0ms }
+.history li:nth-child(2){ animation-delay:calc(var(--stagger) * .75) }
+.history li:nth-child(3){ animation-delay:calc(var(--stagger) * 1.5) }
+.history li:nth-child(4){ animation-delay:calc(var(--stagger) * 2.25) }
+@keyframes mw-push{
+  from{ opacity:0; transform:translateX(-16px) }
+  to  { opacity:1; transform:none }
+}
+
+/* 4.4 产品区的界面按钮：依次亮起（深色通栏里的一个小节拍） */
+.screen-buttons.reveal-on button{ animation:mw-rise var(--dur-standard) var(--ease-out-expo) both }
+.screen-buttons.reveal-on button:nth-child(1){ animation-delay:0ms }
+.screen-buttons.reveal-on button:nth-child(2){ animation-delay:calc(var(--stagger) * .6) }
+.screen-buttons.reveal-on button:nth-child(3){ animation-delay:calc(var(--stagger) * 1.2) }
+
+/* 4.5 下载卡：依次落位，带一点回弹 —— 全页唯一有弹性的地方，
+       因为它确实是"可以拿走"的东西。原有的悬停底色保持不变，只补箭头位移。 */
+.downloads.reveal-on a{ animation:mw-land var(--dur-standard) var(--ease-out-back) both }
+.downloads a:nth-child(1){ animation-delay:0ms }
+.downloads a:nth-child(2){ animation-delay:calc(var(--stagger) * .6) }
+.downloads a:nth-child(3){ animation-delay:calc(var(--stagger) * 1.2) }
+.downloads a:nth-child(4){ animation-delay:calc(var(--stagger) * 1.8) }
+@keyframes mw-land{
+  from{ opacity:0; transform:translateY(20px) }
+  to  { opacity:1; transform:none }
+}
+
+/* 4.6 安静带：宣言条、关于区与页脚不做任何入场。
+       全页都在动 = 动效没有层级，和字体没有层级一样糟。 */
+.manifesto, .about-grid, footer{ animation:none !important }
+
+/* ── 5. 悬停体系：各给各的反馈，不做「全站统一上浮」 ───────────────────────
+   同一个 translateY(-4px)+阴影 作用于一切 = 什么都没表达。
+   ------------------------------------------------------------------------ */
+
+/* 导航链接：下划线从左展开 */
+nav > a:not(.nav-get){ position:relative; padding-block:4px }
+nav > a:not(.nav-get)::after{
+  content:''; position:absolute; left:0; right:0; bottom:0; height:1px;
+  background:currentColor; transform:scaleX(0); transform-origin:left;
+  transition:transform var(--dur-fast) var(--ease-out-expo);
+}
+nav > a:not(.nav-get):hover::after{ transform:scaleX(1) }
+
+/* 当前所在区块：下划线常驻 + 字重加深（由 motion-web.js 打 aria-current） */
+nav > a[aria-current]{ color:#243d35; font-weight:600 }
+nav > a[aria-current]::after{ transform:scaleX(1) }
+
+/* 导航 CTA：整块填色（与主按钮的动作区分开，不重复"上浮"） */
+.nav-get{ transition:background var(--dur-fast) var(--ease-out-circ), color var(--dur-fast) var(--ease-out-circ) }
+.nav-get:hover{ background:#243d35; color:#f7f6f0 }
+
+/* 文本链接：颜色加深，箭头右移一点 */
+.text-link{ transition:color var(--dur-fast) var(--ease-out-circ), border-color var(--dur-fast) var(--ease-out-circ) }
+.text-link:hover{ color:#243d35; border-color:#243d35 }
+.download-extra a{ transition:color var(--dur-fast) var(--ease-out-circ) }
+.download-extra a:hover{ color:#c0552d }
+
+/* 下载卡：只让"标题+箭头"右移（底色变化沿用原有规则，不覆盖） */
+.downloads a h3{ transition:transform var(--dur-fast) var(--ease-out-expo) }
+.downloads a:hover h3{ transform:translateX(4px) }
+
+/* 产品区界面按钮：左侧指示条自上落下 */
+.screen-buttons button{ position:relative }
+.screen-buttons button::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:#d6ddbc; transform:scaleY(0); transform-origin:top;
+  transition:transform var(--dur-fast) var(--ease-out-expo);
+}
+.screen-buttons button:hover::before{ transform:scaleY(1) }
+
+/* 触屏没有 hover，位移只对真指针设备生效；:active 在所有设备都保留 */
+@media (hover:none){
+  .button:hover{ transform:none; box-shadow:none }
+  .downloads a:hover h3{ transform:none }
+}
+
+/* ── 6. 减动效：永远放最后。 ───────────────────────────────────────────────
+   关键帧在这里被撤掉后，元素回到**普通 CSS 的终态**——因此上面每一段入场
+   都必须让「没有动画」等于「已经到位」，绝不能把内容留在 opacity:0 上。
+   ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+  html{ scroll-behavior:auto }
+  .reveal-on, .reveal-on *{ animation:none !important; clip-path:none !important }
+  .round-stamp{ transform:rotate(15deg) !important }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7. 审计修复（2026-10-10）
+   以下每条的数值都来自真实浏览器的实测（getComputedStyle + WCAG 相对亮度、
+   getBoundingClientRect 几何），不是目测。
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* 7.1 对比度：四处小字不足 AA（括号内为实测比值 → 修后比值） */
+.step, .history time{ color:#ad4a22 }        /* #c0552d 对纸底 4.24 → 5.13 */
+.downloads span{ color:#465e3c }             /* #55704b 对 #e0e7d6 4.35 → 5.66 */
+.paper-back > span{ color:#6b7263 }          /* #7d8574 对纸白 3.79 → 4.62 */
+.text-link{ border-bottom-color:#5f7364 }    /* #899a8b 对纸底 2.75 → 3.55 */
+
+/* 7.2 深色通栏里的焦点环：原 #c0552d 对 #203d34 只有 2.57，低于非文本 3:1 */
+.product :focus-visible{ outline-color:#f0b48f }   /* 对 #203d34 = 6.54 */
+
+/* 7.3 320px 下 hero 台面内部重叠 —— 纸片压住 .desk-bottom 里的暂停按钮。
+   实测修前：.paper-front 底边 418px、.desk-bottom 顶边 384px，GAP = −34。
+   注意：7.5 给 #motion 加了 min-height:44px（原 30px），按钮自身长高会把
+   .desk-bottom 的顶边再往下推 14px，所以 462 仍差 7.7px；取 480 留出余量。 */
+@media (max-width:430px){ .desk{ height:480px } }
+
+/* 7.4 横向溢出兜底 + 两处裸 1fr（当前实测无溢出，这是防止将来内容变宽） */
+html, body{ overflow-x:clip }
+@media (max-width:1050px){
+  .history ol{ grid-template-columns:repeat(2, minmax(0, 1fr)) }
+  .downloads{ grid-template-columns:repeat(2, minmax(0, 1fr)) }
+}
+
+/* 7.5 触控目标：实测 375px 下 26 个可点元素里有 15 个不足 44px */
+.nav-get, .text-link, .download-extra a{ min-height:44px; display:inline-flex; align-items:center }
+#motion{ min-height:44px; padding:6px 10px }
+.mode-picker button{ min-height:44px }
+.faq summary{ padding:7px 0 }               /* summary 不能改 display:flex，会吃掉展开三角 */
+footer a{ min-height:44px; display:inline-flex; align-items:center }
+
+/* 7.6 字号：装饰层出现过 9–10px，辅助文字 11px 也偏小 */
+.desk-bottom, .paper-top, .review-note small, .stage-label{ font-size:11px }
+@media (max-width:760px){
+  .downloads small, .stage-note, .history time, footer small{ font-size:13px }
+}
+
+/* 7.7 按下反馈：全站去掉了 tap-highlight，但此前只有 .button 有 :active */
+.downloads a:active,
+.mode-picker button:active,
+.screen-buttons button:active,
+.nav-get:active,
+.faq summary:active,
+footer a:active,
+.text-link:active{ transform:scale(.985); transition-duration:var(--dur-instant) }
+
+/* 7.8 触屏没有 hover，但 768px 的触屏平板落在 ≤760 断点之外，
+       导航链接仍是 34px 高 —— 单独补一档 */
+@media (max-width:768px){
+  nav > a:not(.nav-get){ min-height:44px; display:inline-flex; align-items:center }
+}
+
+
+/* 7.9 「还有一些顺手的地方」小节的网格（与站内既有的细描边风格一致） */
+.extras-grid{
+  list-style:none; margin:0; padding:0;
+  display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:0; border-top:1px solid #d9dfd5;
+}
+.extras-grid > li{
+  padding:26px 24px 28px 0; border-right:1px solid #d9dfd5; margin-right:24px;
+}
+.extras-grid > li:nth-child(3n){ border-right:0; margin-right:0; padding-right:0 }
+.extras-grid h3{ font-size:19px; margin:0 0 10px; font-weight:700 }
+.extras-grid p{ font-size:14px; line-height:1.7; margin:0; color:#5a6b62 }
+@media (max-width:1050px){
+  .extras-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)) }
+  .extras-grid > li:nth-child(3n){ border-right:1px solid #d9dfd5; margin-right:24px; padding-right:24px }
+  .extras-grid > li:nth-child(2n){ border-right:0; margin-right:0; padding-right:0 }
+}
+@media (max-width:760px){
+  .extras-grid{ grid-template-columns:1fr }
+  .extras-grid > li,
+  .extras-grid > li:nth-child(3n){ border-right:0; margin-right:0; padding:22px 0; border-bottom:1px solid #d9dfd5 }
+  .extras-grid > li:last-child{ border-bottom:0 }
+}
+
+
+/* 7.10 hero 装饰纸片的标题原本是真 <h3>，出现在任何 <h2> 之前造成 h1→h3 跳级。
+   它们只是功能示意的 mockup 文案，改成 <p> 后原样保留观感即可。
+   （保留 studio.css 里 h3 的那几档字号，包括两个断点的降级。） */
+.paper-title{ font-size:25px; margin:12px 0; font-weight:700; color:#243d35 }
+.paper-front .paper-title{ font-size:29px; line-height:1.45; margin:18px 0 }
+@media (max-width:1050px){ .paper-front .paper-title{ font-size:25px } }
